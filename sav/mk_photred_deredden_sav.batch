@@ -1,0 +1,9 @@
+;cd,'/net/home/dln5q/idl/'
+cd,'~/idl/'
+resolve_routine,'matchstars',/compile_full_file
+.r photred_deredden
+resolve_all
+;save,/routines,file='/net/home/dln5q/photred/sav/photred_deredden.sav'
+save,/routines,file='~/photred/sav/photred_deredden.sav'
+
+

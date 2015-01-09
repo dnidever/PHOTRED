@@ -1,0 +1,1097 @@
+;+
+;
+; PHOTCALIB
+;
+; This is a modified version of Mike Siegel's MAGMA program that
+; calibrates raw photometry.  MAGMA is very versatile and can
+; average multiple exposures per band, offsets, variables stars
+; and the more.  PHOTCALIB just calibrates raw photometry
+; non-interactively.  If you need more than that then you should
+; probably use MAGMA instead.
+; This is an updated version of MSCMAGMA.PRO
+;
+; While the original MAGMA took minutes to run, PHOTCALIB has
+; been "vectorized" and runs in just a few seconds.
+;
+; INPUTS:
+;  inpfile    This is an input file that lists information about
+;             the raw photometry files.  You can calibrate many
+;             raw photometry files at once.  Each file needs its
+;             own line in the input file that has the following
+;             information:
+;
+;             raw photometry filename, Band1 name, Band1 airmass,
+;             Band1 exptime, Band1 aperture correction, Band2 ...
+;             The aperture corrections need to be POSITIVE!!
+;
+; This is an example inpfile:
+; obj1110_1.raw  I  1.7270  90.0  0.0141  M  1.6960  60.0  0.0081  D  1.7040  420.0  0.0079
+;
+;             The input files can easily be generated with the
+;             MSCMAGMA_PREP.PRO program.
+;
+;             The raw photometry files are assumed to be in
+;             the DAOMASTER format:
+;             -The first three lines are a header, and are skipped
+;             -Each star has a separate line with the format:
+;              ID, X, Y, Band1, Band1 error, Band2, Band2 error, ...
+;               chi, sharp
+;
+;             The raw files can have as many bands as you like,
+;             but otherwise they must conform to this format.
+;
+;
+;  transfile  This gives the transformation information needed
+;             to calibrate the raw photometry.  Normally there
+;             is a different one of these for every night.
+;
+;             There need to be two lines per band.
+;             FIRST line:  band name,  color name, transformation
+;             equation coefficients (zero point, airmass, color
+;             airmass*color, color^2)
+;             SECOND line: errors in the transformation equation
+;             coefficients
+;
+;     This is an example transfile:
+;     M    M-T  -0.9990    0.1402     -0.1345    0.0000   0.0000
+;               1.094E-02  5.037E-03  2.010E-03  0.0000   0.0000
+;     T    M-T  -0.0061    0.0489     0.0266     0.0000   0.0000
+;               6.782E-03  3.387E-03  1.374E-03  0.0000   0.0000
+;     D    M-D  1.3251     0.1403     -0.0147    0.0000   0.0000
+;               1.001E-02  5.472E-03  2.653E-02  0.0000   0.0000
+;
+;  =inptrans  The transformation structure to use.
+;  /average  This averages multiple frames in the same band, but
+;              also keeps the individual frames.  The tag names will
+;              be:  "M1, M1err, M2, M2err, ..., M, Merr"
+;  /onlyaverage  This averages multiples frames, but does not keep
+;                the individual observations.  (setting /combine
+;                  does the same thing).
+;  /keepinstrumental  Keep the instrumental magnitudes and errors.
+;                     They will have names of "I_MAG","I_MAGERR".
+;  /header  The column names are in the first line.
+;  /silent  Don't print anything out
+;  /stp     Stop at the end of the program
+;
+; OUTPUTS:
+;  A calibrated photometry file will be output for each raw photometry
+;  file in the input file.  The ".phot" extension will be used for
+;  the calibrated photometry files.
+;
+;
+; EXAMPLE:
+;  IDL>photcalib,'field1.input','n1.trans'
+; 
+;
+; History:  1989:       getmags.for written by Majewski
+;           1997-2003:  Magma.pro written by Mike Siegel
+;           2007:       Mscmagma.pro by David Nidever
+;           Mar 2008:   Renamed photcalib.pro
+;-
+
+PRO averagemag,mag,err,newmag,newerr,robust=robust
+
+; Average magnitudes
+; /robust  Outlier rejection
+
+sz = size(mag)
+numstar = sz[1]
+numobs = sz[2]
+
+; Starting arrays
+finalflux = fltarr(numstar)+99.9999
+newmag = fltarr(numstar)+99.9999
+newerr = fltarr(numstar)+9.9999
+
+tmag = mag
+terr = err
+tflux = 2.511864^tmag
+twt = 1.0/(terr^2.0)
+bd = where(tmag gt 50,nbd)
+if nbd gt 0 then begin
+  tmag[bd] = !values.f_nan
+  terr[bd] = !values.f_nan
+  tflux[bd] = !values.f_nan
+  twt[bd] = !values.f_nan
+endif
+
+; Outlier rejection
+if numobs gt 2 and keyword_set(robust) then begin
+
+  ; Number of detections per star
+  ngood = total(finite(tmag),2)
+  ngood2 = ngood#replicate(1,numobs)
+
+  ; Get average sigma value and median difference
+  medmag = median(tmag,dim=2)  ; no /even, want an actual value
+  diffmag = tmag-medmag#replicate(1,numobs)
+  sigmag = mad(diffmag,dim=2,/zero)
+  gdsig = where(finite(sigmag) eq 1,ngdsig,comp=bdsig,ncomp=nbdsig)
+  if ngdsig gt 1 then maxsig=max(sigmag[gdsig]) else maxsig=0.5
+  if nbdsig gt 0 then sigmag[bderr]=maxsig
+
+  ; Get average error
+  avgerr = total(terr,2,/nan)/(ngood>1)
+  gderr = where(finite(avgerr) eq 1,ngderr,comp=bderr,ncomp=nbderr)
+  if ngderr gt 1 then maxerr=max(avgerr[gderr]) else maxerr=0.5
+  if nbderr gt 0 then avgerr[bderr]=maxerr
+
+  ; Need to set threshold on a star-by-star basis since the scatter
+  ; will vary with magnitude
+  
+  ; Old method
+  ;gdsig = where(finite(sigmag) eq 1 and sigmag gt 0.0,ngdsig,comp=bdsig,ncomp=nbdsig)
+  ;if ngdsig gt 0 then avgsig=median([sigmag[gdsig]]) else avgsig=0.2  ; average sigma value
+
+  ; Rejected "bad" values, only for stars detection in 3 or more frames
+  ;bdval = where(abs(diffmag) gt 3*(0.2>avgsig) or finite(tmag) eq 0 and ngood2 ge 3,nbdval)
+  threshold = 5.0 * (sigmag > avgerr > 0.05)
+  threshold2 = threshold#replicate(1,numobs)
+  bdval = where(abs(diffmag) gt threshold2 or finite(tmag) eq 0 and ngood2 ge 3,nbdval)
+  if nbdval gt 0 then begin
+    tflux[bdval] = !values.f_nan
+    twt[bdval] = !values.f_nan
+  endif
+
+endif ; outlier rejection
+
+; Now do flux-weighted average for the leftover "good" values
+totalwt = total(twt,2,/nan)
+totalfluxwt = total(twt*tflux,2,/nan)
+bdwt = where(finite(totalwt) eq 0,nbdwt)
+if nbdwt gt 0 then totwt[bdwt]=0.0
+
+; Calculate final mags and errors
+fgd = where(totalwt gt 0.0,nfgd)  ; stars with at least one good mag
+if (nfgd gt 0) then begin
+  finalflux[fgd] = totalfluxwt[fgd]/totalwt[fgd]
+  newmag[fgd] = 2.50*alog10(finalflux[fgd])
+  newerr[fgd] = sqrt(1.0/totalwt[fgd])
+endif
+
+; OLD METHOD
+
+; ; Starting arrays
+; colmag = fltarr(numstar)+99.9999
+; colerr = fltarr(numstar)+9.9999
+; totalwt = fltarr(numstar)
+; totalfluxwt = fltarr(numstar)
+; finalflux = fltarr(numstar)
+;
+; ; The equations are:
+; ; wt = 1.0/(err^2.0)
+; ; totalwt = (wt1 + wt2 + ...)
+; ; finalflux = (flux1*wt1 + flux2*wt2 + ...)/totalwt
+; ; finalmag = 2.50*alog10(finalflux)
+; ; finalerr = sqrt(1.0/totalwt)
+; ;
+; ; Add totalwt and (flux1*wt1 + ...) as you go only for good mags
+; ; Then calculate finalmag and finalerr at the end
+;
+; ; Looping through the multiple exposures
+; for k=0,nind-1 do begin
+;
+;   mag = tempmag[*,ind[k]]
+;   ;err = temperr[*,ind[k]]
+;   err = inerr[*,ind[k]]            ; use the instrumental errors
+;   gd = where(mag lt 50.0,ngd)
+;
+;   flux = mag*0.0
+;   wt = mag*0.0
+;   if (ngd gt 0) then begin
+;     flux[gd] = 2.511864^mag[gd]
+;     wt[gd] = 1.0/(err[gd]^2.0)
+;     totalwt[gd] = totalwt[gd] + wt[gd]
+;     totalfluxwt[gd] = totalfluxwt[gd] + flux[gd]*wt[gd]
+;   endif
+; end ; multiple bands loop
+;
+; ; Calculate final mags and errors
+; fgd = where(totalwt gt 0.0,nfgd)  ; stars with at least one good mag
+; if (nfgd gt 0) then begin
+;   finalflux[fgd] = totalfluxwt[fgd]/totalwt[fgd]
+;   colmag[fgd] = 2.50*alog10(finalflux[fgd])
+;   colerr[fgd] = sqrt(1.0/totalwt[fgd])
+; endif
+
+end
+
+;------------------------------------------------------------
+
+FUNCTION simplerr,inerr,am,cl,cler,t
+;=====================================================================
+;
+;   This propogates photometric error through the transformation equations
+;   This version takes into account error in transformation constants, although
+;   it assumes perfect airmass
+;
+; sigma(V)=sqrt[ sigma(mV)^2 + + sigma(v1)^2 + (XV*sigma(v2))^2+((B-V)*sigma(v3))^2 
+;		+ (XV*(B-V)*sigma(v4))^2 + (B-V*sigma(v5))^2]
+;                +(v3+v4*XV*+v5*2*(B-V))^2*sigma(B-V)^2               
+;
+;=====================================================================
+
+temper = inerr^2 + t.zptermsig^2 + (am*t.amtermsig)^2
+temper = temper + (cl*t.coltermsig)^2 + (am*cl*t.amcoltermsig)^2
+temper = temper + (cl*cl*t.colsqtermsig)^2
+temper = temper + (t.colterm+t.amcolterm*am+2*t.colsqterm*cl)^2*cler^2
+outerr = sqrt(temper)
+
+; Set bad ones to 9.9999
+bd = where(inerr gt 9.,nbd)
+if nbd gt 0 then outerr[bd] = 9.9999
+
+return,outerr
+
+end
+
+;------------------------------------------------------------
+
+
+FUNCTION simplestar,inmag,am,colr,apcorr,exp,t
+;=====================================================================
+;
+;   This uses the solved colors and other terms to find the magnitude in each band
+;
+;   V = mV - v1 - v2 * XV - v3 * (B-V) - v4 * XV*(B-V) - v5 * (B-V) * (B-V)
+;         +(aperture correction) + (time correction)
+; 
+;   The aperture corrections need to be POSITIVE
+;
+;=====================================================================
+
+outmag = inmag - t.zpterm - t.amterm*am - t.colterm*colr
+outmag = outmag - t.amcolterm*am*colr-t.colsqterm*colr*colr
+outmag = outmag - apcorr 
+;outmag = outmag + apcorr
+
+; Correct for exposure time
+if (exp gt 0) then begin
+   outmag = outmag+2.5*alog10(exp)
+endif
+
+; Set bad ones to 99.9999
+bd = where(inmag gt 90.,nbd)
+if nbd gt 0 then outmag[bd] = 99.9999
+
+return,outmag
+
+end
+
+;------------------------------------------------------------
+
+PRO solvestar,instar,trans,inp,outstar
+;=====================================================================
+;
+;   The heart of the program.  This iteratively solves for each star.  It applies 
+;   the transformation equation assuming a color of zero.  It then averages the 
+;   passbands that are common, solves for the color and resolves for each
+;   magnitude given the new color, gradually iterating until convergence.
+;   
+;   The solved magnitude is in the form: (V in the example)
+;   V = mV - v1 - v2 * XV - v3 * (B-V) - v4 * XV*(B-V) - v5 * (B-V) * (B-V)
+;         +(aperture correction)+(time correction)
+;
+;  It sends back to the code outstar, an array of average values in each
+;  passband and tempstar, an array of the individual solved magnitudes
+;
+;=====================================================================
+
+; Setting up some important arrays
+numobs = n_elements(inp.band)
+numstar = n_elements(instar[*,0])
+;passband = inp.band
+passband = trans.band
+colband = trans.colband
+colsign = trans.colsign
+
+; Information about the observations
+; The some for all stars and bands
+airmass = inp.airmass
+exptime = inp.exptime
+apcorr = inp.apcorr
+
+; The input magnitudes and errors
+inmag = instar[*,2*lindgen(numobs)+3]
+inerr = instar[*,2*lindgen(numobs)+4]
+
+; Initializing some arrays
+clr = inmag*0.
+clrerr = inmag*0.
+tempmag = inmag*0.
+temperr = inmag*0.
+laststar = inmag*0.
+
+
+;#############################
+;# First we set the color terms to zero, then solve for the magnitudes using
+;#   simplestar
+
+; Loop through the bands
+for a=0,numobs-1 do begin
+
+  ; Assume an initial color and color error of zero
+  clr[*,a] = 0
+  clrerr[*,a] = 0
+
+  ; Run simplestar to calculate the tranformed magnitudes
+  newmag = SIMPLESTAR(inmag[*,a],airmass[a],clr[*,a],apcorr[a],exptime[a],trans[a])
+  tempmag[*,a] = newmag
+
+
+  ; Run simplerr to calculate the error in the transformed magnitudes
+  newerr = SIMPLERR(inerr[*,a],airmass[a],clr[*,a],clrerr[*,a],trans[a])
+  temperr[*,a] = newerr
+
+endfor
+
+
+
+;##################################
+;# Now begin the iteration loop
+;##################################
+
+niter = 0
+converge = 0
+
+WHILE (converge eq 0) do begin
+
+
+  ; #############################
+  ; First set the color term.
+  ; Passbands with an indefinite color will have it set to zero.
+
+  ; Loop through the bands
+  for d=0,numobs-1 do begin
+
+    ; Index of the passband to use for the color
+    ind = where(passband eq colband[d],nind)
+    ;ind = first_el(where(passband eq colband[d],nind))
+
+    ; More than one color band, average them
+    ;----------------------------------------
+    if (nind gt 1) then begin
+
+      ; Average the mags
+      AVERAGEMAG,tempmag[*,ind],temperr[*,ind],colmag,colerr,/robust
+
+      ; Making the color
+      ; Color sign = 1
+      if (colsign[d] eq 1) then begin
+        clr[*,d] = tempmag[*,d]-colmag
+
+      ; Color sign = 2
+      endif else begin
+        clr[*,d] = colmag-tempmag[*,d]
+      endelse
+
+      ; To avoid the color^2 recursion, color error is taken from instrumental errors
+      gd = where(colerr lt 9.0,ngd)
+      if ngd gt 0 then clrerr[gd,d]  = colerr[gd]
+      ;gd = where(inerr[*,ind] lt 9.0,ngd)
+      ;if ngd gt 0 then clrerr[gd,d]  = inerr[gd,ind]
+
+      ; Bad photometry, use color=0
+      bd = where( (colmag gt 90.) OR (tempmag[*,d] gt 90.) ,nbd)
+      if nbd gt 0 then begin
+        clr[bd,d] = 0.0  
+        clrerr[bd,d] = 0.0
+      endif
+
+
+    ; One or No color band
+    ;----------------------
+    endif else begin
+
+      ; We have a valid color index
+      if (nind eq 1) then begin
+        ind = ind[0]
+
+        ; Color sign = 1
+        if (colsign[d] eq 1) then begin
+          clr[*,d] = tempmag[*,d]-tempmag[*,ind]
+    
+        ; Color sign = 2
+        endif else begin
+          clr[*,d] = tempmag[*,ind]-tempmag[*,d]
+        endelse
+
+        ; To avoid the color^2 recursion, color error is taken from instrumental errors
+        gd = where(inerr[*,ind] lt 9.0,ngd)
+        if ngd gt 0 then clrerr[gd,d]  = inerr[gd,ind]
+
+        ; Bad photometry, use color=0
+        bd = where( (tempmag[*,ind] gt 90.) OR (tempmag[*,d] gt 90.) ,nbd)
+        if nbd gt 0 then begin
+          clr[bd,d] = 0.0
+          clrerr[bd,d] = 0.0
+        endif
+
+      ; No valid color index, set color=0
+      endif else begin
+        clr[*,d] = 0.0
+        clrerr[*,d] = 0.0
+      endelse
+
+    endelse  ; one or no color band
+
+
+  endfor ; looping through the bands
+
+
+  ; ############################
+  ; Now resolve the star
+
+  ; Loop through the stars
+  for f=0,numobs-1 do begin
+
+    ; Run simplestar to calculate the tranformed magnitudes
+    newmag = SIMPLESTAR(inmag[*,f],airmass[f],clr[*,f],apcorr[f],exptime[f],trans[f])
+    tempmag[*,f] = newmag
+
+  
+    ; Run simplerr to calculate the error in the transformed magnitudes
+    newerr = SIMPLERR(inerr[*,f],airmass[f],clr[*,f],clrerr[*,f],trans[f])
+    temperr[*,f] = newerr
+
+  endfor
+
+
+  ; #######################
+  ; Check for convergence
+  ; the iteration loop recycles until the solution is good
+  ; Every star+band must not change at the 0.002 level in order to stop
+  ; OR niter>30
+
+  converge = 1  ; assume good at first
+
+  bd = where( abs(tempmag-laststar) gt 0.002,nbd)
+  if nbd gt 0 then converge=0
+
+  ; Copying current solution to "last" solution
+  if (converge eq 0) then laststar = tempmag
+
+  ; Go up to 30 iterations, send out an error message if it doesn't converge
+  if (niter gt 30) then begin
+    bd2 = array_indices(tempmag,bd)
+    nbdstars = n_elements(bd2[0,*])
+    print,strtrim(nbdstars,2),'/',strtrim(numstar,2),' failed to converge.'
+    converge = 1
+  endif
+
+  ; Increment
+  niter = niter+1
+
+ENDWHILE
+
+
+; Putting together the output array
+outstar = instar*0.
+; Transfer over the id,position,chi and sharp
+outstar[*,0] = instar[*,0]
+outstar[*,1] = instar[*,1]
+outstar[*,2] = instar[*,2]
+;outstar[*,2*numobs+3] = instar[*,2*numobs+3]
+;outstar[*,2*numobs+4] = instar[*,2*numobs+4]
+; Transferring over all other columns
+outstar[*,2*numobs+3:*] = instar[*,2*numobs+3:*]
+
+; Transfer the final magnitudes and errors
+outstar[*,2*lindgen(numobs)+3] = tempmag
+outstar[*,2*lindgen(numobs)+4] = temperr
+
+end
+
+
+
+;----------------------------------------------------------
+
+
+
+PRO  photcalib,inpfile,transfile,silent=silent,stp=stp,average=average,$
+               onlyaverage=onlyaverage,keepinstrumental=keepinstrumental,$
+               combine=combine,header=header,logfile=logfile,inptrans=inptrans
+
+;=====================================================================
+;
+;   This is the main program.  It reads in the data from magfile and trans
+;   after asking for user input, initializes variables and then starts 
+;   solving for each star.
+;
+;=====================================================================
+
+; Not enough inputs
+if n_params() lt 2 then begin
+  print,'Syntax - photcalib,inpfile,transfile'
+  return
+endif
+
+; Logfile
+if keyword_set(logfile) then logf=logfile else logf=-1
+
+
+; Testing the files
+
+test = file_test(inpfile)
+if test eq 0 then begin
+  print,'FILE ',inpfile,' DOES NOT EXIST'
+  return
+endif
+
+; Using input transformation structure
+ninptrans = n_elements(inptrans)
+if ninptrans gt 0 then begin
+
+  printlog,logf,'USING INPUT TRANSFORMATION EQUATIONS'
+  trans = inptrans
+  numbands = n_elements(trans)
+
+  printlog,logf,' TRANSFORMATION EQUATIONS'
+  printlog,logf,'------------------------------------------------------------------'
+  printlog,logf,' BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'------------------------------------------------------------------'
+  for i=0,numbands-1 do begin
+    form = '(A-5,A8,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    printlog,logf,format=form,'  '+trans[i].band,trans[i].color,trans[i].zpterm,trans[i].amterm,$
+                      trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    printlog,logf,format=form,'','',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
+                      trans[i].amcoltermsig,trans[i].colsqtermsig
+  end
+  printlog,logf,'------------------------------------------------------------------'
+  printlog,logf,''
+
+; Loading transformation equations from file
+endif else begin
+
+  test2 = file_test(transfile)
+  if test2 eq 0 and ninptrans eq 0 then begin
+    print,'FILE ',transfile,' DOES NOT EXIST'
+    return
+  endif
+
+
+  ;# #####################################################
+  ;# READ THE TRANSFORMATION FILE
+  READ_TRANS,transfile,trans,logfile=logf,silent=silent
+  numbands = n_elements(trans)
+
+endelse
+
+
+
+
+;###############################
+;# READ THE INPUT FILE
+;# Read in the input file which has the following information:
+;# photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1 aperture correction, Band2 ...
+inparr = importascii(inpfile,/noprint)
+ninp = n_elements(inparr)
+
+tags = tag_names(inparr)
+ntags = n_elements(tags)
+
+; Transferring to a more user-friendly structure
+numobs = (ntags-1)/4
+dum = {magfile:'',outfile:'',band:strarr(numobs),airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
+input = replicate(dum,ninp)
+input.magfile = strtrim(inparr.(0),2)
+for i=0,numobs-1 do begin
+  input.band[i] = strtrim(inparr.(1+i*4),2)
+  input.airmass[i] = double(inparr.(2+i*4))
+  input.exptime[i] = double(inparr.(3+i*4))
+  input.apcorr[i] = double(inparr.(4+i*4))
+end
+
+; Making the output filename
+ext = 'phot'
+for i=0,ninp-1 do begin
+  magfile = input[i].magfile
+  arr = strsplit(magfile,'.',/extract)
+  narr = n_elements(arr)
+  outfile = strjoin(arr[0,narr-2],'')+'.'+ext
+  input[i].outfile = outfile
+end
+
+if not keyword_set(silent) then begin
+  printlog,logf,'Running PHOTCALIB on ',strtrim(ninp,2),' input files'
+  printlog,logf,''
+endif
+
+
+; Looping through the magnitude files
+FOR i=0L,ninp-1 do begin
+
+  inp = input[i]
+  magfile = inp.magfile
+
+  ; Testing the file
+  test = file_test(magfile)
+  if test eq 0 then begin
+    printlog,logf,'FILE ',magfile,' DOES NOT EXIST'
+    goto,BOMB
+  endif
+
+
+  ; Stars in this file
+  numstar = file_lines(magfile)-3L
+
+  ; For 12+ files DAOMASTER starts writing on a second line
+  if (numobs ge 12) then begin
+    numstar = numstar / 2L
+  endif
+
+  ; Not DAOPHOT file, Header line
+  if keyword_set(header) then numstar = file_lines(magfile)-1L
+
+  ; Print file info
+  if not keyword_set(silent) then begin
+    printlog,logf,format='(A-9,A-20)','FILE ',input[i].magfile
+    printlog,logf,format='(A-9,'+strtrim(numobs,2)+'A-7)','BAND',input[i].band
+    printlog,logf,format='(A-9,'+strtrim(numobs,2)+'F-7.4)','AIRMASS',input[i].airmass
+    printlog,logf,format='(A-9,'+strtrim(numobs,2)+'F-7.1)','EXPTIME',input[i].exptime
+    printlog,logf,format='(A-9,'+strtrim(numobs,2)+'F-7.4)','APCORR',input[i].apcorr
+    printlog,logf,format='(A-9,I-8)','NSTARS',numstar
+    printlog,logf,''
+  endif
+
+
+  ;#############################
+  ;# READING IN THE PHOTOMETRY
+  ;#############################
+  If keyword_set(header) then begin
+
+    phot = IMPORTASCII(magfile,/header,/noprint)
+    tags = tag_names(phot)
+    ncol = n_tags(phot)
+    nextra = ncol - 2*numobs
+    mastable = dblarr(numstar,2*numobs+nextra)
+    for j=0,ncol-1 do begin
+      mastable[*,j] = phot.(j)
+    end
+
+
+  ; Daophot/ALLframe input
+  Endif else begin
+
+    ; Figure out how many columns there are
+    line1='' & line2='' & line3='' & line4='' & line5=''
+    openr,unit,/get_lun,magfile
+    readf,unit,line1
+    readf,unit,line2
+    readf,unit,line3
+    readf,unit,line4
+    readf,unit,line5
+    close,unit
+    free_lun,unit
+    arr = strsplit(line4,' ',/extract)
+    ncol = n_elements(arr)
+
+    ; For 12+ files DAOMASTER starts writing on a second line
+    if (numobs ge 12) then begin
+      arr5 = strsplit(line5,' ',/extract)
+      ncol2 = n_elements(arr5)
+      ncol = ncol + ncol2
+    endif
+
+    nextra = ncol - 2*numobs    ; nextra includes, ID, X, Y, CHI, SHARP, etc.
+
+    ; mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
+    ;mastable = fltarr(numstar,2*numobs+5)
+    mastable = dblarr(numstar,2*numobs+nextra)
+
+    ; Reading in the magnitude file
+    get_lun,unit
+    openr, unit, magfile
+
+    line=''
+    readf,unit,line
+    readf,unit,line
+    readf,unit,line
+
+    for j=0l,numstar-1 do begin
+      instr=' '
+      ;inline = fltarr(2*numobs+5)
+      inline = fltarr(2*numobs+nextra)
+      readf, unit, instr
+
+      ; For 12+ files DAOMASTER starts writing on a second line
+      if (numobs ge 12) then begin
+        instr2 = ''
+        readf,unit,instr2
+        instr = instr+instr2
+      endif
+
+      reads,instr,inline
+      ;mastable[j,0:2*numobs+4] = inline[0:2*numobs+4]
+      mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
+    endfor
+
+    close, unit
+    free_lun,unit
+
+  Endelse
+
+
+  raarray = reform(mastable[*,1])
+  decarray = reform(mastable[*,2])
+
+  ; Initializing the arrays
+  ;goodstar = fltarr(2*numbands+5)
+  goodstar = dblarr(2*numbands+nextra)
+  manystars = dblarr(2*numobs)
+  ;startable = fltarr(numstar,2*numbands+5)
+  startable = dblarr(numstar,2*numbands+nextra)
+  indystar = dblarr(numstar,2*numobs)
+
+
+  ;########################
+  ;# Making the transformation structure for the bands of this input file
+  trans2 = replicate(trans[0],numobs)
+
+  ; Associate each observed passband with each trans band
+  for j=0,numobs-1 do begin
+    gd = where(trans.band eq inp.band[j],ngd)
+
+    ;if (ngd eq 0) then begin
+    ;
+    ;  ; Checking for I=T2
+    ;  if inp.band[j] eq 'I' then begin
+    ;    gd = where(trans.band eq 'T',ngd)
+    ;    if ngd eq 0 then gd = where(trans.band eq 'T2',ngd)
+    ;  endif
+    ;
+    ;  ; Checking T2=I
+    ;  if inp.band[j] eq 'T2' or inp.band[j] eq 'T' then begin
+    ;    gd = where(trans.band eq 'I',ngd)
+    ;  endif
+    ;endif
+
+    ; Found the transformation for this band
+    if (ngd gt 0) then begin
+      trans2[j] = trans[gd[0]]
+    endif else begin
+      printlog,logf,'NO TRANSFORMATION INPUT FOR ',inp.band[j]
+      return
+    endelse
+
+    ; Check that the color exists
+    gdcol = where(inp.band eq trans2[j].colband,ngdcol)
+    if (ngdcol eq 0) then begin
+      printlog,logf,trans2[j].colband,' BAND NOT FOUND. CANNOT FORM ',trans2[j].color,' COLOR FOR BAND ',inp.band[j]
+      return
+    endif
+
+  end
+
+
+
+  ;##################
+  ;# CALIBRATING
+  ;##################
+  ; Ah, the meat of the program.  One by one, each star is popped off of
+  ; the observation file, thrown into the solution engine (SOLVESTAR), solved
+  ; and then brought out as an average solution (goodstar) and individual measures
+  ; (indystar).  After that, frame to frame residuals are calculated
+  ; indystar is where the individual solved magnitudes will be stored
+  SOLVESTAR,mastable,trans2,inp,goodstar
+
+
+  ;########################
+  ;# PREPARING THE OUTPUT
+  ;########################
+
+  ; Getting the unique passbands
+  ;ui = uniq(trans2.band)
+  ui = uniq(trans2.band,sort(trans2.band))
+  ui = ui[sort(ui)]
+  ubands = trans2[ui].band
+  nubands = n_elements(ubands)
+
+  ;--------------
+  ; Head columns 
+  ;--------------
+  finalstar = goodstar[*,0:2]
+  headline = '    ID       X         Y     '
+  ;format = '(2X,I5,2F9.3'
+  format = '(2X,I5,2F10.3'
+
+
+  ;--------------------------------------------
+  ; Instrumental Individual Magnitudes columns
+  ;--------------------------------------------
+  if keyword_set(keepinstrumental) then begin
+
+    ; mastable is: id, x, y, unsolved magnitudes, chi, sharp
+    instrstar = mastable[*,3:numobs*2+2]
+    
+    ; Add to the final array
+    finalstar = [ [finalstar], [instrstar] ]
+
+
+    ; Looping through the unique bands
+    instroutband = strarr(numobs)
+    instrouterr = strarr(numobs)
+    for j=0,nubands-1 do begin
+      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      
+      ; More than one observation in this band
+      if (ngdbands gt 1) then begin
+
+        instroutband[gdbands] = 'I_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)
+        instrouterr[gdbands] = 'I_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
+        ;instroutband[gdbands] = 'INSTR_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)
+        ;instrouterr[gdbands] = 'INSTR_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
+
+      ; Only ONE obs in this band
+      endif else begin
+        instroutband[gdbands[0]] = 'I_'+ubands[j]
+        instrouterr[gdbands[0]] = 'I_'+ubands[j]+'ERR'
+        ;instroutband[gdbands[0]] = 'INSTR_'+ubands[j]
+        ;instrouterr[gdbands[0]] = 'INSTR_'+ubands[j]+'ERR'
+      endelse
+      
+    end  ; looping through unique bands
+
+    ; header
+    instrbandspace = strarr(numobs)
+    instrerrspace = strarr(numobs)
+    for j=0,numobs-1 do instrbandspace[j] = string(bytarr( (10-strlen(instroutband[j])) > 1)+32B)
+    for j=0,numobs-1 do instrerrspace[j] = string(bytarr( (8-strlen(instrouterr[j])) > 1)+32B)
+    for j=0,numobs-1 do headline=headline+instroutband[j]+instrbandspace[j]+instrouterr[j]+instrerrspace[j]
+
+    ; format
+    format = format+','+strtrim(2*numobs,2)+'F9.4'
+
+    ;stop
+
+  endif
+
+
+  ;------------------------------------------
+  ; Calibrated Individual Magnitudes columns
+  ;------------------------------------------
+  if not keyword_set(onlyaverage) then begin
+
+    indivstar = goodstar[*,3:(numobs*2)+2]
+
+    ; Add to the final array
+    finalstar = [ [finalstar], [indivstar] ]
+
+    ; Looping through the unique bands
+    outband = strarr(numobs)
+    outerr = strarr(numobs)
+    for j=0,nubands-1 do begin
+      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      
+      ; More than one observation in this band
+      if (ngdbands gt 1) then begin
+
+        outband[gdbands] = ubands[j]+'MAG'+strtrim(indgen(ngdbands)+1,2)
+        ;outband[gdbands] = ubands[j]+strtrim(indgen(ngdbands)+1,2)
+        outerr[gdbands] = ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
+
+      ; Only ONE obs in this band
+      endif else begin
+        outband[gdbands[0]] = ubands[j]+'MAG'
+        ;outband[gdbands[0]] = ubands[j]
+        outerr[gdbands[0]] = ubands[j]+'ERR'
+      endelse
+      
+    end  ; looping through unique bands
+
+    ; header
+    bandspace = strarr(numobs)
+    errspace = strarr(numobs)
+    for j=0,numobs-1 do bandspace[j] = string(bytarr( (10-strlen(outband[j])) > 1)+32B)
+    for j=0,numobs-1 do errspace[j] = string(bytarr( (8-strlen(outerr[j])) > 1)+32B)
+    for j=0,numobs-1 do headline=headline+outband[j]+bandspace[j]+outerr[j]+errspace[j]
+
+    ; format
+    format = format+','+strtrim(2*numobs,2)+'F9.4'
+
+    ;stop
+
+  endif
+
+
+  ;---------------------------------------
+  ; Calibrated Average Magnitudes columns
+  ;---------------------------------------
+  if keyword_set(average) or keyword_set(combine) or keyword_set(onlyaverage) then begin
+
+
+    ; Looping through the unique bands
+    undefine,multibands,multierr
+    ;multioutband = strarr(numobs)
+    ;multiouterr = strarr(numobs)
+    for j=0,nubands-1 do begin
+      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      
+      ; More than one observation in this band
+      if (ngdbands gt 1) then begin
+
+        PUSH,multibands,ubands[j]+'MAG'
+        ;PUSH,multibands,ubands[j]
+        PUSH,multierr,ubands[j]+'ERR'
+
+      ; Only ONE obs in this band
+      endif else begin
+        if keyword_set(onlyaverage) then begin
+          PUSH,multibands,ubands[j]+'MAG'
+          ;PUSH,multibands,ubands[j]
+          PUSH,multierr,ubands[j]+'ERR'
+        endif
+      endelse
+      
+    end  ; looping through unique bands
+    nmultibands = n_elements(multibands)
+
+
+    ; We have some multi observations
+    if (nmultibands gt 0) then begin
+
+      ; Combining the data
+      combstar = fltarr(numstar,nmultibands*2)
+
+      ; Looping through the unique bands
+      for j=0,nmultibands-1 do begin
+
+        gdband = where(trans2.band+'MAG' eq multibands[j],ngdband)
+
+        ; Multiple exposures in this band
+        if (ngdband gt 1) then begin
+
+          ; Average the mags
+          AVERAGEMAG,goodstar[*,3+2*gdband],goodstar[*,4+2*gdband],newmag,newerr,/robust
+
+          ; Now put in the final output array
+          combstar[*,j*2] = newmag
+          combstar[*,j*2+1] = newerr
+
+        ; One exposure in this band
+        endif else begin
+
+          combstar[*,j*2] = goodstar[*,3+2*gdband[0]]    ; transfer mag
+          combstar[*,j*2+1] = goodstar[*,4+2*gdband[0]]    ; transfer error
+
+        endelse
+
+      end ; multiband loop
+
+
+      ; Add to the final array
+      finalstar = [ [finalstar], [combstar] ]
+
+      ; header
+      multibandspace = strarr(nmultibands)
+      multierrspace = strarr(nmultibands)
+      for j=0,nmultibands-1 do multibandspace[j] = string(bytarr( (10-strlen(multibands[j])) > 1)+32B)
+      for j=0,nmultibands-1 do multierrspace[j] = string(bytarr( (8-strlen(multierr[j])) > 1)+32B)
+      for j=0,nmultibands-1 do headline=headline+multibands[j]+multibandspace[j]+multierr[j]+multierrspace[j]
+
+      ; format
+      format = format+','+strtrim(2*nmultibands,2)+'F9.4'
+
+    end  ; nmultibands gt 0
+
+    ;stop
+
+  endif
+
+  ;---------------
+  ; Extra columns
+  ;---------------
+  extrastar = goodstar[*,numobs*2+3:numobs*2+nextra-1]
+
+  ; Add to the final array
+  finalstar = [ [finalstar], [extrastar] ]
+
+  ; We have header from input
+  if keyword_set(header) then begin
+
+    extratags = tags[2*numobs+3:*]
+    headline = headline + strjoin(extratags,'   ')
+
+    ; format
+    for j=2*numobs+3,ncol-1 do begin
+      form = 'F9.4'
+      type = SIZE(phot[0].(j),/type)
+      if type eq 1 then form='I5'  ; byte
+      if type eq 2 then form='I9'  ; int
+      if type eq 3 then form='I12'  ; long
+      if type eq 4 then form='F11.4'  ; float
+      if type eq 5 then form='F13.6'  ; double
+      if type eq 7 then form='A20'  ; string
+
+      if tags[j] eq 'CHI' and type eq 4 then form='F9.4'
+      if tags[j] eq 'SHARP' and type eq 4 then form='F9.4'
+      if tags[j] eq 'FLAG' and type eq 3 then form='I5'
+      if tags[j] eq 'PROB' and type eq 4 then form='F7.2'
+
+      format = format+','+form
+    end
+
+    format = format+')'
+
+  ; Figure out the names for the Extra columns
+  endif else begin
+
+    ; header
+    headline = headline+' CHI      SHARP'
+    ; We have FLAG/PROB colums
+    if (nextra eq 7) then begin
+      headline = headline+'  FLAG  PROB'
+    end
+    ; We have other columns
+    if nextra gt 5 and nextra ne 7 then begin
+      for j=0,nextra-6 do headline = headline+'    EXTRA'+strtrim(j+1,2)
+    endif
+
+    ; format
+    format = format+',2F9.4'     ; chi and sharp
+    ; We have FLAG/PROB colums   
+    if nextra eq 7 then begin
+      format = format+',I5,F7.2'
+    end
+    ; We have other columns
+    if nextra gt 5 and nextra ne 7 then begin
+      for j=0,nextra-6 do format = format+','+strtrim(nextra-5,2)+'F9.4'
+    endif
+    format = format+')'
+
+  endelse
+
+
+
+  ;----------------
+  ; WRITE the file
+  ;----------------
+
+  ; Printing results to output file
+  ; Header information is printed (an index of columns) and then
+  ; the stars, one by one
+  outfile = input[i].outfile
+  
+  OPENW,unit,/get_lun,outfile
+  
+  ; Print the header
+  printf,unit,headline
+
+  ; Loop through the stars
+  for d=0l,numstar-1 do printf,unit,format=format,finalstar[d,*]
+    
+  CLOSE,unit
+  FREE_LUN,unit
+
+  printlog,logf,'Final Photometry File is = ',outfile
+  
+  BOMB:
+
+
+END ; loop through the magnitude files
+
+if not keyword_set(silent) then printlog,logf,'PHOTCALIB FINISHED'
+
+if keyword_set(stp) then stop
+
+end

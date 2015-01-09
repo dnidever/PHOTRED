@@ -1,0 +1,12 @@
+# TELESCOPE   INSTRUMENT  OBSERVATORY  NAMPS  SEPARATOR
+blanco        decam       CTIO         62     _
+#blanco        decam       CTIO         1     _
+blanco        mosaic      CTIO         16     _
+#blanco        mosaic      CTIO         8      _
+mayall        mosaic      KPNO         8      _
+baade         imacs       LCO          8      c
+lbt           lbc         MGIO         4      _
+swope         ccd         LCO          1
+rrrt          sbig        FMO          1      -
+2p2           wfi         LASILLA      8      _
+

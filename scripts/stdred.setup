@@ -1,0 +1,28 @@
+##### REQUIRED #####
+scriptsdir  /net/home/dln5q/daophot/
+irafdir     /net/home/dln5q/iraf/
+telescope   Blanco
+instrument  MOSAIC
+observatory CTIO
+##### OPTIONAL #####
+keepmef     0
+redo        0
+#wcsup       N
+#wcsleft     E
+#pixscale    0.5
+wcsrefname  2MASS-PSC
+#searchdist  60
+wcsrmslim   0.5
+matchdist   0.8
+ddo51radoffset  1
+fiterrlim   0.1
+##### STAGES #####
+rename
+split
+wcs
+aperphot
+daogrow
+astrom
+matchcat
+combinecat
+fitdata

@@ -1,0 +1,8 @@
+;cd,'/net/home/dln5q/idl/'
+cd,'~/idl/'
+.r photred_html
+resolve_all,/continue_on_error
+;save,/routines,file='/net/home/dln5q/photred/sav/photred_html.sav'
+save,/routines,file='~/photred/sav/photred_html.sav'
+
+

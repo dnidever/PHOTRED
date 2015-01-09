@@ -1,0 +1,8 @@
+;cd,'/net/home/dln5q/idl/'
+cd,'~/idl/'
+.r photred_summary
+resolve_all
+;save,/routines,file='/net/home/dln5q/photred/sav/photred_summary.sav'
+save,/routines,file='~/photred/sav/photred_summary.sav'
+
+

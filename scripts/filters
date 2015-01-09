@@ -1,0 +1,38 @@
+'M Washington c6007'    M
+'M Washington k1007'    M
+'M'                     M
+'I c6028'               T
+'I Nearly-Mould k1005'  T
+'T'                     T
+'T2'                    T
+'DDO 51 c6008'          D
+'D51 DDO c6008'         D
+'D51 DDO 51 c6008'      D
+'D51 DDO 51 k1008'      D
+'D'                     D
+'D51'                   D
+'DDO51'                 D
+'DDO-51'                D
+'DDO_51'                D
+'DDO 51'                D
+'51'                    D
+'T1'                    T1
+'C'                     C
+'B Harris c6002'        B
+'B-BESSEL'              B
+'B'                     B
+'V'                     V
+'R-BESSEL'              R
+'R'                     R
+'u DECam c0006 3500.0 1000.0'         u
+'g DECam SDSS c0001 4720.0 1520.0'    g
+'r DECam SDSS c0002 6415.0 1480.0'    r
+'i DECam SDSS c0003 7835.0 1470.0'    i
+'z DECam SDSS c0004 9260.0 1520.0'    z
+'Y DECam c0005 10095.0 1130.0'        Y
+'u'                     u
+'g'                     g
+'r'                     r
+'i'                     i
+'z'                     z
+'Y'                     Y
