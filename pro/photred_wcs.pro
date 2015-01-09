@@ -187,6 +187,9 @@ printlog,logfile,''
 ; Initialzing some arrays
 UNDEFINE,outlist,successlist,failurelist
 
+; Figure out which files to make OPT files for
+undefine,cmd,cmddir,cmdlongfile,cmdfile
+
 ; Loop through the input files
 FOR i=0,ninputlines-1 do begin
 
@@ -264,67 +267,42 @@ FOR i=0,ninputlines-1 do begin
 
     ; SPLIT MOSAIC frames have a default TNX WCS
     ; The distortion terms are normally okay
-
     printlog,logfile,''
     printlog,logfile,file,' is a SPLIT MOSAIC IMAGE'
     printlog,logfile,''
 
-    ; Run WCSFIT
-    undefine,error
-    WCSFIT,file,up='E',left='S',error=error,redo=redo,searchdist=searchdist,$
-           rmslim=wcsrmslim,refname=wcsrefname
-
-    ; Successful
-    head = HEADFITS(file)
-    ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-    if (n_elements(error) eq 0 and ctype1 ne '0') then begin
-      PUSH,successlist,longfile
-      PUSH,outlist,longfile
-
-    ; Failure
-    endif else begin
-      printlog,logfile,'PROBLEMS FITTING WCS FOR ',file
-      PUSH,failurelist,longfile
-    endelse
-
-  End ; MOSAIC
+    ; Add to the PBS command list
+    cmd1 = "WCSFIT,'"+file+"',up='E',left='S',refname="+wcsrefname
+    if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
+    if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if keyword_set(redo) then cmd1+=',/redo'
+    PUSH,cmd,cmd1
+    PUSH,cmddir,filedir
+    PUSH,cmdlongfile,longfile
+  Endif ; MOSAIC
 
 
   ; IMACS IMAGES
   ;-------------
   if (instrument eq 'imacs') then begin
-
     printlog,logfile,''
     printlog,logfile,file,' is an IMACS IMAGE'
     printlog,logfile,''
 
-    ; Run WCSFIT_IMACS
-    undefine,error
-    WCSFIT_IMACS,file,error=error,redo=redo,searchdist=searchdist,$
-                 rmslim=wcsrmslim,refname=wcsrefname
-
-
-    ; Successful
-    head = HEADFITS(file)
-    ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-    if (n_elements(error) eq 0 and ctype1 ne '0') then begin
-      PUSH,successlist,longfile
-      PUSH,outlist,longfile
-
-    ; Failure
-    endif else begin
-      printlog,logfile,'PROBLEMS FITTING WCS FOR ',file
-      PUSH,failurelist,longfile
-    endelse
-
-  End ; IMACS
-
+    ; Add to the PBS command list
+    cmd1 = "WCSFIT_IMACS,'"+file+"',refname="+wcsrefname
+    if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
+    if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if keyword_set(redo) then cmd1+=',/redo'
+    PUSH,cmd,cmd1
+    PUSH,cmddir,filedir
+    PUSH,cmdlongfile,longfile
+  Endif ; IMACS
 
 
   ; LBC IMAGES
-  ;-----------------
+  ;------------
   if (instrument eq 'lbc') then begin
-
     printlog,logfile,''
     printlog,logfile,file,' is a SPLIT LBC IMAGE'
     printlog,logfile,''
@@ -354,26 +332,16 @@ FOR i=0,ninputlines-1 do begin
     left = leftarr[chip-1]
     pixscale = 0.224
 
-    ; Run WCSFIT
+    ; Add to the PBS command list
     undefine,error
-    WCSFIT,file,error=error,up=up,left=left,pixscale=pixscale,redo=redo,$
-           searchdist=searchdist,rmslim=wcsrmslim,refname=wcsrefname
-
-
-    ; Successful
-    head = HEADFITS(file)
-    ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-    if (n_elements(error) eq 0 and ctype1 ne '0') then begin
-      PUSH,successlist,longfile
-      PUSH,outlist,longfile
-
-    ; Failure
-    endif else begin
-      printlog,logfile,'PROBLEMS FITTING WCS FOR ',file
-      PUSH,failurelist,longfile
-    endelse
-
-  End ; LBC
+    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
+    if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if keyword_set(redo) then cmd1+=',/redo'
+    PUSH,cmd,cmd1
+    PUSH,cmddir,filedir
+    PUSH,cmdlongfile,longfile
+  Endif ; LBC
 
 
   ; SWOPE IMAGES
@@ -403,26 +371,15 @@ FOR i=0,ninputlines-1 do begin
       pixscale = 0.6955
     endelse
 
-    ; Fitting with WCSFIT.PRO
-    undefine,error
-    WCSFIT,file,up=up,left=left,pixscale=pixscale,error=error,redo=redo,$
-           searchdist=searchdist,rmslim=wcsrmslim,refname=wcsrefname
-
-
-    ; Successful
-    head = HEADFITS(file)
-    ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-    if (n_elements(error) eq 0 and ctype1 ne '0') then begin
-      PUSH,successlist,longfile
-      PUSH,outlist,longfile
-
-    ; Failure
-    endif else begin
-      printlog,logfile,'PROBLEMS FITTING WCS FOR ',file
-      PUSH,failurelist,longfile
-    endelse
-
-  End ; SWOPE
+    ; Add to the PBS command list
+    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
+    if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if keyword_set(redo) then cmd1+=',/redo'
+    PUSH,cmd,cmd1
+    PUSH,cmddir,filedir
+    PUSH,cmdlongfile,longfile
+  Endif ; SWOPE
 
 
   ; Unknown image type
@@ -445,47 +402,53 @@ FOR i=0,ninputlines-1 do begin
       goto,BOMB
     endif
 
-    ; Fitting with WCSFIT.PRO
-    undefine,error
-    WCSFIT,file,pixscale=pixscale,error=error,redo=redo,searchdist=searchdist,$
-           rmslim=wcsrmslim,refname=wcsrefname,left=wcsleft,up=wcsup
-
-    ; Successful
-    head = HEADFITS(file)
-    ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-    if (n_elements(error) eq 0 and ctype1 ne '0') then begin
-      PUSH,successlist,longfile
-      PUSH,outlist,longfile
-
-    ; Failure
-    endif else begin
-      printlog,logfile,'PROBLEMS FITTING WCS FOR ',file
-      PUSH,failurelist,longfile
-    endelse
-
-    ;stop
-
-  End
-
-
+    ; Add to the PBS command list
+    cmd1 = "WCSFIT,'"+file+"',pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    if n_elements(wcsleft) gt 0 then cmd1+=",left="+wcsleft
+    if n_elements(wcsup) gt 0 then cmd1+=",up="+wcsup
+    if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
+    if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if keyword_set(redo) then cmd1+=',/redo'
+    PUSH,cmd,cmd1
+    PUSH,cmddir,filedir
+    PUSH,cmdlongfile,longfile
+  Endif
 
   BOMB:
-
 
   ; Back to original directory
   CD,curdir
 
+ENDFOR
 
-  ;#####################
-  ; UPDATE the Lists
-  ;#####################
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
 
+; Run WCSFIT with PBS_DEAMON
+;----------------------------
+printlog,logfile,'Running WCSFIT on images'
+ncmd = n_elements(cmd)
+printlog,logfile,strtrim(ncmd,2),' files to run WCSFIT on'
+
+if ncmd gt 0 then begin
+  ; Submit the jobs to the daemon
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=5
+endif
+
+
+; Check for success/failures
+for i=0,ncmd-1 do begin
+  ; Successful
+  head = HEADFITS(cmdlongfile[i])
+  ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
+  if (n_elements(error) eq 0 and ctype1 ne '0') then begin
+    PUSH,successlist,cmdlongfile[i]
+    PUSH,outlist,cmdlongfile[i]
   
-  ;stop
-
-END
+  ; Failure
+  endif else begin
+    printlog,logfile,'PROBLEMS FITTING WCS FOR ',file_basename(cmdlongfile[i])
+    PUSH,failurelist,cmdlongfile[i]
+  endelse
+endfor
 
 
 FINISH:

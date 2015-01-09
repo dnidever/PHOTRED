@@ -95,7 +95,12 @@ minRange = Float( minRange )
 maxRange = Float( maxRange )
 
    ; Make sure we have a valid range.
-IF maxRange EQ minRange THEN Message, 'Range max and min are coincidental'
+;IF maxRange EQ minRange THEN Message, 'Range max and min are coincidental'
+IF maxRange EQ minRange THEN begin
+  print, 'Range max and min are coincidental'
+  ;MESSAGE, 'Range max and min are coincidental'
+  return,vector*0+minRange
+ENDIF
 
    ; Check keyword parameters.
 

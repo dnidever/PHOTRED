@@ -295,7 +295,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
         ;stop
 
-      End  ; submitting new jobs loop
+      Endfor  ; submitting new jobs loop
 
     Endif  ; new jobs to submit
 

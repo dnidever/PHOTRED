@@ -135,7 +135,12 @@ endif
 
 ; Load the image
 if n_elements(inpim) eq 0 then begin
-  FITS_READ,filename,im,head,exten=exten
+  FITS_READ,filename,im,head,exten=exten,/no_abort,message=message
+  if message ne '' then begin
+    error = 'Problem loading '+filename
+    print,error
+    return    
+  endif
   im = float(im)
 endif else im=float(inpim)
 
@@ -844,13 +849,30 @@ End ; TNX
     bestind = first_el(minloc(rmsarr))
     bestcd = reform(cdarr[bestind,*,*])
     bestcrval = reform(crvalarr[bestind,*,*])
-
-    print,'INIT WCS rms = ',rmsarr[bestind],' pixels'
+    bestrms = rmsarr[bestind]
 
     wcs2 = wcs
     wcs2.ast.cd = bestcd
     wcs2.ast.crval = bestcrval
-          
+
+    ; RMS too high, this seems to have often for DECam images
+    if rmsarr[bestind] gt 1.0 then begin
+      ; Just fix the CRVAL values
+      WCSTPV_XY2RD,cat3.x,cat3.y,wcs,tra,tdec,/degree
+      radiff = double(refcat3.raj2000) - tra
+      decdiff = double(refcat3.dej2000) - tdec
+      wcs2 = wcs
+      wcs2.ast.crval[0] = wcs2.ast.crval[0] + median(radiff)
+      wcs2.ast.crval[1] = wcs2.ast.crval[1] + median(decdiff)
+
+      ; Calculating RMS for this solution
+      WCSTPV_XY2RD,cat3.x,cat3.y,wcs2,tra,tdec,/degree
+      diff = SPHDIST(double(refcat3.raj2000),double(refcat3.dej2000),tra,tdec,/deg)
+      bestrms = sqrt(mean(diff^2.0)) * 3600.0
+    endif
+
+    print,'INIT WCS rms = ',bestrms,' pixels'
+
     ; Put new WCS into header
     WCSTPV2HDR, head, wcs2    
 
@@ -859,8 +881,6 @@ End ; TNX
     ;plot,refcat3.raj2000,(refcat3.dej2000-dd)*3600.,ps=1
     ;diff = SPHDIST(refcat3.raj2000,refcat3.dej2000,aa,dd,/deg)
     ;print,sqrt(mean(diff^2.))*3600.0
-
-    ;stop
 
 
   ; NEW TPV WCS
@@ -1172,6 +1192,7 @@ WHILE (flag ne 1) do begin
   dchi = chi0 - chi
 
   if drms/rms lt 0.01 and dchi/chi lt 0.01 then flag=1
+  ;if drms/rms lt 0.01 and dchi/chi lt 0.01 and count gt 0 then flag=1
   if (count+1) ge maxiter then flag=1
   if not keyword_set(iterate) and not keyword_set(maxiter) then flag=1
 
@@ -1316,7 +1337,12 @@ print,'========================================='
 
 
 ; Getting image header
-FITS_READ,filename,im,head
+FITS_READ,filename,im,head,/no_abort,message=message
+if message ne '' then begin
+  error = 'Problem loading '+filename
+  print,error
+  return    
+endif
 im = float(im)
 ;head = HEADFITS(filename)
 
@@ -2416,7 +2442,8 @@ if not keyword_set(noupdate) then begin
     SXADDHIST,'WCSFIT: RMS='+string(rms,format='(F5.3)')+' arcsec on '+systime(),head
 
     print,'Updating WCS in ',filename
-    FITS_WRITE,filename,im,head
+    MWRFITS,im,filename,head,/create
+    ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
 
   ; RMS too high
   endif else begin

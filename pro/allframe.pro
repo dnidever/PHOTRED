@@ -88,6 +88,42 @@ for i=0,nfiles-1 do begin
 
   SPAWN,'grep Clipped '+logfile,out,errout
   ;              Clipped mean and median =  187.442  187.215
+
+  ; daophot.sh log files are clipped on Tortoise for some reason
+  ;  Get mean/median sky level
+  if n_elements(out) eq 1 and out[0] eq '' then begin
+    print,'Getting mean/median sky levels for ',base
+    undefine,cmdlines
+    PUSH,cmdlines,'#!/bin/sh'
+    PUSH,cmdlines,'export image=${1}'
+    PUSH,cmdlines,'daophot << END_DAOPHOT >> ${image}.find.log'
+    PUSH,cmdlines,'OPTIONS'
+    PUSH,cmdlines,'${image}.opt'
+    PUSH,cmdlines,' '
+    PUSH,cmdlines,'ATTACH ${image}.fits'
+    PUSH,cmdlines,'FIND'
+    PUSH,cmdlines,'1,1'
+    PUSH,cmdlines,'${image}.find.temp'
+    PUSH,cmdlines,'y'
+    PUSH,cmdlines,'EXIT'
+    PUSH,cmdlines,'END_DAOPHOT'
+    tempscript = MKTEMP('dfind')   ; absolute filename
+    WRITELINE,tempscript,cmdlines
+    FILE_CHMOD,tempscript,'755'o
+    FILE_DELETE,base+'.find.temp',/allow
+    FILE_DELETE,base+'.find.log',/allow
+    ; Run DAOPHOT/FIND
+    SPAWN,tempscript+' '+base,out1,errout1
+
+    logfile2 = base+'.find.log'
+    SPAWN,'grep Clipped '+logfile2,out,errout
+    ;              Clipped mean and median =  187.442  187.215
+
+    ; Delete temporary files
+    FILE_DELETE,base+'.find.temp',/allow
+    FILE_DELETE,tempscript,/allow
+  endif
+
   arr = strsplit(out[0],' ',/extract)
   mnsky[i] = float(arr[5])
   medsky[i] = float(arr[6])
@@ -507,6 +543,7 @@ WRITECOL,scalefile,invscales,fmt='(F10.5)'  ; want to scale it UP
 zerofile = mchbase+'.zero'
 WRITECOL,zerofile,-sky,fmt='(F10.2)'  ; want to remove the background, set to 1st frame
 
+
 ;---------------------------------------
 ; Get X/Y translations using DAOMASTER
 ;  NO ROTATION ONLY SHIFTS
@@ -524,7 +561,6 @@ PUSH,cmdlines,'1,1,1'
 PUSH,cmdlines,'99.'
 PUSH,cmdlines,'2'
 PUSH,cmdlines,'10'
-;for i=0,nfiles-1 do PUSH,cmdlines,''  ; for MONGO daomaster version
 PUSH,cmdlines,'5'
 PUSH,cmdlines,'4'
 PUSH,cmdlines,'3'
@@ -895,14 +931,13 @@ if not keyword_set(nocmbimscale) then begin
 
   maskdatalevel = max(combim) + 10000       ; set "bad" data level above the highest "good" value
   combim2 = combim*(1-badmask) + maskdatalevel*badmask    ; set bad pixels to maskdatalevel
-  FITS_WRITE,combfile,combim2,combhead
+  MWRFITS,combim2,combfile,combhead,/create  ; fits_write can create an empty PDU
 
   ; Create the weight map for Sextractor using the BPM output by IMCOMBINE
   ;  bad only if bad in ALL images
   weightmap = -2.0*float(badmask eq 1) + 1.0
   combweightfile = mchbase+'_comb.mask.fits'
-  FITS_WRITE,combweightfile,weightmap,whead
-
+  MWRFITS,weightmap,combweightfile,whead,/create
 
 ; NO SCALING of the images for combining
 ;---------------------------------------

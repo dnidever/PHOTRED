@@ -164,7 +164,7 @@ ncol = sz[1]
 nrow = sz[2]
 
 arr1 = reform(arr[*,0])
-typearr = datatypes(arr1)
+if n_elements(typearr) eq 0 then typearr = datatypes(arr1)
 bd = where(typearr eq 7,nbd)
 if nbd eq 0 then allfloat=1
 
@@ -208,7 +208,10 @@ IF not keyword_set(allfloat) THEN BEGIN
   str = replicate(dum,nrow)
 
   ; Transferring the data
-  for i=0,ncol-1 do str.(i) = fix(reform(arr[i,*]),type=typearr[i])
+  for i=0,ncol-1 do begin
+    if typearr[i] ne 7 then str.(i)=fix(reform(arr[i,*]),type=typearr[i]) else $
+      str.(i)=reform(arr[i,*])   ; just copy strings
+  endfor
   ;undefine,arr
 
   ; Converting INDEF's to 999999

@@ -300,7 +300,7 @@ if not keyword_set(noplot) then begin
     if not keyword_set(colcharsize) then colcharsize=charsize
 
     ; Displaying the colorbar
-    cgcolorbar,position=colpos,minrange=minrange,maxrange=maxrange,$
+    df_colorbar,position=colpos,minrange=minrange,maxrange=maxrange,$
                charsize=colcharsize,format=form,bottom=bottom,ncolors=ncolors,$
                xlog=xlog,ylog=ylog,minor=minor,divisions=divisions,thick=thick,$
                charthick=charthick,color=framecolor,xthick=thick,$

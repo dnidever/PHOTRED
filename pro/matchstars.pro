@@ -109,10 +109,39 @@ COMMON xcorr, factorsum, factornum
 ; CORREL_IMAGES, CORREL_OPTIMIZE, and CORRMAT_ANALYZE functions,
 ; but these DO NOT use FFTs.  It's very slow!
 
+
+; Error Handling
+;------------------
+; Establish error handler. When errors occur, the index of the  
+; error is returned in the variable Error_status:  
+CATCH, Error_status 
+
+;This statement begins the error handler:  
+if (Error_status ne 0) then begin 
+   print,'MATCHSTARS_XCORR ERROR: ', !ERROR_STATE.MSG  
+   xshift = 999999.
+   yshift = 999999.
+   angle = 999999.
+   xcorr = -1
+   bestcorr = -1
+   matchnum = -1
+   nsig = -1
+   CATCH, /CANCEL 
+   return
+endif
+
 nxx1 = n_elements(xx1)
 nyy1 = n_elements(yy1)
 nxx2 = n_elements(xx2)
 nyy2 = n_elements(yy2)
+
+xshift = 999999.  ; initalize output values
+yshift = 999999.
+angle = 999999.
+xcorr = -1
+bestcorr = -1
+matchnum = -1
+nsig = -1
 
 ; Not enough inputs
 if (nxx1 eq 0 or nyy1 eq 0 or nxx2 eq 0 or nyy2 eq 0) then begin
@@ -130,6 +159,12 @@ if nxx1 ne nyy1 or nxx2 ne nyy2 then begin
   if nxx2 ne nyy2 then $
     print,'XX1/YY1 must have the same number of elements'
   return
+endif
+
+; Need at least two stars
+if nxx1 lt 2 or nxx2 lt 2 then begin
+  if not keyword_set(silent) then print,'Need 2 or more points for matching.'
+  return  
 endif
 
 
@@ -458,7 +493,6 @@ if keyword_set(extra) then begin
   if yrtind eq -1 then yrtind = n_elements(yprofile)-1
   ywidth1 = (yrtind-ylftind)+1    ; this is going to be larger than the width
 
-
   ; Getting an image of JUST the PEAK
   ;----------------------------------
   ; Looking at a broader range
@@ -481,7 +515,6 @@ if keyword_set(extra) then begin
   highind2 = array_indices(subxcorr,highind)
   xhighind = highind2[0]
   yhighind = highind2[1]
-
 
   ; Using CONTOUR
   ;-----------------
@@ -657,7 +690,6 @@ endif else begin
 
 endelse
 
-
 ;-----------------------------------------
 ; NOW BACK TO THE **ORIGINAL** SCALE
 ;-----------------------------------------
@@ -685,7 +717,6 @@ matchnum = (bestcorr-median([xcorr],/even))/onematch
 
 ; How significant is this peak
 nsig = (bestcorr-median([xcorr],/even))/mad(xcorr)
-
 
 ; How significant does it need to be for the number of pixels
 ;http://en.wikipedia.org/wiki/Normal_distribution
@@ -723,6 +754,22 @@ pro matchstars_linefit,par0,xx1m0,yy1m0,xx2m0,yy2m0,fpar,rms1,plotresid=plotresi
 
 ; This removes any leftover rotation by fitting lines to the x/y residuals
 ; iteratively
+
+; Error Handling
+;------------------
+; Establish error handler. When errors occur, the index of the  
+; error is returned in the variable Error_status:  
+CATCH, Error_status 
+
+;This statement begins the error handler:  
+if (Error_status ne 0) then begin 
+   print,'MATCHSTARS_LINEFIT ERROR: ', !ERROR_STATE.MSG  
+   fpar = 999999.
+   rms1 = 999999.
+   CATCH, /CANCEL 
+   return
+endif
+
 
 xx1m = xx1m0
 yy1m = yy1m0
@@ -986,7 +1033,6 @@ MATCHSTARS_XCORR,xx1,yy1,xx2,yy2,xshift1,yshift1,angle1,bestcorr,xcorr,smooth=sm
                  /extra,silent=silent
 nsig = nsig1
 
-
 ; No rotation
 if keyword_set(norot) and nsig gt 5 then begin
   xshift = xshift1
@@ -1037,7 +1083,6 @@ if (nsig gt 5.0) and not keyword_set(norot) then begin
   MATCHSTARS_XCORR,xx1s,yy1s,xx2s,yy2s,xshiftN,yshiftN,angleN,bestcorrN,xcorrN,silent=silent,$
                    smooth=smooth,xyscale=xyscale,fwhm=fwhm,nsig=nsigN,matchnum=matchnumN,/extra
 
-
   ; Find the SOUTH shift
   Sgd1 = where(tyy1 le tyhalf,nSgd1)
   Sgd2 = where(tyy2 le tyhalf,nSgd2)
@@ -1049,7 +1094,6 @@ if (nsig gt 5.0) and not keyword_set(norot) then begin
 
   MATCHSTARS_XCORR,xx1s,yy1s,xx2s,yy2s,xshiftS,yshiftS,angleS,bestcorrS,xcorrS,silent=silent,$
                    smooth=smooth,xyscale=xyscale,fwhm=fwhm,nsig=nsigS,matchnum=matchnumS,/extra
-
 
   ; Good fits
   ;if nsigS gt 5.0 and nsigN gt 5.0 then begin

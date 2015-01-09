@@ -136,6 +136,28 @@ if (count lt 1) then begin
   return
 endif
 
+
+;; Get initial guess for X/Y shifts from WCS
+;if keyword_set(initwcs) then begin
+;  fitsfiles = file_basename(files,'.als')+'.fits'
+;  if total(file_test(fitsfiles)) eq nfiles then begin
+;    raarr = dblarr(nfiles) & decarr=dblarr(nfiles)
+;    getpixscale,fitsfiles[0],pixscale
+;    for i=0,nfiles-1 do begin
+;      head = headfits(fitsfiles[i])
+;      head_xyad,head,0,0,a,d,/deg
+;      raarr[i]=a & decarr[i]=d
+;   endfor
+;    initwcs_xoff = (raarr-raarr[0])*3600*cos(decarr[0]/!radeg)/pixscale
+;    initwcs_yoff = (decarr-decarr[0])*3600/pixscale
+;    print,'Initial offsets from WCS'
+;    for i=0,nfiles-1 do print,files[i],initwcs_xoff[i],initwcs_yoff[i]
+;stop
+;
+;  endif else print,'Not all FITS files found'
+;endif
+
+
 format = '(A2,A-30,A1,2F10.2,4F10.5,2F10.3)'
 newline = STRING("'",files[0],"'",0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, format=format)
 PUSH,mchfinal,newline
@@ -216,6 +238,24 @@ for i=1,nfiles-1 do begin
   ;MATCHSTARS,refals.x,refals.y,als.x,als.y,ind1,ind2,trans,count=count,/silent
   MATCHSTARS,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,ind1,ind2,trans,count=count,/silent
 
+  ; No good matches, try srcmatch with "small" shifts
+  if (count lt 1) then begin
+    SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,100,ind1a,ind2a,count=count1
+    if count1 gt 0 then begin
+      xdiff1 = refals[gdref[ind1a]].x-als[gdals[ind2a]].x
+      ydiff1 = refals[gdref[ind1a]].y-als[gdals[ind2a]].y
+      xmed1 = median(xdiff1)
+      ymed1 = median(ydiff1)
+      ; redo the search
+      SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,20,ind1,ind2,count=count
+      xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
+      ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
+      xmed = median(xdiff)
+      ymed = median(ydiff)
+      trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+    endif
+  endif
+
   ; No good match
   if (count lt 1) then begin
     printlog,logf,'NO MATCHES.  Using XSHIFT=YSHIFT=ROTATION=0'
@@ -241,7 +281,9 @@ for i=1,nfiles-1 do begin
   if keyword_set(verbose) then $
     printlog,logf,format='(A-20,2F10.4,4F12.8)',files[i],trans
 
-end  ; ALS file loop
+  ;stop
+
+endfor  ; ALS file loop
 
 
 ; Writing the final mchfile

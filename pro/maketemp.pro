@@ -45,11 +45,17 @@ while (dum(0) ne '') do begin
   file = file+suffix
 
   ; Checking if it exists already
-  ;dum = findfile(file+'*')
-  dum = FILE_SEARCH(file+'*')
-  if keyword_set(directory) then dum = FILE_SEARCH(file+'*',/test_directory)
+  ;dum = FILE_SEARCH(file+'*')
+  ;if keyword_set(directory) then dum = FILE_SEARCH(file+'*',/test_directory)
+  dum = FILE_TEST(file)
+  if keyword_set(directory) then dum = FILE_TEST(file,/directory)
 
 end
+
+; Create an empty file
+openw,unit,file,/get_lun
+close,unit
+free_lun,unit
 
 ;stop
 

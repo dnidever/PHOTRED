@@ -161,12 +161,20 @@ if n_elements(interp_type) eq 0 then interp_type='spline3'
 if n_elements(boundary_type) eq 0 then boundary_type='constant'
 if n_elements(constant) eq 0 then constant=0.
 
+; Multiple files input
+if n_elements(shifts_file) gt 0 then begin
+  if strmid(input,0,1) eq '@' then readcol,strmid(input,1),inpnames,format='A',/silent
+  if strmid(output,0,1) eq '@' then readcol,strmid(output,1),outnames,format='A',/silent
+  readcol,shifts_file,xshift,yshift,format='F,F',/silent
+
+; One file
+endif else begin
+  inpnames = input
+  outnames = output
+endelse
+nfiles = n_elements(inpnames)
+
 ; Input strings
-sinput = strtrim(input,2)
-soutput = strtrim(output,2)
-if n_elements(shifts_file) gt 0 then sshifts_file = strtrim(shifts_file,2) else sshifts_file=''
-if n_elements(xshift) gt 0 then sxshift=strtrim(xshift,2)
-if n_elements(yshift) gt 0 then syshift=strtrim(yshift,2)
 sinterp_type = strtrim(interp_type,2)
 sboundary_type = strtrim(boundary_type,2)
 sconstant = strtrim(constant,2)
@@ -174,15 +182,26 @@ sconstant = strtrim(constant,2)
 ; Write IRAF script
 push,cmd,'cd '+curdir
 push,cmd,'immatch'
-push,cmd,'imshift.shifts_file = "'+sshifts_file+'"'
+push,cmd,'imshift.input=""'
+push,cmd,'imshift.output=""'
+push,cmd,'imshift.shifts_file = ""'  ; don't use shifts_file use x/yshifts
 push,cmd,'imshift.interp_type = "'+sinterp_type+'"'
 push,cmd,'imshift.boundary_type = "'+sboundary_type+'"'
-push,cmd,'imshift.constant = "'+sconstant+'"'
-if n_elements(xshift) gt 0 and n_elements(yshift) gt 0 then begin
-  push,cmd,'imshift("'+sinput+'","'+soutput+'",xshift='+sxshift+',yshift='+syshift+')'
-endif else begin
-  push,cmd,'imshift("'+sinput+'","'+soutput+'")'
-endelse
+push,cmd,'imshift.constant = '+sconstant
+
+; Loop through files
+for i=0,nfiles-1 do begin
+  sinpname1 = strtrim(inpnames[i],2)
+  soutname1 = strtrim(outnames[i],2)
+  ; if shift is very small round to zero, otherwise can cause problems
+  if abs(xshift[i]) lt 1e-4 then xshift1=0.0 else xshift1=xshift[i]
+  if abs(yshift[i]) lt 1e-4 then yshift1=0.0 else yshift1=yshift[i]
+  sxshift1 = strtrim(xshift1,2)
+  syshift1 = strtrim(yshift1,2)
+  push,cmd,'imshift("'+sinpname1+'","'+soutname1+'",xshift='+sxshift1+',yshift='+syshift1+')'
+  push,cmd,'flprcache'
+endfor
+
 push,cmd,'logout'
 cmdfile = MKTEMP('temp')        ; absolute filename
 WRITELINE,cmdfile,cmd
@@ -195,6 +214,8 @@ CD,irafdir
 ; Running IRAF
 undefine,out
 SPAWN,'cl < '+cmdfile,out,errout
+
+if keyword_set(verbose) then print,out,errout
 
 ; Return to original directory
 CD,curdir

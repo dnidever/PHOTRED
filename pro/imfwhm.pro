@@ -12,6 +12,8 @@
 ;             i.e. '*.fits', or a list of files if it starts
 ;             with an '@'
 ;  =outfile   A file to print the output to
+;  =nsigdetect  The source detection limit in background sigma.
+;                 The default is 8.
 ;  /silent    Don't print anything to the screen.  By default the
 ;             filename and FWHM are printed to the screen.
 ;  /stp       Stop at the end of the program.
@@ -120,7 +122,7 @@ end
 ;--------------------------------------------------------
 
 pro imfwhm,input,fwhm,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
-           skymode=skymode,skysig=skysig,backgim=backgim
+           skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
@@ -154,6 +156,11 @@ endif
 
 ; Starting ALLFWHM
 allfwhm = fltarr(nfiles)+99.99
+
+; Detection threshoold
+if n_elements(nsigdetect) gt 0 then if nsigdetect[0] gt 0 then nsig=nsigdetect[0]
+if n_elements(nsig) eq 0 then nsig=8.0
+
 
 ; Opening output file
 if n_elements(outfile) gt 0 then $
@@ -238,7 +245,6 @@ for f=0,nfiles-1 do begin
     if skysig1 lt 0.0 then skysig1 = mad(im)
     max = max(im)
     ;satlim = max     ; saturation limit
-    nsig = 8.0
     ;med = median(im)
     ;std = stddev(im)
 
@@ -305,26 +311,61 @@ for f=0,nfiles-1 do begin
     diffy1 = smim-shift(smim,0,1)
     diffy2 = smim-shift(smim,0,-1)
 
+    ; Get the gain (electrons/ADU)
+    gain = sxpar(head,'GAIN',count=ngain)
+    if ngain eq 0 then begin
+      ; use scatter in background and Poisson statistic
+      ; to calculate gain empirically
+      ; Nadu = Ne/gain
+      ; Poisson scatter in electrons = sqrt(Ne) = sqrt(Nadu*gain)
+      ; scatter (ADU) = scatter(e)/gain = sqrt(Nadu*gain)/gain = sqrt(Nadu/gain)
+      ; gain = Nadu / scatter(ADU)^2
+
+      ; of course we should remove the RDNOISE in quadrature from the empirical scatter
+      rdnoise = sxpar(head,'RDNOISE',count=nrdnoise)  ; normally in electrons
+      if nrdnoise eq 0 then rdnoise_adu=0.0
+      if nrdnoise gt 0 and ngain gt 0 then rdnoise_adu=rdnoise/gain
+      skyscatter = sqrt( skysig^2 - rdnoise_adu^2)
+      gain = median(backgim)/skyscatter^2
+    endif
+    if gain lt 0 then gain=1.0
 
     ; Make the SIGMA map
     ;sigmap = sqrt(backgim>1) > skysig
-    sigmap = sqrt(im>1) > skysig
+    sigmap = sqrt(im/gain>1) > skysig
     sigmap = sigmap*(1.0-bpmask) + bpmask*65000.
 
 
     ; Getting the "stars"
     ; Must be a maximum, 8*sig above the background, but 1/2 the maximum (saturation)
+    niter = 0
+    detection:
     diffth = 0.0 ;skysig  ; sigmap
     ind = where(diffx1 gt diffth and diffx2 gt diffth and diffy1 gt diffth and diffy2 gt diffth $
                    and (im2 gt (nsig*sigmap)) and (im lt 0.5*max),nind)
     ;ind = where(diffx1 gt 0 and diffx2 gt 0 and diffy1 gt 0 and diffy2 gt 0 $
     ;               and (im gt (skymode+nsig*skysig)) and (im lt 0.5*max),nind)
+
+
+    ; No stars this way
+    ;if nind lt 2 then begin
+    ;  find,im2,xx,yy,flux,sharp,round,5*skysig,5.0,[-1,1],[0.2,1.0],/silent
+    ;  nind = n_elements(xx)
+    ;  xind = round(xx)
+    ;  yind = round(yy)
+    ;  ind2 = transpose( [[xind],[yind]])
+    ;endif else begin
+    ;  ind2 = array_indices(im,ind)
+    ;  xind = reform(ind2[0,*])
+    ;  yind = reform(ind2[1,*])
+    ;endelse
+
     ; No "stars" found
     if nind lt 2 then begin
       print,files[f],' NO STARS FOUND'
       fwhm = 99.99
       return
-    end
+    endif
     ind2 = array_indices(im,ind)
     xind = reform(ind2[0,*])
     yind = reform(ind2[1,*])
@@ -350,7 +391,7 @@ for f=0,nfiles-1 do begin
     ;sigyarr = fltarr(nind)
 
     ; Loop through the stars
-    for i=0.,nind-1 do begin
+    for i=0LL,nind-1 do begin
 
       ; Checking neighboring pixels
       ; Must >50% of central pixel
@@ -473,7 +514,7 @@ for f=0,nfiles-1 do begin
 
      endif                      ; good so far
 
-    end ; for i
+    endfor ; for i
 
     ; Getting the good ones:
     ;  -If they were bad then FWHM=0
@@ -486,6 +527,15 @@ for f=0,nfiles-1 do begin
 
     ; If no stars fit this criteria then make it more conservative
     if ngd eq 0 then gd = where(fwhmarr gt 0.0 and roundarr lt 1.0,ngd)
+
+    ; Retry with lower detection limit
+    if ngd lt 10 and niter lt 5 and nsig gt 2 then begin
+      nsig *= 0.5
+      if not keyword_set(silent) then print,'No good sources detected.  Lowering detection limts to ',strtrim(nsig,2),' sigma'
+      niter++
+      goto,detection
+    endif
+
     if ngd eq 0 then begin
       fwhm = 99.99
       return
@@ -544,7 +594,7 @@ for f=0,nfiles-1 do begin
       ;wait,0.5
       ;stop
 
-    End
+    Endfor
 
     ; Now pick out the "good" ones
     medpar2 = MEDIAN([gstr.pars[2]])
@@ -575,7 +625,6 @@ for f=0,nfiles-1 do begin
       ;print,strtrim(nokay,2),'/',strtrim(ngd,2),' sources passed the Gaussian fitting tests'
       ngd = nokay
     endif
-
 
     ; There are some good stars
     if ngd ge 2 then begin

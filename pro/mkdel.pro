@@ -53,7 +53,7 @@ print,strtrim(nf,2),' FILES'
 
 ; Loop through the files
 for k=0,nf-1 do begin
-
+   
   ; Read the .als file
   READCOL,aalsfile[k],id1,x1,y1,amag,amagerr,sky,it,chi,sharp,format='I,F,F,F,F,F,F,F,F',skipline=3,/silent
   nstars = n_elements(id1)
@@ -78,7 +78,7 @@ for k=0,nf-1 do begin
   close,unit
   free_lun,unit
 
-end
+endfor
 
 
 ; THIS IS THE FORTRAN VERSION

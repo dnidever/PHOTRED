@@ -61,7 +61,7 @@ y = fltarr(nrow)
 num = lonarr(nrow,nfiles)-1
 ;arr = fltarr(ncol,nrow)
 flag = 0
-count = 0
+count = 0LL
 istar = 0LL
 while ~EOF(unit) do begin
   line = ''

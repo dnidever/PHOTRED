@@ -135,7 +135,7 @@ if (imagerstest eq 0) then begin
   printlog,logfile,'NO >>imagers<< file in '+scriptsdir+'  PLEASE CREATE ONE!'
   return
 endif
-; The columns need to be: Telescope, Instrument, Naps, separator
+; The columns need to be: Telescope, Instrument, Namps, separator
 imagers_fieldnames = ['telescope','instrument','observatory','namps','separator']
 imagers_fieldtpes = [7,7,7,3,7]
 imagers = IMPORTASCII(scriptsdir+'/imagers',fieldnames=imagers_fieldnames,$
@@ -419,7 +419,7 @@ For i=0,nfieldfiles-1 do begin
     tempfile = MKTEMP('dao')    ; absolute path
     WRITELINE,tempfile,lines
     FILE_CHMOD,tempfile,'755'o
- 
+
     ; Run the program
     SPAWN,tempfile+' '+ibase,out,errout
     ;FILE_DELETE,tempfile    ; delete the temporary script

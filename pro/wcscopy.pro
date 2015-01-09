@@ -1,4 +1,4 @@
-pro wcscopy,file1,file2,stp=stp
+pro wcscopy,file1,file2,stp=stp,distortion=distortion
 
 ;+
 ;
@@ -9,6 +9,7 @@ pro wcscopy,file1,file2,stp=stp
 ; INPUTS:
 ;  file1   The FITS file with the reference WCS that is to be copied
 ;  file2   The FITS file to be updated.
+;  /distortion  Include the distortion terms (for TNX and TPV only for now).
 ;  /stp    Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -25,7 +26,7 @@ nfile2 = n_elements(file2)
 
 ; Not enough inputs
 if (nfile1 eq 0 or nfile2 eq 0) then begin
-  print,'Syntax - wcscopy,file1,file2'
+  print,'Syntax - wcscopy,file1,file2,distortion=distortion'
   return
 endif
 
@@ -61,6 +62,18 @@ endif
 ; Extracting WCS in FILE1
 EXTAST,head1,astr1
 
+; Get distortion terms
+if keyword_set(distortion) then begin
+  ctype1 = sxpar(head1,'CTYPE1')
+  dum = strsplit(ctype1,'-',/extract)
+  wcstype = dum[1]
+  case wcstype of  ; WCS type
+  'TNX': wcs = hdr2wcstnx(head1)
+  'TPV': wcs = hdr2wcstpv(head1)
+  else: print,'No distortion terms for '+wcstype
+  endcase
+endif
+
 if (n_elements(astr1) eq 0) then begin
   print,'NO WCS in ',file1
   return
@@ -76,7 +89,16 @@ if (error2 ne '') then begin
 endif
 
 ; Putting WCS into FILE2
-PUTAST,head2,astr1
+if n_elements(wcs) eq 0 then begin
+  PUTAST,head2,astr1
+endif else begin
+  case wcstype of  ; WCS type
+  'TNX': wcstnx2hdr, head2, wcs
+  'TPV': wcstpv2hdr, head2, wcs
+  else: print,'No distortion terms for '+wcstype
+  endcase
+endelse
+
 
 ; Updating FILE2
 print,'Updating ',file2

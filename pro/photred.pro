@@ -128,7 +128,6 @@ pro photred,dirs,redo=redo,stp=stp
 ;           F3.ccd1053.fits        F3.ccd1053c1.fits     IMACS
 ;   SUCCESS: FITS  - Same as outlist
 ;
-
 ;
 ; DAOPHOT
 ;   This program runs DAOPHOT on all the images (using Tony Sohn's script).

@@ -62,7 +62,8 @@ if nname eq 0 then begin
   name = strarr(ninput)
   pre = 'pr'
   if n_elements(prefix) gt 0 then pre=prefix[0]
-  for i=0,ninput-1 do name[i]=maketemp(pre)
+  for i=0,ninput-1 do name[i]=maketemp(pre)   ; I sped this up
+  ;for i=0,ninput-1 do name[i]=file_basename(mktemp(pre))
 endif
 
 ; Make scriptnames
@@ -178,7 +179,7 @@ FOR i=0,ninput-1 do begin
   Endelse
 
 
-END
+ENDFOR
 
 ; Go back to original directory
 CD,curdir

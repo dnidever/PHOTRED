@@ -333,7 +333,7 @@ nrej=0
 par = replicate(0.0,nnights+3)
 if not keyword_set(silent) then begin
   print,'-------------------------------------'
-  print,' ITER  NPTS   RMS       MAD     NREJ  '
+  print,' ITER  NPTS   RMS       SIG     NREJ  '
   print,'====================================='
 endif
 WHILE (flag ne 1) do begin
@@ -350,11 +350,17 @@ WHILE (flag ne 1) do begin
         night:tarr.night, chip:chip, mapnight:mapnight, weight:tarr.weight}
 
   npar = n_elements(par)
-  parinfo = replicate({fixed:0},npar)
+  parinfo = replicate({limited:[0,0],limits:[0.0,0.0],fixed:0},npar)
+  ; zeropoint
+  parinfo[npar-4].limited=1 & parinfo[npar-4].limits=[-5,5]
+  ; airmass
+  parinfo[npar-3].limited=1 & parinfo[npar-3].limits=[-5,5]
   if n_elements(fixam) gt 0 then begin
     par[npar-3] = fixam
     parinfo[npar-3].fixed = 1
   endif
+  ; color
+  parinfo[npar-2].limited=1 & parinfo[npar-2].limits=[-5,5]
   if n_elements(fixcol) gt 0 then begin
     par[npar-2] = fixcol
     parinfo[npar-2].fixed = 1
@@ -381,14 +387,15 @@ WHILE (flag ne 1) do begin
   npts = n_elements(tarr.mag)
   totwt = total(tarr.weight)
   rms = sqrt( total(tarr.weight*resid^2.)*npts/((npts-1.)*totwt) )
-  mad = mad(resid)
+  sig = mad(resid)
   
   model2 = std_transfunc(fpar,mag=arr.mag,col=arr.col,am=arr.airmass,night=arr.night,mapnight=mapnight)
   resid2 = model2-arr.cmag
 
 
   ; New Rejecting stars with bad resids
-  bad1 = where(abs(resid2-median(resid2,/even)) gt 3.0*mad and arr.rejected eq 0,nbad1)
+  thresh = 3.0*sig > 0.015 
+  bad1 = where(abs(resid2-median(resid2,/even)) gt thresh and arr.rejected eq 0,nbad1)
   if nbad1 gt 0 then begin
     arr[bad1].rejected = 1
     ;remove,bd,arr
@@ -404,7 +411,7 @@ WHILE (flag ne 1) do begin
     ind = lindgen(nind)+idlo[i]
     ;ind = where(arr.id eq uniqid[i],nind)
     medresid = median(resid2[ind],/even)
-    if (abs(medresid) gt 2.0*mad and min(arr[ind].rejected) eq 0 and nind gt 2) then begin
+    if (abs(medresid) gt 2.0*sig and min(arr[ind].rejected) eq 0 and nind gt 2) then begin
       newbad = where(arr[ind].rejected eq 0,nbad2)
       arr[ind].rejected = 1
       
@@ -426,9 +433,9 @@ WHILE (flag ne 1) do begin
   if nnewrej eq 0 then flag=1
 
   fmt = '(I3,I6,F10.5,F10.5,I5,A5,A-45)'
-  ;print,format=fmt,count,npts,rms,mad,nbd
+  ;print,format=fmt,count,npts,rms,sig,nbd
   if not keyword_set(silent) then $
-    print,format=fmt,count,npts,rms,mad,nnewrej,'',com
+    print,format=fmt,count,npts,rms,sig,nnewrej,'',com
 
   ;stop
 

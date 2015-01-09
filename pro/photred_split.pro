@@ -244,10 +244,13 @@ FOR i=0,ninputlines-1 do begin
     if (next ge 10) then begin
       strnext = strtrim(next,2)
       last = strmid(strnext,1,1)
-    
+
+      undefine,splitfiles    
       splitfiles1 = FILE_SEARCH(base+'_[1-9].fits',/fully,count=nsplitfiles1)
       if nsplitfiles1 gt 0 then PUSH,splitfiles,splitfiles1
-      splitfiles2 = FILE_SEARCH(base+'_1[0-'+last+'].fits',/fully,count=nsplitfiles2)
+      ;splitfiles2 = FILE_SEARCH(base+'_1[0-'+last+'].fits',/fully,count=nsplitfiles2)
+      maxten = long(next)/10
+      splitfiles2 = FILE_SEARCH(base+'_[1-'+strtrim(maxten,2)+'][0-9].fits',/fully,count=nsplitfiles2)
       if nsplitfiles2 gt 0 then PUSH,splitfiles,splitfiles2
       nsplitfiles = n_elements(splitfiles)
     
