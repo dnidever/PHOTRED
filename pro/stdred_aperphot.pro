@@ -108,6 +108,11 @@ if obs_struct.name eq '' then begin
   return
 endif
 
+; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread')
+if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if strtrim(hyperthread,2) eq '0' then hyperthread=0
+if n_elements(hyperthread) eq 0 then hyperthread=0
 
 
 ;###################
@@ -157,7 +162,7 @@ endif
 ; Copy the scripts to the directories
 ;-------------------------------------
 ; Checking that the scripts exist
-scripts = ['photo.opt']
+scripts = ['photo.opt','aperphot.sh']
 ;scripts = ['photo.opt','apcor.opt','daophot.sh','lstfilter','goodpsf.pro']
 nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
@@ -172,6 +177,9 @@ for i=0,ndirs-1 do begin
   FILE_COPY,scriptsdir+'/'+scripts,dirs[i],/overwrite
 end
 
+; Getting NMULTI
+nmulti = READPAR(setup,'NMULTI')
+nmulti = long(nmulti)
 
 
 ;##################################################
@@ -299,10 +307,12 @@ for i=0,ndirs-1 do begin
       ; Make daophot option files
       ;--------------------------
       ;MKOPT,base+'.fits'
-      PHOTRED_MKOPT,base+'.fits',error=error
-      if n_elements(error) gt 0 then begin
-        printlog,logfile,'PHOTRED_MKOPT Error'
-        successarr[ind]=0
+      if testopt eq 0 or testals eq 0 then begin
+        PHOTRED_MKOPT,base+'.fits',error=error
+        if n_elements(error) gt 0 then begin
+          printlog,logfile,'PHOTRED_MKOPT Error'
+          successarr[ind]=0
+        endif
       endif
 
       ; Check OPT file
@@ -389,77 +399,32 @@ procbaselist = FILE_BASENAME(fitsbaselist[gd],'.fits')
 procdirlist = fitsdirlist[gd]
 nprocbaselist = n_elements(procbaselist)
 
-; Looping through the files
-FOR i=0,nprocbaselist-1 do begin
+
+
+
+;----------------------
+; RUNNING THE COMMANDS
+;----------------------
+
+; Make commands for daophot
+cmd = './aperphot.sh '+procbaselist
+
+; Submit the jobs to the daemon
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread
+
+
+;-------------------
+; Checking OUTPUTS
+;-------------------
+
+; Loop through all files in procbaselist
+For i=0,nprocbaselist-1 do begin
 
   ; CD to the appropriate directory
   CD,procdirlist[i]
 
   longfile = procdirlist[i]+'/'+procbaselist[i]+'.fits'
   base = procbaselist[i]
-
-  printlog,logfile,'Running DAOPHOT on ',base
-
-  ; Copy the .opt file daophot.opt 
-  if FILE_TEST('daophot.opt') eq 0 then $
-    FILE_COPY,base+'.opt','daophot.opt',/over
-
-  ; Make a temporary script to run FIND and PHOT on all stars
-  ; and get bright stars for DAOGROW
-  undefine,lines
-  push,lines,'#!/bin/sh'
-  push,lines,'daophot="/net/astro/bin/daophot"'
-  push,lines,'export image=${1}'
-  push,lines,'rm ${image}.log      >& /dev/null'
-  push,lines,'rm ${image}.coo      >& /dev/null'
-  push,lines,'rm ${image}.ap       >& /dev/null'
-  push,lines,'rm ${image}a.coo       >& /dev/null'
-  push,lines,'rm ${image}a.ap       >& /dev/null'
-  push,lines,'daophot << END_DAOPHOT >> ${image}.log'
-  push,lines,'OPTIONS'
-  push,lines,'${image}.opt'
-  push,lines,''
-  push,lines,'ATTACH ${image}.fits'
-  push,lines,'FIND'
-  push,lines,'1,1'
-  push,lines,'${image}.coo'
-  push,lines,'y'
-  push,lines,'PHOTOMETRY'
-  push,lines,'photo.opt'
-  push,lines,''
-  push,lines,'${image}.coo'
-  push,lines,'${image}.ap'
-  push,lines,'EXIT'
-  push,lines,'END_DAOPHOT'
-  push,lines,''
-  push,lines,'# Get the magnitude limit'
-  push,lines,'maglim=`grep "Estimated magnitude limit" ${image}.log'+" | awk '{print $6-1.0}'`"
-  push,lines,''
-  push,lines,'# Pick PSF stars'
-  push,lines,'daophot << END_DAOPHOT >> ${image}.log'
-  push,lines,'OPTIONS'
-  push,lines,'${image}.opt'
-  push,lines,''
-  push,lines,'ATTACH ${image}.fits'
-  push,lines,'PICKPSF'
-  push,lines,'${image}.ap'
-  push,lines,'100,${maglim}'
-  push,lines,'${image}a.coo'
-  push,lines,'PHOTOMETRY'
-  push,lines,'photo.opt'
-  push,lines,''
-  push,lines,'${image}a.coo'
-  push,lines,'${image}a.ap'
-  push,lines,'EXIT'
-  push,lines,'END_DAOPHOT'
-
-  tempfile = MKTEMP('dao')    ; absolute path
-  WRITELINE,tempfile,lines
-  FILE_CHMOD,tempfile,'755'o
-
-  ; Run the program
-  SPAWN,tempfile+' '+base,out,errout
-  FILE_DELETE,tempfile    ; delete the temporary script
 
   ; Check the outputs
   cootest = FILE_TEST(base+'.coo')
@@ -484,25 +449,15 @@ FOR i=0,nprocbaselist-1 do begin
     PUSH,failurelist,longfile
   endelse
 
-
-  ; CD back to original directory
   CD,curdir
 
-
-  ;#####################
-  ; UPDATE the Lists
-  ;#####################
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
-
-END
-
+Endfor
 
 ;#####################
-; SUMMARY of the Lists
+; UPDATE the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,/silent
 
 
 printlog,logfile,'STDRED_APERPHOT Finished  ',systime(0)
