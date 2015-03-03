@@ -121,10 +121,13 @@ orig = arr
 if keyword_set(sepchip) and tag_exist(arr,'CHIP') then begin
   print,'Solving all CHIPS separately'
 
+  print,'' & print,'Initial solution of each chip separately'
   ui = uniq(arr.chip,sort(arr.chip))
   chips = arr[ui].chip
   nchips = n_elements(chips)
+  undefine,alltrans1
   for i=0,nchips-1 do begin
+    print,'' & print,'Chip = ',strtrim(chips[i],2)
     ind = where(arr.chip eq chips[i],nind)
     inparr = arr[ind]
     stdred_transphot,'',stp=stp,plotresid=plotresid,$
@@ -141,25 +144,32 @@ if keyword_set(sepchip) and tag_exist(arr,'CHIP') then begin
   mapchip[chips] = indgen(nchips)
 
   ; Remove zero-point offsets and fit color-term, airmass and airmass*color terms
+  print,'' & print,'Removing zero-point offsets and solving for color, airmass and airmass*color terms'
   zpterm = alltrans1[mapchip[arr.chip]].zpterm
   tarr = arr
   tarr.mag -= zpterm
   stdred_transphot,'',stp=stp,plotresid=plotresid,$
                  yrange=yrange,fixam=fixam,fixcol=fixcol,fixac=fixac,fitac=fitac,$
                  trans=trans0,tlines=tlines,rms=rms,errlim=errlim,$
-                 inparr=tarr,/nooutput,/silent
-
+                 inparr=tarr,/nooutput  ;,/silent
+  print,'Airmass term = ',trans0.amterm
+  print,'Color term = ',trans0.colterm
+  print,'Airmass*color term = ',trans0.amcolterm
+  
   ; Now fix color-term, airmass and airmass-color terms and refit chip zeropoints
-  fixam = trans0.amterm
-  fixcol = trans0.colterm
-  fixac = trans0.amcolterm
+  print,'' & print,'Refitting zero-point offsets and keeping color, airmass and airmass*color terms fixed'
+  fixam = trans0[0].amterm
+  fixcol = trans0[0].colterm
+  fixac = trans0[0].amcolterm
+  undefine,alltrans
   for i=0,nchips-1 do begin
+    print,'' & print,'Chip = ',strtrim(chips[i],2)
     ind = where(arr.chip eq chips[i],nind)
     inparr = arr[ind]
     stdred_transphot,'',stp=stp,plotresid=plotresid,$
                  yrange=yrange,fixam=fixam,fixcol=fixcol,fixac=fixac,$
                  trans=trans,tlines=tlines,rms=rms,errlim=errlim,$
-                 arr=arr1,inparr=inparr,/silent,/nooutput
+                 arr=arr1,inparr=inparr,/nooutput  ;,/silent
     push,allarr,arr1
     add_tag,trans,'chip',chips[i],trans
     PUSH,alltrans,trans
@@ -208,37 +218,49 @@ if keyword_set(sepchip) and tag_exist(arr,'CHIP') then begin
   if not keyword_set(nooutput) then $
     WRITELINE,magname+'.trans',lines
 
-  ; Transformation equations for each chip
-  undefine,lines1,all
-  tlines = strarr(nchips,2)
-  for i=0,nchips-1 do begin
+  ; Transformation equations for each night and chip
+  ui = uniq(alltrans.night,sort(alltrans.night))
+  unights = alltrans[ui].night
+  nnights = n_elements(unights)
+  for i=0,nnights-1 do begin
+    print,'Night ',strtrim(unights[i],2)
+    undefine,lines1,all
+    tlines = strarr(nchips,2)
+    for j=0,nchips-1 do begin
+      tind = where(alltrans.night eq unights[i] and alltrans.chip eq chips[j],ntind)
+      itrans = alltrans[tind[0]]
 
-    itrans = alltrans[i]
+      undefine,lines1
+      add=string(itrans.chip,format='(I3)')+'  '+magname+'  '+colname+'  '
+      nadd = strlen(add)
+      magline = add+string(itrans.zpterm,format=fmt2)+'   '+string(itrans.amterm,format=fmt2)+$
+           '   '+string(itrans.colterm,format=fmt2)+'   '+string(itrans.amcolterm,format=fmt2)+'   0.0000'
+      push,lines1,magline
+      spaces = string(byte(lonarr(nadd)+32))
+      errline = spaces+string(itrans.zperr,format=fmt2)+'   '+string(itrans.amerr,format=fmt2)+$
+           '   '+string(itrans.colerr>0.0001,format=fmt2)+'   '+string(itrans.amcolerr>0.0001,format=fmt2)+'   0.0000'
+      push,lines1,errline
 
-    undefine,lines1
-    add=string(itrans.chip,format='(I3)')+'  '+magname+'  '+colname+'  '
-    nadd = strlen(add)
-    magline = add+string(itrans.zpterm,format=fmt2)+'   '+string(itrans.amterm,format=fmt2)+$
-         '   '+string(itrans.colterm,format=fmt2)+'   '+string(itrans.amcolterm,format=fmt2)+'   0.0000'
-    push,lines1,magline
-    spaces = string(byte(lonarr(nadd)+32))
-    errline = spaces+string(itrans.zperr,format=fmt2)+'   '+string(itrans.amerr,format=fmt2)+$
-         '   '+string(itrans.colerr>0.0001,format=fmt2)+'   '+string(itrans.amcolerr>0.0001,format=fmt2)+'   0.0000'
-    push,lines1,errline
+      ; Add to trans lines array
+      tlines[i,*] = lines1
 
-    ; Add to trans lines array
-    tlines[i,*] = lines1
+      push,all,' '
+      push,all,lines1
+    endfor
+    printline,all
+    print,''
+    WRITELINE,'n'+strtrim(unights[i],2)+magname+'.trans',all
 
-    push,all,' '
-    push,all,lines1
-  end
-  printline,all
-  WRITELINE,magname+'.trans',all,/append
+    ; Add to MAG.trans file
+    WRITELINE,magname+'.trans',['','Night '+strtrim(unights[i],2)],/append
+    WRITELINE,magname+'.trans',all,/append
+  endfor
+
 
   ; Output the stars used for deriving the transformation
   ; with the REJECTED tag
   arr = allarr
-
+  
   return
 
 endif  ; each chip separately
@@ -666,7 +688,7 @@ for i=0,nnights-1 do begin
   ;push,all,'Night '+strtrim(i+1,2)+' Transformation Equations'
   push,all,'Night '+strtrim(unights[i],2)+' Transformation Equations'
   push,all,lines1
-end
+endfor
 
 ; Write everything to a log file
 if not keyword_set(nooutput) then begin
