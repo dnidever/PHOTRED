@@ -49,7 +49,8 @@ if test eq 0 then begin
 endif
 
 ; Read in the file
-if numlines(filename) gt 0 then $
+;if numlines(filename) gt 0 then $
+if file_lines(filename) gt 0 then $
 ;READLINE,filename,lines,comment='#'
 ;lines = strtim(lines,2)
 READCOL,filename,lines,format='A',comment='#',/silent
