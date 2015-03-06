@@ -122,7 +122,7 @@ end
 ;--------------------------------------------------------
 
 pro imfwhm,input,fwhm,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
-           skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect
+           head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
@@ -195,6 +195,7 @@ for f=0,nfiles-1 do begin
 
     files = 'Input Image'
     im = inpim
+    if n_elements(head0) gt 0 then head=head0 else mkhdr,head,im  ; input header, otherwise make fake header
 
   endelse
 
