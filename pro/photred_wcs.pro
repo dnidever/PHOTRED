@@ -122,7 +122,15 @@ skipwcs = READPAR(setup,'SKIPWCS')
 skipwcs = strtrim(skipwcs,2)
 if skipwcs eq '1' then skipwcs=1 else undefine,skipwcs
 
+; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread')
+if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if strtrim(hyperthread,2) eq '0' then hyperthread=0
+if n_elements(hyperthread) eq 0 then hyperthread=0
 
+; Getting NMULTI
+nmulti = READPAR(setup,'NMULTI')
+nmulti = long(nmulti)
 
 
 ;###################
@@ -197,6 +205,7 @@ FOR i=0,ninputlines-1 do begin
   file = FILE_BASENAME(longfile)
   filedir = FILE_DIRNAME(longfile)
   base = FILE_BASENAME(file,'.fits')
+  printlog,logfile,strtrim(i+1,2),' ',longfile
 
   ; Check that the file exists
   test = FILE_TEST(longfile)
@@ -214,9 +223,10 @@ FOR i=0,ninputlines-1 do begin
   object = SXPAR(head,'OBJECT')
 
   ; Does this have multiple extensions
-  UNDEFINE,im,hh
-  FITS_READ,file,im,hh,exten=1,message=message,/no_abort
-  if n_elements(im) gt 0 and strtrim(message,2) eq '' then mef=1 else mef=0
+  FITS_OPEN,file,fcb,message=message0
+  nextend = fcb.nextend
+  FITS_CLOSE,fcb
+  if nextend gt 0 then mef=1 else mef=0
 
   ; We only do SPLIT files, NOT MEF files
   if (mef eq 1) then begin
@@ -234,14 +244,16 @@ FOR i=0,ninputlines-1 do begin
     printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
     ; Read in the image
-    FITS_READ,file,im,head,/no_abort,message=message
+    ;FITS_READ,file,im,head,/no_abort,message=message
+    im = MRDFITS(file,0,head,status=status,/silent)
 
     ; Make sure BZERO=0
     bzero = sxpar(head,'BZERO',count=nbzero)
     if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
     ; Write the FLOAT image
-    if (message[0] eq '') then $
+    ;if (message[0] eq '') then $
+    if (status eq 0) then $
     FITS_WRITE,file,float(im),head
 
     ; There was a problem reading the image
@@ -272,7 +284,7 @@ FOR i=0,ninputlines-1 do begin
     printlog,logfile,''
 
     ; Add to the PBS command list
-    cmd1 = "WCSFIT,'"+file+"',up='E',left='S',refname="+wcsrefname
+    cmd1 = "WCSFIT,'"+file+"',up='E',left='S',refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
@@ -290,7 +302,7 @@ FOR i=0,ninputlines-1 do begin
     printlog,logfile,''
 
     ; Add to the PBS command list
-    cmd1 = "WCSFIT_IMACS,'"+file+"',refname="+wcsrefname
+    cmd1 = "WCSFIT_IMACS,'"+file+"',refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
@@ -334,7 +346,7 @@ FOR i=0,ninputlines-1 do begin
 
     ; Add to the PBS command list
     undefine,error
-    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
@@ -372,7 +384,7 @@ FOR i=0,ninputlines-1 do begin
     endelse
 
     ; Add to the PBS command list
-    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
@@ -387,9 +399,9 @@ FOR i=0,ninputlines-1 do begin
   if (instrument ne 'mosaic' and instrument ne 'imacs' and instrument ne 'lbc' and $
       telescope ne 'swope') then begin
 
-    printlog,logfile,''
-    printlog,logfile,file,' is NOT a MOSAIC/IMACS/LBC/SWOPE image.  Trying anyway.'
-    printlog,logfile,''
+    ;printlog,logfile,''
+    ;printlog,logfile,file,' is NOT a MOSAIC/IMACS/LBC/SWOPE image.  Trying anyway.'
+    ;printlog,logfile,''
 
     if n_elements(wcspixscale) gt 0 then pixscale=wcspixscale
 
@@ -403,7 +415,7 @@ FOR i=0,ninputlines-1 do begin
     endif
 
     ; Add to the PBS command list
-    cmd1 = "WCSFIT,'"+file+"',pixscale="+strtrim(pixscale,2)+",refname="+wcsrefname
+    cmd1 = "WCSFIT,'"+file+"',pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(wcsleft) gt 0 then cmd1+=",left="+wcsleft
     if n_elements(wcsup) gt 0 then cmd1+=",up="+wcsup
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
@@ -421,25 +433,28 @@ FOR i=0,ninputlines-1 do begin
 
 ENDFOR
 
-
 ; Run WCSFIT with PBS_DEAMON
 ;----------------------------
 printlog,logfile,'Running WCSFIT on images'
 ncmd = n_elements(cmd)
 printlog,logfile,strtrim(ncmd,2),' files to run WCSFIT on'
 
+; no update
+;print,'NO UPDATE'
+;cmd += ',/noupdate'
+
 if ncmd gt 0 then begin
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=5
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=1  ;2, 5
 endif
-
 
 ; Check for success/failures
 for i=0,ncmd-1 do begin
   ; Successful
   head = HEADFITS(cmdlongfile[i])
-  ctype1 = strtrim(SXPAR(head,'CTYPE1'),2)
-  if (n_elements(error) eq 0 and ctype1 ne '0') then begin
+  ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1),2)
+  dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
+  if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then begin
     PUSH,successlist,cmdlongfile[i]
     PUSH,outlist,cmdlongfile[i]
   
@@ -449,7 +464,6 @@ for i=0,ncmd-1 do begin
     PUSH,failurelist,cmdlongfile[i]
   endelse
 endfor
-
 
 FINISH:
 
