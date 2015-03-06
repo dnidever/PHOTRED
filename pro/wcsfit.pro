@@ -150,7 +150,7 @@ endif else im=float(inpim)
 ; Get the FWHM
 ;IMFWHM,filename,fwhm,im=im
 if n_elements(inpfwhm) eq 0 then begin
-  IMFWHM,filename,fwhm,silent=silent,exten=exten,im=im
+  IMFWHM,filename,fwhm,silent=silent,exten=exten,im=im,head=head
 endif else fwhm=inpfwhm
 ;if fwhm gt 50 then fwhm=10
 if fwhm gt 50 then begin
@@ -431,7 +431,11 @@ endif else begin
   if tag_exist(refcat1,'RMAG') then begin
     refals.mag = refcat1.rmag
     refals.err = refcat1.rerr
+  endif else if tag_exist(refcat1,'R1MAG') then begin
+    refals.mag = refcat1.r1mag
+    refals.err = 0.05  ; just a guess
   endif
+
 endelse
 
 ; Only getting reference stars with good photometry
@@ -1270,7 +1274,7 @@ end
 
 pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
            cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
-           redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname
+           redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift
 
 t0 = systime(1)
 undefine,error
@@ -1400,7 +1404,6 @@ if nastr gt 0 then begin
   HEAD_XYAD,head,0.5*nx,0.5*ny,cenra0,cendec0,/degree
 
 endif
-
 
 ; WCS Projection Type
 if n_elements(projection) eq 0 and n_elements(projhead) ne 0 then projection=projhead
@@ -1950,7 +1953,8 @@ if n_elements(refcat) eq 0 then begin
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
-  refcat = QUERYVIZIER(refcatname, [cenra,cendec], [dist,dist], /canada, /allcolumns)
+  canada = 0 ; 1
+  refcat = QUERYVIZIER(refcatname, [cenra,cendec], [dist,dist], canada=canada, /allcolumns)
   nrefcat = n_elements(refcat)
   type = size(refcat,/type)
 
@@ -2057,14 +2061,14 @@ if (strmid(ctype1,5,3) eq 'TNX' or strupcase(projection) eq 'TNX') or $
    (strmid(ctype1,5,3) eq 'TPV' or strupcase(projection) eq 'TPV') then begin
   print,'Using header WCS to get initial X/Y coordinates for Reference stars'
 
-  HEAD_ADXY,head,double(refcat.raj2000),double(refcat.dej2000),x,y,/degree
+  ;HEAD_ADXY,head,double(refcat.raj2000),double(refcat.dej2000),x,y,/degree
+  ADXY,head,double(refcat.raj2000),double(refcat.dej2000),x,y
+
   refcat.x = x
   refcat.y = y
 
   usedheadxy = 1
 endif
-
-;stop
 
 
 ;########################################################
@@ -2113,7 +2117,8 @@ if tag_exist(refcat1b,'JMAG') then begin
 endif else begin
   maglim = 21.0
   print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2)
-  gd = where(refcat1b.rmag lt maglim,ngd)
+  if tag_exist(refcat1b,'RMAG') then gd = where(refcat1b.rmag lt maglim,ngd) else $
+    gd = where(refcat1b.r1mag lt maglim,ngd)
   refcat1b = refcat1b[gd]
 endelse
 
@@ -2148,6 +2153,8 @@ if (nastr gt 0) then begin
 
   dcr = ceil(2.0/pixscale)
   SRCMATCH,xref,yref,cat.x,cat.y,dcr,ind1,ind2,count=nmatch
+  ;if nmatch lt 10 then SRCMATCH,xref,yref,cat.x,cat.y,2*dcr,ind1,ind2,count=nmatch
+  ;if nmatch lt 10 then SRCMATCH,xref,yref,cat.x,cat.y,4*dcr,ind1,ind2,count=nmatch
 
   ; Enough matches
   if (nmatch gt 10) then begin
@@ -2165,14 +2172,34 @@ if (nastr gt 0) then begin
 
   endif else initrms=99999.
 
+  ;; No good matches, try MATCHSTARS.PRO
+  ;if (initrms ge 1.0) then begin
+  ;
+  ;  print,'Initial RMS bad.  Trying cross-correlation.'
+  ;
+  ;  MATCHSTARS,xref,yref,cat.x,cat.y,ind1,ind2,trans,maxshift=maxshift,count=nmatch,/norot
+  ;
+  ;  ; Enough matches
+  ;  if (nmatch gt 10) then begin
+  ;    xdiff = xref[ind1]-cat[ind2].x
+  ;    ydiff = yref[ind1]-cat[ind2].y
+  ;    xmed = median(xdiff,/even)
+  ;    ymed = median(ydiff,/even)
+  ;    diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
+  ;    initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0)
+  ;    print,'Robust RMS = ',strtrim(initrms,2),' arcsec'
+  ;  endif else initrms=999999.
+  ;endif ; no match
+
 
   ; No good matches, try MATCHSTARS_XCORR.PRO
-  if (initrms ge 1.0) then begin
+  ;if (initrms ge 1.0) then begin
+  if (nmatch lt 10) or (initrms ge 2.0) then begin
 
-    print,'Initial RMS bad.  Trying cross-correlation.'
+    print,'Initial RMS bad or not enough matches.  Trying cross-correlation.'
 
     MATCHSTARS_XCORR,xref,yref,cat.x,cat.y,xsh,ysh,ang,bestcorr,xcorr,xyscale=4,fwhm=4,$
-                     smooth=4,nsig=nsig,matchnum=matchnum
+                     smooth=4,nsig=nsig,matchnum=matchnum,maxshift=maxshift
 
     ; Good XCORR match
     if (nsig gt 7) then begin
@@ -2197,7 +2224,8 @@ if (nastr gt 0) then begin
 
 
   ; Use the intial WCS
-  if (initrms lt 1.0) then begin
+  ;if (initrms lt 1.0) then begin
+  if (initrms lt 2.0) then begin
     print,'Using the intial WCS'
     refcat1b.x = xref
     refcat1b.y = yref
@@ -2246,7 +2274,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
     si = sort(refcat1b.jmag)
     refcat1b = refcat1b[si]
   endif else begin
-    si = sort(refcat1b.rmag)
+    if tag_exist(refcat1b,'RMAG') then si=sort(refcat1b.rmag) else si=sort(refcat1b.r1mag)
     refcat1b = refcat1b[si]
   endelse
 
@@ -2260,7 +2288,8 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
   print,''
 
   ; Get the matches
-  MATCHSTARS,refcat1b_bright.x,refcat1b_bright.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,rms=matchrms
+  MATCHSTARS,refcat1b_bright.x,refcat1b_bright.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+             rms=matchrms,maxshift=maxshift
 
   ; We successed
   if (nmatch ge 3 and matchrms*pixscale lt 1.5*rmslim) then begin
@@ -2291,7 +2320,8 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
   print,'-- Matching Stars.  Using ALL reference stars --'
   print,''
 
-  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,rms=matchrms
+  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+             rms=matchrms,maxshift=maxshift
 
 endif
 
@@ -2312,7 +2342,8 @@ if ((nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and usedheadxy eq 1) then b
   refcat1b.y = y
 
   ; Match the stars
-  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,rms=matchrms
+  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+             rms=matchrms,maxshift=maxshift
 
 endif
 
