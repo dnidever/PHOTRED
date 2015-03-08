@@ -444,6 +444,7 @@ printlog,logfile,strtrim(ncmd,2),' files to run WCSFIT on'
 ;cmd += ',/noupdate'
 
 if ncmd gt 0 then begin
+  cmd = "cd,'"+cmddir+"' & "+cmd  ; go to the directory
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=1  ;2, 5
 endif

@@ -365,7 +365,7 @@ if ntomakeoptlist gt 0 then begin
   ; We could run them in groups of 5.  Lose less "runtime" between checks
 
   ; Make commands for daophot
-  cmd = "PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
+  cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5
 endif
@@ -497,7 +497,7 @@ if (psfcomsrc eq 1) then begin
   endfor
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=60
+  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=30
 
 endif
 
@@ -589,7 +589,7 @@ Endif ; some done already?
 cmd = './daophot.sh '+procbaselist
 
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=30
 
 
 ; IT WOULD BE BETTER TO UPDATE THE LISTS

@@ -274,10 +274,10 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
           SPAWN,'qsub '+scriptname[0],out,errout
         endif else begin
           if keyword_set(idle) then batchprog='idlbatch' else batchprog='runbatch'
-          cd,dirs[newind[i]]
+          ;cd,dirs[newind[i]]
           SPAWN,batchprog+' '+scriptname[0],out,errout
-          cd,curdir
-       endelse
+          ;cd,curdir
+        endelse
 
         ; Check that there weren't any errors
         dum = where(errout ne '',nerror)
