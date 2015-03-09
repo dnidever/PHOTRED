@@ -39,7 +39,7 @@
 ;-
 
 pro photred_commonsources,input,minsources=minsources0,redo=redo,gaussfit=gaussfit,$
-                          error=error,stp=stp,maxframes=maxframes
+                          error=error,stp=stp,maxframes=maxframes,setupdir=setupdir
 
 COMMON photred,setup
 
@@ -67,7 +67,7 @@ endif
 if nfiles gt 1 then begin
   for i=0,nfiles-1 do begin
     PHOTRED_COMMONSOURCES,file[i],minsources=minsources0,redo=redo,gaussfit=gaussfit,$
-                          error=error,stp=stp,maxframes=maxframes
+                          error=error,stp=stp,maxframes=maxframes,setupdir=setupdir
     if keyword_set(verbose) then print,''
   endfor
   return
@@ -100,7 +100,7 @@ if n_elements(maxframes) eq 0 then maxframes=5
 ; and the second column are the values.
 ; Use READPAR.PRO to read it
 if n_elements(setup) eq 0 then begin
-  PHOTRED_LOADSETUP,setup,count=count
+  PHOTRED_LOADSETUP,setup,setupdir=setupdir,count=count
   if count lt 1 then return
 endif
 

@@ -1,5 +1,5 @@
 pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
-               hyperthread=hyperthread,waittime=waittime
+               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir
 
 ;+
 ;
@@ -274,9 +274,9 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
           SPAWN,'qsub '+scriptname[0],out,errout
         endif else begin
           if keyword_set(idle) then batchprog='idlbatch' else batchprog='runbatch'
-          ;cd,dirs[newind[i]]
+          if keyword_set(cdtodir) then cd,dirs[newind[i]]
           SPAWN,batchprog+' '+scriptname[0],out,errout
-          ;cd,curdir
+          if keyword_set(cdtodir) then cd,curdir
         endelse
 
         ; Check that there weren't any errors

@@ -1,4 +1,4 @@
-pro photred_loadsetup,setup,count=count,std=std,stp=stp
+pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,stp=stp
 
 ;+
 ;
@@ -30,8 +30,12 @@ setup = strarr(2,2)+'-1'         ; no setup
 ; This is a 2xN array.  First colume are the keywords
 ; and the second column are the values.
 ; Use READPAR.PRO to read it
-setupfiles = FILE_SEARCH('photred.*setup',count=nsetupfiles)
-if keyword_set(std) then setupfiles = FILE_SEARCH('stdred.*setup',count=nsetupfiles)
+if n_elements(setupdir) gt 0 then setupfiles=FILE_SEARCH(setupdir+'/photred.*setup',count=nsetupfiles) else $
+  setupfiles = FILE_SEARCH('photred.*setup',count=nsetupfiles)
+if keyword_set(std) then begin
+  if n_elements(setupdir) gt 0 then setupfiles=FILE_SEARCH(setupdir+'/stdred.*setup',count=nsetupfiles)
+  setupfiles = FILE_SEARCH('stdred.*setup',count=nsetupfiles)
+endif
 if (nsetupfiles lt 1) then begin
   if keyword_set(std) then print,'NO STDRED SETUP FILE' else $
     print,'NO PHOTRED SETUP FILE'
