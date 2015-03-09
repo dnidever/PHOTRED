@@ -182,7 +182,7 @@ FOR i=0,ninput-1 do begin
 ENDFOR
 
 ; Erase the temporary files that MAKETEMP makes
-file_delete,name,'\/allow
+file_delete,name,/allow
 
 ; Go back to original directory
 CD,curdir
