@@ -93,6 +93,7 @@ for i=0,nfiles-1 do begin
   ;  Get mean/median sky level
   if n_elements(out) eq 1 and out[0] eq '' then begin
     print,'Getting mean/median sky levels for ',base
+    if file_test('daophot.opt') eq 0 then file_copy,base+'.opt','daophot.opt'
     undefine,cmdlines
     PUSH,cmdlines,'#!/bin/sh'
     PUSH,cmdlines,'export image=${1}'
