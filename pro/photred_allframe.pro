@@ -356,6 +356,8 @@ For i=0,ninputlines-1 do begin
 
   BOMB:
 
+  CD,curdir
+
 end  ; loop through MCH files
 
 
@@ -424,7 +426,6 @@ If not keyword_set(redo) then begin
     printlog,logfile,''
   endif
 
-
   ; No files to run
   if nprocbaselist eq 0 then begin
     printlog,logfile,'NO FILES TO PROCESS'
@@ -458,7 +459,7 @@ hyades = stregex(host,'hyades',/boolean,/fold_case)
 if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread))  then begin
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,procdirlist,/idle,nmulti=nmulti,prefix='alf',hyperthread=hyperthread
+  PBS_DAEMON,cmd,procdirlist,/idle,nmulti=nmulti,prefix='alf',hyperthread=hyperthread,waittime=1,/cdtodir
 
 
 ; Normal, single jobs
@@ -466,8 +467,10 @@ endif else begin
 
   ; Looping through the files
   FOR i=0,nprocbaselist-1 do begin
+    cd,procdirlist[i]
     ALLFRAME,procbaselist[i],scriptsdir=scriptsdir,finditer=finditer,detectprog=alfdetprog
-  END
+    cd,curdir
+  ENDFOR
 
 endelse
 
