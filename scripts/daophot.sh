@@ -478,6 +478,7 @@ apcor.opt
 ${image}.plst
 ${image}a.ap
 exit
+
 END_DAOPHOT
 #cat ${image}.als.opt > allstar.opt
 cat ${image}.als.opt > ${image}a.als.inp
