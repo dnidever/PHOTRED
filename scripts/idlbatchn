@@ -1,0 +1,9 @@
+if test $# -eq 0
+then
+  echo 'Syntax - idlbatchn idl.batch'
+else
+  echo 'Log file: '$1'.log'
+#  ( nohup nice /common/rsi/idl/bin/idl < $1 > $1.log 2>&1 ) &
+  ( nohup nice /Applications/exelis/idl82/bin/idl < $1 > $1.log 2>&1 ) &
+  echo $!
+fi

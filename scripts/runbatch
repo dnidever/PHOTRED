@@ -1,0 +1,8 @@
+if test $# -eq 0
+then
+  echo 'Syntax - runbatch program'
+else
+  echo 'Log file: '$1'.log'
+  ( nohup  $1 > $1.log 2>&1 ) &
+  echo $!
+fi
