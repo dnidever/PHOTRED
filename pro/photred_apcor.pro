@@ -146,7 +146,7 @@ test = file_test('daogrow',/directory)
 ; directory exists already, erase and start again
 if test eq 1 then FILE_DELETE,'daogrow',/recursive
 FILE_MKDIR,'daogrow'
-
+daogrowdir = curdir+'/daogrow/'
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
@@ -265,8 +265,8 @@ for i=0,ninputlines-1 do begin
 
   ; Copy the files to daogrow/
   ;----------------------------
-  FILE_COPY,alsfile,'daogrow',/overwrite,/allow_same
-  FILE_COPY,apfile,'daogrow',/overwrite,/allow_same
+  FILE_COPY,alsfile,daogrowdir,/overwrite,/allow_same
+  FILE_COPY,apfile,daogrowdir,/overwrite,/allow_same
 
   ; This file was okay
   successarr[i] = 1
@@ -286,8 +286,8 @@ printlog,logfile,strtrim(ncopy,2),'/',strtrim(ninputlines,2),' successfully copi
 ;--------------------------------
 printlog,logfile,'Making DAOGROW input files: daogrow/daogrow.inf and daogrow/daogrow.ext'
 
-OPENW,infunit,/get_lun,'daogrow/daogrow.inf'
-OPENW,extunit,/get_lun,'daogrow/daogrow.ext'
+OPENW,infunit,/get_lun,daogrowdir+'daogrow.inf'
+OPENW,extunit,/get_lun,daogrowdir+'daogrow.ext'
 
 ; Loop through the FITS files
 For i=0,ninputlines-1 do begin
@@ -295,7 +295,9 @@ For i=0,ninputlines-1 do begin
   ; Only use "good" files
   if (successarr[i] eq 1) then begin
 
-    fitsfile = FILE_BASENAME(inputlines[i])
+    filedir = FILE_DIRNAME(inputlines[i])
+    ;fitsfile = FILE_BASENAME(inputlines[i])
+    fitsfile = inputlines[i]
     base = FILE_BASENAME(fitsfile,'.fits')
 
     ; Getting information from header
@@ -350,13 +352,11 @@ For i=0,ninputlines-1 do begin
     ; Outputting to the EXT file
     printf,extunit,base+'a.ap'
 
-
-  end  ; "good" file
-
+  endif  ; "good" file
 
   BOMB2:
 
-End
+Endfor
 
 CLOSE,infunit
 FREE_LUN,infunit
