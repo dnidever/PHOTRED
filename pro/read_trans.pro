@@ -163,23 +163,23 @@ for i=0,ntrans-1 do begin
   ind = where(arr eq band,nind)
 
   ; colsign = 1 means band - colband
-  if (ind eq 0) then begin
+  if (ind[0] eq 0) then begin
     trans[i].colband = arr[1]
     trans[i].colsign = 1
   endif
 
   ; colsign = 2 means colband - band
-  if (ind eq 1) then begin
+  if (ind[0] eq 1) then begin
     trans[i].colband = arr[0]
     trans[i].colsign = 2
   endif
 
-  if (ind eq -1) then begin
+  if (ind[0] eq -1) then begin
     trans[i].colband = ''
     trans[i].colsign = -1
   endif
 
-end
+endfor
 
 
 ; Print the transformation equations
