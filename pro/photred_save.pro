@@ -169,7 +169,6 @@ FOR i=0,ninputlines-1 do begin
       finalfile = ifield+'.final'
       printlog,logfile,'Copying ',file,' -> ',finalfile
       FILE_COPY,file,finalfile,/overwrite
-      ;SPAWN,'cp '+file+' '+finalfile,out,errout
 
       ; Make the IDL SAVE file
       savefile = ifield+'.dat'
@@ -177,18 +176,39 @@ FOR i=0,ninputlines-1 do begin
       printlog,logfile,'Making IDL SAVE file ',savefile
       SAVE,final,file=savefile
 
+      ; Make FITS binary file
+      fitsfile = ifield+'.fits'
+      printlog,logfile,'Making FITS binary file ',fitsfile
+      MWRFITS,final,fitsfile,/create
+      printlog,logfile,'Compressing FITS binary file'
+      gfitsfile = fitsfile+'.gz'
+      if file_test(gfitsfile) then file_delete,gfitsfile    
+      SPAWN,'gzip '+fitsfile
+
+      ; Copy final files from FIELD subdirectory to "main" directory
+      if filedir ne curdir then begin
+        printlog,logfile,'Copying final files to main directory ',curdir
+        FILE_COPY,[finalfile,savefile,gfitsfile],curdir+'/'+[finalfile,savefile,gfitsfile],/allow_same,/overwrite
+        ; Rename the final output files
+        finalfile = curdir+'/'+finalfile
+        savefile = curdir+'/'+savefile
+        gfitsfile = curdir+'/'+gfitsfile
+      endif
+
       ; Check that the FINAL and DAT files exist
       finaltest = FILE_TEST(finalfile)
       savetest = FILE_TEST(savefile)
+      fitstest = FILE_TEST(gfitsfile)
 
       ; We were successful
-      if (finaltest eq 1) and (savetest eq 1) then begin
-        PUSH,outlist,filedir+'/'+[finalfile,savefile]   ; add both files to outputarr
+      if (finaltest eq 1) and (savetest eq 1) and (fitstest eq 1) then begin
+        PUSH,outlist,filedir+'/'+[finalfile,savefile,gfitsfile]   ; add all files to outputarr
         PUSH,successlist,longfile
       end else begin
         PUSH,failurelist,longfile
         if finaltest eq 0 then printlog,logfile,finalfile,' NOT FOUND'
         if savetest eq 0 then printlog,logfile,savefile,' NOT FOUND'
+        if savetest eq 0 then printlog,logfile,gfitsfile,' NOT FOUND'
       endelse
 
 
@@ -218,7 +238,7 @@ FOR i=0,ninputlines-1 do begin
 
   ;stop
 
-END
+ENDFOR
 
 
 ;#####################
