@@ -4,16 +4,15 @@ pro photred_calib,redo=redo,stp=stp
 ;
 ; PHOTRED_CALIB
 ;
-; This does the calibration (i.e runs mscmagma.pro) for photred
-; See mscmagma_prep.pro and mscmagma.pro
-; and post_processingsmc.pro
+; This does the calibration (i.e runs photcalib.pro) for photred
+; See photcalib_prep.pro and photcalib.pro
 ;
 ; INPUTS:
 ;  /redo Redo files that were already done.
 ;  /stp  Stop at the end of the program.
 ;
 ; OUTPUTS:
-;  The calibrated photometry PHOT files from MSCMAGMA
+;  The calibrated photometry PHOT files from PHOTCALIB
 ;
 ; By D.Nidever  Mar 2008
 ;-
@@ -46,8 +45,8 @@ printlog,logfile,'Starting PHOTRED_'+thisprog+'  ',systime(0)
 
 
 ; Check that all of the required programs are available
-progs = ['readline','readlist','readpar','photred_mscmagma_prep','photred_getfilter',$
-         'photred_getexptime','mscmagma','photred_getinput','photred_updatelists','photred_loadsetup',$
+progs = ['readline','readlist','readpar','photred_photcalib_prep','photred_getfilter',$
+         'photred_getexptime','photcalib','photred_getinput','photred_updatelists','photred_loadsetup',$
          'undefine','push','printlog','importascii','loadmch','photred_photcalib_prep','photcalib',$
          'photred_getairmass','photred_getdate','badpar','airmass','first_el','strsplitter',$
          'touchzero','writeline','mktemp','photred_getuttime','sexig2ten','stress','strep',$
