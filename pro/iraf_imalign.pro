@@ -342,14 +342,14 @@ trimsection = (trimsection)(*)
 ; Because of the trimming this can cause shifts between the
 ; original and shifted/combined images
 head1 = headfits(sreference)
-crpix1a = sxpar(head1,'CRPIX1')
-crpix2a = sxpar(head1,'CRPIX2')
+crpix1a = sxpar(head1,'CRPIX1',/silent)
+crpix2a = sxpar(head1,'CRPIX2',/silent)
 ; Image has WCS
 if strtrim(crpix1a,2) ne '0' then begin
   base = file_basename(sreference,'.fits')
   head2 = headfits(base+'.shft.fits')
-  crpix1b = sxpar(head2,'CRPIX1')
-  crpix2b = sxpar(head2,'CRPIX2')
+  crpix1b = sxpar(head2,'CRPIX1',/silent)
+  crpix2b = sxpar(head2,'CRPIX2',/silent)
   xoff = crpix1a-crpix1b
   yoff = crpix2a-crpix2b
 ; No WCS, Use LTV1/LTV2
@@ -357,8 +357,8 @@ endif else begin
   base = file_basename(sreference,'.fits')
   head = headfits(base+'.shft.fits')
   ; Take negative
-  ltv1 = sxpar(head,'LTV1')
-  ltv2 = sxpar(head,'LTV2')
+  ltv1 = sxpar(head,'LTV1',/silent)
+  ltv2 = sxpar(head,'LTV2',/silent)
   ; Take negative
   ; xorig = xshift + xoff
   ; yorig = yshift + yoff

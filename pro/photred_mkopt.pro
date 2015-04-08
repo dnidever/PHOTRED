@@ -141,7 +141,7 @@ endif
 ; Getting saturation limit from the header
 if n_elements(hilimit) eq 0 then hilimit = 6.4e4
 lolimit = 10000.0                                   ; just in case
-saturate = SXPAR(head,'SATURATE',count=nsaturate)
+saturate = SXPAR(head,'SATURATE',count=nsaturate,/silent)
 ;if nsaturate eq 0 then saturate=(max(im) < hilimit)  ; if not found
 if nsaturate eq 0 then saturate=lolimit > (max(im)-1000) < hilimit  ; if not found
 

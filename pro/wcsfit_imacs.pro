@@ -108,12 +108,12 @@ filebase = FILE_BASENAME(ifile,'.fits')
   head = HEADFITS(ifile)
 
   ; Make sure this is an IMACS image
-  chip = strtrim(sxpar(head,'CHIP'),2)
-  ra_d = strtrim(sxpar(head,'RA-D'),2)
-  dec_d = strtrim(sxpar(head,'DEC-D'),2)
-  choffx = strtrim(SXPAR(head,'CHOFFX'),2)
-  choffy = strtrim(SXPAR(head,'CHOFFY'),2)
-  rotangle = strtrim(SXPAR(head,'ROTANGLE'),2)
+  chip = strtrim(sxpar(head,'CHIP',/silent),2)
+  ra_d = strtrim(sxpar(head,'RA-D',/silent),2)
+  dec_d = strtrim(sxpar(head,'DEC-D',/silent),2)
+  choffx = strtrim(SXPAR(head,'CHOFFX',/silent),2)
+  choffy = strtrim(SXPAR(head,'CHOFFY',/silent),2)
+  rotangle = strtrim(SXPAR(head,'ROTANGLE',/silent),2)
   if (chip eq '0' or ra_d eq '0' or dec_d eq '0' or choffx eq '0' or $
       choffy eq '0' or rotangle eq '0') then begin
     printlog,logf,ifile,' IS NOT AN IMACS IMAGE'
@@ -128,7 +128,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
 
   ; Make sure that |BITPIX| > 16
   ; Only works for single chip images
-  bitpix = long(SXPAR(head,'BITPIX'))
+  bitpix = long(SXPAR(head,'BITPIX',/silent))
   if (bitpix eq 8 or bitpix eq 16) then begin
     printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
@@ -245,8 +245,8 @@ filebase = FILE_BASENAME(ifile,'.fits')
   ; SKY-RIGHT sense.
   ; X(fieldcen) = X(chipcen) + XOFF
   ; Y(fieldcen) = Y(chipcen) + YOFF
-  xoffcen = SXPAR(head,'CHOFFX')/0.20   ; convert to pix
-  yoffcen = SXPAR(head,'CHOFFY')/0.20   ; convert to pix
+  xoffcen = SXPAR(head,'CHOFFX',/silent)/0.20   ; convert to pix
+  yoffcen = SXPAR(head,'CHOFFY',/silent)/0.20   ; convert to pix
 
   ; Star Coordinates
   x = cat.x
@@ -292,8 +292,8 @@ filebase = FILE_BASENAME(ifile,'.fits')
   ;--------------------------------
   ; Now get the USNO-B1 catalog
   ;--------------------------------
-  cenra = SXPAR(head,'RA-D')
-  cendec = SXPAR(head,'DEC-D')
+  cenra = SXPAR(head,'RA-D',/silent)
+  cendec = SXPAR(head,'DEC-D',/silent)
 
   usnocat = filebase+'_refcat.dat'
   test = FILE_TEST(usnocat)
@@ -403,7 +403,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
   y = y * 3600.0d0 / 0.200d0
 
   ; Check the rotation
-  rotangle = SXPAR(head,'ROTANGLE')
+  rotangle = SXPAR(head,'ROTANGLE',/silent)
   diffangle = 90.0 - rotangle
   ;diffangle = rotangle - 90.0
 
@@ -523,7 +523,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
   ; CRPIX1 NOT input
   endif else begin
     ;scrpix1 = SXPAR(head,'CRPIX1')
-    scrpix1 = SXPAR(head_orig,'CRPIX1')
+    scrpix1 = SXPAR(head_orig,'CRPIX1',/silent)
     ; Using value already in header
     if strtrim(scrpix1,2) ne '0' then begin
       crpix1 = float(scrpix1)
@@ -542,7 +542,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
   ; CRPIX2 NOT input
   endif else begin
     ;scrpix2 = SXPAR(head,'CRPIX2')
-    scrpix2 = SXPAR(head_orig,'CRPIX2')
+    scrpix2 = SXPAR(head_orig,'CRPIX2',/silent)
     ; Using value already in header
     if strtrim(scrpix2,2) ne '0' then begin
       crpix2 = float(scrpix2)

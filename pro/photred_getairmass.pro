@@ -56,7 +56,7 @@ if n_elements(obs) eq 0 then obs=''
 head = HEADFITS(file)
 
 ; Get AIRMASS from header
-am = SXPAR(head,'AIRMASS',count=nam)
+am = SXPAR(head,'AIRMASS',count=nam,/silent)
 
 
 ; Compute airmass with RA/DEC, DATE and observatory
@@ -67,8 +67,8 @@ if nam eq 0 or float(am) lt 0.9 or keyword_set(recalculate) then begin
   if n_elements(astr) gt 0 then begin
     ;ra = astr.crval[0]
     ;dec = astr.crval[1]
-    naxis1 = sxpar(head,'NAXIS1')
-    naxis2 = sxpar(head,'NAXIS2')
+    naxis1 = sxpar(head,'NAXIS1',/silent)
+    naxis2 = sxpar(head,'NAXIS2',/silent)
 
     ; use center of image
     head_xyad,head,naxis1/2,naxis2/2,ra,dec,/degree
@@ -77,9 +77,9 @@ if nam eq 0 or float(am) lt 0.9 or keyword_set(recalculate) then begin
   endif else begin
 
     ; Get RA/DEC
-    ra = SXPAR(head,'RA',count=nra)
+    ra = SXPAR(head,'RA',count=nra,/silent)
     if (nra gt 0 and (strpos(ra,':'))[0] ne -1) then ra=sexig2ten(ra)*15.0
-    dec = SXPAR(head,'DEC',count=ndec)
+    dec = SXPAR(head,'DEC',count=ndec,/silent)
     if (ndec gt 0 and (strpos(dec,':'))[0] ne -1) then dec=sexig2ten(dec)
 
     if (nra eq 0) then begin

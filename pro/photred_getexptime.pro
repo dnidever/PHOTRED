@@ -44,7 +44,7 @@ if test eq 0 then begin
 endif
 
 head = HEADFITS(file)
-exptime = SXPAR(head,'EXPTIME')
+exptime = SXPAR(head,'EXPTIME',/silent)
 
 ; No EXPTIME
 if strtrim(exptime,2) eq '0' then exptime=-1.0

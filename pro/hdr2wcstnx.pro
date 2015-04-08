@@ -12,13 +12,13 @@ function hdr2wcstnx, h, $
     for i=0,n_elements(ss1)-1 do s1 = s1 + ss1[i]
     ;for i=0,4 do s1 = s1 + ss1[i]
     tnx1 = parsetnx(s1)
-    ss2 = sxpar(h,'WAT2_*')
+    ss2 = sxpar(h,'WAT2_*',/silent)
     s2 = ''
     for i=0,n_elements(ss2)-1 do s2 = s2 + ss2[i]
     ;for i=0,4 do s2 = s2 + ss2[i]
     tnx2 = parsetnx(s2)
-    ccdsec  = fix(strsplit(sxpar(h,'CCDSEC'), '[:,]',/ex))
-    datasec = fix(strsplit(sxpar(h,'CCDSEC'),'[:,]',/ex))
+    ccdsec  = fix(strsplit(sxpar(h,'CCDSEC',/silent), '[:,]',/ex))
+    datasec = fix(strsplit(sxpar(h,'CCDSEC',/silent),'[:,]',/ex))
     ;datasec = fix(strsplit(sxpar(h,'DATASEC'),'[:,]',/ex))
 
     ;et = utc2et(sxpar(h,'DATE-OBS'))

@@ -71,17 +71,17 @@ head = HEADFITS(file)
 
 
 ; Try DATE-OBS
-date = sxpar(head,'DATE-OBS',count=ndate)
+date = sxpar(head,'DATE-OBS',count=ndate,/silent)
 if ndate eq 0 then $
 ; Try DATENEW
 if ndate eq 0 then $
-date = sxpar(head,'DATENEW',count=ndate)
+date = sxpar(head,'DATENEW',count=ndate,/silent)
 ; Try UT-DATE
 if ndate eq 0 then $
-date = sxpar(head,'UT-DATE',count=ndate)
+date = sxpar(head,'UT-DATE',count=ndate,/silent)
 ; Try DATE_OBS
 if ndate eq 0 then $
-date = sxpar(head,'DATE_OBS',count=ndate)
+date = sxpar(head,'DATE_OBS',count=ndate,/silent)
 
 
 ; NO date found

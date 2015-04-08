@@ -189,21 +189,21 @@ for i=0,ninputlines-1 do begin
   if (uttime eq '') then com=com+' UT-TIME ERROR,'
 
   ; Checking FILTER
-  filter = SXPAR(head,'FILTER',count=nfilter)
+  filter = SXPAR(head,'FILTER',count=nfilter,/silent)
   if (nfilter eq 0) then com=com+' FILTER ERROR,'
 
   ; Checking EXPTIME
-  exptime = SXPAR(head,'EXPTIME',count=nexptime)
+  exptime = SXPAR(head,'EXPTIME',count=nexptime,/silent)
   if (nexptime eq 0) then com=com+' EXPTIME ERROR,'
 
   ; Checking RA
-  ra = SXPAR(head,'RA',count=nra)
-  if nra eq 0 then ra = SXPAR(head,'CRVAL1',count=nra)
+  ra = SXPAR(head,'RA',count=nra,/silent)
+  if nra eq 0 then ra = SXPAR(head,'CRVAL1',count=nra,/silent)
   if (nra eq 0) then com=com+' RA ERROR,'
 
   ; Checking DEC
-  dec = SXPAR(head,'DEC',count=ndec)
-  if ndec eq 0 then dec = SXPAR(head,'CRVAL2',count=ndec)
+  dec = SXPAR(head,'DEC',count=ndec,/silent)
+  if ndec eq 0 then dec = SXPAR(head,'CRVAL2',count=ndec,/silent)
   if (ndec eq 0) then com=com+' DEC ERROR,'
 
   ; Checking DATE
@@ -256,7 +256,7 @@ FOR i=0,ninputlines-1 do begin
   head = HEADFITS(file)
 
   ; Getting object information
-  object = SXPAR(head,'OBJECT')
+  object = SXPAR(head,'OBJECT',/silent)
   objarr[i] = object
 
   ; Getting filter information
@@ -371,7 +371,7 @@ FOR i=0,ninputlines-1 do begin
   ; Load the header
   head = HEADFITS(longfile)
 
-  object = SXPAR(head,'OBJECT')
+  object = SXPAR(head,'OBJECT',/silent)
   exptime = PHOTRED_GETEXPTIME(longfile)
   filter = PHOTRED_GETFILTER(longfile)
   ut = PHOTRED_GETUTTIME(longfile)

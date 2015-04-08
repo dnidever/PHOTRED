@@ -371,7 +371,7 @@ satlevelarr = fltarr(nfiles)
 for i=0,nfiles-1 do begin
   ;head = headfits(base[i]+'.fits')
   FITS_READ,base[i]+'.fits',im,head,/no_abort
-  saturate = sxpar(head,'SATURATE',count=nsaturate)
+  saturate = sxpar(head,'SATURATE',count=nsaturate,/silent)
   if nsaturate eq 0 then saturate=max(im)-1000.
   satlevelarr[i] = saturate
 endfor
@@ -409,8 +409,8 @@ if keyword_set(trimcomb) then begin
 
   ; Calculate the trim section
   hd = headfits(reffile)
-  xsize = lonarr(nfiles)+sxpar(hd,'NAXIS1')
-  ysize = lonarr(nfiles)+sxpar(hd,'NAXIS2')
+  xsize = lonarr(nfiles)+sxpar(hd,'NAXIS1',/silent)
+  ysize = lonarr(nfiles)+sxpar(hd,'NAXIS2',/silent)
   IA_TRIM,xshift,yshift,xsize,ysize,trimsection
   xoff = trimsection[0]-1
   yoff = trimsection[2]-1
@@ -433,8 +433,8 @@ if keyword_set(trimcomb) then begin
 ; Don't trim the images
 endif else begin
   hd = headfits(reffile)
-  xsize = sxpar(hd,'NAXIS1')
-  ysize = sxpar(hd,'NAXIS2')
+  xsize = sxpar(hd,'NAXIS1',/silent)
+  ysize = sxpar(hd,'NAXIS2',/silent)
   trimsection = [1,xsize,1,ysize]
   xoff = 0
   yoff = 0
@@ -503,8 +503,8 @@ if keyword_set(trimcomb) then begin
     newim = im[xstart:xstop,ystart:ystop]
     ; Add LTV1/LTV2 to the header
     ;  these are IRAF keywords to convert from logical to physical coords
-    ltv1 = sxpar(head,'LTV1')  ; 0 if not found
-    ltv2 = sxpar(head,'LTV2')  ; 0 if not found
+    ltv1 = sxpar(head,'LTV1',/silent)  ; 0 if not found
+    ltv2 = sxpar(head,'LTV2',/silent)  ; 0 if not found
     sxaddpar,head,'LTV1',ltv1-xstart
     sxaddpar,head,'LTV2',ltv2-ystart
     MWRFITS,newim,outmaskfiles[i],head,/create,/silent

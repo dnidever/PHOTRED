@@ -623,7 +623,7 @@ case strupcase(proj) of
 
   ; This header already has a TNX WCS
   ;----------------------------------
-  ctype1 = sxpar(head,'CTYPE1')
+  ctype1 = sxpar(head,'CTYPE1',/silent)
   if (strtrim(ctype1,2) ne '0') then begin
 
 
@@ -770,7 +770,7 @@ End ; TNX
 
   ; This header already has a TPV WCS
   ;----------------------------------
-  ctype1 = sxpar(head,'CTYPE1')
+  ctype1 = sxpar(head,'CTYPE1',/silent)
   if (strtrim(ctype1,2) ne '0') then begin
 
 
@@ -1355,8 +1355,8 @@ info = {up:'', left:'', cenra:0.0d0, cendec:0.0d0, nx:0L, ny:0L,$
          pixscale:0.0, xhalf:0L, yhalf:0L}
 
 ; Does this image already have a WCS?
-ctype1 = SXPAR(head,'CTYPE1')
-ctype2 = SXPAR(head,'CTYPE2')
+ctype1 = SXPAR(head,'CTYPE1',/silent)
+ctype2 = SXPAR(head,'CTYPE2',/silent)
 EXTAST,head,astr
 nastr = n_elements(astr)
 ; We have a WCS
@@ -1393,14 +1393,14 @@ if nastr gt 0 then begin
   if n_elements(up0) eq 0 then up0=up
 
   ; Projection type
-  c1type = SXPAR(head,'CTYPE1')
+  c1type = SXPAR(head,'CTYPE1',/silent)
   ;c1type = astr.ctype[0]
   projhead = first_el(strsplit(c1type,'-',/extract),/last)
   projhead = strtrim(projhead,2)
 
   ; Getting central RA/DEC
-  nx = SXPAR(head,'NAXIS1')
-  ny = SXPAR(head,'NAXIS2')
+  nx = SXPAR(head,'NAXIS1',/silent)
+  ny = SXPAR(head,'NAXIS2',/silent)
   HEAD_XYAD,head,0.5*nx,0.5*ny,cenra0,cendec0,/degree
 
 endif
@@ -1478,12 +1478,12 @@ info.pixscale = pixscale
 
 ; Getting central RA
 if n_elements(cenra0) eq 0 then begin
-  sra = sxpar(head,'RA')
+  sra = sxpar(head,'RA',/silent)
 
   ; RA not found, check CRVAL1
   if strtrim(sra,2) eq '0' then begin
-    ctype1 = sxpar(head,'CTYPE1')
-    crval1 = sxpar(head,'CRVAL1')
+    ctype1 = sxpar(head,'CTYPE1',/silent)
+    crval1 = sxpar(head,'CRVAL1',/silent)
 
     ; Use CRVAL1
     if strupcase(strmid(strtrim(ctype1,2),0,2)) eq 'RA' and $
@@ -1492,8 +1492,8 @@ if n_elements(cenra0) eq 0 then begin
 
     ; CRVAL1 not there or not RA, Check CRVAL2
     endif else begin
-      ctype2 = sxpar(head,'CTYPE2')
-      crval2 = sxpar(head,'CRVAL2')
+      ctype2 = sxpar(head,'CTYPE2',/silent)
+      crval2 = sxpar(head,'CRVAL2',/silent)
 
       ; It's there
       if strupcase(strmid(strtrim(ctype2,2),0,2)) eq 'RA' and $
@@ -1526,12 +1526,12 @@ endif else cenra=cenra0
 
 ; Getting central DEC
 if n_elements(cendec0) eq 0 then begin
-  sdec = sxpar(head,'DEC')
+  sdec = sxpar(head,'DEC',/silent)
  
   ; DEC not found, check CRVAL2
   if strtrim(sdec,2) eq '0' then begin
-    ctype2 = sxpar(head,'CTYPE2')
-    crval2 = sxpar(head,'CRVAL2')
+    ctype2 = sxpar(head,'CTYPE2',/silent)
+    crval2 = sxpar(head,'CRVAL2',/silent)
 
     ; Use CRVAL2
     if strupcase(strmid(strtrim(ctype2,2),0,3)) eq 'DEC' and $
@@ -1540,8 +1540,8 @@ if n_elements(cendec0) eq 0 then begin
 
     ; CRVAL2 not there or not DEC, Check CRVAL1
     endif else begin
-      ctype1 = sxpar(head,'CTYPE1')
-      crval1 = sxpar(head,'CRVAL1')
+      ctype1 = sxpar(head,'CTYPE1',/silent)
+      crval1 = sxpar(head,'CRVAL1',/silent)
 
       ; It's there
       if strupcase(strmid(strtrim(ctype1,2),0,3)) eq 'DEC' and $
@@ -1570,8 +1570,8 @@ info.cendec = cendec
 
 
 ; Get image size
-nx = sxpar(head,'NAXIS1')
-ny = sxpar(head,'NAXIS2')
+nx = sxpar(head,'NAXIS1',/silent)
+ny = sxpar(head,'NAXIS2',/silent)
 ; Get it from the image
 if strtrim(nx,2) eq '0' or strtrim(ny,2) eq '0' then begin
   ;FITS_READ,filename,im,head
@@ -1589,7 +1589,7 @@ info.xhalf = xhalf
 info.yhalf = yhalf
 
 ; Print out image information
-obj = SXPAR(head,'OBJECT',count=nobj)
+obj = SXPAR(head,'OBJECT',count=nobj,/silent)
 if nobj eq 0 then obj=''
 print,''
 print,'OBJECT: ',obj
@@ -2056,7 +2056,7 @@ refcat.y = y
 
 ; Use the WCS in the header to get initial X/Y coordinates
 usedheadxy = 0
-ctype1 = SXPAR(head,'CTYPE1')
+ctype1 = SXPAR(head,'CTYPE1',/silent)
 if (strmid(ctype1,5,3) eq 'TNX' or strupcase(projection) eq 'TNX') or $
    (strmid(ctype1,5,3) eq 'TPV' or strupcase(projection) eq 'TPV') then begin
   print,'Using header WCS to get initial X/Y coordinates for Reference stars'
@@ -2394,7 +2394,7 @@ if n_elements(crpix1) gt 0 then begin
   crpix1 = float(crpix1)
 ; CRPIX1 NOT input
 endif else begin
-  scrpix1 = SXPAR(head,'CRPIX1')
+  scrpix1 = SXPAR(head,'CRPIX1',/silent)
   ; Using value already in header
   if strtrim(scrpix1,2) ne '0' then begin
     crpix1 = float(scrpix1)
@@ -2412,7 +2412,7 @@ if n_elements(crpix2) gt 0 then begin
   crpix2 = float(crpix2)
 ; CRPIX2 NOT input
 endif else begin
-  scrpix2 = SXPAR(head,'CRPIX2')
+  scrpix2 = SXPAR(head,'CRPIX2',/silent)
   ; Using value already in header
   if strtrim(scrpix2,2) ne '0' then begin
     crpix2 = float(scrpix2)

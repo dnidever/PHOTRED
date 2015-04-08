@@ -17,9 +17,9 @@ function hdr2wcstpv, h, $
     ; all parameters default to 0 except PV1_1 and PV2_1
     ; which default to 1
     for i=0,39 do begin
-      pv1num = sxpar(h,'PV1_'+strtrim(i,2),count=npv1num)
+      pv1num = sxpar(h,'PV1_'+strtrim(i,2),count=npv1num,/silent)
       if npv1num gt 0 then pv1[i]=pv1num
-      pv2num = sxpar(h,'PV2_'+strtrim(i,2),count=npv2num)
+      pv2num = sxpar(h,'PV2_'+strtrim(i,2),count=npv2num,/silent)
       if npv2num gt 0 then pv2[i]=pv2num
     endfor
 
@@ -33,8 +33,8 @@ function hdr2wcstpv, h, $
     ;for i=0,n_elements(ss2)-1 do s2 = s2 + ss2[i]
     ;;for i=0,4 do s2 = s2 + ss2[i]
     ;tnx2 = parsetnx(s2)
-    ccdsec  = fix(strsplit(sxpar(h,'CCDSEC'), '[:,]',/ex))
-    datasec = fix(strsplit(sxpar(h,'CCDSEC'),'[:,]',/ex))
+    ccdsec  = fix(strsplit(sxpar(h,'CCDSEC',/silent), '[:,]',/ex))
+    datasec = fix(strsplit(sxpar(h,'CCDSEC',/silent),'[:,]',/ex))
     ;datasec = fix(strsplit(sxpar(h,'DATASEC'),'[:,]',/ex))
 
     ;et = utc2et(sxpar(h,'DATE-OBS'))

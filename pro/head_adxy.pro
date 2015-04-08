@@ -38,7 +38,7 @@ if nhead eq 0 or na eq 0 or nd eq 0 then begin
   return
 endif
 
-ctype1 = sxpar(head,'CTYPE1')
+ctype1 = sxpar(head,'CTYPE1',/silent)
 ; No WCS in header
 if strtrim(ctype1,2) eq '0' then begin
   x = -1

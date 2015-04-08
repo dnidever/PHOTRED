@@ -159,7 +159,7 @@ for i=0,nfiles-1 do begin
   ;hilim = floor(hilim/100.)*100  ; round down to the nearest 100
 
   ; Getting saturation limit from the header
-  saturate = sxpar(head,'SATURATE')
+  saturate = sxpar(head,'SATURATE',/silent)
   if saturate eq 0 then saturate=(max(im) < hilimit)  ; if not found
 
   ; Minimum of all saturation levels

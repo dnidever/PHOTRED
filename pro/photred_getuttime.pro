@@ -48,20 +48,20 @@ head = HEADFITS(file)
 ; Getting UT TIME
 ;----------------
 ; Try TIME-OBS
-ut = sxpar(head,'TIME-OBS')
+ut = sxpar(head,'TIME-OBS',/silent)
 ind = strpos(ut,':')
 if ind[0] eq -1 then ut='0'
 
 ; Try UT
 if strtrim(ut,2) eq '0' then begin
-  ut = sxpar(head,'UT')
+  ut = sxpar(head,'UT',/silent)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
 endif
 
 ; Try DATE-OBS
 if strtrim(ut,2) eq '0' then begin
-  ut = sxpar(head,'DATE-OBS')
+  ut = sxpar(head,'DATE-OBS',/silent)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
   ; Is this in the format YYYY-MM-DDTHH:MM:SS.SSS ?
@@ -70,7 +70,7 @@ endif
 
 ; Try DATE_OBS (LBC data)
 if strtrim(ut,2) eq '0' then begin
-  ut = sxpar(head,'DATE_OBS')
+  ut = sxpar(head,'DATE_OBS',/silent)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
   ; Is this in the format YYYY-MM-DDTHH:MM:SS.SSS ?
@@ -79,7 +79,7 @@ endif
 
 ; Try UT-TIME
 if (strtrim(ut,2) eq '0') then begin
-  ut = SXPAR(head,'UT-TIME')
+  ut = SXPAR(head,'UT-TIME',/silent)
   ut = strtrim(ut,2)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
@@ -87,7 +87,7 @@ endif
 
 ; Try UTSTART (old Swope data)
 if strtrim(ut,2) eq '0' then begin
-  utstart = sxpar(head,'UTSTART')
+  utstart = sxpar(head,'UTSTART',/silent)
   utstart = strtrim(utstart,2)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut = REPSTR(utstart,' ',':')

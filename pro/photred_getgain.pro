@@ -52,8 +52,8 @@ if test eq 0 then begin
 endif
 
 head = HEADFITS(file)
-gain = SXPAR(head,'GAIN',count=ngain)
-egain = SXPAR(head,'EGAIN',count=negain)          ; imacs
+gain = SXPAR(head,'GAIN',count=ngain,/silent)
+egain = SXPAR(head,'EGAIN',count=negain,/silent)          ; imacs
 
 ; Use GAIN
 if ngain gt 0 then begin

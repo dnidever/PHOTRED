@@ -220,7 +220,7 @@ FOR i=0,ninputlines-1 do begin
 
   ; Load the header
   head = HEADFITS(longfile)
-  object = SXPAR(head,'OBJECT')
+  object = SXPAR(head,'OBJECT',/silent)
 
   ; Does this have multiple extensions
   FITS_OPEN,file,fcb,message=message0
@@ -239,7 +239,7 @@ FOR i=0,ninputlines-1 do begin
 
   ; Make sure that |BITPIX| > 16
   ; Only works for single chip images
-  bitpix = long(SXPAR(head,'BITPIX'))
+  bitpix = long(SXPAR(head,'BITPIX',/silent))
   if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) then begin
     printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
@@ -248,7 +248,7 @@ FOR i=0,ninputlines-1 do begin
     im = MRDFITS(file,0,head,status=status,/silent)
 
     ; Make sure BZERO=0
-    bzero = sxpar(head,'BZERO',count=nbzero)
+    bzero = sxpar(head,'BZERO',count=nbzero,/silent)
     if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
     ; Write the FLOAT image
@@ -453,7 +453,7 @@ endif
 for i=0,ncmd-1 do begin
   ; Successful
   head = HEADFITS(cmdlongfile[i])
-  ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1),2)
+  ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1,/silent),2)
   dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
   if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then begin
     PUSH,successlist,cmdlongfile[i]

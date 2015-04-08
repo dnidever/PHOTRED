@@ -306,7 +306,7 @@ for i=0,ndirs-1 do begin
       ;----------------------------------------
       ; Make sure that |BITPIX| > 16
       head = HEADFITS(fil)
-      bitpix = long(SXPAR(head,'BITPIX'))
+      bitpix = long(SXPAR(head,'BITPIX',/silent))
       if (bitpix eq 8 or bitpix eq 16) then begin
         printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
@@ -314,7 +314,7 @@ for i=0,ndirs-1 do begin
         FITS_READ,fil,im,head,/no_abort,message=message
 
         ; Make sure BZERO=0
-        bzero = sxpar(head,'BZERO',count=nbzero)
+        bzero = sxpar(head,'BZERO',count=nbzero,/silent)
         if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
         ; Write the FLOAT image

@@ -221,7 +221,7 @@ for f=0,nfiles-1 do begin
     ; Saturation limit
     satlim = max(im)
     if n_elements(head) gt 0 then begin
-      saturate = sxpar(head,'SATURATE',count=nsaturate)
+      saturate = sxpar(head,'SATURATE',count=nsaturate,/silent)
       if nsaturate gt 0 then satlim = saturate
     endif
     satlim = satlim < max(im)
@@ -313,7 +313,7 @@ for f=0,nfiles-1 do begin
     diffy2 = smim-shift(smim,0,-1)
 
     ; Get the gain (electrons/ADU)
-    gain = sxpar(head,'GAIN',count=ngain)
+    gain = sxpar(head,'GAIN',count=ngain,/silent)
     if ngain eq 0 then begin
       ; use scatter in background and Poisson statistic
       ; to calculate gain empirically
@@ -323,7 +323,7 @@ for f=0,nfiles-1 do begin
       ; gain = Nadu / scatter(ADU)^2
 
       ; of course we should remove the RDNOISE in quadrature from the empirical scatter
-      rdnoise = sxpar(head,'RDNOISE',count=nrdnoise)  ; normally in electrons
+      rdnoise = sxpar(head,'RDNOISE',count=nrdnoise,/silent)  ; normally in electrons
       if nrdnoise eq 0 then rdnoise_adu=0.0
       if nrdnoise gt 0 and ngain gt 0 then rdnoise_adu=rdnoise/gain
       skyscatter = sqrt( skysig^2 - rdnoise_adu^2)

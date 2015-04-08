@@ -64,7 +64,7 @@ EXTAST,head1,astr1
 
 ; Get distortion terms
 if keyword_set(distortion) then begin
-  ctype1 = sxpar(head1,'CTYPE1')
+  ctype1 = sxpar(head1,'CTYPE1',/silent)
   dum = strsplit(ctype1,'-',/extract)
   wcstype = dum[1]
   case wcstype of  ; WCS type

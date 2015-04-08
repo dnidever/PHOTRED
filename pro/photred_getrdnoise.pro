@@ -52,9 +52,9 @@ if test eq 0 then begin
 endif
 
 head = HEADFITS(file)
-rdnoise = SXPAR(head,'RDNOISE',count=nrdnoise)
-readnois = SXPAR(head,'READNOIS',count=nreadnois)  ; Swope
-enoise = SXPAR(head,'ENOISE',count=nenoise)        ; IMACS
+rdnoise = SXPAR(head,'RDNOISE',count=nrdnoise,/silent)
+readnois = SXPAR(head,'READNOIS',count=nreadnois,/silent)  ; Swope
+enoise = SXPAR(head,'ENOISE',count=nenoise,/silent)        ; IMACS
 
 ; Use RDNOISE
 if nrdnoise gt 0 then begin

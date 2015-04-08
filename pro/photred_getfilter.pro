@@ -127,7 +127,7 @@ if (nfile gt 0) then begin
     return,''
   endif
 
-  filtname = SXPAR(head,'FILTER')
+  filtname = SXPAR(head,'FILTER',/silent)
   filtname = strtrim(filtname,2)
   if strtrim(filtname,2) eq '0' then begin
     if not keyword_set(silent) then $

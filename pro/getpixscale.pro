@@ -38,16 +38,16 @@ endif
 head = headfits(file)
 
 ; Does the image have a SCALE parameter
-hscale = sxpar(head,'SCALE')
+hscale = sxpar(head,'SCALE',/silent)
 if strtrim(hscale,2) ne '0' then scale=hscale
 ; Does the image have a PIXSCALE parameter
 if scale eq -1 then begin
-  pixscale = sxpar(head,'PIXSCALE')
+  pixscale = sxpar(head,'PIXSCALE',/silent)
   if strtrim(pixscale,2) ne '0' then scale=pixscale
 endif
 ; Does the image have a PIXSCALE1 parameter
 if scale eq -1 then begin
-  pixscale1 = sxpar(head,'PIXSCALE1')
+  pixscale1 = sxpar(head,'PIXSCALE1',/silent)
   if strtrim(pixscale1,2) ne '0' then scale=pixscale1
 endif
 

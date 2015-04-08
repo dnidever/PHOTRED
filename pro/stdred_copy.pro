@@ -170,11 +170,11 @@ print,'-------------------------------------------------------------------------
     base = FILE_BASENAME(longfile,'.fits')
 
     head = HEADFITS(longfile)
-    object = SXPAR(head,'OBJECT',count=nobject)
+    object = SXPAR(head,'OBJECT',count=nobject,/silent)
     exptime = -1.0
-    exptime = SXPAR(head,'EXPTIME')
-    filter = SXPAR(head,'FILTER')
-    ut = SXPAR(head,'DATE-OBS')
+    exptime = SXPAR(head,'EXPTIME',/silent)
+    filter = SXPAR(head,'FILTER',/silent)
+    ut = SXPAR(head,'DATE-OBS',/silent)
 
     if (nobject eq 0) then begin
       print,'OBJECT parameter not found'

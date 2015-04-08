@@ -67,7 +67,7 @@ For i=0,nfiles-1 do begin
   sxaddpar,head,'BPM',maskname,' BPM mask file'
 
   ; Do we have bad pixels?
-  saturate = SXPAR(head,'SATURATE',count=nsaturate)
+  saturate = SXPAR(head,'SATURATE',count=nsaturate,/silent)
   if nsaturate eq 0 then begin
     if keyword_set(satlevel) then if satlevel gt 0 then saturate=satlevel
     if n_elements(saturate) eq 0 then saturate=50000.
