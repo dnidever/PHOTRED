@@ -361,8 +361,9 @@ ENDIF ELSE BEGIN
 
     endelse
 
+    cd,curdir  ; back to original directory
 
-  END
+  ENDFOR
 
 ENDELSE
 
