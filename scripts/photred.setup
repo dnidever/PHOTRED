@@ -8,6 +8,7 @@ nmulti      1
 filtref     M
 trans       blanco.trans
 ##### OPTIONAL #####
+sepfielddir 1
 keepmef     0
 redo        0
 #skipwcs    0
@@ -24,6 +25,7 @@ psfcomsrc   1
 finditer    2
 #alfdetprog  sextractor
 #alfnocmbimscale 0
+#alfexclude  F1,F3
 ddo51radoffset  1
 keepinstr   1
 avgmag      1
