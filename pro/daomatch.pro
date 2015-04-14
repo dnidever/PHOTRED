@@ -10,6 +10,7 @@
 ;  files     Array of ALS files,  The first file will be used
 ;            as the reference.
 ;  =maxshift Constraints on the initial X/Y shifts.
+;  /usewcs   Use the WCS for initial matching.  This is the default.
 ;  /verbose  Verbose output
 ;  /stp      Stop at the end of the program
 ;  =hi       Not used anymore.
@@ -78,7 +79,7 @@ end
 
 ;---------------------------------------------------------------
 
-pro daomatch,files,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
+pro daomatch,files,usewcs=usewcs,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
              maxshift=maxshift
 
 t0 = systime(1)
@@ -87,10 +88,13 @@ undefine,error
 
 nfiles = n_elements(files)
 if nfiles eq 0 then begin
-  print,'Syntax - daomatch,files,stp=stp,verbose=verbose'
+  print,'Syntax - daomatch,files,usewcs=usewcs,stp=stp,verbose=verbose'
   error = 'Not enough inputs'
   return
 end
+
+; Default parameters
+if n_elements(usewcs) eq 0 then usewcs=1  ; use WCS by default
 
 ; Logfile
 if keyword_set(logfile) then logf=logfile else logf=-1
@@ -147,7 +151,7 @@ endif
 ;      head = headfits(fitsfiles[i])
 ;      head_xyad,head,0,0,a,d,/deg
 ;      raarr[i]=a & decarr[i]=d
-;   endfor
+;    endfor
 ;    initwcs_xoff = (raarr-raarr[0])*3600*cos(decarr[0]/!radeg)/pixscale
 ;    initwcs_yoff = (decarr-decarr[0])*3600/pixscale
 ;    print,'Initial offsets from WCS'
@@ -156,6 +160,20 @@ endif
 ;
 ;  endif else print,'Not all FITS files found'
 ;endif
+
+
+; Use WCS
+if keyword_set(usewcs) then begin
+  ; Checking WCS of first file
+  fitsfile1 = file_basename(files[0],'.als')+'.fits'
+  if file_test(fitsfile1) eq 0 then begin
+    print,fitsfile1,' NOT FOUND. Cannot use WCS for matching'
+  endif else begin
+    head1 = headfits(fitsfile1)
+    extast,head1,astr1,noparams1
+    if noparams1 lt 1 then print,fitsfile1,' has NO WCS.  Cannot use WCS for matching'
+  endelse
+endif
 
 
 format = '(A2,A-30,A1,2F10.2,4F10.5,2F10.3)'
@@ -234,9 +252,53 @@ for i=1,nfiles-1 do begin
     return
   endif
 
-  ; Match stars
-  ;MATCHSTARS,refals.x,refals.y,als.x,als.y,ind1,ind2,trans,count=count,/silent
-  MATCHSTARS,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,ind1,ind2,trans,count=count,/silent
+
+  ; --- Use WCS ---
+  if keyword_set(usewcs) and noparams1 ge 1 then begin
+    ; Checking WCS of second file
+    fitsfile2 = file_basename(files[i],'.als')+'.fits'
+    if file_test(fitsfile2) eq 0 then begin
+      print,fitsfile2,' NOT FOUND. Cannot use WCS for matching'
+      goto,BOMB1
+    endif
+    head2 = headfits(fitsfile2)
+    extast,head2,astr2,noparams2
+    if noparams2 lt 1 then begin
+      print,fitsfile2,' has NO WCS.  Cannot use WCS for matching'
+      goto,BOMB1
+    endif
+
+    ; Get coordinates for the stars
+    head_xyad,head1,refals.x,refals.y,a1,d1,/deg
+    head_xyad,head2,als.x,als.y,a2,d2,/deg
+
+    SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
+ 
+    if count gt 0 then begin 
+      xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
+      ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
+      xmed = median(xdiff)
+      ymed = median(ydiff)
+      trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+      ; Fit rotation if there are enough stars
+      if count gt 10 then begin
+        fa = {x1:refals[gdref[ind1]].x,y1:refals[gdref[ind1]].y,x2:als[gdals[ind2]].x,y2:als[gdals[ind2]].y}
+        initpar = fltarr(6)
+        fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
+                      bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
+        trans = fpar
+      endif
+    endif
+
+    BOMB1:
+  endif
+
+
+  ; Match stars with X/Y coordinates
+  if (count lt 1) then begin
+    ;MATCHSTARS,refals.x,refals.y,als.x,als.y,ind1,ind2,trans,count=count,/silent
+    MATCHSTARS,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,ind1,ind2,trans,count=count,/silent
+  endif
 
   ; No good matches, try srcmatch with "small" shifts
   if (count lt 1) then begin
