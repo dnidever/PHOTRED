@@ -135,6 +135,11 @@ if strtrim(alfnocmbimscale,2) eq '1' then alfnocmbimscale=1 else undefine,alfnoc
 alftrimcomb = READPAR(setup,'alftrimcomb')
 if strtrim(alftrimcomb,2) eq '1' then alftrimcomb=1 else undefine,alftrimcomb
 
+; Fields to exclude from ALLFRAME processing
+alfexclude = READPAR(setup,'alfexclude')
+if alfexclude eq '0' or alfexclude eq '' or alfexclude eq '-1' then undefine,alfexclude
+
+
 
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------
@@ -173,6 +178,67 @@ lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='mch')
 ninputlines = lists.ninputlines
 
 
+; Exclude fields from ALLFRAME processing
+If ninputlines gt 0 and n_elements(alfexclude) gt 0 then begin
+  inputlines = lists.inputlines
+  inputfiles = file_basename(inputlines)   
+
+  ; Splitting the comma-delimited list
+  fields_exclude = strupcase(strtrim(strsplit(alfexclude,',',/extract),2))
+  nfields_exclude = n_elements(fields_exclude)
+  printlog,logfile,' '
+  printlog,logfile,'Excluding fields from ALLFRAME processing: ',fields_exclude
+
+  ; Check if there are any matches with the input list
+  toexcludearr = lonarr(ninputlines)
+  for i=0,nfields_exclude-1 do begin
+    indmatch = where(stregex(inputfiles,'^'+fields_exclude[i]+'-',/boolean) eq 1,nindmatch)
+    if nindmatch gt 0 then toexcludearr[indmatch]=1
+  endfor
+  excludefilesind = where(toexcludearr eq 1,nexcludefiles,comp=keepfilesind,ncomp=nkeepfiles)
+  if nexcludefiles eq 0 then printlog,logfile,'No files to exclude'
+
+  ; Some files to exclude
+  if nexcludefiles gt 0 then begin
+    printlog,logfile,'Excluding ',strtrim(nexcludefiles,2),' input files from ALLFRAME processing'
+
+    ; ---Adding Excluded files to logs/ASTROM.inlist---
+    ;  reading in ASTROM.inlist
+    READLIST,'logs/ASTROM.inlist',astinputlines,/exist,/unique,/fully,count=nastinputlines,logfile=logfile,/silent
+    ; Add new files to the inputlist
+    PUSH,astinputlines,inputlines[excludefilesind]
+    nastinputlines = n_elements(astinputlines)
+    ; Remove redundant names
+    ui = UNIQ(astinputlines,sort(astinputlines))
+    ui = ui[sort(ui)]
+    astinputlines = astinputlines[ui]
+    nastinputlines = n_elements(astinputlines)
+    ; Write file
+    WRITELINE,'logs/ASTROM.inlist',astinputlines
+    printlog,logfile,strtrim(nastinputlines,2),' files moved to logs/ASTROM.inlist'
+
+    ; ---Removing excluded files from input list and logs/ALLFRAME.inlist---
+    if nkeepfiles gt 0 then begin
+      REMOVE,excludefilesind,inputlines    
+      ; Write file
+      WRITELINE,'logs/ALLFRAME.inlist',inputlines
+      ninputlines = n_elements(inputlines)
+      printlog,logfile,strtrim(nexcludefiles,2),' excluded files removed from ALLFRAME.inlist'
+      printlog,logfile,strtrim(ninputlines,2),' non-excluded input files left in ALLFRAME.inlist'
+    endif else begin
+      ; All files removed
+      FILE_DELETE,'logs/ALLFRAME.inlist'
+      TOUCHZERO,'logs/ALLFRAME.inlist' 
+    endelse
+
+    ; ---Reload the input file---
+    lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='mch')
+    ninputlines = lists.ninputlines
+    
+  endif   ; files to exclude
+Endif  ; allframe exclude files
+
+
 ; No files to process
 ;---------------------
 if ninputlines eq 0 then begin
@@ -181,8 +247,6 @@ if ninputlines eq 0 then begin
 endif
 
 inputlines = lists.inputlines
-
-
 
 
 
