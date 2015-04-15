@@ -89,13 +89,6 @@ if (instrument eq '0' or instrument eq '' or instrument eq '-1') then begin
   printlog,logfile,'NO INSTRUMENT FOUND.  Please add to >>photred.setup<< file'
   return
 endif
-; FILTREF
-filtref = READPAR(setup,'FILTREF')
-filtref = strupcase(strtrim(filtref,2))
-if (filtref eq '0' or filtref eq '' or filtref eq '-1') then begin
-  printlog,logfile,'NO REFERENCE FILTER.  Please add to >>photred.setup<< file'
-  return
-endif
 ; FORCE combination
 cmbforce = READPAR(setup,'CMBFORCE')
 cmbforce = strupcase(strtrim(cmbforce,2))

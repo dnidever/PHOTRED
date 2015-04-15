@@ -112,6 +112,10 @@ if (filtref eq '0' or filtref eq '' or filtref eq '-1') then begin
   printlog,logfile,'NO REFERENCE FILTER.  Please add to >>photred.setup<< file'
   return
 endif
+; check if filtref is a comma-delimited list of filters in order of
+; preference
+filtref = strsplit(filtref,',',/extract)
+nfiltref = n_elements(filtref)
 ; MAXSHIFT
 maxshift = READPAR(setup,'MCHMAXSHIFT')
 if maxshift ne '0' and maxshift ne '' and maxshift ne '-1' then $
@@ -434,7 +438,14 @@ FOR i=0,ndirs-1 do begin
       filters = PHOTRED_GETFILTER(base1+'.fits')
       exptime = PHOTRED_GETEXPTIME(base1+'.fits')
 
-      gdref = where(filters eq filtref,ngdref)
+      ; Find matches to the reference filter in priority order
+      ngdref=0 & refind=-1
+      repeat begin
+        refind++
+        gdref = where(filters eq filtref[refind],ngdref)
+      endrep until (ngdref gt 0) or (refind eq nfiltref-1)
+      if ngdref gt 0 then usefiltref=filtref[refind]
+      ;gdref = where(filters eq filtref,ngdref)
       ; No reference filters
       if ngdref eq 0 then begin
         printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
@@ -470,7 +481,7 @@ FOR i=0,ndirs-1 do begin
       refimbase = strmid(refimbase,0,len-lenend)
 
       ; Reference image information
-      printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+filtref+' Exptime='+strtrim(refexptime,2)
+      printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+usefiltref+' Exptime='+strtrim(refexptime,2)
 
 
       ;--------------
@@ -493,8 +504,8 @@ FOR i=0,ndirs-1 do begin
           ; Making the input list
           inlist = ampfiles
           REMOVE,gdref[0],inlist
-          inlist = [ampfiles[gdref[0]],inlist]+'.als'
-
+          si = sort(inlist)  ; Make sure they are in order!!!
+          inlist = [ampfiles[gdref[0]],inlist[si]]+'.als'
 
           ; Running daomatch
           DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,/verbose
@@ -550,7 +561,7 @@ FOR i=0,ndirs-1 do begin
         CD,dirs[i]
 
 
-      END ; amp loop
+      ENDFOR ; amp loop
 
 
 
@@ -616,7 +627,14 @@ FOR i=0,ndirs-1 do begin
       filters = PHOTRED_GETFILTER(base+'.fits')
       exptime = PHOTRED_GETEXPTIME(base+'.fits')
 
-      gdref = where(filters eq filtref,ngdref)
+      ; Find matches to the reference filter in priority order
+      ngdref=0 & refind=-1
+      repeat begin
+        refind++
+        gdref = where(filters eq filtref[refind],ngdref)
+      endrep until (ngdref gt 0) or (refind eq nfiltref-1)
+      if ngdref gt 0 then usefiltref=filtref[refind]
+      ;gdref = where(filters eq filtref,ngdref)
       ; No reference filters
       if ngdref eq 0 then begin
         printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
@@ -647,7 +665,7 @@ FOR i=0,ndirs-1 do begin
       endelse
 
       ; Reference image information
-      printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+filtref+' Exptime=',strtrim(refexptime,2)
+      printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+usefiltref+' Exptime=',strtrim(refexptime,2)
 
       printlog,logfile,strtrim(nbase,2)+' FILES'
 
@@ -661,6 +679,7 @@ FOR i=0,ndirs-1 do begin
       ; Making the input list
       inlist = base
       REMOVE,gdref[0],inlist
+      si = sort(inlist)  ; Make sure they are in order!!!
       inlist = [base[gdref[0]],inlist]+'.als'
 
       ; Running daomatch
@@ -717,7 +736,7 @@ FOR i=0,ndirs-1 do begin
     CD,dirs[i]
 
 
-  End  ; field loop
+  Endfor  ; field loop
 
 
 
@@ -732,7 +751,7 @@ FOR i=0,ndirs-1 do begin
 
 
 
-END  ; directoryloop
+ENDFOR  ; directoryloop
 
 
 
