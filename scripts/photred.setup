@@ -2,11 +2,11 @@
 scriptsdir  /net/home/dln5q/daophot/
 irafdir     /net/home/dln5q/iraf/
 telescope   Blanco
-instrument  MOSAIC
+instrument  DECAM
 observatory CTIO
 nmulti      1
-filtref     M
-trans       blanco.trans
+filtref     g,i,r,z,u
+trans       nocalib.trans
 ##### OPTIONAL #####
 sepfielddir 1
 keepmef     0
