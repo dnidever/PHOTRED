@@ -277,8 +277,8 @@ for i=1,nfiles-1 do begin
     if count gt 0 then begin 
       xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
-      xmed = median(xdiff)
-      ymed = median(ydiff)
+      xmed = median([xdiff],/even)
+      ymed = median([ydiff],/even)
       trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
       ; Fit rotation if there are enough stars
       if count gt 10 then begin
