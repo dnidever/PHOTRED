@@ -72,8 +72,6 @@ if n_elements(setup) eq 0 then begin
   if count lt 1 then return
 endif
 
-
-
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
@@ -125,7 +123,6 @@ if ninputlines eq 0 then begin
 endif
 
 inputlines = lists.inputlines
-
 
 ; Remove files that start with "F[1-9]" or end in _0.fits
 ; *This is a final check on the entire INLIST*
@@ -306,6 +303,13 @@ FOR i=0,ninputlines-1 do begin
   n3680 = stregex(object2,'n3680',/fold_case,/boolean) OR $
           stregex(object2,'ngc3680',/fold_case,/boolean)
 
+  ; Check for standards against standard file
+  stdfile=readpar(setup,'STDFILE')
+  if (FILE_TEST(stdfile) eq 1) then begin
+    readcol,stdfile,stdname,stdra,stdec,f='a,a,a',/silent
+    stdcheck = max(stregex(stdname,object2,/fold_case,/boolean))
+
+  endif
   ; This is a non-object frame
   if (zeroname eq 1) or (biasname eq 1) or (flatname eq 1) or $
      (zeroobj eq 1) or (biasobj eq 1) or (flatobj eq 1) or $
@@ -314,10 +318,9 @@ FOR i=0,ninputlines-1 do begin
 
   ; Standard star field
   if (sa98 eq 1) or (sa110 eq 1) or (sa114 eq 1) or $
-     (n3680 eq 1) then stdarr[i] = 1
+     (n3680 eq 1) or (stdcheck eq 1) then stdarr[i] = 1
 
 end
-
 
 ; Making object fieldname list
 ;-------------------------------
@@ -379,7 +382,6 @@ endif else begin
   nfields = 0
 
 endelse
-
 
 ; Initialzing some arrays
 newfilearr = strarr(ninputlines)

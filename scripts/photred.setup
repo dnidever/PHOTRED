@@ -1,10 +1,10 @@
 ##### REQUIRED #####
-scriptsdir  /net/home/dln5q/daophot/
-irafdir     /net/home/dln5q/iraf/
+scriptsdir  /idl/idllocal/photred/PHOTRED/scripts/
+irafdir     /home/smash/
 telescope   Blanco
 instrument  DECAM
 observatory CTIO
-nmulti      1
+nmulti      10
 filtref     g,i,r,z,u
 trans       nocalib.trans
 ##### OPTIONAL #####
@@ -33,6 +33,7 @@ avgonlymag  0
 todered     M,T,D,M-T,M-D
 #toextadd    M,T,D,M-T,M-D
 #cmd2cdaxes  M,M-T,M-D
+stdfile	     /home/smash/SMASH/standards.txt
 ##### STAGES #####
 rename
 split
