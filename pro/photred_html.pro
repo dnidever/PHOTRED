@@ -199,7 +199,7 @@ READCOL,'fields',shfields,fields,format='A,A',/silent
 apcor = IMPORTASCII('apcor.lst',fieldnames=['name','value'],/noprint)
 ; Remove the 'a.del' endings for the names
 apcor_orig = apcor
-apcor.name = repstr(apcor.name,'a.del')  ; base names
+apcor.name = repstr(apcor.name,'a.del','')  ; base names
 
 
 ; Magnitudes and colors to use for CMD and 2CD

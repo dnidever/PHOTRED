@@ -47,7 +47,7 @@ endif
 ; Aperture arrays
 apcnames = apcor.name
 apcvalue = apcor.value
-apcnames2 = repstr(apcnames,'a.del')    ; base names
+apcnames2 = repstr(apcnames,'a.del','')    ; base names
 
 
 ; Load the MCH file
@@ -56,7 +56,7 @@ apcnames2 = repstr(apcnames,'a.del')    ; base names
 LOADMCH,mchfile,files,trans
 
 files = strtrim(files,2)
-;files = repstr(files,"'")
+;files = repstr(files,"'",'')
 nfiles = n_elements(files)
 
 ; Initializing arrays

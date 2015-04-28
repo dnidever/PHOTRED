@@ -193,7 +193,7 @@ apcorfile = FILE_SEARCH(apcorfile,/fully)
 apcor = IMPORTASCII(apcorfile,fieldnames=['name','value'],/noprint)
 ; Remove the 'a.del' endings for the names
 apcor_orig = apcor
-apcor.name = repstr(apcor.name,'a.del')  ; base names
+apcor.name = repstr(apcor.name,'a.del','')  ; base names
 
 
 ; Are we keeping the INSTRUMENTAL magnitudes 

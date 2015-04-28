@@ -366,7 +366,7 @@ WRITELINE,files2[0]+'.mch',mchfinal
 ;tempbase = MAKETEMP('temp','')
 tempbase = FILE_BASENAME(MKTEMP('temp'))
 FILE_DELETE,tempbase,/allow       ; remove empty file
-tempbase = REPSTR(tempbase,'.')   ; remove the dot
+tempbase = REPSTR(tempbase,'.','')   ; remove the dot
 tempmch = tempbase+'.mch'
 FILE_COPY,files2[0]+'.mch',tempmch,/overwrite,/allow
 

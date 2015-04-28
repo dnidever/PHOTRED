@@ -49,7 +49,7 @@ close,unit
 free_lun,unit
 
 ; Creating the trans array
-lines2 = repstr(lines,"'")
+lines2 = repstr(lines,"'",'')
 nlines = n_elements(lines)
 arr = strsplit(lines2[0],' ',/extract)
 ntrans = n_elements(arr)-3    ; first line is the samee, last two are mag offsets

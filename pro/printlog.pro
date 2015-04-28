@@ -84,8 +84,8 @@ if np gt 0 then begin
   ; Make a new format array
   if n_elements(format) gt 0 then begin
     ;fmtarr = strarr(np)
-    format2 = REPSTR(format,'(')
-    format2 = REPSTR(format2,')')
+    format2 = REPSTR(format,'(','')
+    format2 = REPSTR(format2,')','')
     format2arr = strsplit(format2,',',/extract)
     nformat2arr = n_elements(format2arr)
     for i=0,nformat2arr-1 do begin

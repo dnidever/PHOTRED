@@ -90,7 +90,7 @@ tlines = lines[lo:hi]
 nightind = where(stregex(tlines,'Night',/boolean) eq 1,nnightind)
 
 tlines2 = strmid(tlines,8,100)
-tlines2 = REPSTR(tlines2,'sigma =')
+tlines2 = REPSTR(tlines2,'sigma =','')
 
 tarr = strsplitter(tlines2,' ',/extract)
 par = float(reform(tarr[0,*]))
