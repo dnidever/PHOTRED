@@ -20,7 +20,8 @@ C
 C=====================================================================
 C
       INTEGER nmax
-      PARAMETER(nmax=50000)
+      PARAMETER(nmax=100000)
+C      PARAMETER(nmax=50000)
 C
       INTEGER i,j,nstar,nnstar,nleft
       INTEGER id(nmax),cid(nmax)
