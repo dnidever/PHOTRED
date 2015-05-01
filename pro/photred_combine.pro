@@ -332,7 +332,7 @@ FOR i=0,nsfields-1 do begin
     ;-------------------------------------------------
     ncombined = 0
     undefine,str,all
-    undefine,fieldnames,fieldtypes
+    undefine,fieldnames0,fieldtypes0
     For j=0,nfieldlines-1 do begin
 
       file = fieldlines[j]
@@ -350,23 +350,40 @@ FOR i=0,nsfields-1 do begin
 
       ; Get the fieldnames and fieldtypes
       ; We need ID to be STRING not LONG
+      tempfile = MKTEMP('temp')
+      SPAWN,'head '+file+' >> '+tempfile,out,errout
+      temp = IMPORTASCII(tempfile,/header,/noprint)
+      FILE_DELETE,tempfile,/allow,/quiet
+      fieldnames = TAG_NAMES(temp)
+      nfieldnames = n_elements(fieldnames)
+      fieldtypes = lonarr(nfieldnames)
+      for k=0,nfieldnames-1 do fieldtypes[k] = SIZE(temp[0].(k),/type)
+      idind = where(fieldnames eq 'ID',nidind)
+      fieldtypes[idind[0]] = 7
       ; FORCE it to be the same for ALL chip files, otherwise we sometimes
       ;  get "type mismatch" errors with double/floats
       if j eq 0 then begin
-        tempfile = MKTEMP('temp')
-        SPAWN,'head '+file+' >> '+tempfile,out,errout
-        temp = IMPORTASCII(tempfile,/header,/noprint)
-        FILE_DELETE,tempfile,/allow,/quiet
-        fieldnames = TAG_NAMES(temp)
-        nfieldnames = n_elements(fieldnames)
-        fieldtypes = lonarr(nfieldnames)
-        for k=0,nfieldnames-1 do fieldtypes[k] = SIZE(temp[0].(k),/type)
-        idind = where(fieldnames eq 'ID',nidind)
-        fieldtypes[idind[0]] = 7
+        fieldnames0 = fieldnames
+        fieldtypes0 = fieldtypes
+        file0 = file
       endif
         
+      ; Check that the fieldnames are the same
+      if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
+        PUSH,failurelist,file
+        printlog,logfile,''
+        printlog,logfile,file+' format does NOT agree with '+file0
+        goto,BOMB2
+      endif
+      if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
+        PUSH,failurelist,file
+        printlog,logfile,''
+        printlog,logfile,file+' format does NOT agree with '+file0
+        goto,BOMB2
+      endif
+
       ; Load the PHOT file
-      str = IMPORTASCII(file,fieldnames=fieldnames,fieldtypes=fieldtypes,skip=1,/noprint)
+      str = IMPORTASCII(file,fieldnames=fieldnames0,fieldtypes=fieldtypes0,skip=1,/noprint)
       nstr = n_elements(str)
 
 
