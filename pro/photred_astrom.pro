@@ -246,17 +246,22 @@ FOR i=0,ninputlines-1 do begin
 
   ; Loop through the stars
   for j=0.,numstar-1 do begin
-    instr=' '
-    instr1=' '
+    instr=''
+    instr1=''
     inline = fltarr(2*numobs+nextra)
 
     ; Loop through the lines per star
     for k=0l,nstarline-1 do begin
       readf, unit, instr1
-      instr += instr1
+      ;instr += instr1
+      ; remove extra 25 spaces at the beginning of extra/wrap lines
+      if k eq 0 then instr+=instr1 else instr+=strmid(instr1,25)
     endfor
-
-    reads,instr,inline
+    ; we need to use the formatted read because sometimes there are
+    ; NO spaces between the numbers in the columns.
+    ; ***BUT if the daomaster format changes then this will be MESSED UP!!!!***
+    fmt = '(I7,2F9.3,'+strtrim(ncol-3,2)+'F9.4)'
+    reads,instr,inline,format=fmt
     mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
   endfor
 
