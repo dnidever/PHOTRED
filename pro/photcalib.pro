@@ -128,7 +128,7 @@ if numobs gt 2 and keyword_set(robust) then begin
   sigmag = mad(diffmag,dim=2,/zero)
   gdsig = where(finite(sigmag) eq 1,ngdsig,comp=bdsig,ncomp=nbdsig)
   if ngdsig gt 1 then maxsig=max(sigmag[gdsig]) else maxsig=0.5
-  if nbdsig gt 0 then sigmag[bderr]=maxsig
+  if nbdsig gt 0 then sigmag[bdsig]=maxsig
 
   ; Get average error
   avgerr = total(terr,2,/nan)/(ngood>1)
