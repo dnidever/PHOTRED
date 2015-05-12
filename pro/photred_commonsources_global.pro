@@ -39,38 +39,14 @@ COMMON photred,setup
 undefine,error
 
 ; Not enough inputs
-ninput = n_elements(input)
+ninput = n_elements(field)
 if ninput eq 0 then begin
-  print,'Syntax - photred_commonsources,input,minsources=minsources,gaussfit=gaussfit,'
-  print,'                                maxframes=maxframes,error=error,stp=stp'
+  print,'Syntax - photred_commonsources,field,minsources=minsources,gaussfit=gaussfit,'
+  print,'                               error=error,stp=stp'
   error = 'Not enough inputs'
   return
 endif
 
-;; Loading input
-;LOADINPUT,input,file,count=nfiles
-
-; Not enough inputs
-if nfiles eq 0 then begin
-  print,'No files'
-  return
-endif
-
-
-;; Is this a FITS file
-;len = strlen(file)
-;if (strmid(strtrim(file,2),len-5,5) ne '.fits') then begin
-;  print,file,' is NOT a FITS file'
-;  error = file+' is NOT a FITS file'
-;  return
-;endif
-;
-;; Does the FITS file exist
-;if FILE_TEST(file) eq 0 then begin
-;  print,file,' NOT FOUND'
-;  error = file+' NOT FOUND'
-;  return
-;endif
 
 ; Defaults
 if n_elements(minsources0) eq 0 then minsources=6 else minsources=minsources0
@@ -147,130 +123,44 @@ thisimager = imagers[ind_imager[0]]
 nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
-;; Get the field information
-;base = FILE_BASENAME(file,'.fits')
-;basarr = strsplit(base,'-',/extract)
-;dash = strpos(base,'-')
-;if (strmid(base,0,1) ne 'F' or dash[0] eq -1) then begin
-;  print,'NO field information in ',base
-;  error = 'NO field information in '+base
-;  return
-;endif
-;field = basarr[0]
 
-
-;; Does the file exist already?
-;test = FILE_TEST(base+'.cmn.lst')
-;if test eq 1 and not keyword_set(redo) then begin
-;  print,'FILE '+base+'.cmn.lst EXISTS ALREADY.'
-;  return
-;endif
-
-
-;print,'Making list of CONFIRMED CELESTIAL SOURCES for ',file
+print,'Making list of CONFIRMED CELESTIAL SOURCES for Field = ',field
 
 
 ;#########################################
 ;#   Find all files for this field
 ;#########################################
 
-
-;; Check the logs/RENAME.outlist
-;nfieldfiles = 0
-;if FILE_TEST('logs/RENAME.outlist') eq 1 then begin
-;  READLIST,'logs/RENAME.outlist',fieldfiles,/exist,/unique,/fully,/silent,count=nfieldfiles
-;  if nfieldfiles gt 0 then begin
-;    gf = where(stregex(FILE_BASENAME(fieldfiles),'^'+field+'-',/boolean) eq 1,ngf)
-;    if ngf gt 0 then begin
-;      fieldfiles = fieldfiles[gf]
-;      nfieldfiles = ngf
-;    endif else begin
-;      undefine,fieldfiles
-;      nfieldfiles = 0
-;    endelse
-;  endif else begin
-;    undefine,fieldfiles
-;    nfieldfiles = 0
-;  endelse
-;endif
-
 ; Search for files in the directory.
-; If less than 2 files found
-;if (nfieldfiles lt 2) then begin
-   if thisimager.namps gt 1 then $
-     fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
-     fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
+if thisimager.namps gt 1 then $
+  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
+  fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
 
-  ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
-  if nfieldfiles gt 0 then begin
-    fbases = FILE_BASENAME(fieldfiles,'.fits')
-    bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
-                stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
-                stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
-                stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
-                stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
-                stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
-                stregex(fbases,'jnk$',/boolean) eq 1,nbad)      ; daophot? temp file
-    if nbad gt 0 then begin
-      if nbad eq nfieldfiles then begin
-        undefine,fieldfiles
-        nfieldfiles = 0
-      endif else begin
-        REMOVE,bad,fieldfiles
-        nfieldfiles = n_elements(fieldfiles)
-      endelse
-    endif ; some ones to remove
-  endif ; some fieldfiles
-
-;endif
-
-;; Make sure the current file is in the FIELDFILES list
-;allfiles = [fieldfiles, file]
-;fieldfiles = FILE_SEARCH(allfiles,/fully_qualify,count=nfieldfiles)
-;ui = uniq(fieldfiles,sort(fieldfiles))
-;fieldfiles = fieldfiles[ui]
-;nfieldfiles = n_elements(fieldfiles)
-;
-;
-;; If multiple chips, get the correct chip files
-;if thisimager.namps gt 1 then begin
-;
-;  amp = first_el(strsplit(base,thisimager.separator,/extract),/last)
-;  fbases = FIlE_BASENAME(fieldfiles,'.fits')
-;  gdbase = where(stregex(fbases,thisimager.separator+amp+'$',/boolean) eq 1,ngdbase)
-;
-;  if (ngdbase gt 0) then begin
-;    fieldfiles = fieldfiles[gdbase]
-;    nfieldfiles = ngdbase
-;  endif else begin
-;    print,'NO frames for this Field/amp combination  ',field,'/',amp
-;    error = 'NO frames for this Field/amp combination  '+field+'/'+amp
-;    return
-;  endelse
-;
-;endif
-
-
+; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
+if nfieldfiles gt 0 then begin
+  fbases = FILE_BASENAME(fieldfiles,'.fits')
+  bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
+              stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
+              stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
+              stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
+              stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
+              stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
+              stregex(fbases,'jnk$',/boolean) eq 1,nbad)      ; daophot? temp file
+  if nbad gt 0 then begin
+    if nbad eq nfieldfiles then begin
+      undefine,fieldfiles
+      nfieldfiles = 0
+    endif else begin
+      REMOVE,bad,fieldfiles
+      nfieldfiles = n_elements(fieldfiles)
+    endelse
+  endif ; some ones to remove
+endif else begin  ; some fieldfiles
+  print,'No ',field,' files found in current directory'
+  return
+endelse
 
 print,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
-
-
-;###############################################
-;#   Get Sources with DAOPHOT FIND/PHOTOMETRY
-;###############################################
-
-;; Only take a certain number of frames
-;if keyword_set(maxframes) then begin
-;  ; Want maxframes plust the current file
-;  if maxframes+1 lt nfieldfiles then begin
-;    ; Make sure the current file is in the FIELDFILES list
-;    fieldfiles = [fieldfiles[0:maxframes],file]
-;    fieldfiles = FILE_SEARCH(fieldfiles,/fully_qualify,count=nfieldfiles)
-;    ui = uniq(fieldfiles,sort(fieldfiles))
-;    fieldfiles = fieldfiles[ui]
-;    nfieldfiles = n_elements(fieldfiles)
-;  endif
-;endif
 
 
 ; Run DAOPHOT FIND/PHOT on ALL the field files
@@ -278,12 +168,13 @@ For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
   ibase = FILE_BASENAME(ifile,'.fits')
+  idir = FILE_DIRNAME(ifile)
 
   ; Do the CMN.COO and CMN.AP files already exist?
-  coofile = ibase+'.cmn.coo'
+  coofile = idir+'/'+ibase+'.cmn.coo'
   cootest = FILE_TEST(coofile)
   if cootest eq 1 then coolines=FILE_LINES(coofile) else coolines=0
-  apfile = ibase+'.cmn.ap'
+  apfile = idir+'/'+ibase+'.cmn.ap'
   aptest = FILE_TEST(apfile)
   if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
 
@@ -294,29 +185,36 @@ For i=0,nfieldfiles-1 do begin
 
 Endfor
 
+
 ; Now run PBS_DAEMON.PRO
-PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5
+if n_elements(cmd) gt 0 then $
+  PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5
 
 ; Now load all of the files
-undefine,all
+cat0 = {id:0L,frame:'',amp:0L,ndet:0L,detframes:'',fid:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,sharp:0.0,round:0.0,round2:0.0,ra:0.0d0,dec:0.0d0}
+all = replicate(cat0,500000L)
+cntall = 0LL
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
   ibase = FILE_BASENAME(ifile,'.fits')
+  idir = FILE_DIRNAME(ifile)
 
   if thisimager.namps gt 1 then begin 
     amp = long( first_el(strsplit(ibase,thisimager.separator,/extract),/last) )
     frame = first_el(strsplit(ibase,thisimager.separator,/extract))
   endif else begin
     amp = 1L
-    frame = first_el(strsplit(ibase,thisimager.separator,/extract) 
+    frame = first_el(strsplit(ibase,thisimager.separator,/extract) )
   endelse
 
   ; Test the coo and ap file
-  cootest = FILE_TEST(ibase+'.cmn.coo')
-  if cootest eq 1 then coolines=FILE_LINES(ibase+'.cmn.coo') else coolines=0
-  aptest = FILE_TEST(ibase+'.cmn.ap')
-  if aptest eq 1 then aplines=FILE_LINES(ibase+'.cmn.ap') else aplines=0
+  coofile = idir+'/'+ibase+'.cmn.coo'
+  cootest = FILE_TEST(coofile)
+  if cootest eq 1 then coolines=FILE_LINES(coofile) else coolines=0
+  apfile = idir+'/'+ibase+'.cmn.ap'
+  aptest = FILE_TEST(apfile)
+  if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
 
   undefine,cat
   
@@ -327,11 +225,11 @@ For i=0,nfieldfiles-1 do begin
     head = headfits(ifile)
 
     ; Load the coordinates file
-    LOADCOO,ibase+'.cmn.coo',coo,coohead1
+    LOADCOO,coofile,coo,coohead1
     ncoo = n_elements(coo)
 
     ; Load the aperture photometry file
-    LOADAPER,ibase+'.cmn.ap',aper,aperhead1
+    LOADAPER,apfile,aper,aperhead1
 
     ; Get the coordinates
     EXTAST,head,astr
@@ -340,9 +238,7 @@ For i=0,nfieldfiles-1 do begin
     HEAD_XYAD,head,coo.x,coo.y,ra,dec,/deg
 
     ; Create the CAT structure
-    dum = {id:0L,frame:'',amp:0L,ndet:0L,detframes:'',fid:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,sharp:0.0,round:0.0,round2:0.0,$
-           ra:0.0d0,dec:0.0d0}
-    cat = replicate(dum,ncoo)
+    cat = replicate(cat0,ncoo)
     cat.frame = frame
     cat.amp = amp
     cat.ndet = 1
@@ -367,7 +263,7 @@ For i=0,nfieldfiles-1 do begin
     if (ngdcat eq 0) then begin
       print,ibase,' has NO sources with good photometry'
       error = ibase+' has NO sources with good photometry'
-      return
+      goto,BOMB1
     endif
     cat = cat[gdcat]
     ncat = n_elements(cat)
@@ -375,46 +271,67 @@ For i=0,nfieldfiles-1 do begin
     ; Now match to the existing sources
     ;----------------------------------
     if n_elements(all) gt 0 then begin
-      SRCMATCH,all.ra,all.dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch
+      SRCMATCH,all.ra,all.dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch,domains=100
       cat_old = cat
       if nmatch gt 0 then begin
         all[ind1].ndet++
         all[ind1].detframes += ','+ibase 
         if nmatch eq n_elements(cat) then undefine,cat else remove,ind2,cat
       endif
-    endif
+    endif else nmatch=0
+
+    print,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
 
     ; New elements to add
-    if n_elements(cat) gt 0 then begin
-      newid = lindgen(n_elements(cat))+1 + n_elements(all) ; create new IDs, running count
+    ncat = n_elements(cat)
+    if ncat gt 0 then begin
+      newid = lindgen(n_elements(cat))+1 + cntall ; create new IDs, running count
       cat.id = newid
-      push,all,cat
+      if cntall+ncat gt n_elements(all) then begin
+        print,'Adding new elements to ALL structure'
+        oldall = all
+        undefine,all
+        all = replicate(cat0,n_elements(oldall)+200000L)
+        all[0] = oldall
+        undefine,oldall
+      endif
+      all[cntall:cntall+ncat-1] = cat
+      cntall += ncat
+      ;push,all,cat
     endif
 
   ; DAOPHOT did NOT run properly
   endif else begin
     print,'DAOPHOT did NOT run properly on ',ibase
     error = 'DAOPHOT did NOT run properly on '+ibase
-    return
   endelse  
 
-Endfor
+  BOMB1:
 
+  ;stop
+
+Endfor  ; field files loop
+all = all[0:cntall-1]  ; trim extra elements of all
+
+; Write combined catalog
+allcat_outfile = field+'.cmn.fits'
+print,'Writing combined file to ',allcat_outfile
+MWRFITS,all,allcat_outfile,/create
 
 ; Create .cmn.lst files
-For i=0,nfieldfiles-1 do begin
-
+;-----------------------
 ndetected = lonarr(ncat)  ; The number of detections in other frames
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
   ibase = FILE_BASENAME(ifile,'.fits')
+  idir = FILE_DIRNAME(ifile)
 
   ; Do the CMN.COO and CMN.AP files exist?
-  coofile = ibase+'.cmn.coo'
+  coofile = idir+'/'+ibase+'.cmn.coo'
   cootest = FILE_TEST(coofile)
   if cootest eq 1 then coolines=FILE_LINES(coofile) else coolines=0
-  apfile = ibase+'.cmn.ap'
+  apfile = idir+'/'+ibase+'.cmn.ap'
   aptest = FILE_TEST(apfile)
   if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
 
@@ -423,8 +340,7 @@ For i=0,nfieldfiles-1 do begin
     undefine,coo,aper
 
     ; Get the header
-    fitsfile = ibase+'.fits'
-    head1 = headfits(fitsfile)
+    head1 = headfits(ifile)
 
     ; Load the coordinates file
     LOADCOO,coofile,coo,coohead
@@ -442,113 +358,67 @@ For i=0,nfieldfiles-1 do begin
     ; Create the CAT structure
     dum = {id:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,sharp:0.0,round:0.0,round2:0.0,$
            ra:0.0d0,dec:0.0d0}
-    refcat = replicate(dum,ncoo)
-    refcat.id = coo.id
-    refcat.x = coo.x
-    refcat.y = coo.y
-    refcat.sharp = coo.sharp
-    refcat.round = coo.round
-    refcat.round2 = coo.round2
-    refcat.mag = aper.mag[0]
-    refcat.err = aper.err[0]
-    refcat.sky = aper.sky
-    refcat.skysig = aper.skysig
-    refcat.ra = ra
-    refcat.dec = dec
+    cat = replicate(dum,ncoo)
+    cat.id = coo.id
+    cat.x = coo.x
+    cat.y = coo.y
+    cat.sharp = coo.sharp
+    cat.round = coo.round
+    cat.round2 = coo.round2
+    cat.mag = aper.mag[0]
+    cat.err = aper.err[0]
+    cat.sky = aper.sky
+    cat.skysig = aper.skysig
+    cat.ra = ra
+    cat.dec = dec
 
     ; Only keep sources with "decent" photometry
-    refcat_orig = refcat
-    gdref = where(refcat.mag lt 50. and refcat.err lt 5.0,ngdref)
-    ;gdref = where(refcat.mag lt 50. and refcat.err lt 5.0 and refcat.sharp lt 2.0,ngdref)
+    cat_orig = cat
+    gdcat = where(cat.mag lt 50. and cat.err lt 5.0,ngdref)
+    ;gdref = where(cat.mag lt 50. and cat.err lt 5.0 and cat.sharp lt 2.0,ngdref)
     if (ngdref eq 0) then begin
       print,ibase,' has NO sources with good photometry'
       goto,BOMB
     endif
-    refcat = refcat[gdref]
-
-    ; Find sources for this file in the ALL catalog file
-    ind = where(stregex(all.detframes,ibase,/boolean) eq 1,nind)
-    ind2 = where(stregex(all.detframes,ibase,/boolean) eq 1 and all.ndet eq 2,nind2)
-    
-    stop
-    
-
-   ; ; MATCH sources with X/Y
-   ; MATCHSTARS,cat.x,cat.y,refcat.x,refcat.y,ind1_xy,ind2_xy,trans,count=nmatch_xy,rms=rms_xy,/silent
-   ;
-   ; ; MATCH sources with RA/DEC
-   ; nmatch_ad = -1
-   ; rms_ad = -1.0
-   ; if max(cat.ra) gt -1000. and max(refcat.ra) gt -1000. then begin
-   ;   SRCMATCH,cat.ra,cat.dec,refcat.ra,refcat.dec,1.0,ind1_ad,ind2_ad,count=nmatch_ad,/sph
-   ;   if (nmatch_ad gt 10) then begin
-   ;     raresid = (cat[ind1_ad].ra-refcat[ind2_ad].ra)*cos(cat[ind1_ad].dec/!radeg)*3600.
-   ;     decresid = (cat[ind1_ad].dec-refcat[ind2_ad].dec)*3600.
-   ;     resid = sqrt( raresid^2.0 + decresid^2.0 )
-   ;     rms_ad =  sqrt( mean( resid^2. ) )
-   ;   endif
-   ; end
-   ;
-   ; ; No matches 
-   ; if nmatch_xy eq 0 and nmatch_ad eq 0 then begin
-   ;   print,'NO matches'
-   ;   error = 'NO matches'
-   ;   return
-   ; endif
-   ;
-   ; ; Use X/Y or RA/DEC Matches?
-   ; mcase = 0   ; X/Y by default
-   ; if nmatch_ad lt 0 then mcase=0    ; NO RA/DEC, use X/Y
-   ; if nmatch_ad gt 10 then mcase=1   ; Use RA/DEC
-   ; if nmatch_xy eq 0 and nmatch_ad gt 0 then mcase=1
-   ; CASE mcase of
-   ;   0: begin   ; use X/Y
-   ;       ind1 = ind1_xy
-   ;       ind2 = ind2_xy
-   ;       ndetected[ind1_xy]++      ; increment the star Ndetected array
-   ;       print,ibase,'  Nmatch = ',strtrim(nmatch_xy,2),'  RMS=',strtrim(rms_xy,2),' pixels'
-   ;   end
-   ;   1:  begin  ; use RA/DEC
-   ;       ind1 = ind1_ad
-   ;       ind2 = ind2_ad
-   ;       ndetected[ind1_ad]++      ; increment the star Ndetected array
-   ;       print,ibase,'  Nmatch = ',strtrim(nmatch_ad,2),'  RMS=',strtrim(rms_ad,2),' arcsec'
-   ;   end
-   ;   else:
-   ; ENDCASE
-
-    ;stop
+    cat = cat[gdcat]
 
 
     ; Only keep sources that are seen in other frames
-    gd2 = where(ndetected ge 2,ngd2)  ; detected in TWO other frames
-    gd1 = where(ndetected ge 1,ngd1)  ; detected in ONE other frame
-
+    gdall1 = where(stregex(all.detframes,ibase,/boolean) eq 1 and all.ndet ge 2,ngdall1)  ; detected in ONE other frame
+    gdall2 = where(stregex(all.detframes,ibase,/boolean) eq 1 and all.ndet ge 3,ngdall2)  ; detected in TWO other frames
 
     ; Keeping detections in TWO other frames
-    if (ngd2 ge 100) then begin
-      gd = gd2
-      ngd = ngd2
-      print,strtrim(ngd,2),' sources detected in at least TWO other frames'
+    if (ngdall2 ge 100) then begin
+      gdall = gdall2
+      ngdall = ngdall2
+      print,strtrim(ngdall,2),' sources detected in at least TWO other frames'
     endif
     ; Keeping detections in ONE other frame
-    if (ngd2 lt 100 and ngd1 gt 0) then begin
-      gd = gd1
-      ngd = ngd1
-      print,strtrim(ngd,2),' sources detected in at least ONE other frame'
+    if (ngdall2 lt 100 and ngdall1 gt 0) then begin
+      gdall = gdall1
+      ngdall = ngdall1
+      print,strtrim(ngdall,2),' sources detected in at least ONE other frame'
     endif
     ; No detections in other frames
-    if (ngd1 eq 0) then begin
+    if (ngdall1 eq 0) then begin
       print,'NO sources detected in other frames'
       error = 'NO sources detected in other frames'
-      return
+      goto,BOMB
     endif
 
+    ; MATCH them to the catalog
+    SRCMATCH,all[gdall].ra,all[gdall].dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch
+    if nmatch eq 0 then begin
+      print,'No matched sources'
+      goto,BOMB
+    endif
+    gd = ind2  ; indices of CAT to use
+    ngd = nmatch
 
     ; Fit Gaussians to the sources
     if keyword_set(gaussfit) then begin
       print,'Fitting Gaussians to common sources'
-      FITS_READ,file,im,head
+      FITS_READ,ifile,im,head
       sz = size(im)
       x = lindgen(sz[1])
       y = lindgen(sz[2])
@@ -597,7 +467,7 @@ For i=0,nfieldfiles-1 do begin
         ;wait,0.5
         ;stop
 
-      Endif
+      Endfor
 
       ; Now pick out the "good" ones
       medpar2 = MEDIAN(gstr.pars[2])
@@ -635,12 +505,12 @@ For i=0,nfieldfiles-1 do begin
     ; Only create it if there are enough sources
     if (ngd ge minsources) then begin
       com = cat[gd]
-      print,'Creating the CONFIRMED CELESTIAL SOURCES file = ',base+'.cmn.lst'
-      WRITECOL,base+'.cmn.lst',com.id,com.x,com.y,com.mag,com.err,com.sky,com.skysig,$
+      print,'Creating the CONFIRMED CELESTIAL SOURCES file = ',ibase+'.cmn.lst'
+      WRITECOL,idir+'/'+ibase+'.cmn.lst',com.id,com.x,com.y,com.mag,com.err,com.sky,com.skysig,$
                com.sharp,com.round,com.round2,fmt='(I7,2F9.2,3F9.3,F9.2,3F9.3)'
 
       ; Prepend the COO header
-      WRITELINE,base+'.cmn.lst',[coohead1,''],/prepend
+      WRITELINE,idir+'/'+ibase+'.cmn.lst',[coohead1,''],/prepend
 
     ; Not enough sources
     endif else begin
@@ -651,7 +521,7 @@ For i=0,nfieldfiles-1 do begin
 
   BOMB:
 
-Dndfor  ; fieldfiles loop
+Endfor  ; fieldfiles loop
 
 
 if keyword_set(stp) then stop

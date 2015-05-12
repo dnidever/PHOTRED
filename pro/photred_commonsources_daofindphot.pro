@@ -132,6 +132,6 @@ BOMB_DAOPHOT:
 
 cd,curdir  ; back to original directory
 
-stop
+;stop
 
 end

@@ -103,6 +103,12 @@ if psfcomsrc ne '0' and psfcomsrc ne '' and psfcomsrc ne '-1' then psfcomsrc=1
 if strtrim(psfcomsrc,2) eq '0' then psfcomsrc=0
 if n_elements(psfcomsrc) eq 0 then psfcomsrc=1
 
+; Global Common PSF stars?
+psfcomglobal = READPAR(setup,'PSFCOMGLOBAL')
+if psfcomglobal ne '0' and psfcomglobal ne '' and psfcomglobal ne '-1' then psfcomglobal=1
+if strtrim(psfcomglobal,2) eq '0' then psfcomglobal=0
+if n_elements(psfcomglobal) eq 0 then psfcomglobal=1
+
 ; Hyperthread?
 hyperthread = READPAR(setup,'hyperthread')
 if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
@@ -454,15 +460,70 @@ for i=0,nfitsbaselist-1 do begin
 
 Endfor ; files loop
 
+; Make the Confirmed celestial sources lists, GLOBAL METHOD
+;-----------------------------------------------------------
+if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
 
-; Make the Confirmed celestial sources lists
-;--------------------------------------------
-if (psfcomsrc eq 1) then begin
+  printlog,logfile,''
+  printlog,logfile,'Making CONFIRMED CELESTIAL SOURCES lists - GLOBAL METHOD'
+  printlog,logfile,''
+
+  ; Get field and chip information for each file
+  fitsfieldlist = strarr(nfitsbaselist)
+  fitschiplist = strarr(nfitsbaselist)
+  for i=0,nfitsbaselist-1 do begin
+    base = file_basename(fitsbaselist[i],'.fits')
+    fitsfieldlist[i] = first_el(strsplit(base,'-',/extract))
+    fitschiplist[i] = first_el(strsplit(base,thisimager.separator,/extract),/last)
+  endfor
+
+  ; Group them into dir/field
+  alldirfield = fitsdirlist+' '+fitsfieldlist
+  ui = uniq(alldirfield,sort(alldirfield))
+  dirfield = alldirfield[ui]
+  ndirfield = n_elements(dirfield)
+  
+  ; Field loop
+  for i=0,ndirfield-1 do begin
+    idir = first_el(strsplit(dirfield[i],' ',/extract))
+    ifield = first_el(strsplit(dirfield[i],' ',/extract),/last)
+
+    CD,idir  ; cd to the appropriate directory
+    PHOTRED_COMMONSOURCES_GLOBAL,ifield
+    CD,curdir
+  endfor
+  
+
+
+  ;; Make the command files
+  ;cmd = strarr(ndirfieldchip)
+  ;cmnprocdirs = strarr(ndirfieldchip)
+  ;for i=0,ndirfieldchip-1 do begin
+  ;
+  ;  idirfieldchip = dirfieldchip[i]
+  ;  ind = where(alldirfieldchip eq idirfieldchip,nind)
+  ;
+  ;  ; Make the CONFIRMED CELESTIAL SOURCES list to be used to make PSF stars
+  ;  icmd = "PHOTRED_COMMONSOURCES,['"+strjoin(fitsbaselist[ind],"','")+"'],setupdir='"+curdir+"'"
+  ;  if keyword_set(redo) then icmd=icmd+',/redo'
+  ;  ;  PHOTRED_COMMONSOURCES,fil,error=psferror,redo=redo
+  ;  cmd[i] = icmd
+  ;  cmnprocdirs[i] = fitsdirlist[ind[0]]
+  ;endfor
+  ;
+  ;; Submit the jobs to the daemon
+  ;PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=30,/cdtodir
+endif
+
+
+; Make the Confirmed celestial sources lists, SINGLE-CHIP, OLD METHOD
+;--------------------------------------------------------------------
+if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
 
   ; Make the confirmed CELESTIAL SOURCES list to be used to make PSF stars
   ;---------------------------------------------------------------------
   printlog,logfile,''
-  printlog,logfile,'Making CONFIRMED CELESTIAL SOURCES lists'
+  printlog,logfile,'Making CONFIRMED CELESTIAL SOURCES lists - SINGLE-CHIP METHOD'
   printlog,logfile,''
 
   ; Get field and chip information for each file

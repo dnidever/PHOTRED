@@ -20,6 +20,7 @@ redo        0
 #wcsrmslim  1.0
 #hyperthread 1
 psfcomsrc   1
+psfcomglobal 1
 #psfcomgauss 1
 #mchmaxshift  50.0
 finditer    2
