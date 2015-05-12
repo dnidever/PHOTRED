@@ -143,7 +143,9 @@ if nind_imager eq 0 then begin
 endif
 thisimager = imagers[ind_imager[0]]
 
-
+; Getting NMULTI
+nmulti = READPAR(setup,'NMULTI')
+nmulti = long(nmulti)
 
 ;; Get the field information
 ;base = FILE_BASENAME(file,'.fits')
@@ -293,8 +295,7 @@ For i=0,nfieldfiles-1 do begin
 Endfor
 
 ; Now run PBS_DAEMON.PRO
-nmulti = 10
-PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=30,/cdtodir
+PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5
 
 ; Now load all of the files
 undefine,all
