@@ -66,10 +66,10 @@ endif
 ; Log files
 ;----------
 ;  write to DAOPHOT logfile
-logfile = 'logs/DAOPHOT.log'
+if n_elements(setupdir) gt 0 then logfile=setupdir+'/logs/DAOPHOT.log' else $
+  logfile = 'logs/DAOPHOT.log'
 logfile = FILE_EXPAND_PATH(logfile)  ; want absolute filename
 if file_test(logfile) eq 0 then SPAWN,'touch '+logfile,out
-; IF SEPFIELDDIR THEN I NEED TO USE '../log/DAOPHOT.log'!!!!!!!!
 
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
@@ -124,7 +124,7 @@ nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
 
-print,'Making list of CONFIRMED CELESTIAL SOURCES for Field = ',field
+printlog,logfile,'Making list of CONFIRMED CELESTIAL SOURCES for Field = ',field
 
 
 ;#########################################
@@ -156,11 +156,11 @@ if nfieldfiles gt 0 then begin
     endelse
   endif ; some ones to remove
 endif else begin  ; some fieldfiles
-  print,'No ',field,' files found in current directory'
+  printlog,logfile,'No ',field,' files found in current directory'
   return
 endelse
 
-print,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
+printlog,logfile,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
 
 
 ; Run DAOPHOT FIND/PHOT on ALL the field files
@@ -190,143 +190,151 @@ Endfor
 if n_elements(cmd) gt 0 then $
   PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5
 
-; Now load all of the files
-cat0 = {id:0L,frame:'',amp:0L,ndet:0L,detframes:'',fid:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,sharp:0.0,round:0.0,round2:0.0,ra:0.0d0,dec:0.0d0}
-all = replicate(cat0,500000L)
-cntall = 0LL
-For i=0,nfieldfiles-1 do begin
-
-  ifile = fieldfiles[i]
-  ibase = FILE_BASENAME(ifile,'.fits')
-  idir = FILE_DIRNAME(ifile)
-
-  if thisimager.namps gt 1 then begin 
-    amp = long( first_el(strsplit(ibase,thisimager.separator,/extract),/last) )
-    frame = first_el(strsplit(ibase,thisimager.separator,/extract))
-  endif else begin
-    amp = 1L
-    frame = first_el(strsplit(ibase,thisimager.separator,/extract) )
-  endelse
-
-  ; Test the coo and ap file
-  coofile = idir+'/'+ibase+'.cmn.coo'
-  cootest = FILE_TEST(coofile)
-  if cootest eq 1 then coolines=FILE_LINES(coofile) else coolines=0
-  apfile = idir+'/'+ibase+'.cmn.ap'
-  aptest = FILE_TEST(apfile)
-  if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
-
-  undefine,cat
-  
-  ; DAOPHOT ran properly
-  if (coolines ge 4 and aplines ge 4) then begin
-   
-    ; Get the header
-    head = headfits(ifile)
-
-    ; Load the coordinates file
-    LOADCOO,coofile,coo,coohead1
-    ncoo = n_elements(coo)
-
-    ; Load the aperture photometry file
-    LOADAPER,apfile,aper,aperhead1
-
-    ; Get the coordinates
-    EXTAST,head,astr
-    ra=coo.x*0.-999999. & dec=ra    ; BAD until proven okay
-      if n_elements(astr) gt 0 then $
-    HEAD_XYAD,head,coo.x,coo.y,ra,dec,/deg
-
-    ; Create the CAT structure
-    cat = replicate(cat0,ncoo)
-    cat.frame = frame
-    cat.amp = amp
-    cat.ndet = 1
-    cat.detframes = ibase
-    cat.fid = coo.id
-    cat.x = coo.x
-    cat.y = coo.y
-    cat.sharp = coo.sharp
-    cat.round = coo.round
-    cat.round2 = coo.round2
-    cat.mag = aper.mag[0]
-    cat.err = aper.err[0]
-    cat.sky = aper.sky
-    cat.skysig = aper.skysig
-    cat.ra = ra
-    cat.dec = dec
-
-    ; Only keep sources with "decent" photometry
-    cat_orig = cat
-    gdcat = where(cat.mag lt 50. and cat.err lt 5.0,ngdcat)
-    ;gdcat = where(cat.mag lt 50. and cat.err lt 5.0 and cat.sharp lt 2.0,ngdcat)
-    if (ngdcat eq 0) then begin
-      print,ibase,' has NO sources with good photometry'
-      error = ibase+' has NO sources with good photometry'
-      goto,BOMB1
-    endif
-    cat = cat[gdcat]
-    ncat = n_elements(cat)
-
-    ; Now match to the existing sources
-    ;----------------------------------
-    if n_elements(all) gt 0 then begin
-      SRCMATCH,all.ra,all.dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch,domains=100
-      cat_old = cat
-      if nmatch gt 0 then begin
-        all[ind1].ndet++
-        all[ind1].detframes += ','+ibase 
-        if nmatch eq n_elements(cat) then undefine,cat else remove,ind2,cat
-      endif
-    endif else nmatch=0
-
-    print,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
-
-    ; New elements to add
-    ncat = n_elements(cat)
-    if ncat gt 0 then begin
-      newid = lindgen(n_elements(cat))+1 + cntall ; create new IDs, running count
-      cat.id = newid
-      if cntall+ncat gt n_elements(all) then begin
-        print,'Adding new elements to ALL structure'
-        oldall = all
-        undefine,all
-        all = replicate(cat0,n_elements(oldall)+200000L)
-        all[0] = oldall
-        undefine,oldall
-      endif
-      all[cntall:cntall+ncat-1] = cat
-      cntall += ncat
-      ;push,all,cat
-    endif
-
-  ; DAOPHOT did NOT run properly
-  endif else begin
-    print,'DAOPHOT did NOT run properly on ',ibase
-    error = 'DAOPHOT did NOT run properly on '+ibase
-  endelse  
-
-  BOMB1:
-
-  ;stop
-
-Endfor  ; field files loop
-all = all[0:cntall-1]  ; trim extra elements of all
-
-; Write combined catalog
+; Now concatenate and merge all of the catalogs
+;----------------------------------------------
 allcat_outfile = field+'.cmn.fits'
-print,'Writing combined file to ',allcat_outfile
-MWRFITS,all,allcat_outfile,/create
+if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
 
+  cat0 = {id:0L,frame:'',amp:0L,ndet:0L,detframes:'',fid:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,$
+          sharp:0.0,round:0.0,round2:0.0,ra:0.0d0,dec:0.0d0}
+  all = replicate(cat0,500000L)
+  cntall = 0LL
+  For i=0,nfieldfiles-1 do begin
+
+    ifile = fieldfiles[i]
+    ibase = FILE_BASENAME(ifile,'.fits')
+    idir = FILE_DIRNAME(ifile)
+
+    if thisimager.namps gt 1 then begin 
+      amp = long( first_el(strsplit(ibase,thisimager.separator,/extract),/last) )
+      frame = first_el(strsplit(ibase,thisimager.separator,/extract))
+    endif else begin
+      amp = 1L
+      frame = first_el(strsplit(ibase,thisimager.separator,/extract) )
+    endelse
+
+    ; Test the coo and ap file
+    coofile = idir+'/'+ibase+'.cmn.coo'
+    cootest = FILE_TEST(coofile)
+    if cootest eq 1 then coolines=FILE_LINES(coofile) else coolines=0
+    apfile = idir+'/'+ibase+'.cmn.ap'
+    aptest = FILE_TEST(apfile)
+    if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
+
+    undefine,cat
+  
+    ; DAOPHOT ran properly
+    if (coolines ge 4 and aplines ge 4) then begin
+   
+      ; Get the header
+      head = headfits(ifile)
+
+      ; Load the coordinates file
+      LOADCOO,coofile,coo,coohead1
+      ncoo = n_elements(coo)
+      ; Load the aperture photometry file
+      LOADAPER,apfile,aper,aperhead1
+      ; Get the coordinates
+      EXTAST,head,astr
+      ra=coo.x*0.-999999. & dec=ra    ; BAD until proven okay
+        if n_elements(astr) gt 0 then $
+      HEAD_XYAD,head,coo.x,coo.y,ra,dec,/deg
+
+      ; Create the CAT structure
+      cat = replicate(cat0,ncoo)
+      cat.frame = frame
+      cat.amp = amp
+      cat.ndet = 1
+      cat.detframes = ibase
+      cat.fid = coo.id
+      cat.x = coo.x
+      cat.y = coo.y
+      cat.sharp = coo.sharp
+      cat.round = coo.round
+      cat.round2 = coo.round2
+      cat.mag = aper.mag[0]
+      cat.err = aper.err[0]
+      cat.sky = aper.sky
+      cat.skysig = aper.skysig
+      cat.ra = ra
+      cat.dec = dec
+
+      ; Only keep sources with "decent" photometry
+      cat_orig = cat
+      gdcat = where(cat.mag lt 50. and cat.err lt 5.0,ngdcat)
+      ;gdcat = where(cat.mag lt 50. and cat.err lt 5.0 and cat.sharp lt 2.0,ngdcat)
+      if (ngdcat eq 0) then begin
+        printlog,logfile,ibase,' has NO sources with good photometry'
+        error = ibase+' has NO sources with good photometry'
+        goto,BOMB1
+      endif
+      cat = cat[gdcat]
+      ncat = n_elements(cat)
+
+      ; Now match to the existing sources
+      ;----------------------------------
+      if n_elements(all) gt 0 then begin
+        SRCMATCH,all.ra,all.dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch,domains=100
+        cat_old = cat
+        if nmatch gt 0 then begin
+          all[ind1].ndet++
+          all[ind1].detframes += ','+ibase 
+          if nmatch eq n_elements(cat) then undefine,cat else remove,ind2,cat
+        endif
+      endif else nmatch=0
+
+      print,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
+
+      ; New elements to add
+      ncat = n_elements(cat)
+      if ncat gt 0 then begin
+        newid = lindgen(n_elements(cat))+1 + cntall ; create new IDs, running count
+        cat.id = newid
+        if cntall+ncat gt n_elements(all) then begin
+          print,'Adding new elements to ALL structure'
+          oldall = all
+          undefine,all
+          all = replicate(cat0,n_elements(oldall)+200000L)
+          all[0] = oldall
+          undefine,oldall
+        endif
+        all[cntall:cntall+ncat-1] = cat
+        cntall += ncat
+        ;push,all,cat
+      endif
+
+    ; DAOPHOT did NOT run properly
+    endif else begin
+      printlog,logfile,'DAOPHOT did NOT run properly on ',ibase
+      error = 'DAOPHOT did NOT run properly on '+ibase
+    endelse  
+
+    BOMB1:
+  Endfor  ; field files loop
+  all = all[0:cntall-1]  ; trim extra elements of all
+
+  ; Write combined catalog
+  printlog,logfile,'Writing combined file to ',allcat_outfile
+  MWRFITS,all,allcat_outfile,/create
+
+; Combined catalog already exists, use it
+Endif else begin
+  printlog,logfile,'Using existing combined catalog file ',allcat_outfile
+  all = MRDFITS(allcat_outfile,1)
+Endelse
+  
 ; Create .cmn.lst files
 ;-----------------------
-ndetected = lonarr(ncat)  ; The number of detections in other frames
+printlog,logfile,'Creating individual .cmn.lst files'
+ndetected = lonarr(ncat)        ; The number of detections in other frames
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
   ibase = FILE_BASENAME(ifile,'.fits')
   idir = FILE_DIRNAME(ifile)
 
+  printlog,logfile,strtrim(i+1,2),' ',ibase
+  
   ; Do the CMN.COO and CMN.AP files exist?
   coofile = idir+'/'+ibase+'.cmn.coo'
   cootest = FILE_TEST(coofile)
@@ -335,8 +343,10 @@ For i=0,nfieldfiles-1 do begin
   aptest = FILE_TEST(apfile)
   if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
 
+  lstfile = ibase+'.cmn.lst'
+  
   ; DAOPHOT ran properly
-  if (coolines ge 4 and aplines ge 4) then begin
+  if (coolines ge 4 and aplines ge 4) and (file_test(lstfile) eq 0 or keyword_set(redo)) then begin
     undefine,coo,aper
 
     ; Get the header
@@ -505,7 +515,7 @@ For i=0,nfieldfiles-1 do begin
     ; Only create it if there are enough sources
     if (ngd ge minsources) then begin
       com = cat[gd]
-      print,'Creating the CONFIRMED CELESTIAL SOURCES file = ',ibase+'.cmn.lst'
+      print,'Creating the CONFIRMED CELESTIAL SOURCES file = ',lstfile
       WRITECOL,idir+'/'+ibase+'.cmn.lst',com.id,com.x,com.y,com.mag,com.err,com.sky,com.skysig,$
                com.sharp,com.round,com.round2,fmt='(I7,2F9.2,3F9.3,F9.2,3F9.3)'
 
@@ -517,7 +527,12 @@ For i=0,nfieldfiles-1 do begin
       print,'NO CMN.LST file created.  Need at least ',strtrim(minsources,2),' sources.'
     endelse
 
-  endif ; we have coo/ap file
+  ; Not creating .cmn.lst file
+  Endif else begin
+    if (coolines lt 4 or aplines lt 4) then $
+       printlog,logfile,'Cannot create .cmn.lst file for '+ibase+'.  Problems with coo and/or .ap file'
+    if file_test(lstfile) eq 1 and not keyword_set(redo) then printlog,logfile,lstfile+' already exists and /redo not set'
+  Endelse
 
   BOMB:
 

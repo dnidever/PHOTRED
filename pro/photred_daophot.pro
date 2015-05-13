@@ -489,30 +489,10 @@ if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
     ifield = first_el(strsplit(dirfield[i],' ',/extract),/last)
 
     CD,idir  ; cd to the appropriate directory
-    PHOTRED_COMMONSOURCES_GLOBAL,ifield
+    PHOTRED_COMMONSOURCES_GLOBAL,ifield,setupdir=curdir
     CD,curdir
   endfor
   
-
-
-  ;; Make the command files
-  ;cmd = strarr(ndirfieldchip)
-  ;cmnprocdirs = strarr(ndirfieldchip)
-  ;for i=0,ndirfieldchip-1 do begin
-  ;
-  ;  idirfieldchip = dirfieldchip[i]
-  ;  ind = where(alldirfieldchip eq idirfieldchip,nind)
-  ;
-  ;  ; Make the CONFIRMED CELESTIAL SOURCES list to be used to make PSF stars
-  ;  icmd = "PHOTRED_COMMONSOURCES,['"+strjoin(fitsbaselist[ind],"','")+"'],setupdir='"+curdir+"'"
-  ;  if keyword_set(redo) then icmd=icmd+',/redo'
-  ;  ;  PHOTRED_COMMONSOURCES,fil,error=psferror,redo=redo
-  ;  cmd[i] = icmd
-  ;  cmnprocdirs[i] = fitsdirlist[ind[0]]
-  ;endfor
-  ;
-  ;; Submit the jobs to the daemon
-  ;PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=30,/cdtodir
 endif
 
 
