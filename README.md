@@ -24,7 +24,7 @@ Installation Instructions
 1. Download the PHOTRED IDL programs
 Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
 
-gunzip photred_idl.tar.gz tar -xvf photred_idl.tar
+> gunzip photred_idl.tar.gz tar -xvf photred_idl.tar
 
 Let it overwrite any older programs by the same name. You need the new
 versions!  You will also need the IDL Astro User's Library. The
