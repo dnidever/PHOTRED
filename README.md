@@ -252,7 +252,7 @@ html
 
 Parameter  |  Description
 ------------ | -------------
-REQUIRED |  REQUIRED
+*REQUIRED* |  *REQUIRED*
 scriptsdir |  The absolute path to the directory that contains the PHOTRED scripts (i.e. daophot.sh, etc.)
 irafdir | The absolute path to your IRAF directory (that contains your login.cl file)
 telescope | The name of the telescope (e.g. Blanco, Swope)
@@ -262,27 +262,34 @@ nmulti |  The number of processors PHOTRED should use for the DAOPHOT and ALLFRA
 filtref |  The shortname of the filter (specified in the "filters" file) to be used as the reference frame (e.g. the M frame). This can be a comma-delimited priority-ordered list of filters (e.g. g,i,r,z,u). If there are multiple observations in this filter then the longest exposure in this filter will be used.
 trans | The name of the file that contains the photometric transformation equations.
 keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
-redo | OPTIONAL. PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
-skipwcs | OPTIONAL. Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
-wcsup | OPTIONAL. What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
-wcsleft | OPTIONAL. What cardinal direction (i.e. N, S, E or W) is "left" in the image? This is only used for non-standard setups.
+*OPTIONAL*  |  *OPTIONAL*
+sepfielddir |  Put each field in a separate directory (this is now the default option), otherwise everything will go in the main directory and can slow down processing because a very large (~100,000) number of fileds.
+keepmef  |  Keep the original multi-exension files (MEF).
+redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
+skipwcs | Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
+wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
+wcsleft | What cardinal direction (i.e. N, S, E or W) is "left" in the image? This is only used for non-standard setups.
 pixscale | The plate scale in arcseconds/pixel. This is ONLY used for non-"standard" imagers (i.e. not MOSAIC, IMACS, LBC or Swope) where the pixel scale cannot be determined from the image headers.
-wcsrefname | OPTIONAL. The name of the WCS reference catalog to use. The two options are 'USNO-B1' and '2MASS-PSC'. USNO-B1 is the default. The astrometric accuracy of the 2MASS catalog is better (~0.170 arcsec) than USNO-B1 (~0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20). So if you have deep images then definitely use USNO-B1, but if you have moderately deep images then 2MASS-PSC is probably better (and faster).
-searchdist | OPTIONAL. This sets the search distance (in arcmin) for WCS fitting (PHOTRED_WCS). Normally this is not needed. The default is 2*image size > 60 arcmin (i.e. whichever is greater). This is normally sufficient. If the WCS isn't fitting correctly then try setting "searchdist" to a larger value.
+wcsrefname | The name of the WCS reference catalog to use. The two options are 'USNO-B1' and '2MASS-PSC'. USNO-B1 is the default. The astrometric accuracy of the 2MASS catalog is better (~0.170 arcsec) than USNO-B1 (~0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20). So if you have deep images then definitely use USNO-B1, but if you have moderately deep images then 2MASS-PSC is probably better (and faster).
+searchdist | This sets the search distance (in arcmin) for WCS fitting (PHOTRED_WCS). Normally this is not needed. The default is 2*image size > 60 arcmin (i.e. whichever is greater). This is normally sufficient. If the WCS isn't fitting correctly then try setting "searchdist" to a larger value.
 wcsrmslim | This is the maximum RMS (in arcseconds) allowed for an acceptable WCS fit. The default is 1.0 arcseconds. Normally the RMS values are ~0.2-0.3 arcseconds.
 hyperthread | This allows multiple jobs to be running (daophot and allframe only) on a computer (such as halo or stream) that has multiple processors. It's similar to running it on a cluster.
 psfcomsrc | If this is set to 1 then only sources detected in other frames of the same field are used as PSF stars. This makes sure that your PSF stars are not contaminated by cosmic rays or other junk. HIGHLY RECOMMENDED.
-mchmaxshift | OPTIONAL. This sets a maximum constraint on the X/Y shifts found in the MATCH stage. WARNING, only use this if you ABSOLUTELY known that your frames are well aligned already.
+psfcomglobal | This finds PSF stars in other exposures of the same field in a "global" manner that works better with large dithers.  HIGHLY RECOMMENDED.
+psfcomgauss | This fits Gaussians to each potential PSF star and requires the Gaussian parameters to be "reasonable".
+mchmaxshift | This sets a maximum constraint on the X/Y shifts found in the MATCH stage. WARNING, only use this if you ABSOLUTELY known that your frames are well aligned already and do not have large dithers.
 finditer | The number of times to iteratively find sources in ALLFRAME (allfprep). The default is 2.
-alfdetprog | OPTIONAL. The program to use for source detection in the ALLFRAME stage (allfprep). The options are "sextractor" and "daophot". The default is "sextractor". SExtractor is generally better at finding faint sources and returns a stellaricity probability value which is very useful. HOWEVER, SExtractor fails in VERY crowded regions. It's best to use DAOPHOT for very crowded images.
-ddo51radoffset | OPTIONAL. There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
-keepinstr | OPTIONAL. CALIB should keep the instrumental magnitudes in the final output file.
-avgmag | OPTIONAL. CALIB should calculate average magnitudes in filters that were observed multiple times. The individual magnitudes are also kept.
-avgonlymag | OPTIONAL. Same as "avgmag" but only keeps the average magnitudes.
-todered | OPTIONAL. The magnitudes and colors the DEREDDEN stage should deredden. The short names of the filters and colors should be used (i.e. M, T, M-T). The dereddened magnitudes and colors will have the same names but with a "0" (zero) after it (i.e. M0 for M). The dash is removed for the color names.
-toextadd | OPTIONAL. The extinction and reddening values to add. The short names of the filters and colors should be used (i.e. M, T, M-T). The extinctions will have the same name as the magnitude but with an "A" at the beginning (i.e. AM for M), and the reddening values will have the same name as the color names but with the dash removed and an "E" at the beginning (i.e. EMT for M-T).
+alfdetprog | The program to use for source detection in the ALLFRAME stage (allfprep). The options are "sextractor" and "daophot". The default is "sextractor". SExtractor is generally better at finding faint sources and returns a stellaricity probability value which is very useful. HOWEVER, SExtractor fails in VERY crowded regions. It's best to use DAOPHOT for very crowded images.
+alfnocmbimscale | Do not "scale" the combined images in the ALLFRAME prep stage.
+alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from ALLFRAME processing.
+ddo51radoffset | There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
+keepinstr | CALIB should keep the instrumental magnitudes in the final output file.
+avgmag | CALIB should calculate average magnitudes in filters that were observed multiple times. The individual magnitudes are also kept.
+avgonlymag | Same as "avgmag" but only keeps the average magnitudes.
+todered | The magnitudes and colors the DEREDDEN stage should deredden. The short names of the filters and colors should be used (i.e. M, T, M-T). The dereddened magnitudes and colors will have the same names but with a "0" (zero) after it (i.e. M0 for M). The dash is removed for the color names.
+toextadd | The extinction and reddening values to add. The short names of the filters and colors should be used (i.e. M, T, M-T). The extinctions will have the same name as the magnitude but with an "A" at the beginning (i.e. AM for M), and the reddening values will have the same name as the color names but with the dash removed and an "E" at the beginning (i.e. EMT for M-T).
 cmd2cdaxes | The magnitudes and colors to use for the CMD and 2CD plots in PHOTRED_HTML.PRO. It should be in this format: MAG, MAG1-MAG2, MAG3-MAG4, i.e. M,M-T,M-D. For this example the CMD would be M vs. M-T and the 2CD would be M-D vs. M-T. The CMD and 2CD will be connected (CMD on top, 2CD on bottom) and will share the x-axis which be the first color. The magnitude will also be used for other plots (i.e. error vs. magnitude, chi vs. magnitude, etc).
-
+stdfile  |  List of standard star fields to exclude from processing and move to the "standards/" directory.
 
 Then add all the stage names that you want to process from the
 following list: rename, split, wcs, daophot, match, allframe, apcor,
