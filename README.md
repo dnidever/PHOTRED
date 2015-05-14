@@ -252,7 +252,7 @@ html
 
 Parameter  |  Description
 ------------ | -------------
-REQUIRED
+REQUIRED |  
 scriptsdir |  The absolute path to the directory that contains the PHOTRED scripts (i.e. daophot.sh, etc.)
 irafdir | The absolute path to your IRAF directory (that contains your login.cl file)
 telescope | The name of the telescope (e.g. Blanco, Swope)
