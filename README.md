@@ -81,12 +81,12 @@ from iraf.net.
 
 Make sure that DAOPHOT/ALLSTAR/ALLFRAME and SExtractor are installed. Type:
 
-which daophot
-which allstar
-which daomaster
-which daogrow
-which allframe
-which sex
+> which daophot
+> which allstar
+> which daomaster
+> which daogrow
+> which allframe
+> which sex
 
 They should all return the name of the program. If you get an error
 then you will need to install that program.
@@ -113,13 +113,13 @@ variable "DUST_DIR" to the directory where the Schlegel dust maps are
 located (actually one directory up in the directory tree). At UVa
 Astro this is the line you should add to your ".cshrc" file:
 
-setenv DUST_DIR /net/grass/catalogs/reddening/
+> setenv DUST_DIR /net/grass/catalogs/reddening/
 
 Now test that it works (you must already have installed the PHOTRED
 IDL files):
 
-mycomputer % idl IDL>print,dust_getval(10,10)
-￼￼￼0.472163
+> mycomputer % idl IDL>print,dust_getval(10,10)
+> ￼￼￼0.472163
 
 If you get an error here, then there is a problem. Check that all the
 files and required programs are there.
@@ -134,7 +134,7 @@ lines following "# Delete any old MTIO lock (magtape position) files."
 (these give problems on the Pleione cluster). If that still doesn't
 work, create a blank file called ".hushiraf" in your iraf directory.
 
-touch .hushiraf
+> touch .hushiraf
 
 Start IRAF by typing "cl" in your IRAF directory and see what
 happens. Nothing should be written to the screen except "cl>" or maybe
@@ -158,7 +158,14 @@ up WCS, DAOPHOT, MATCH, and ALLFRAME.
 
 2. Transformation Equations
 
-In order to do calibration step (CALIB) PHOTRED needs the photometry transformation equations which means doing the standard star reduction. There is a separate pipeline for the standard star reduction called STDRED that you should run first to get the transformation equations for the entire run. You can run all of the PHOTRED stages before CALIB (which include the cpu intensive DAOPHOT and ALLFRAME stages) without the transformation equations, and then do the final stages once you have transformation equations.
+In order to do calibration step (CALIB) PHOTRED needs the photometry
+transformation equations which means doing the standard star
+reduction. There is a separate pipeline for the standard star
+reduction called STDRED that you should run first to get the
+transformation equations for the entire run. You can run all of the
+PHOTRED stages before CALIB (which include the cpu intensive DAOPHOT
+and ALLFRAME stages) without the transformation equations, and then do
+the final stages once you have transformation equations.
 
 The transformation file needs to be in this format. Each filter gets
 two lines. The first line should contain: filter, color, nightly
@@ -168,12 +175,13 @@ terms. Normally the last two terms (airmass*color and color^2 are
 0.0000).
 
 n1.trans
-M M-T  -0.9990 0.1402 -0.1345 0.0000 0.0000
-       1.094E-02 5.037E-03 2.010E-03 0.0000 0.0000
-T M-T   -0.0061 0.0489 0.0266 0.0000 0.0000
-       6.782E-03 3.387E-03 1.374E-03 0.0000 0.0000
-D M-D   1.3251 0.1403 -0.0147 0.0000 0.0000
-       1.001E-02 5.472E-03 2.653E-02 0.0000 0.0000
+
+> M M-T  -0.9990 0.1402 -0.1345 0.0000 0.0000
+>        1.094E-02 5.037E-03 2.010E-03 0.0000 0.0000
+> T M-T   -0.0061 0.0489 0.0266 0.0000 0.0000
+>        6.782E-03 3.387E-03 1.374E-03 0.0000 0.0000
+> D M-D   1.3251 0.1403 -0.0147 0.0000 0.0000
+>        1.001E-02 5.472E-03 2.653E-02 0.0000 0.0000
 
 3. Setup File
 
@@ -181,48 +189,48 @@ PHOTRED needs a "photred.setup" file to run. This file specifies a few
 important parameters. Here's an example of a "photred.setup" file. The
 various parameters are described below.
 
-##### REQUIRED #####
-scriptsdir /net/home/dln5q/daophot/
-irafdir /net/home/dln5q/iraf/
-telescope Blanco
-instrument MOSAIC
-observatory CTIO
-nmulti 1
-filtref M
-trans blanco.trans
-##### OPTIONAL #####
-keepmef
-redo
-#skipwcs
-#wcsup
-#wcsleft
-#pixscale
-#wcsrefname
-#searchdist
-#wcsrmslim
-#hyperthread 1
-psfcomsrc 1
-#mchmaxshift 10.0
-finditer 2
-#alfdetprog sextractor
-#ddo51radoffset 1
-todered M,T,D,M-T,M-D
-#toextadd M,T,D,M-T,M-D
-keepinstr 1
-avgmag 1
-avgonlymag 0
-#cmd2cdaxes
-##### STAGES ##### rename
-split
-wcs
-daophot
-match
-allframe
-apcor
-astrom
-calib
-combine
-deredden
-save
-html
+> ##### REQUIRED #####
+> scriptsdir /net/home/dln5q/daophot/
+> irafdir /net/home/dln5q/iraf/
+> telescope Blanco
+> instrument MOSAIC
+> observatory CTIO
+> nmulti 1
+> filtref M
+> trans blanco.trans
+> ##### OPTIONAL #####
+> keepmef
+> redo
+> #skipwcs
+> #wcsup
+> #wcsleft
+> #pixscale
+> #wcsrefname
+> #searchdist
+> #wcsrmslim
+> #hyperthread 1
+> psfcomsrc 1
+> #mchmaxshift 10.0
+> finditer 2
+> #alfdetprog sextractor
+> #ddo51radoffset 1
+> todered M,T,D,M-T,M-D
+> #toextadd M,T,D,M-T,M-D
+> keepinstr 1
+> avgmag 1
+> avgonlymag 0
+> #cmd2cdaxes
+> ##### STAGES ##### rename
+> split
+> wcs
+> daophot
+> match
+> allframe
+> apcor
+> astrom
+> calib
+> combine
+> deredden
+> save
+> html
 
