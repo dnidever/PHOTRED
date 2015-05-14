@@ -24,7 +24,9 @@ Installation Instructions
 1. Download the PHOTRED IDL programs
 Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
 
-> gunzip photred_idl.tar.gz tar -xvf photred_idl.tar
+```
+gunzip photred_idl.tar.gz tar -xvf photred_idl.tar
+```
 
 Let it overwrite any older programs by the same name. You need the new
 versions!  You will also need the IDL Astro User's Library. The
@@ -56,7 +58,9 @@ be compiled. The tar file includes compiled versions that were
 compiled on a Linux system. If you are planning to run PHOTRED on a
 Sun machine or are having problems with the programs recompile them:
 
-g77 lstfilter.f -o lstfilter f95 makemag.f -o makemag
+```
+gfortran lstfilter.f -o lstfilter
+```
 
 3. Make sure IDL/IRAF are available
 
@@ -81,12 +85,14 @@ from iraf.net.
 
 Make sure that DAOPHOT/ALLSTAR/ALLFRAME and SExtractor are installed. Type:
 
-> which daophot
-> which allstar
-> which daomaster
-> which daogrow
-> which allframe
-> which sex
+```
+which daophot
+which allstar
+which daomaster
+which daogrow
+which allframe
+which sex
+```
 
 They should all return the name of the program. If you get an error
 then you will need to install that program.
@@ -113,13 +119,17 @@ variable "DUST_DIR" to the directory where the Schlegel dust maps are
 located (actually one directory up in the directory tree). At UVa
 Astro this is the line you should add to your ".cshrc" file:
 
-> setenv DUST_DIR /net/grass/catalogs/reddening/
+```
+setenv DUST_DIR /net/grass/catalogs/reddening/
+```
 
 Now test that it works (you must already have installed the PHOTRED
 IDL files):
 
-> mycomputer % idl IDL>print,dust_getval(10,10)
-> ￼￼￼0.472163
+```
+mycomputer % idl IDL>print,dust_getval(10,10)
+ ￼￼0.472163
+```
 
 If you get an error here, then there is a problem. Check that all the
 files and required programs are there.
@@ -134,7 +144,9 @@ lines following "# Delete any old MTIO lock (magtape position) files."
 (these give problems on the Pleione cluster). If that still doesn't
 work, create a blank file called ".hushiraf" in your iraf directory.
 
-> touch .hushiraf
+```
+touch .hushiraf
+```
 
 Start IRAF by typing "cl" in your IRAF directory and see what
 happens. Nothing should be written to the screen except "cl>" or maybe
@@ -191,48 +203,49 @@ PHOTRED needs a "photred.setup" file to run. This file specifies a few
 important parameters. Here's an example of a "photred.setup" file. The
 various parameters are described below.
 
-> ##### REQUIRED #####
-> scriptsdir /net/home/dln5q/daophot/
-> irafdir /net/home/dln5q/iraf/
-> telescope Blanco
-> instrument MOSAIC
-> observatory CTIO
-> nmulti 1
-> filtref M
-> trans blanco.trans
-> ##### OPTIONAL #####
-> keepmef
-> redo
-> #skipwcs
-> #wcsup
-> #wcsleft
-> #pixscale
-> #wcsrefname
-> #searchdist
-> #wcsrmslim
-> #hyperthread 1
-> psfcomsrc 1
-> #mchmaxshift 10.0
-> finditer 2
-> #alfdetprog sextractor
-> #ddo51radoffset 1
-> todered M,T,D,M-T,M-D
-> #toextadd M,T,D,M-T,M-D
-> keepinstr 1
-> avgmag 1
-> avgonlymag 0
-> #cmd2cdaxes
-> ##### STAGES ##### rename
-> split
-> wcs
-> daophot
-> match
-> allframe
-> apcor
-> astrom
-> calib
-> combine
-> deredden
-> save
-> html
-
+```
+##### REQUIRED #####
+scriptsdir /net/home/dln5q/daophot/
+irafdir /net/home/dln5q/iraf/
+telescope Blanco
+instrument MOSAIC
+observatory CTIO
+nmulti 1
+filtref M
+trans blanco.trans
+##### OPTIONAL #####
+keepmef
+redo
+#skipwcs
+#wcsup
+#wcsleft
+#pixscale
+#wcsrefname
+#searchdist
+#wcsrmslim
+#hyperthread 1
+psfcomsrc 1
+#mchmaxshift 10.0
+finditer 2
+#alfdetprog sextractor
+#ddo51radoffset 1
+todered M,T,D,M-T,M-D
+#toextadd M,T,D,M-T,M-D
+keepinstr 1
+avgmag 1
+avgonlymag 0
+#cmd2cdaxes
+##### STAGES ##### rename
+split
+wcs
+daophot
+match
+allframe
+apcor
+astrom
+calib
+combine
+deredden
+save
+html
+```
