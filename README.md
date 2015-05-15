@@ -8,11 +8,11 @@ forced PSF photometry across multiple exposures using a master source list creat
 STDRED is also included and can be used to derive the transformation equations from exposures of standard star fields.
 
 PHOTRED does require the following that need to be installed separately:
--IRAF
--IDL
--The IDL Astronomy Uers's Library
--The stand-alone fortran version of DAOPHOT/ALLFRAME
--SExtractor
+- IRAF
+- IDL
+- The IDL Astronomy Uers's Library
+- The stand-alone fortran version of DAOPHOT/ALLFRAME
+- SExtractor
 
 PDF manuals for PHOTRED and STDRED are included in the doc/ directory.
 
