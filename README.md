@@ -259,7 +259,7 @@ html
 
 Parameter  |  Description
 ------------ | -------------
-*REQUIRED* |  *REQUIRED*
+**REQUIRED** |  **REQUIRED**
 scriptsdir |  The absolute path to the directory that contains the PHOTRED scripts (i.e. daophot.sh, etc.)
 irafdir | The absolute path to your IRAF directory (that contains your login.cl file)
 telescope | The name of the telescope (e.g. Blanco, Swope)
@@ -269,7 +269,7 @@ nmulti |  The number of processors PHOTRED should use for the DAOPHOT and ALLFRA
 filtref |  The shortname of the filter (specified in the "filters" file) to be used as the reference frame (e.g. the M frame). This can be a comma-delimited priority-ordered list of filters (e.g. g,i,r,z,u). If there are multiple observations in this filter then the longest exposure in this filter will be used.
 trans | The name of the file that contains the photometric transformation equations.
 keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
-*OPTIONAL*  |  *OPTIONAL*
+**OPTIONAL**  |  **OPTIONA*L*
 sepfielddir |  Put each field in a separate directory (this is now the default option), otherwise everything will go in the main directory and can slow down processing because a very large (~100,000) number of fileds.
 keepmef  |  Keep the original multi-exension files (MEF).
 redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
