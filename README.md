@@ -22,6 +22,8 @@ machine for people who don't have an IDL license.
 # Contents
 
 * [Installation Instructions](#Installation_Instructions)
+  * [1. Download PHOTRED IDL](#1_Download_PHOTRED)
+  * [2. Download PHOTRED Scripts](#2_Download_Scripts)
 * [Running Instructions](#Running_Instructions)
 * [Adding New Imagers](#Adding_New_Imagers)
 * [Basic Explanation](#Basic_Explanation)
@@ -29,7 +31,7 @@ machine for people who don't have an IDL license.
 
 # <a name="Installation_Instructions"></a>Installation Instructions
 
-## 1. Download the PHOTRED IDL programs
+## <a name="1_Download_PHOTRED"></a> 1. Download the PHOTRED IDL programs
 Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
 
 ```
@@ -53,7 +55,7 @@ programs in the IDL Astro User's Library (run it by typing
 erase the offending program or rename it (e.g. proname.pro ->
 proname.pro.bak).
 
-## 2. Download the PHOTRED scripts
+## <a name="2_Download_Scripts"></a> 2. Download the PHOTRED scripts
 
 Download the PHOTRED scripts tar file (last updated 06/02/08). Make a
 directory where these scripts will reside (i.e. ~/photred/), and copy
