@@ -22,12 +22,12 @@ machine for people who don't have an IDL license.
 # Contents
 
 * [Installation Instructions](#Installation_Instructions)
-  * [1. Download PHOTRED IDL](#1_Download_PHOTRED)
-  * [2. Download PHOTRED Scripts](#2_Download_Scripts)
-  * [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
-  * [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
-  * [5. Schlegel Maps](#5_Schlegel_Maps)
-  * [6. Setup Your IRAF Login File](#6_Setup_IRAF)
+  1. [1. Download PHOTRED IDL](#1_Download_PHOTRED)
+  2. [2. Download PHOTRED Scripts](#2_Download_Scripts)
+  3. [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
+  4. [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
+  5. [5. Schlegel Maps](#5_Schlegel_Maps)
+  6. [6. Setup Your IRAF Login File](#6_Setup_IRAF)
 * [Running Instructions](#Running_Instructions)
 * [Adding New Imagers](#Adding_New_Imagers)
 * [Basic Explanation](#Basic_Explanation)
