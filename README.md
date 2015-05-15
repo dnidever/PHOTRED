@@ -80,12 +80,14 @@ gfortran lstfilter.f -o lstfilter
 
 ## <a name="2_Download_Astro_Library"></a> 2. Download IDL Astro User's Library
 
-You will also need the IDL Astro User's Library.  Most major astronomy institutions already have
-this installed but it's good to check that you have an updated copy.  You can download a tar file
-with all the programs ("astron.dir.tar.gz") from their ftp site:
+You will also need the IDL Astro User's Library.  Most major astronomy
+institutions already have this installed but it's good to check that
+you have an updated copy.  You can download a tar file with all the
+programs ("astron.dir.tar.gz") from their ftp site:
 
 http://idlastro.gsfc.nasa.gov/ftp/
 
+**This is a bit outdated and I don't think it works anymore**.
 There can be a problems if you have older copies of the IDL Astro
 User's programs in your IDL directory or programs with the same
 name. I've included a program called "checkidlastro.sh" in the
@@ -167,7 +169,8 @@ Now test that it works (you must already have installed the PHOTRED
 IDL files):
 
 ```
-mycomputer % idl IDL>print,dust_getval(10,10)
+% idl
+IDL>print,dust_getval(10,10)
  ￼￼0.472163
 ```
 
