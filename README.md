@@ -114,8 +114,12 @@ You can also download the IDL Virtual Machine for free and run IDL
 "sav" files. I have made IDL sav files for the PHOTRED pipeline so
 they can be run with the IDL Virtual Machine. Download the tar file
 (last updated 05/12/08) and put them in your ~/idl/ directory. To run
-a program type `idl -vm=progname.sav`.  IRAF is freely downloadable
-from http://iraf.net.
+a program type
+```
+idl -vm=progname.sav
+```
+
+IRAF is freely downloadable from http://iraf.net.
 
 ## <a name="4_DAOPHOT_Installed"></a> 4. Make sure DAOPHOT/ALLFRAME is installed
 
