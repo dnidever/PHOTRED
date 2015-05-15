@@ -21,11 +21,11 @@ machine for people who don't have an IDL license.
 
 # Contents
 
-[Installation Instructions](#Installation_Instructions)
-[Running Instructions][]
-[Adding New Imagers][]
-[Basic Explanation][]
-[STAGES][]
+* [Installation Instructions](#Installation_Instructions)
+* [Running Instructions](#Running_Instructions)
+* [Adding New Imagers](#Adding_New_Imagers)
+* [Basic Explanation](#Basic_Explanation)
+* [STAGES](#Stages)
 
 # <a name="Installation_Instructions"></a>Installation Instructions
 
@@ -161,7 +161,7 @@ happens. Nothing should be written to the screen except "cl>" or maybe
 "ecl>". If it's still printing other things to the screen, then you'll
 need to comment out more lines from the "login.cl" file.
 
-# Running Instructions
+# <a name="Running_Instructions">Running Instructions
 
 ## 1. Data
 
@@ -526,7 +526,7 @@ checks to see which files have the expected output (i.e. .als or .mag
 files). This information is listed in the "COMPLETED" column. If you
 are redoing some files then these numbers won't be accurate.
 
-## Adding new imagers
+## <a name="Adding_New_Imagers"> Adding new imagers
 
 PHOTRED currently works on data from KPNO+MOSAIC, CTIO+MOSAIC
 (Blanco), Swope CCD, IMACS, LBT Camera (LBC), and DECam. New imagers
@@ -545,7 +545,7 @@ might need to be modified to deal with the new data type.
 images. PIXSCALE might need to be specified in the "photred.setup"
 file.
 
-## Basic Explanation
+## <a name="Basic_Explanation"> Basic Explanation
 
 Photred is meant to be run on one night's data at a time. The standard
 star reduction should already have been done and the transformation
@@ -582,7 +582,7 @@ capability. The maximum number of processes that will be allowed to be
 in the PBS queue at any given time is set by the NMULTI parameter in
 the photred.setup file (NMULTI=8 is a good value to use).
 
-# STAGES
+# <a name="Stages"> STAGES
 
 ## RENAME
 
