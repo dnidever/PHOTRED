@@ -40,6 +40,20 @@ machine for people who don't have an IDL license.
 * [Adding New Imagers](#Adding_New_Imagers)
 * [Basic Explanation](#Basic_Explanation)
 * [STAGES](#Stages)
+  * [RENAME](#Stage_RENAME)
+  * [SPLIT](#Stage_SPLIT)
+  * [WCS](#Stage_WCS)
+  * [DAOPHOT](#Stage_DAOPHOT)
+  * [MATCH](#Stage_MATCH)
+  * [ALLFRAME](#Stage_ALLFRAME)
+  * [APCOR](#Stage_APCOR)
+  * [ASTROM](#Stage_ASTROM)
+  * [CALIB](#Stage_CALIB)
+  * [COMBINE](#Stage_COMBINE)
+  * [DEREDDEN](#Stage_DEREDDEN)
+  * [SAVE](#Stage_SAVE)
+  * [HTML](#Stage_HTML)
+	
 
 # <a name="Installation_Instructions"></a>Installation Instructions
 
@@ -598,7 +612,7 @@ the photred.setup file (NMULTI=8 is a good value to use).
 
 # <a name="Stages"></a> STAGES
 
-## RENAME
+##  <a name="Stage_RENAME"></a> RENAME
 
 ### Basic Explanation
 
@@ -631,7 +645,8 @@ F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
 F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
 F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
 
-## SPLIT
+
+##  <a name="Stage_SPLIT"></a> SPLIT
 
 ### Basic Explanation
 
@@ -664,7 +679,8 @@ F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053_1.fits, F3.ccd1053_2.fits, ...
 From now on the "Split Multi-chip" and "Multi-chip" files will "look"
 the same, since now the MEF files have been split.
 
-## WCS
+
+## <a name="Stage_WCS"></a> WCS
 
 ### Basic Explanation
 
@@ -691,7 +707,8 @@ F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
 F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
 F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
 
-## DAOPHOT
+
+## <a name="Stage_DAOPHOT"></a> DAOPHOT
 
 ### Basic Explanation
 
@@ -720,7 +737,8 @@ F1.ccd1012.als | F1.ccd1012_2.als
 F2.ccd1024.als | F2.ccd1024c3.als
 F3.ccd1053.als | F3.ccd1053c5.als
 
-## MATCH
+
+## <a name="Stage_MATCH"></a> MATCH
 
 ### Basic Explanation
 
@@ -753,7 +771,8 @@ ALS files as MCH files. The MCH files will have the names of the
 
 If any of the ALS files don't match then the entire "set" of images fails.
 
-## ALLFRAME
+
+## <a name="Stage_ALLFRAME"></a> ALLFRAME
 
 ### Basic Explanation
 
@@ -782,7 +801,8 @@ F1.ccd1012.mag | F1.ccd1012_2.mag
 F2.ccd1024.mag | F2.ccd1024c3.mag
 F3.ccd1053.mag | F3.ccd1053c5.mag
 
-## APCOR
+
+## <a name="Stage_APCOR"></a> APCOR
 
 ### Basic Explanation
 
@@ -814,7 +834,7 @@ F3.ccd1053.fits | F3.ccd1053c5.fits
 **SUCCESS** (fits) - Same as outlist.
 
 
-## ASTROMETRY
+## <a name="Stage_ASTROM"></a> ASTROM
 
 ### Basic Explanation
 
@@ -846,7 +866,7 @@ F2.ccd1024.ast | F2.ccd1024c3.ast
 F3.ccd1053.ast | F3.ccd1053c5.ast
 
 
-## CALIB
+## <a name="Stage_CALIB"></a> CALIB
 
 ### Basic Explanation
 
@@ -876,7 +896,7 @@ F2.ccd1024.phot | F2.ccd1024c3.phot
 F3.ccd1053.phot | F3.ccd1053c5.phot
 
 
-## COMBINE
+## <a name="Stage_COMBINE"></a> COMBINE
 
 ### Basic Explanation
 
@@ -907,7 +927,7 @@ F2.ccd1024.cmb | F2.ccd1024.cmb
 F3.ccd1053.cmb | F3.ccd1053.cmb
 
 
-## DEREDDEN
+## <a name="Stage_DEREDDEN"></a> DEREDDEN
 
 ### Basic Explanation
 
@@ -938,7 +958,7 @@ F2.ccd1024.dered | F2.ccd1024.dered
 F3.ccd1053.dered | F3.ccd1053.dered
 
 
-## SAVE
+## <a name="Stage_SAVE"></a> SAVE
 
 ### Basic Explanation
 
@@ -969,7 +989,7 @@ FIELD2.final/dat/fits | FIELD2.final/dat/fits
 FIELD3.final/dat/fits | FIELD3.final/dat/fits
 
 
-## HTML
+## <a name="Stage_HTML"></a> HTML
 
 ### Basic Explanation
 
@@ -989,4 +1009,4 @@ F1.ccd1012.dat | F1.ccd1012.dat
 F2.ccd1024.dat | F2.ccd1024.dat
 F3.ccd1053.dat | F3.ccd1053.dat
 
-*OUTLIST* NO outlist at the moment.
+**OUTLIST** NO outlist at the moment.
