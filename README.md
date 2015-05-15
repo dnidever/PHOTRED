@@ -24,6 +24,10 @@ machine for people who don't have an IDL license.
 * [Installation Instructions](#Installation_Instructions)
   * [1. Download PHOTRED IDL](#1_Download_PHOTRED)
   * [2. Download PHOTRED Scripts](#2_Download_Scripts)
+  * [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
+  * [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
+  * [5. Schlegel Maps](#5_Schlegel_Maps)
+  * [6. Setup Your IRAF Login File](#6_Setup_IRAF)
 * [Running Instructions](#Running_Instructions)
 * [Adding New Imagers](#Adding_New_Imagers)
 * [Basic Explanation](#Basic_Explanation)
@@ -72,7 +76,7 @@ Sun machine or are having problems with the programs recompile them:
 gfortran lstfilter.f -o lstfilter
 ```
 
-## 3. Make sure IDL/IRAF are available
+## <a name="3_IDL_IRAF_Available"></a> 3. Make sure IDL/IRAF are available
 
 PHOTRED needs IDL and IRAF run. If you don't have IDL then you might
 consider buying a license from ITT Visual Information
@@ -91,7 +95,7 @@ they can be run with the IDL Virtual Machine. Download the tar file
 a program type "idl -vm=progname.sav".  IRAF is freely downloadable
 from iraf.net.
 
-## 4. Make sure DAOPHOT/ALLFRAME is installed
+## <a name="4_DAOPHOT_Installed"></a> 4. Make sure DAOPHOT/ALLFRAME is installed
 
 Make sure that DAOPHOT/ALLSTAR/ALLFRAME and SExtractor are installed. Type:
 
@@ -118,7 +122,7 @@ machines is called "/net/halo/bin/allframe.2004.fixed". This is
 currently hardcoded in photred_allframe.pro and allframe.pro. Make
 sure that this program exists.
 
-## 5. Schlegel Maps
+## <a name="5_Schlegel_Maps"></a> 5. Schlegel Maps
 
 PHOTRED uses the Schlegel maps to deredden the photometry. The FITS
 files can be downloaded from here. On the UVa Astro machines the files
@@ -144,7 +148,7 @@ mycomputer % idl IDL>print,dust_getval(10,10)
 If you get an error here, then there is a problem. Check that all the
 files and required programs are there.
 
-## 6. Setup Your IRAF Login File
+## <a name="6_Setup_IRAF"></a> 6. Setup Your IRAF Login File
 
 PHOTRED calls some IRAF programs. In order for this to work you need
 to edit your IRAF "login.cl" file so that it doesn't print out any
