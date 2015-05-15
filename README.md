@@ -21,11 +21,11 @@ machine for people who don't have an IDL license.
 
 # Contents
 
-* [Installation Instructions][]
-* [Running Instructions][]
-* [Adding New Imagers][]
-* [Basic Explanation][]
-* [STAGES][]
+[Installation Instructions][]
+[Running Instructions][]
+[Adding New Imagers][]
+[Basic Explanation][]
+[STAGES][]
 
 # Installation Instructions
 
