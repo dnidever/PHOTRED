@@ -19,9 +19,9 @@ PDF manuals for PHOTRED and STDRED are included in the doc/ directory.
 IDL "sav" files of all the main PHOTRED programs are in the sav/ directory.  These can be used with the IDL virtual
 machine for people who don't have an IDL license.
 
-Installation Instructions
+# Installation Instructions
 
-1. Download the PHOTRED IDL programs
+## 1. Download the PHOTRED IDL programs
 Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
 
 ```
@@ -45,7 +45,7 @@ programs in the IDL Astro User's Library (run it by typing
 erase the offending program or rename it (e.g. proname.pro ->
 proname.pro.bak).
 
-2. Download the PHOTRED scripts
+## 2. Download the PHOTRED scripts
 
 Download the PHOTRED scripts tar file (last updated 06/02/08). Make a
 directory where these scripts will reside (i.e. ~/photred/), and copy
@@ -62,7 +62,7 @@ Sun machine or are having problems with the programs recompile them:
 gfortran lstfilter.f -o lstfilter
 ```
 
-3. Make sure IDL/IRAF are available
+## 3. Make sure IDL/IRAF are available
 
 PHOTRED needs IDL and IRAF run. If you don't have IDL then you might
 consider buying a license from ITT Visual Information
@@ -205,37 +205,44 @@ various parameters are described below.
 
 ```
 ##### REQUIRED #####
-scriptsdir /net/home/dln5q/daophot/
-irafdir /net/home/dln5q/iraf/
-telescope Blanco
-instrument MOSAIC
+scriptsdir  /idl/idllocal/photred/PHOTRED/scripts/
+irafdir     /home/smash/
+telescope   Blanco
+instrument  DECAM
 observatory CTIO
-nmulti 1
-filtref M
-trans blanco.trans
+nmulti      10
+filtref     g,i,r,z,u
+trans       nocalib.trans
 ##### OPTIONAL #####
-keepmef
-redo
-#skipwcs
-#wcsup
-#wcsleft
-#pixscale
-#wcsrefname
-#searchdist
-#wcsrmslim
+sepfielddir 1
+keepmef     0
+redo        0
+#skipwcs    0
+#wcsup      N
+#wcsleft    E
+#pixscale   0.50
+#wcsrefname USNO-B1
+#searchdist 60
+#wcsrmslim  1.0
 #hyperthread 1
-psfcomsrc 1
-#mchmaxshift 10.0
-finditer 2
-#alfdetprog sextractor
-#ddo51radoffset 1
-todered M,T,D,M-T,M-D
-#toextadd M,T,D,M-T,M-D
-keepinstr 1
-avgmag 1
-avgonlymag 0
-#cmd2cdaxes
-##### STAGES ##### rename
+psfcomsrc   1
+psfcomglobal 1
+#psfcomgauss 1
+#mchmaxshift  50.0
+finditer    2
+#alfdetprog  sextractor
+#alfnocmbimscale 0
+#alfexclude  F1,F3
+ddo51radoffset  1
+keepinstr   1
+avgmag      1
+avgonlymag  0
+todered     M,T,D,M-T,M-D
+#toextadd    M,T,D,M-T,M-D
+#cmd2cdaxes  M,M-T,M-D
+stdfile	     /home/smash/SMASH/standards.txt
+##### STAGES #####
+rename
 split
 wcs
 daophot
