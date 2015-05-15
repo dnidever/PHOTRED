@@ -560,3 +560,67 @@ in a different format from the INLIST files.
 - **SUCCESS** The files in INLIST that were successfully processed
 - **FAILURE** The files in INLIST that were NOT successfully processed LOG A
 running log of what the stage has done
+
+The main interface and logistical work of PHOTRED is done in IDL. Most
+of the heavy processing is done by Peter Stetson's photometric codes
+DAOPHOT, ALLSTAR, DAOMATCH, DAOMASTER, ALLFRAME and DAOGROW. Some IRAF
+tasks, such as MSCCMATCH, are also used.
+
+PHOTRED has the built-in capability to run multiple DAOPHOT or
+ALLFRAME processes at the same time on Pleione (i.e. our beowulf
+cluster). You have to be logged in to Pleione and be able to access
+the data in order to take advantage of the multi-plexing
+capability. The maximum number of processes that will be allowed to be
+in the PBS queue at any given time is set by the NMULTI parameter in
+the photred.setup file (NMULTI=8 is a good value to use).
+
+# STAGES
+
+## RENAME
+
+### Basic Explanation
+
+This program renames object fits files so that it includes their field
+information. For example, ccd1001.fits gets renamed to
+F1.ccd1001.fits. Any calibration frames (zero, dflat, sflat, etc.) get
+moved to the "calib/" directory without getting renamed.
+
+### Lists
+
+It will create the inlist from all fits files in the directory Outlist
+will be of all files that aren't zero, dflat, sflat, etc. and were
+successfully put in a "field". It also creates the "fields"
+file. Files are renamed: F1.obj1023.fits, F2.obj1045.fits, etc.
+
+**INLIST** (fits) - Creates it itself from fits files in directory
+
+Single-Chip | Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+zero1001.fits | zero1001_1.fits | zero1001.fits
+ccd1012.fits | ccd1012_2.fits | ccd1012.fits
+ccd1024.fits | ccd1024c3.fits | ccd1024.fits
+ccd1053.fits | ccd1053c5.fits | ccd1053.fits
+
+**OUTLIST** (fits) - The renamed object files
+
+Single-Chip | Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
+
+## SPLIT
+
+### Basic Explanation
+
+This splits multiple-extension files (MEF) into separate files for
+each amp/chip. Non-MEF files are not affected.
+
+### Lists
+
+All the files in rename.outlist are put in split.inlist. All non-MEF
+(single chip) files automatically go to split.outlist. All
+successfully split files (not original MEF files) are put in
+split.outlist
+
+**INLIST** (fits) - Copied from rename.outlist
