@@ -2,7 +2,7 @@
 Automated DAOPHOT-based PSF photometry pipeline
 
 PHOTRED is an automated DAOPHOT-based PSF photometry pipeline.  It's very generic but does require reduced flat images.
-PHOTRED does WCS fitting, aperture photometry, single-image PSF photometry (ALLSTAR), source matching across multiple images,
+PHOTRED performs WCS fitting, aperture photometry, single-image PSF photometry (ALLSTAR), source matching across multiple images,
 forced PSF photometry across multiple exposures using a master source list created from a deep stack of all exposures
 (ALLFRAME), aperture correction, calibration using photometric transformation equations, and dereddening.
 STDRED is also included and can be used to derive the transformation equations from exposures of standard star fields.
@@ -23,8 +23,8 @@ machine for people who don't have an IDL license.
 # Contents
 
 * [Installation Instructions](#Installation_Instructions)
-  * [1. Download PHOTRED IDL](#1_Download_PHOTRED)
-  * [2. Download PHOTRED Scripts](#2_Download_Scripts)
+  * [1. Checkout PHOTREDL](#1_Checkout_PHOTRED)
+  * [2. Download IDL Astro User's Library](#2_Download_Astro_Library)
   * [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
   * [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
   * [5. Schlegel Maps](#5_Schlegel_Maps)
@@ -58,18 +58,33 @@ machine for people who don't have an IDL license.
 
 # <a name="Installation_Instructions"></a>Installation Instructions
 
-## <a name="1_Download_PHOTRED"></a> 1. Download the PHOTRED IDL programs
-Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
+## <a name="1_Checkout_PHOTRED"></a> 1. Checkout PHOTRED repository
+
+Checkout this PHOTRED github repository.  Update your IDL_PATH in your
+.cshrc, .tcshrc or .login file so that the "PHOTRED/pro/" directory is
+included.  I would put PHOTRED near the beginning of the list so that
+it's programs have priority if there happens to be other programs with
+the same names.
+
+You could also copy the PHOTRED/pro directory directly into your
+"~/idl/" directory (maybe in a "photred/" subdirectory).  It's
+probably better to keep full repository in a separate directly so that
+it's easy to pull in updates.
+
+There is one fortran code (lstfilter.f) that needs to be compiled.
+Compile it like this:
 
 ```
-gunzip photred_idl.tar.gz tar -xvf photred_idl.tar
+gfortran lstfilter.f -o lstfilter
 ```
 
-Let it overwrite any older programs by the same name. You need the new
-versions!  You will also need the IDL Astro User's Library. The
-programs are automatically available on UVa Astronomy. If you don't
-have the IDL Astro User's Library then you should download the
-programs from their download site (get "astron.tar.gz").
+## <a name="2_Download_Astro_Library"></a> 2. Download IDL Astro User's Library
+
+You will also need the IDL Astro User's Library.  Most major astronomy institutions already have
+this installed but it's good to check that you have an updated copy.  You can download a tar file
+with all the programs ("astron.dir.tar.gz") from their ftp site:
+
+http://idlastro.gsfc.nasa.gov/ftp/
 
 There can be a problems if you have older copies of the IDL Astro
 User's programs in your IDL directory or programs with the same
@@ -81,23 +96,6 @@ programs in the IDL Astro User's Library (run it by typing
 "idlastro.lst" which is also included). If it finds anything I would
 erase the offending program or rename it (e.g. proname.pro ->
 proname.pro.bak).
-
-## <a name="2_Download_Scripts"></a> 2. Download the PHOTRED scripts
-
-Download the PHOTRED scripts tar file (last updated 06/02/08). Make a
-directory where these scripts will reside (i.e. ~/photred/), and copy
-the tar file to the directory and unpack it:
-
-gunzip photred_scripts.tar.gz tar -xvf photred_scripts.tar
-
-There are two fortran codes (lstfilter.f and makemag.f) that need to
-be compiled. The tar file includes compiled versions that were
-compiled on a Linux system. If you are planning to run PHOTRED on a
-Sun machine or are having problems with the programs recompile them:
-
-```
-gfortran lstfilter.f -o lstfilter
-```
 
 ## <a name="3_IDL_IRAF_Available"></a> 3. Make sure IDL/IRAF are available
 
