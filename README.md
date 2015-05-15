@@ -27,7 +27,7 @@ machine for people who don't have an IDL license.
 [Basic Explanation][]
 [STAGES][]
 
-# Installation Instructions
+# Installation Instructions #
 
 ## 1. Download the PHOTRED IDL programs
 Download the PHOTRED IDL programs tar file (last updated 06/02/08). Copy this to your IDL directory (most likely ~/idl/) and unpack it:
