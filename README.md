@@ -624,3 +624,347 @@ successfully split files (not original MEF files) are put in
 split.outlist
 
 **INLIST** (fits) - Copied from rename.outlist
+
+Single-Chip | Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
+
+**OUTLIST** (fits) - All split files that are split okay, or single-chip files
+
+Single-Chip |  Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012_1.fits, F1.ccd1012_2.fits, ...
+F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024_1.fits, F2.ccd1024_2.fits, ...
+F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053_1.fits, F3.ccd1053_2.fits, ...
+
+From now on the "Split Multi-chip" and "Multi-chip" files will "look"
+the same, since now the MEF files have been split.
+
+## WCS
+
+### Basic Explanation
+
+This program gets the correct WCS for images.
+
+### Lists
+
+It takes all files from split.outlist and puts them into
+wcs.inlist. All files that succeeded get put in wcs.outlist.
+
+**INLIST** (fits) - Moved from split.outlist
+
+Single-Chip | Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
+
+**OUTLIST** (fits) - All object files that are given a proper wcs.
+
+Single-Chip |  Split Multi-chip | Multi-chip (MEF)
+------------ | ------------- | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits | F1.ccd1012.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits | F2.ccd1024.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits | F3.ccd1053.fits
+
+## DAOPHOT
+
+### Basic Explanation
+
+This program runs DAOPHOT on all the images (using Tony's script).
+
+### Lists
+
+If split.outlist exists then they are put into daophot.inlist. If
+split.outlist does NOT exist then the wcs.outlist is taken
+instead. All fits files that successfully run through daophot get put
+into daophot.outlist
+
+**INLIST** (fits) - Moved from split.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits
+
+**OUTLIST** (als) - All files in inlist that are succcessfully processed
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.als | F1.ccd1012_2.als
+F2.ccd1024.als | F2.ccd1024c3.als
+F3.ccd1053.als | F3.ccd1053c5.als
+
+## MATCH
+
+### Basic Explanation
+
+This program runs DAOMATCH and DAOMASTER on the ALS files which combines the photometry from the various filters.
+
+### Lists
+
+It takes all the files from daophot.outlist and puts them into match.inlist. It uses the fields (from the filenames) to figure out which files to together and should be matched. All of the MCH files to in the match.outlist.
+
+**INLIST** (als) - Moved from daophot.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.als | F1.ccd1012_2.als
+F2.ccd1024.als | F2.ccd1024c3.als
+F3.ccd1053.als | F3.ccd1053c5.als
+
+**OUTLIST** (mch) - All files in inlist that were successfully matched (ALL??)
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.mch | F1.ccd1012_2.mch
+F2.ccd1024.mch | F2.ccd1024c3.mch
+F3.ccd1053.mch | F3.ccd1053c5.mch
+
+There won't be as many MCH files in the outlist as ALS files in the
+inlist. If there are 3 frames per field then there will be 3x as many
+ALS files as MCH files. The MCH files will have the names of the
+"reference" frame.
+
+If any of the ALS files don't match then the entire "set" of images fails.
+
+## ALLFRAME
+
+### Basic Explanation
+
+This program runs ALLFRAME on all of the MCH files. ALLFRAME does PSF fitting on images of all filters/bands similtaneously.
+
+### Lists
+
+list of all mch files Takes the list of MCH files from the
+match.outlist and puts them in allframe.inlist. All fields that
+succeed, their MAG files get put into allframe.outlist.
+
+**INLIST** (mch) - Moved from match.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.mch | F1.ccd1012_2.mch
+F2.ccd1024.mch | F2.ccd1024c3.mch
+F3.ccd1053.mch | F3.ccd1053c5.mch
+
+**OUTLIST** (mag) - Every MCH file that was processed successfully by
+  allframe and has a MAG file.
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.mag | F1.ccd1012_2.mag
+F2.ccd1024.mag | F2.ccd1024c3.mag
+F3.ccd1053.mag | F3.ccd1053c5.mag
+
+## APCOR
+
+### Basic Explanation
+
+This programs find the aperture correction for all the files using DAOGROW.
+
+### Lists
+
+Takes all of the fits files from daophot.success(!!) and puts them
+into apcor.inlist. All fits files that have an aperture correction in
+the final apcor.lst get put into the apcor.outlist.
+
+**INLIST** (fits) - COPIED from daophot.success
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits
+
+**OUTLIST** (fits) - Every FITS file that was successfully given an
+aperture correction in the final apcor.lst file
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.fits | F1.ccd1012_2.fits
+F2.ccd1024.fits | F2.ccd1024c3.fits
+F3.ccd1053.fits | F3.ccd1053c5.fits
+
+**SUCCESS** (fits) - Same as outlist.
+
+
+## ASTROMETRY
+
+### Basic Explanation
+
+This program gets coordinates for all stars from the WCS in the
+reference image.
+
+### Lists
+
+This takes all of the mag files from ALLFRAME.outlist or mch files
+from MATCH.outlist. All files that are successfully given coordinates
+are put into the ASTROM.outlist (with .ast endings). There will be a
+separate file for each field chip/amp.
+
+**INLIST** (mag/mch) - Moved from ALLFRAME.outlist or if that does not
+exist, then from MATCH.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.mag | F1.ccd1012_2.mag
+F2.ccd1024.mag | F2.ccd1024c3.mag
+F3.ccd1053.mag | F3.ccd1053c5.mag
+
+**OUTLIST** (ast) - Every MAG/MCH file that was processed successfully
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.ast | F1.ccd1012_2.ast
+F2.ccd1024.ast | F2.ccd1024c3.ast
+F3.ccd1053.ast | F3.ccd1053c5.ast
+
+
+## CALIB
+
+### Basic Explanation
+
+This uses the transformation equations to convert the instrumental
+magnitudes to calibrated magnitudes.
+
+### Lists
+
+Get the list of all ast files from ASTROM.outlist. All files that are
+successfully calibrated are put into the calib.outlist (with .phot
+endings). There will be a .phot file for each field chip/amp.
+
+**INLIST** (ast) - Moved from ASTROM.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.ast | F1.ccd1012_2.ast
+F2.ccd1024.ast | F2.ccd1024c3.ast
+F3.ccd1053.ast | F3.ccd1053c5.ast
+
+**OUTLIST** (phot) - Every AST file that was successfully calibrated
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.phot | F1.ccd1012_2.phot
+F2.ccd1024.phot | F2.ccd1024c3.phot
+F3.ccd1053.phot | F3.ccd1053c5.phot
+
+
+## COMBINE
+
+### Basic Explanation
+
+This combines all the photometry from the various chips/amps for multi- chip data.
+
+### Lists
+
+This combines all chips/amps of a multi-chip frame. It takes all the
+files in CALIB.outlist and puts them into COMBINE.inlist. All files
+that are successfully combined are put into the COMBINE.outlist. There
+will be a separate output file for each field.
+
+**INLIST** (phot) - Moved from CALIB.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.phot | F1.ccd1012_2.phot
+F2.ccd1024.phot | F2.ccd1024c3.phot
+F3.ccd1053.phot | F3.ccd1053c5.phot
+
+**OUTLIST** (cmb) - All of the chips/amps get combined. For single-chip
+data the PHOT files are just copied over.
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.cmb | F1.ccd1012.cmb
+F2.ccd1024.cmb | F2.ccd1024.cmb
+F3.ccd1053.cmb | F3.ccd1053.cmb
+
+
+## DEREDDEN
+
+### Basic Explanation
+
+This program dereddens the magnitudes (and colors specified in the
+setup file) using the Schlegel maps.
+
+### Lists
+
+This takes all the files in COMBINE.outlist and dereddens the
+magnitudes and colors. All files that are successful get put into
+DEREDDEN.outlist There will be a separate output file for each field
+with a .dered ending.
+
+**INLIST** (ast) - Moved from combine.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.cmb | F1.ccd1012.cmb
+F2.ccd1024.cmb | F2.ccd1024.cmb
+F3.ccd1053.cmb | F3.ccd1053.cmb
+
+**OUTLIST** (dered) - All of the files that were successfully dereddened.
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.dered | F1.ccd1012.dered
+F2.ccd1024.dered | F2.ccd1024.dered
+F3.ccd1053.dered | F3.ccd1053.dered
+
+
+## SAVE
+
+### Basic Explanation
+
+This renames the final photometry files with the field name.
+
+### Lists
+
+Takes all of the files from deredden.outlist and renames them to have
+the field names with .final extensions. It also saves IDL save files
+of the final photometry structures.
+
+**INLIST** (dered) - Moved from deredden.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.dered | F1.ccd1012.dered
+F2.ccd1024.dered | F2.ccd1024.dered
+F3.ccd1053.dered | F3.ccd1053.dered
+
+**OUTLIST** (final/dat/fits) - Rename the files with their field names. An IDL
+save file of the photometry structure is saved to FIELD.dat and FITS binary
+table saved to FIELD.fits.gz.
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+FIELD1.final/dat/fits | FIELD1.final/dat/fits
+FIELD2.final/dat/fits | FIELD2.final/dat/fits
+FIELD3.final/dat/fits | FIELD3.final/dat/fits
+
+
+## HTML
+
+### Basic Explanation
+
+This makes plots and summary HTML files for all the fields output by
+SAVE. The plots and HTML files will be put in the "html/"
+directory. The main index page is called "html/index.html"
+
+### Lists
+
+Takes all of the files from SAVE.outlist and creates plots and HTML summary pages.
+
+**INLIST** (dat) - Moved from SAVE.outlist
+
+Single-Chip | Split Multi-chip
+------------ | -------------
+F1.ccd1012.dat | F1.ccd1012.dat
+F2.ccd1024.dat | F2.ccd1024.dat
+F3.ccd1053.dat | F3.ccd1053.dat
+
+*OUTLIST* NO outlist at the moment.
