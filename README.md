@@ -81,7 +81,7 @@ they can be run with the IDL Virtual Machine. Download the tar file
 a program type "idl -vm=progname.sav".  IRAF is freely downloadable
 from iraf.net.
 
-4. Make sure DAOPHOT/ALLFRAME is installed
+## 4. Make sure DAOPHOT/ALLFRAME is installed
 
 Make sure that DAOPHOT/ALLSTAR/ALLFRAME and SExtractor are installed. Type:
 
@@ -108,7 +108,7 @@ machines is called "/net/halo/bin/allframe.2004.fixed". This is
 currently hardcoded in photred_allframe.pro and allframe.pro. Make
 sure that this program exists.
 
-5. Schlegel Maps
+## 5. Schlegel Maps
 
 PHOTRED uses the Schlegel maps to deredden the photometry. The FITS
 files can be downloaded from here. On the UVa Astro machines the files
@@ -134,7 +134,7 @@ mycomputer % idl IDL>print,dust_getval(10,10)
 If you get an error here, then there is a problem. Check that all the
 files and required programs are there.
 
-6. Setup Your IRAF Login File
+## 6. Setup Your IRAF Login File
 
 PHOTRED calls some IRAF programs. In order for this to work you need
 to edit your IRAF "login.cl" file so that it doesn't print out any
@@ -153,9 +153,9 @@ happens. Nothing should be written to the screen except "cl>" or maybe
 "ecl>". If it's still printing other things to the screen, then you'll
 need to comment out more lines from the "login.cl" file.
 
-Running Instructions
+# Running Instructions
 
-1. Data
+## 1. Data
 
 Start by putting all the final flat frames in their nights
 directory. Process them with IRAF's CCDRED, MSCRED or Armin Rest's
@@ -168,7 +168,7 @@ FIX BAD PIXELS!!!. Make sure to fix any bad pixels or columns in the
 images because otherwise they might get detected as "sources" and mess
 up WCS, DAOPHOT, MATCH, and ALLFRAME.
 
-2. Transformation Equations
+## 2. Transformation Equations
 
 In order to do calibration step (CALIB) PHOTRED needs the photometry
 transformation equations which means doing the standard star
@@ -197,7 +197,7 @@ D M-D   1.3251 0.1403 -0.0147 0.0000 0.0000
        1.001E-02 5.472E-03 2.653E-02 0.0000 0.0000
 ```
 
-3. Setup File
+## 3. Setup File
 
 PHOTRED needs a "photred.setup" file to run. This file specifies a few
 important parameters. Here's an example of a "photred.setup" file. The
@@ -303,3 +303,185 @@ following list: rename, split, wcs, daophot, match, allframe, apcor,
 calib, astrom, combine, deredden, and save
 
 The number of ALLFRAME iterations can be set in the "allframe.opt" file, the MA parameter. The default is 50.
+
+## 4. Make sure your Imager is in the "imagers" file
+
+There is an "imagers" file in your scripts directory. If the imager
+you are using is not in the list then add it at the end. You need the
+telescope name, instrument names, observaotry name (as found in the
+OBSERVATORY.PRO IDL program), the number of amplifiers, and the
+separator character (only necessary for multi-amplifier imagers). The
+TELESCOPE and INSTRUMENT names in your "photred.setup" file needs to
+match the ones in the "imagers" file.
+
+```
+# TELESCOPE   INSTRUMENT  OBSERVATORY  NAMPS  SEPARATOR
+blanco        decam       CTIO         62     _
+blanco        mosaic      CTIO         16     _
+mayall        mosaic      KPNO         8      _
+baade         imacs       LCO          8      c
+lbt           lbc         MGIO         4      _
+swope         ccd         LCO          1
+rrrt          sbig        FMO          1      -
+2p2           wfi         LASILLA      8      _
+```
+
+The case is not important. The separator character is used to separate
+the amplifier number from the main frame name for multi-amplifier
+images (i.e. "obj1034_1.fits" is the filename of the first amplifier
+FITS file of the "obj1034" image). The separator character is almost
+always the underscore "_". The only exception (for now) is IMACS which
+uses a "c". If your images are in the multi-extension format (MEF)
+then they will be split up into amplifier files in the SPLIT stage of
+PHOTRED with the IRAF task MSCSPLIT which uses the underscore as the
+separator character.
+
+## 5. Check "filters" file
+
+PHOTRED uses short names for filters, and these are stored in the
+"filters" file. One is provided in the scripts tar file. This is what
+it looks like:
+
+```
+'M Washington c6007'    M
+'M Washington k1007'    M
+'M'                     M
+'I c6028'               T
+'I Nearly-Mould k1005'  T
+'T'                     T
+'T2'                    T
+'DDO 51 c6008'          D
+'D51 DDO c6008'         D
+'D51 DDO 51 c6008'      D
+'D51 DDO 51 k1008'      D
+'D'                     D
+'D51'                   D
+'DDO51'                 D
+'DDO-51'                D
+'DDO_51'                D
+'DDO 51'                D
+'51'                    D
+'T1'                    T1
+'C'                     C
+'B Harris c6002'        B
+'B-BESSEL'              B
+'B'                     B
+'V'                     V
+'R-BESSEL'              R
+'R'                     R
+'u DECam c0006 3500.0 1000.0'         u
+'g DECam SDSS c0001 4720.0 1520.0'    g
+'r DECam SDSS c0002 6415.0 1480.0'    r
+'i DECam SDSS c0003 7835.0 1470.0'    i
+'z DECam SDSS c0004 9260.0 1520.0'    z
+'Y DECam c0005 10095.0 1130.0'        Y
+'u'                     u
+'g'                     g
+'r'                     r
+'i'                     i
+'z'                     z
+'Y'                     Y
+```
+
+The first column is the text that is found in the FILTER keyword in
+the FITS header. The second column is the shortname. These can be
+repeated because different observatories have different names for the
+same filter. These shortname will be used in the transformation file
+and the "extinction" file.
+
+Make sure that your filters appears in the list (leading/trailing
+spaces are not important. If they don't then PHOTRED will make a new
+entry in the "filters" file for your filter and make a new
+shortname. This is NOT desirable because the shortname probaby won't
+match what you have in your transformation file or in the "extinction"
+file.
+
+Here's a way to double-check if your filter is in the "filters"
+file. Copy the "filters" file from your scriptsdir to the directory
+where your data is. Then run PHOTRED_GETFILTER on one FITS file per
+filter. Change the shortname to a single capital letter if possible.
+
+```
+IDL>print,photred_getfilter('ccd1001.fits')
+D
+```
+
+PHOTRED_GETFILTER will print out the shortname of the filter. It will
+tell you if it didn't find the filter in the "filters" file and what
+new entry it added. It's preferable to have the most up to date
+"filters" file in the scriptsdir directory so that it can be used for
+the next run. PHOTRED uses the "filters" file in the main directory
+(where "photred.setup" and the data are located) if there is one,
+otherwise it will copy the "filters" file from the scriptsdir
+directory.
+
+## 6. Check "extinction" file
+
+If you want your photometry dereddened then PHOTRED needs to know what
+extinction value to use for each filter. This is stored in the
+"extinction" file. The first column has the filter shortname and the
+second column A(filter)/E(B-V) for that filter. The reddenings for
+colors can be derived from these values, so no entries for colors are
+needed.
+
+```
+# Filter    A(filter)/E(B-V)
+M           3.43
+T           1.83
+D           3.37
+u           4.239
+g           3.303
+r           2.285
+i           1.698
+z           1.263
+```
+
+Make sure your filter and its appropriate extinction value appears in
+this file. Try to update the "extinction" As with the "filters" file
+PHOTRED uses the "extinction" file in the data directory if there is
+one, otherwise it will copy the "extinction" file from the scriptsdir
+directory.
+
+
+## 7. Run PHOTRED_RENAME
+
+Okay, now you're ready to PHOTRED. PHOTRED has 13 stages and there is
+a separate IDL program for each stage (e.g. PHOTRED_DAOPHOT). Each
+stage can be run on it's own. The PHOTRED program is actually just a
+giant wrapper for the 13 stages (and the ones specified in the
+"photred.setup" file) run in the correct order. If you ever want to
+just run ONE stage then it's probably easier to just run that stage at
+the command line instead of editing the "photred.setup" file and
+running photred.
+
+It's preferable to run the very first stage, PHOTRED_RENAME, by itself
+from the command line and double-check the results. This stage
+prepends a string to each FITS filename that indicates what field it
+is (i.e. obj1101.fits -> F1-obj1101.fits), and it creates a "fields"
+file that has the actual field name for each field "shortname". This
+is information that PHOTRED_MATCH needs to match up the various ALS
+files for each field/chip group. It's very important that the files
+are renamed properly. So check closely the text that is
+output. PHOTRED_RENAME uses the first "word" in the OBJECT FITS
+keyword as the field name. Any
+zero/flat/twilight/sky/pointing/focus/test frames and standard star
+frames (SA98, SA110, SA114 and NGC3680) are moved to a "calib/"
+directory.
+
+It's a good idea to run PHOTRED_RENAME in "testing" mode, so you can
+see how it will rename files without it actually doing anything. Just
+type "photred_rename,/testing". The first thing PHOTRED_RENAME does is
+check that all of the FITS header parameters can be found (readnoise,
+gain, ut-time, filter, exposure time, ra, dec, date, and airmass). If
+any of these cannot be found then it will spit out errors. Watch for
+these! Check that the actual field names (not the "shortnames") in
+"fields" are correct. This information is not used until PHOTRED_SAVE
+renames the final photometry files. **Make sure to change the "fields"
+file ONLY AFTER running PHOTRED_RENAME in the NORMAL mode.** In testing
+mode PHOTRED_RENAME will write the field information to
+"fields.testing" instead of "fields".
+
+If the files were not renamed properly, rename them by hand and update
+the "fields" file. Also, update the "logs/RENAME.outlist" file. It
+might be easiest to delete the "logs/RENAME.outlist" file and remake
+it by typing "ls F*.fits > logs/RENAME.outlist".
