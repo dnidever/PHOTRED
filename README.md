@@ -14,8 +14,8 @@ PHOTRED does require the following that need to be installed separately:
 - The stand-alone fortran version of DAOPHOT/ALLFRAME
 - SExtractor
 
-**Old* PDF manuals for PHOTRED and STDRED are included in the doc/ directory.  **This README file is now the
-main documentation.**
+**This README file is now the main documentation.**
+**Old** PDF manuals for PHOTRED and STDRED are included in the doc/ directory.  
 
 IDL "sav" files of all the main PHOTRED programs are in the sav/ directory.  These can be used with the IDL virtual
 machine for people who don't have an IDL license.
