@@ -22,13 +22,21 @@ machine for people who don't have an IDL license.
 # Contents
 
 * [Installation Instructions](#Installation_Instructions)
-  1. [1. Download PHOTRED IDL](#1_Download_PHOTRED)
-  2. [2. Download PHOTRED Scripts](#2_Download_Scripts)
-  3. [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
-  4. [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
-  5. [5. Schlegel Maps](#5_Schlegel_Maps)
-  6. [6. Setup Your IRAF Login File](#6_Setup_IRAF)
+  * [1. Download PHOTRED IDL](#1_Download_PHOTRED)
+  * [2. Download PHOTRED Scripts](#2_Download_Scripts)
+  * [3. Make sure IDL/IRAF are available](#3_IDL_IRAF_Available)
+  * [4. Make sure DAOPHOT/ALLFRAME is installed](#4_DAOPHOT_Installed)
+  * [5. Schlegel Maps](#5_Schlegel_Maps)
+  * [6. Setup Your IRAF Login File](#6_Setup_IRAF)
 * [Running Instructions](#Running_Instructions)
+  * [1. Data](#1_Data)
+  * [2. Transformation Equations](#2_Transformation_Equations)
+  * [3. Setup File](#3_Setup_File)
+  * [4. Make sure your Imager is in the "imagers" file](#4_Check_Imager_File)
+  * [5. Check "filters" file](#5_Check_Filters_File)
+  * [6. Check "extinction" file](#6_Check_Extinction_File)
+  * [7. Run PHOTRED_RENAME](#7_Run_PHOTRED_RENAME)
+  * [8. Run PHOTRED](#8_Run_PHOTRED)		
 * [Adding New Imagers](#Adding_New_Imagers)
 * [Basic Explanation](#Basic_Explanation)
 * [STAGES](#Stages)
@@ -167,9 +175,9 @@ happens. Nothing should be written to the screen except "cl>" or maybe
 "ecl>". If it's still printing other things to the screen, then you'll
 need to comment out more lines from the "login.cl" file.
 
-# <a name="Running_Instructions">Running Instructions
+# <a name="Running_Instructions"></a>Running Instructions
 
-## 1. Data
+## <a name="1_Data"></a> 1. Data
 
 Start by putting all the final flat frames in their nights
 directory. Process them with IRAF's CCDRED, MSCRED or Armin Rest's
@@ -182,7 +190,7 @@ FIX BAD PIXELS!!!. Make sure to fix any bad pixels or columns in the
 images because otherwise they might get detected as "sources" and mess
 up WCS, DAOPHOT, MATCH, and ALLFRAME.
 
-## 2. Transformation Equations
+## <a name="2_Transformation_Equations"></a> 2. Transformation Equations
 
 In order to do calibration step (CALIB) PHOTRED needs the photometry
 transformation equations which means doing the standard star
@@ -211,7 +219,7 @@ D M-D   1.3251 0.1403 -0.0147 0.0000 0.0000
        1.001E-02 5.472E-03 2.653E-02 0.0000 0.0000
 ```
 
-## 3. Setup File
+## <a name="3_Setup_File"></a> 3. Setup File
 
 PHOTRED needs a "photred.setup" file to run. This file specifies a few
 important parameters. Here's an example of a "photred.setup" file. The
@@ -318,7 +326,7 @@ calib, astrom, combine, deredden, and save
 
 The number of ALLFRAME iterations can be set in the "allframe.opt" file, the MA parameter. The default is 50.
 
-## 4. Make sure your Imager is in the "imagers" file
+## <a name="4_Check_Imager_File"></a> 4. Make sure your Imager is in the "imagers" file
 
 There is an "imagers" file in your scripts directory. If the imager
 you are using is not in the list then add it at the end. You need the
@@ -350,7 +358,7 @@ then they will be split up into amplifier files in the SPLIT stage of
 PHOTRED with the IRAF task MSCSPLIT which uses the underscore as the
 separator character.
 
-## 5. Check "filters" file
+## <a name="5_Check_Filters_File"></a> 5. Check "filters" file
 
 PHOTRED uses short names for filters, and these are stored in the
 "filters" file. One is provided in the scripts tar file. This is what
@@ -429,7 +437,7 @@ the next run. PHOTRED uses the "filters" file in the main directory
 otherwise it will copy the "filters" file from the scriptsdir
 directory.
 
-## 6. Check "extinction" file
+## <a name="6_Check_Extinction_File"></a> 6. Check "extinction" file
 
 If you want your photometry dereddened then PHOTRED needs to know what
 extinction value to use for each filter. This is stored in the
@@ -457,7 +465,7 @@ one, otherwise it will copy the "extinction" file from the scriptsdir
 directory.
 
 
-## 7. Run PHOTRED_RENAME
+## <a name="7_Run_PHOTRED_RENAME"></a> 7. Run PHOTRED_RENAME
 
 Okay, now you're ready to PHOTRED. PHOTRED has 13 stages and there is
 a separate IDL program for each stage (e.g. PHOTRED_DAOPHOT). Each
@@ -503,7 +511,7 @@ it by typing
 % ls F*.fits >> logs/RENAME.outlist
 ```
 
-## 8. Run PHOTRED
+## <a name="8_Run_PHOTRED"></a> 8. Run PHOTRED
 
 Now run PHOTRED. Start idl, type "photred" and you're off!!  You can
 also run PHOTRED in the background. Make a batch file called
@@ -551,7 +559,7 @@ might need to be modified to deal with the new data type.
 images. PIXSCALE might need to be specified in the "photred.setup"
 file.
 
-## <a name="Basic_Explanation"> Basic Explanation
+## <a name="Basic_Explanation"></a> Basic Explanation
 
 Photred is meant to be run on one night's data at a time. The standard
 star reduction should already have been done and the transformation
@@ -588,7 +596,7 @@ capability. The maximum number of processes that will be allowed to be
 in the PBS queue at any given time is set by the NMULTI parameter in
 the photred.setup file (NMULTI=8 is a good value to use).
 
-# <a name="Stages"> STAGES
+# <a name="Stages"></a> STAGES
 
 ## RENAME
 
