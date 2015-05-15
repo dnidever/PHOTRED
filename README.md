@@ -486,5 +486,54 @@ the "fields" file. Also, update the "logs/RENAME.outlist" file. It
 might be easiest to delete the "logs/RENAME.outlist" file and remake
 it by typing
 ```
-ls F*.fits >> logs/RENAME.outlist
+% ls F*.fits >> logs/RENAME.outlist
 ```
+
+## 8. Run PHOTRED
+
+Now run PHOTRED. Start idl, type "photred" and you're off!!  You can
+also run PHOTRED in the background. Make a batch file called
+"photred.batch" that has a single line with "photred". You can then
+run this batch file with idlbatch or idlbatchn (a "niced"
+version). The "idlbatch" programs will run the IDL job in the
+background and create a log file called "photred.batch.log". Make sure
+to put the "idlbatch" programs in your ~/bin/ directory and that
+~/bin/ is also in your path (check your .cshrc file).
+
+Double check (in the logfile) that the WCS is being fit correctly. The
+Total RMS should be around 0.2-0.4 arcsec. If it's not working
+properly check that the images have RA/DEC or CRVAL1/CRVAL2 in them
+and that the pixel scale is correct. If it still isn't working then
+you can try setting "searchdist" larger (the default is 2*image size >
+60 arcmin). You can also set the maximum acceptable RMS with
+"wcsrmslim" in the "photred.setup" file.
+
+You can use PHOTRED_SUMMARY (run it in the same directory) to get an
+update on the progress of PHOTRED. Most of the stages update their
+respective lists and so the number of files in the
+inlist/outlist/success/failure lists will tell you what's going
+on. However, the DAOPHOT and ALLFRAME stages update their lists after
+all files have finished, so for these two stages PHOTRED_SUMMARY
+checks to see which files have the expected output (i.e. .als or .mag
+files). This information is listed in the "COMPLETED" column. If you
+are redoing some files then these numbers won't be accurate.
+
+##Adding new imagers
+
+PHOTRED currently works on data from KPNO+MOSAIC, CTIO+MOSAIC
+(Blanco), Swope CCD, IMACS, LBT Camera (LBC), and DECam. New imagers
+can be added, but there are a couple of things that need to be
+double-checked:
+* Make sure to add your imager to the "imagers" file in the scripts directory.
+* Make sure that PHOTRED_GETUTTIME.PRO, PHOTRED_GETFILTER,
+PHOTRED_GETEXPTIME.PRO, PHOTRED_GETGAIN.PRO, PHOTRED_GETRDNOISE.PRO,
+PHOTRED_GETDATE.PRO and PHOTRED_GETAIRMASS.PRO return the proper
+values. PHOTRED_RENAME.PRO checks that all of the appropriate keywords
+are in the FITS headers. Run PHOTRED_RENAME in /testing mode and see
+if you get any errors. If there are errors then the above programs
+might need to be modified to deal with the new data type.
+* Add the necessary filters to the "filters" file
+* Make sure that PHOTRED_WCS.PRO can properly process the
+images. PIXSCALE might need to be specified in the "photred.setup"
+file.
+
