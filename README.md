@@ -518,7 +518,7 @@ checks to see which files have the expected output (i.e. .als or .mag
 files). This information is listed in the "COMPLETED" column. If you
 are redoing some files then these numbers won't be accurate.
 
-##Adding new imagers
+## Adding new imagers
 
 PHOTRED currently works on data from KPNO+MOSAIC, CTIO+MOSAIC
 (Blanco), Swope CCD, IMACS, LBT Camera (LBC), and DECam. New imagers
@@ -537,3 +537,26 @@ might need to be modified to deal with the new data type.
 images. PIXSCALE might need to be specified in the "photred.setup"
 file.
 
+## Basic Explanation
+
+Photred is meant to be run on one night's data at a time. The standard
+star reduction should already have been done and the transformation
+equation put in the directory.
+
+The pipeline is split into stages and the files are "shuttled" from
+stage to stage via lists of files. Each stage has an INLIST and
+OUTLIST. The INLIST is the list of files to process, and the OUTLIST
+is the list of files output. Normally the INLIST of files is moved
+over from the OUTLIST of the previous stage. The INLIST files that are
+successfully processed are removed from the INLIST file, and are added
+to the SUCCESS list. INLIST files that are NOT successfully process
+are left in the INLIST file and are added to the FAILURE list.
+
+Each stage has several log files associated with it:
+- **INLIST** The list of files to process. These are normally moved over
+from the OUTLIST of the previous stage.
+- **OUTLIST** The files successfully output from the stage. These might be
+in a different format from the INLIST files.
+- **SUCCESS** The files in INLIST that were successfully processed
+- **FAILURE** The files in INLIST that were NOT successfully processed LOG A
+running log of what the stage has done
