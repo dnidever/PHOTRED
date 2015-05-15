@@ -489,7 +489,7 @@ if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
     ifield = first_el(strsplit(dirfield[i],' ',/extract),/last)
 
     CD,idir  ; cd to the appropriate directory
-    PHOTRED_COMMONSOURCES_GLOBAL,ifield,setupdir=curdir
+    PHOTRED_COMMONSOURCES_GLOBAL,ifield,setupdir=curdir,redo=redo
     CD,curdir
   endfor
   
