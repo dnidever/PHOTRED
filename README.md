@@ -99,22 +99,23 @@ proname.pro.bak).
 
 ## <a name="3_IDL_IRAF_Available"></a> 3. Make sure IDL/IRAF are available
 
-PHOTRED needs IDL and IRAF run. If you don't have IDL then you might
-consider buying a license from Exelis Visual Information Solutions
-(http://exelisvis.com/). Student licenses are available and full
-licenses have come down in price. If these are too expensive, then you
-might consider installing the free version of IDL, the GNU Data
-Language. I have not tested PHOTRED on GDL, but I think GDL should
-have all of the functionality needed to run PHOTRED. However, some
-PHOTRED programs might need to be tweaked to work with GDL.  You can
-also download the IDL Virtual Machine for free and run IDL "sav"
+PHOTRED needs IDL and IRAF to run. If you don't have IDL then you
+might consider buying a license from Exelis Visual Information
+Solutions (http://exelisvis.com/). Student licenses are available and
+full licenses have come down in price. If these are too expensive,
+then you might consider installing the free version of IDL, the GNU
+Data Language (http://gnudatalanguage.sourceforge.net). I have not
+tested PHOTRED on GDL, but I think GDL should have all of the
+functionality needed to run PHOTRED. However, some PHOTRED programs
+might need to be tweaked to work with GDL.  You can also download the
+IDL Virtual Machine for free and run IDL "sav"
 
 You can also download the IDL Virtual Machine for free and run IDL
 "sav" files. I have made IDL sav files for the PHOTRED pipeline so
 they can be run with the IDL Virtual Machine. Download the tar file
 (last updated 05/12/08) and put them in your ~/idl/ directory. To run
 a program type "idl -vm=progname.sav".  IRAF is freely downloadable
-from iraf.net.
+from http://iraf.net.
 
 ## <a name="4_DAOPHOT_Installed"></a> 4. Make sure DAOPHOT/ALLFRAME is installed
 
