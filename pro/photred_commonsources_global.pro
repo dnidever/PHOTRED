@@ -87,6 +87,12 @@ if scriptsdir eq '' then begin
   return
 endif
 
+; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread')
+if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if strtrim(hyperthread,2) eq '0' then hyperthread=0
+if n_elements(hyperthread) eq 0 then hyperthread=0
+
 ; LOAD THE "imagers" FILE
 ;----------------------------
 ;printlog,logfile,'Loading imager information'
