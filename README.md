@@ -114,9 +114,8 @@ IDL Virtual Machine for free and run IDL "sav"
 
 You can also download the IDL Virtual Machine for free and run IDL
 "sav" files. I have made IDL sav files for the PHOTRED pipeline so
-they can be run with the IDL Virtual Machine. Download the tar file
-(last updated 05/12/08) and put them in your ~/idl/ directory. To run
-a program type
+they can be run with the IDL Virtual Machine.  They are in the "sav/"
+directory of this repository.  To run a program type
 ```
 idl -vm=progname.sav
 ```
