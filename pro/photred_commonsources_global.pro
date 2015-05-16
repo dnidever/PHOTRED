@@ -130,8 +130,9 @@ nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
 
-printlog,logfile,'Making list of CONFIRMED CELESTIAL SOURCES for Field = ',field
-
+printlog,logfile
+printlog,logfile,'--- Making list of CONFIRMED CELESTIAL SOURCES for Field = '+field+' ---'
+printlog,logfile
 
 ;#########################################
 ;#   Find all files for this field
@@ -191,6 +192,7 @@ For i=0,nfieldfiles-1 do begin
 
 Endfor
 
+printlog,logfile,'Creating cmn.coo and cmn.ap for ',strtrim(nfieldfiles,2),' files'
 
 ; Now run PBS_DAEMON.PRO
 if n_elements(cmd) gt 0 then $
@@ -198,6 +200,10 @@ if n_elements(cmd) gt 0 then $
 
 ; Now concatenate and merge all of the catalogs
 ;----------------------------------------------
+printlog,logfile
+printlog,logfile,'Concatenating and matching the catalogs'
+printlog,logfile
+printlog,logfile,'Num  File   Nsources  Nmatches'
 allcat_outfile = field+'.cmn.fits'
 if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
 
@@ -289,7 +295,7 @@ if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
         endif
       endif else nmatch=0
 
-      print,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
+      printlog,logfile,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
 
       ; New elements to add
       ncat = n_elements(cat)
