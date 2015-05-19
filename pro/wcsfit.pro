@@ -179,7 +179,7 @@ if skymode lt 0.0 then skymode = median(im)
 
 ; Bad pixels are causing problems, they are picked up as sources by FIND
 ; and APER returns 99.99 for any source with a "bad" pixel in it's aperture
-; Temporarily mask out the bad pixels, set to SKYMODE
+; Temporarily mask out the bad pixels, set to SKYMODE. 5/19/2015.
 tempim = im
 bdpix = where(im gt max(im)-100,nbdpix)
 if nbdpix gt 0 then tempim[bdpix]=skymode
