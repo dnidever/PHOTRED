@@ -498,15 +498,17 @@ FOR i=0,ndirs-1 do begin
         gdref = where(ampfiles eq (refimbase+thisimager.separator+amps[k]),ngdref)
 
         ; We have a reference image for this amp
-        if (ngdref gt 0 and nampind gt 1) then begin
-
+        ;if (ngdref gt 0 and nampind gt 1) then begin
+        if (ngdref gt 0) then begin
 
           ; Making the input list
           inlist = ampfiles
-          REMOVE,gdref[0],inlist
-          si = sort(inlist)  ; Make sure they are in order!!!
-          inlist = [ampfiles[gdref[0]],inlist[si]]+'.als'
-
+          if nampind gt 1 then begin
+            REMOVE,gdref[0],inlist
+            si = sort(inlist)  ; Make sure they are in order!!!
+            inlist = [ampfiles[gdref[0]],inlist[si]]+'.als'
+          endif
+            
           ; Running daomatch
           DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,/verbose
 
@@ -545,7 +547,7 @@ FOR i=0,ndirs-1 do begin
         ; No reference image, or only 1 image
         endif else begin
           PUSH,failurelist,dirs[i]+'/'+ampfiles+'.als'
-          if nampind eq 1 then printlog,logfile,'ONLY 1 FILE.  NEED AT LEAST 2'
+          ;if nampind eq 1 then printlog,logfile,'ONLY 1 FILE.  NEED AT LEAST 2'
           if ngdref eq 0 then printlog,logfile,'NO REFERENCE IMAGE FOR AMP=',amps[k]
         endelse
 
