@@ -101,9 +101,10 @@ if keyword_set(logfile) then logf=logfile else logf=-1
 
 ; Only one file, can't match
 if nfiles eq 1 then begin
-  printlog,logf,'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
-  error = 'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
-  return
+  printlog,logf,'ONLY ONE FILE INPUT.  No matching, simply creating .mch and .raw file'
+  ;printlog,logf,'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
+  ;error = 'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
+  ;return
 endif
 
 ; Compile MATCHSTARS.PRO
