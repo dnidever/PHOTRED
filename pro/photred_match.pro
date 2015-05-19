@@ -506,9 +506,10 @@ FOR i=0,ndirs-1 do begin
           if nampind gt 1 then begin
             REMOVE,gdref[0],inlist
             si = sort(inlist)  ; Make sure they are in order!!!
-            inlist = [ampfiles[gdref[0]],inlist[si]]+'.als'
+            inlist = [ampfiles[gdref[0]],inlist[si]]
           endif
-            
+          inlist = inlist+'.als'
+          
           ; Running daomatch
           DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,/verbose
 
