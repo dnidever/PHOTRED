@@ -177,9 +177,17 @@ if skymode lt 0.0 then skymode = median(im)
 ;lorentz = CONVOL(checkmask*im2,kernel,/center,/edge_truncate,missing=0.0)
 ;mask = float(abs(lorentz) gt 1000 and im gt skymode+20*skysig)
 
+; Bad pixels are causing problems, they are picked up as sources by FIND
+; and APER returns 99.99 for any source with a "bad" pixel in it's aperture
+; Temporarily mask out the bad pixels, set to SKYMODE
+tempim = im
+bdpix = where(im gt max(im)-100,nbdpix)
+if nbdpix gt 0 then tempim[bdpix]=skymode
+
 ; Find the sources
 ; X/Y start at 0, while daophot coordinates start at 1.
-FIND,im,x,y,flux,sharp,round,4.0*skysig,fwhm,[-1.0,1.0],[0.2,1.0],/silent
+FIND,tempim,x,y,flux,sharp,round,4.0*skysig,fwhm,[-1.0,1.0],[0.2,1.0],/silent
+;FIND,im,x,y,flux,sharp,round,4.0*skysig,fwhm,[-1.0,1.0],[0.2,1.0],/silent
 
 ; NO stars found
 if (n_elements(x) eq 0) then begin
@@ -191,7 +199,9 @@ endif
 
 ; Get aperture photometry
 lo = skymode-20.0*skysig
-APER,im,x,y,mags,errap,sky,skyerr,1.0,3.0*fwhm,[40,50],[lo,max(im)],/silent,/meanback
+hi = max(im)
+APER,tempim,x,y,mags,errap,sky,skyerr,1.0,3.0*fwhm,[40,50],[lo,hi],/silent,/meanback
+;APER,im,x,y,mags,errap,sky,skyerr,1.0,3.0*fwhm,[40,50],[lo,max(im)],/silent,/meanback
 
 ; Convert coordinates from IDL to DAOPHOT/IRAF/FITS format (0 indexed to 1 indexed)
 x = x + 1.0
@@ -232,6 +242,7 @@ if (ngd eq 0) then begin
 endif
 cat = cat[gd]
 
+undefine,tempim
 
 if keyword_set(stp) then stop
 
