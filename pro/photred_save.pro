@@ -211,6 +211,8 @@ FOR i=0,ninputlines-1 do begin
         if savetest eq 0 then printlog,logfile,gfitsfile,' NOT FOUND'
       endelse
 
+      ; Make Field Summary file
+      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo
 
     ; No field match
     endif else begin
