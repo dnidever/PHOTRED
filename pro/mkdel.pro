@@ -59,25 +59,29 @@ for k=0,nf-1 do begin
   nstars = n_elements(id1)
 
   ; Read the .tot file
-  READCOL,atotfile[k],id2,x2,y2,tmag,tmagerr,format='I,F,F,F,F',skipline=3,/silent
+  if file_test(atotfile[k]) eq 1 then begin
+    READCOL,atotfile[k],id2,x2,y2,tmag,tmagerr,format='I,F,F,F,F',skipline=3,/silent
 
-  ; Matching them
-  MATCH,id1,id2,ind1,ind2,count=nind1
-  id3 = id1[ind1]
-  amag2 = amag[ind1]
-  tmag2 = tmag[ind2]
+    ; Matching them
+    MATCH,id1,id2,ind1,ind2,count=nind1
+    id3 = id1[ind1]
+    amag2 = amag[ind1]
+    tmag2 = tmag[ind2]
 
-  ; Calculating del
-  del = amag2 - tmag2
-  ndel = n_elements(del)
+    ; Calculating del
+    del = amag2 - tmag2
+    ndel = n_elements(del)
 
-  ; Write the .del file
-  openw,unit,/get_lun,adelfile[k]
-  for i=0,ndel-1 do $
-    printf,unit,format='(A1,I5,F9.4)','',id3[i],del[i]
-  close,unit
-  free_lun,unit
-
+    ; Write the .del file
+    openw,unit,/get_lun,adelfile[k]
+    for i=0,ndel-1 do $
+      printf,unit,format='(A1,I5,F9.4)','',id3[i],del[i]
+    close,unit
+    free_lun,unit
+  endif else begin
+    print,atotfile[k],' NOT FOUND'
+  endelse
+    
 endfor
 
 
