@@ -307,7 +307,7 @@ For i=0,nfieldfiles-1 do begin
     ; Calculate "depth"
     hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=50)
     xhist += 0.5*0.2
-    MAXMIN,hist,minarr,maxarr
+    DLN_MAXMIN,hist,minarr,maxarr
     alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
     chipstr[i].dao_depth = alsdepth   ; instrumental "depth"    
   endif
@@ -413,7 +413,7 @@ For i=0,nfieldfiles-1 do begin
     ; Calculate "depth"
     hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
     xhist += 0.5*0.2
-    MAXMIN,hist,minarr,maxarr
+    DLN_MAXMIN,hist,minarr,maxarr
     alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
     chipstr[i].alf_depth = alsdepth   ; instrumental "depth"    
   endif
@@ -499,7 +499,7 @@ For i=0,nchips-1 do begin
           ; Calculate "depth"
           hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
           xhist += 0.5*0.2
-          MAXMIN,hist,minarr,maxarr
+          DLN_MAXMIN,hist,minarr,maxarr
           depth = xhist[first_el(maxarr,/last)] ; use last maximum
           chipstr[indchip[j]].calib_depth = depth   ; calibrated "depth"
           chipstr[indchip[j]].calib_magname = imagname  ; keep track of magname
