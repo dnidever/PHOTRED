@@ -127,6 +127,7 @@ if nfieldfiles gt 0 then begin
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
               stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
+              stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
               stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
               stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
@@ -177,6 +178,7 @@ if file_test(apcorfile) eq 1 then begin
   apcor_orig = apcor
   apcor.name = repstr(apcor.name,'a.del','')  ; base names
 endif
+
 
 ; Loop through all files for this field
 ;  and gather all of the necessary information
@@ -289,6 +291,12 @@ For i=0,nfieldfiles-1 do begin
       chipstr[i].skymode = skymode
       chipstr[i].skysig = skysig
     endif
+  endif
+  if n_elements(skymode) eq 0 then begin 
+    FITS_READ,fitsfile,im,head
+    SKY,im,skymode,skysig,/silent
+    chipstr[i].skymode = skymode
+    chipstr[i].skysig = skysig
   endif
 
   ; Load ALS file
@@ -717,6 +725,6 @@ MWRFITS,chipstr,outfile,/silent
 ; Copy file to main directory
 FILE_COPY,outfile,setupdir,/over,/verbose
 
-stop
+;stop
 
 end
