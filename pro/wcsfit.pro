@@ -2168,7 +2168,7 @@ if (nastr gt 0) then begin
   ;if nmatch lt 10 then SRCMATCH,xref,yref,cat.x,cat.y,4*dcr,ind1,ind2,count=nmatch
 
   ; Enough matches
-  if (nmatch gt 10) then begin
+  if (nmatch gt 5) then begin
     print,strtrim(nmatch,2),' MATCHES'
 
     xdiff = xref[ind1]-cat[ind2].x
