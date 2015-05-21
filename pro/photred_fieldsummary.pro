@@ -399,9 +399,10 @@ For i=0,nfieldfiles-1 do begin
       psflabelused = chipstr[i].dao_psftype
       indpsf = first_el(where(psflabels eq psflabelused,nindpsf))
       psftypeused = psftype[indpsf]
-      if (psftypeused-minpsftype+1) gt n_elements(chiarr) then psfchi=min(chiarr) else $
-        psfchi = chiarr[psftypeused-minpsftype]
-      if abs(psfchi-min(chiarr)) gt 0.01 then stop,'Problem with PSF chi'
+      ;if (psftypeused-minpsftype+1) gt n_elements(chiarr) then psfchi=min(chiarr) else $
+      ;  psfchi = chiarr[psftypeused-minpsftype]
+      ;if abs(psfchi-min(chiarr)) gt 0.01 then stop,'Problem with PSF chi'
+      psfchi = min(chiarr) ; just use the MINIMUM chi value!
       chipstr[i].dao_psfchi = psfchi
     endif
   endif
