@@ -2205,7 +2205,8 @@ if (nastr gt 0) then begin
 
   ; No good matches, try MATCHSTARS_XCORR.PRO
   ;if (initrms ge 1.0) then begin
-  if (nmatch lt 10) or (initrms ge 2.0) then begin
+  ;if (nmatch lt 10) or (initrms ge 2.0) then begin
+  if (nmatch lt 5) or (initrms ge 2.0) then begin
 
     print,'Initial RMS bad or not enough matches.  Trying cross-correlation.'
 
