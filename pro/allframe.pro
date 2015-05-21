@@ -633,6 +633,7 @@ if not keyword_set(nocmbimscale) then begin
   for i=0,nfiles-1 do rdnoisearr[i] = PHOTRED_GETRDNOISE(base[i]+'.fits')
   ;  the "scales" array here is actually 1/scales used by IMCOMBINE.
   rdnoise = sqrt(total((weights*rdnoisearr/scales)^2))
+  rdnoise = rdnoise > 0.01   ; must be >=0.01 or it will be 0.00 in the opt file and daophot will crash
   dummy = PHOTRED_GETRDNOISE(combfile,keyword=rdnoisekey) ; get keyword
   sxaddpar,combhead,rdnoisekey,rdnoise
 
@@ -782,6 +783,13 @@ endif
 ; Get the PSF of the combined image
 SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
 
+; If getpsf failed, lower the spatial PSF variations to linear
+if file_test(file_basename(combfile,'.fits')+'.psf') eq 0 then begin
+  printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
+  MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
+  SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
+stop
+endif
 
 
 

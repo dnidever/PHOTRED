@@ -27,7 +27,7 @@
 ;-
 
 
-pro allframe_getweights,mchfile,actweight,scales,medsky,raw2=raw2
+pro allframe_getweights,mchfile,actweight,scales,medsky,raw2=raw2,stp=stp
 
 ; OUTPUTS:
 ;  actweight  The weight for each frame
@@ -179,7 +179,6 @@ allframe_calcweights,mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe],$
 actweight[gdframe] = actweight1
 scales[gdframe] = scales1
 
-
 ; If there are some "bad" frames calculate their weights
 ;  relative to some of the "good" ones
 for i=0,nbdframe-1 do begin
@@ -285,6 +284,9 @@ actweight /= total(actweight)
 ;raw2 = raw[gd]
 ;mag2 = mag[*,gd]
 ;err2 = err[*,gd]
+
+; Rescale SCALES so the reference frames has SCALE=1.0
+scales /= scales[0]
 
 print,'Files: ',files
 print,'Weights: ',actweight
