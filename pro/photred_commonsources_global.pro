@@ -203,7 +203,7 @@ if n_elements(cmd) gt 0 then $
 printlog,logfile
 printlog,logfile,'Concatenating and matching the catalogs'
 printlog,logfile
-printlog,logfile,'Num  File   Nsources  Nmatches'
+printlog,logfile,'Num    File   Nsources  Nmatches'
 allcat_outfile = field+'.cmn.fits'
 if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
 
@@ -295,7 +295,7 @@ if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
         endif
       endif else nmatch=0
 
-      printlog,logfile,i+1,ibase,ncoo,nmatch,format='(I5,A15,I8,I8)'
+      printlog,logfile,i+1,ibase,ncoo,nmatch,format='(I5,A17,I8,I8)'
 
       ; New elements to add
       ncat = n_elements(cat)
