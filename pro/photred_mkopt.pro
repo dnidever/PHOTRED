@@ -1,4 +1,4 @@
-pro photred_mkopt,input,hilimit=hilimit,stp=stp,fwhm=fwhm,error=error,verbose=verbose
+pro photred_mkopt,input,hilimit=hilimit,va=va,stp=stp,fwhm=fwhm,error=error,verbose=verbose
 
 ;+
 ;
@@ -204,7 +204,7 @@ HS =  1.0
 LR = -1.0
 HR =  1.0
 WA = -2
-VA =  2     ; PSF varies quadratically in the frame
+if n_elements(va) eq 0 then VA=2  ; PSF varies quadratically in the frame 
 AN = -6     ; It will try all PSF models (#1-6) and use the one with the lowest chi value
 EX =  5     ; extra PSF passes
 PE =  0.75
