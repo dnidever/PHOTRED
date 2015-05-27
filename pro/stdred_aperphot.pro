@@ -464,7 +464,7 @@ nprocbaselist = n_elements(procbaselist)
 cmd = './aperphot.sh '+procbaselist
 
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5
 
 
 ;-------------------
