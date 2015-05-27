@@ -225,7 +225,7 @@ for i=0,ninputlines-1 do begin
     testing = 1
   endif
 
-end
+endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
@@ -241,13 +241,10 @@ endif
 
 
 
-printlog,logfile,''
-printlog,logfile,'-----------------------------------'
-printlog,logfile,'Making DAOPHOT/ALLSTAR option files'
-printlog,logfile,'-----------------------------------'
-printlog,logfile,''
+printlog,logfile,'Checking which files to make DAOPHOT/ALLSTAR option files for'
 
-
+; Figure out which files to make OPT files for
+undefine,tomakeoptlist
 ; Loop through directories
 for i=0,ndirs-1 do begin
 
@@ -261,14 +258,14 @@ for i=0,ndirs-1 do begin
   If (ngd gt 0) then begin
 
     printlog,logfile,''
-    printlog,logfile,'Making OPTION files for ',dirs[i]
+    printlog,logfile,'Checking ',dirs[i]
+    ;printlog,logfile,'Making OPTION files for ',dirs[i]
     printlog,logfile,''
 
     ; Looping through files in this directory
     for j=0,ngd-1 do begin
 
       ind = gd[j]
-      longfile = fitsdirlist[ind]+'/'+fitsbaselist[ind]
       fil = fitsbaselist[ind]
       base = FILE_BASENAME(fil,'.fits')
       printlog,logfile,fil
@@ -283,6 +280,10 @@ for i=0,ndirs-1 do begin
 
         ; Read in the image
         FITS_READ,fil,im,head,/no_abort,message=message
+
+        ; Make sure BZERO=0
+        bzero = sxpar(head,'BZERO',count=nbzero,/silent)
+        if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
         ; Write the FLOAT image
         if (message[0] eq '') then $
@@ -304,75 +305,122 @@ for i=0,ndirs-1 do begin
       ; CHIPS????
 
 
-      ; Make daophot option files
+      ; Add to list of files to make OPT file for
       ;--------------------------
-      ;MKOPT,base+'.fits'
-      if testopt eq 0 or testals eq 0 then begin
-        PHOTRED_MKOPT,base+'.fits',error=error
-        if n_elements(error) gt 0 then begin
-          printlog,logfile,'PHOTRED_MKOPT Error'
-          successarr[ind]=0
-        endif
-      endif
+      if testopt eq 0 or testals eq 0 or keyword_set(redo) then PUSH,tomakeoptlist,dirs[i]+'/'+fil
 
-      ; Check OPT file
-      ;----------------
-      optfile = base+'.opt'
-      testopt = FILE_TEST(optfile)
-      if testopt eq 1 then begin
-        READCOL,optfile,opttags,dum,optvals,format='A,A,F',/silent
+    Endfor ; files loop
 
-        ; Checking rdnoise, gain and fwhm
-        rdnoise = optvals[0]           ; RDNOISE, 1st line
-        gain = optvals[1]              ; GAIN, 2nd line
-        fwhm = optvals[4]              ; FWHM, 5th line
-        ps = optvals[12]               ; PSF radius, 13th line
-
-        ; Checking RDNOISE, GAIN, FWHM
-        ; FWHM<=20 for daophot
-        if (rdnoise gt 50.) then successarr[ind]=0
-        if (gain gt 50.) then successarr[ind]=0
-        if (fwhm gt 20.) then successarr[ind]=0
-        if (ps gt 51.) then successarr[ind]=0
-
-        if (rdnoise gt 50.) then printlog,logfile,optfile,' RDNOISE BAD.  TOO LARGE.'
-        if (gain gt 50.) then printlog,logfile,optfile,' GAIN BAD.  TOO LARGE.'
-        if (fwhm gt 20.) then printlog,logfile,optfile,' FWHM BAD.  TOO LARGE.'
-        if (ps gt 51.) then printlog,logfile,optfile,' PS BAD.  TOO LARGE.'
-
-      ; No OPT file
-      endif else begin
-        successarr[ind]=0
-        printlog,logfile,optfile,' NOT FOUND'
-      endelse
-
-
-      ; Is everything okay?
-      ; If not "bad" then it is "good"
-      if successarr[ind] ne 0 then successarr[ind]=1
-
-      ; Failure
-      if successarr[ind] eq 0 then PUSH,failurelist,longfile
-
-
-    End ; files loop
-
-
-  ; No files in this directory
-  Endif else begin
-    ; Do nothing
-  Endelse
+  endif ; some good files
 
   ; cd back to original directory
   CD,curdir
 
+endfor ; directories loop
 
 
-end
+printlog,logfile,'Making DAOPHOT/ALLSTAR option files'
 
-; Updating the lists
-PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+ntomakeoptlist = n_elements(tomakeoptlist)
+printlog,logfile,strtrim(ntomakeoptlist,2),' files need OPT files'
+
+; Make the OPT files
+;-------------------
+if ntomakeoptlist gt 0 then begin
+  tomakeoptlist_base = file_basename(tomakeoptlist)
+  tomakeoptlist_dir = file_dirname(tomakeoptlist)
+
+  ; We could run them in groups of 5.  Lose less "runtime" between checks
+
+  ; Make commands for daophot
+  cmd = "PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
+  ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
+  ; Submit the jobs to the daemon
+  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+endif
+
+
+; Check all OPT files
+;---------------------
+for i=0,nfitsbaselist-1 do begin
+
+  CD,fitsdirlist[i]
+
+  base = file_basename(fitsbaselist[i],'.fits')
+
+  ; Check OPT file
+  ;----------------
+  optfile = base+'.opt'
+  testopt = FILE_TEST(optfile)
+  if testopt eq 1 then begin
+    READCOL,optfile,opttags,dum,optvals,format='A,A,F',/silent
+
+    ; Checking rdnoise, gain and fwhm
+    rdnoise = optvals[0]           ; RDNOISE, 1st line
+    gain = optvals[1]              ; GAIN, 2nd line
+    fwhm = optvals[4]              ; FWHM, 5th line
+    ps = optvals[12]               ; PSF radius, 13th line
+
+    ; Checking RDNOISE, GAIN, FWHM
+    ; FWHM<=20 for daophot
+    if (rdnoise gt 50.) then successarr[i]=0
+    if (gain gt 50.) then successarr[i]=0
+    if (fwhm gt 20.) then successarr[i]=0
+    if (ps gt 51.) then successarr[i]=0
+
+    if (rdnoise gt 50.) then printlog,logfile,optfile,' RDNOISE BAD.  TOO LARGE.'
+    if (gain gt 50.) then printlog,logfile,optfile,' GAIN BAD.  TOO LARGE.'
+    if (fwhm gt 20.) then printlog,logfile,optfile,' FWHM BAD.  TOO LARGE.'
+    if (ps gt 51.) then printlog,logfile,optfile,' PS BAD.  TOO LARGE.'
+
+  ; No OPT file
+  endif else begin
+    successarr[i]=0
+    printlog,logfile,optfile,' NOT FOUND'
+  endelse
+
+  ; Check ALS.OPT file
+  ;--------------------
+  alsfile = base+'.als.opt'
+  testals = FILE_TEST(alsfile)
+  if testals eq 1 then begin
+    READCOL,alsfile,alstags,dum,alsvals,format='A,A,F',/silent
+
+    ; Checking FI, IS, OS
+    fi = alsvals[0]               ; fitting radius, 1st line
+    is = alsvals[1]               ; inner sky radius, 2nd line
+    os = alsvals[2]               ; outer sky radius, 3rd line
+    ma = alsvals[9]               ; maximum group size, 10th line
+
+    ; Checking FI, IS, OS
+    ; FI<=51 for allstar
+    ; IS<=35 for allstar
+    ; OS<=100 for allstar
+    ; MA<=100 for allstar
+    if (fi gt 51.) then successarr[i]=0
+    if (is gt 35.) then successarr[i]=0
+    if (os gt 100.) then successarr[i]=0
+    if (ma gt 100.) then successarr[i]=0
+
+    if (fi gt 51.) then printlog,logfile,optfile,' FI BAD.  TOO LARGE.'
+    if (is gt 35.) then printlog,logfile,optfile,' IS BAD.  TOO LARGE.'
+    if (os gt 100.) then printlog,logfile,optfile,' OS BAD.  TOO LARGE.'
+    if (ma gt 100.) then printlog,logfile,optfile,' MA BAD.  TOO LARGE.'
+
+  ; No ALS.OPT file
+  endif else begin
+    successarr[i]=0
+    printlog,logfile,alsfile,' NOT FOUND'
+  endelse
+
+  ; Is everything okay?
+  ; If not "bad" then it is "good"
+  if successarr[i] ne 0 then successarr[i]=1
+
+  ; cd back to original directory
+  CD,curdir
+
+Endfor ; files loop
 
 
 
@@ -384,9 +432,15 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
 ; Files with okay option files
 gd = where(successarr eq 1,ngd)
 if ngd eq 0 then begin
-  print,'NO GOOD .OPT and .ALS.OPT FILES FOUND'
+  printlog,logfile,'NO GOOD .OPT and .ALS.OPT FILES FOUND'
+  PUSH,failurelist,inputlines
+
+  ; UPDATE the Lists
+  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
+                      failurelist=failurelist,/silent
   return
 endif
+
 
 printlog,logfile,''
 printlog,logfile,'--------------------------'
