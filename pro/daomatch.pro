@@ -307,14 +307,14 @@ for i=1,nfiles-1 do begin
     if count1 gt 0 then begin
       xdiff1 = refals[gdref[ind1a]].x-als[gdals[ind2a]].x
       ydiff1 = refals[gdref[ind1a]].y-als[gdals[ind2a]].y
-      xmed1 = median(xdiff1)
-      ymed1 = median(ydiff1)
+      xmed1 = median([xdiff1],/even)
+      ymed1 = median([ydiff1],/even)
       ; redo the search
       SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,20,ind1,ind2,count=count
       xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
-      xmed = median(xdiff)
-      ymed = median(ydiff)
+      xmed = median([xdiff],/even)
+      ymed = median([ydiff],/even)
       trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
     endif
   endif
