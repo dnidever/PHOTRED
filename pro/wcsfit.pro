@@ -1133,10 +1133,20 @@ WHILE (flag ne 1) do begin
     rarms = mad(radiff)
     decdiff = double(refcatM.dej2000)-dec2[ind2]
     decrms = mad(decdiff)
+    absdiff = sphdist(double(refcatM.raj2000),double(refcatM.dej2000),ra2[ind2],dec2[ind2],/deg)*3600.
 
-    ; Removing outliers
+    ; Removing outliers                                                                                                                                
     gd = where(abs(radiff-median(radiff)) le 3.0*rarms AND $
                abs(decdiff-median(decdiff)) le 3.0*decrms,ngd)
+    ; need at least 6 stars/constraints                                                                                                                
+    if ngd lt 6 then begin
+      gd = where(abs(radiff-median(radiff)) le 5.0*rarms AND $
+                 abs(decdiff-median(decdiff)) le 5.0*decrms,ngd)
+    endif
+    if ngd lt 6 then begin
+      gd = (sort(absdiff))[0:5]
+      ngd = 6
+    endif
 
     refcatM = refcatM[gd]
     catM = catM[gd]
