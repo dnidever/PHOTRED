@@ -98,6 +98,7 @@ if file_test(failurefile) eq 0 then TOUCHZERO,failurefile
 ; Check that all of the required programs are available
 progs = ['undefine','readline','readlist','readpar','strsplitter','writeline','push',$
          'printlog','touchzero']
+
 test = PROG_TEST(progs)
 if min(test) eq 0 then begin
   bd = where(test eq 0,nbd)

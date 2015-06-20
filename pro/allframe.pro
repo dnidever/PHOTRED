@@ -853,6 +853,7 @@ cmdfile = MKTEMP('temp')
 WRITELINE,cmdfile,cmd
 ;SPAWN,'/net/halo/bin/allframe.2004.fixed < '+cmdfile
 ;SPAWN,'/net/halo/bin/allframe.2008 < '+cmdfile
+
 SPAWN,'allframe < '+cmdfile
 
 FILE_DELETE,cmdfile,/allow
