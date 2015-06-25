@@ -338,7 +338,6 @@ Endelse
 ; Create .cmn.lst files
 ;-----------------------
 printlog,logfile,'Creating individual .cmn.lst files'
-ndetected = lonarr(ncat)        ; The number of detections in other frames
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
