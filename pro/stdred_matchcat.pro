@@ -379,7 +379,7 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                     failurelist=failurelist
 
 
-printlog,logfile,'STDRED_ASTROM Finished  ',systime(0)
+printlog,logfile,'STDRED_MATCHCAT Finished  ',systime(0)
 
 if keyword_set(stp) then stop
 
