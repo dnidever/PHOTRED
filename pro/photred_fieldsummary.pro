@@ -535,17 +535,20 @@ For i=0,nchips-1 do begin
       if nind gt 0 then inptrans=trans[ind]
     endif else inptrans=trans  ; global trans eqns
 
-    ; Loop through the exposures
-    For j=0,nindchip-1 do begin
-      indtrans = where(inptrans.band eq chipstr[indchip[j]].filter,nindtrans)
-      if nindtrans gt 0 then begin
-        inptrans1 = inptrans[indtrans[0]]
-        chipstr[indchip[j]].calib_color = inptrans1.color
-        chipstr[indchip[j]].calib_zpterm = inptrans1.zpterm
-        chipstr[indchip[j]].calib_amterm = inptrans1.amterm
-        chipstr[indchip[j]].calib_colorterm = inptrans1.colterm
-      endif
-    Endfor
+    ; We have transformation equations
+    if n_elements(inptrans) gt 0 then begin 
+      ; Loop through the exposures
+      For j=0,nindchip-1 do begin
+        indtrans = where(inptrans.band eq chipstr[indchip[j]].filter,nindtrans)
+        if nindtrans gt 0 then begin
+          inptrans1 = inptrans[indtrans[0]]
+          chipstr[indchip[j]].calib_color = inptrans1.color
+          chipstr[indchip[j]].calib_zpterm = inptrans1.zpterm
+          chipstr[indchip[j]].calib_amterm = inptrans1.amterm
+          chipstr[indchip[j]].calib_colorterm = inptrans1.colterm
+        endif
+      Endfor
+    endif  ; we have transformation equations
   endif 
 
 

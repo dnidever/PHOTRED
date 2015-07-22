@@ -405,8 +405,12 @@ if dofitdata ne '0' then $
 STDRED_FITDATA,redo=redo
 
 
-
 print,'STDRED FINISHED'
+
+; Run STDRED_SUMMARY
+;--------------------
+STDRED_SUMMARY
+
 
 ; End logfile
 ;------------

@@ -33,7 +33,7 @@ endif
 
 ; More than one name input
 if nfile gt 1 then begin
-  date = fltarr(nfile)
+  date = strarr(nfile)
   for i=0,nfile-1 do date[i] = photred_getdate(file[i])
   return,date
 endif

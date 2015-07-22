@@ -32,7 +32,7 @@ endif
 
 ; More than one filter name input
 if nfile gt 1 then begin
-  ut = fltarr(nfile)
+  ut = strarr(nfile)
   for i=0,nfile-1 do ut[i] = photred_getuttime(file[i])
   return,ut
 endif

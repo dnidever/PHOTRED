@@ -437,7 +437,13 @@ FOR i=0,ndirs-1 do begin
       base1 = base[ind1]
       filters = PHOTRED_GETFILTER(base1+'.fits')
       exptime = PHOTRED_GETEXPTIME(base1+'.fits')
-
+      rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
+      utdate = PHOTRED_GETDATE(base1+'.fits')
+      uttime = PHOTRED_GETUTTIME(base1+'.fits')
+      dateobs = utdate+'T'+uttime
+      jd = dblarr(nind1)
+      for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
+      
       ; Find matches to the reference filter in priority order
       ngdref=0 & refind=-1
       repeat begin
@@ -461,10 +467,15 @@ FOR i=0,ndirs-1 do begin
       if ngdref gt 1 then begin
         ; Getting image with longest exptime
         refbase = base1[gdref]
-        exptime2 = exptime[gdref]
-        maxind = first_el(maxloc(exptime2))
+        maxind = maxloc(rexptime[gdref])
+        if n_elements(maxind) gt 1 then begin  ; pick chronological first image
+          si = sort(jd[gdref[maxind]])
+          maxind = maxind[si[0]]  
+        endif 
+        ;exptime2 = exptime[gdref]
+        ;maxind = first_el(maxloc(exptime2))
         refimbase = refbase[maxind]
-        refexptime = exptime2[maxind]
+        refexptime = exptime[gdref[maxind]]
 
         printlog,logfile,'Two images in reference filter.'
         printlog,logfile,'Picking the image with the longest exposure time'
@@ -629,6 +640,12 @@ FOR i=0,ndirs-1 do begin
       ; Get filters 
       filters = PHOTRED_GETFILTER(base+'.fits')
       exptime = PHOTRED_GETEXPTIME(base+'.fits')
+      rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
+      utdate = PHOTRED_GETDATE(base1+'.fits')
+      uttime = PHOTRED_GETUTTIME(base1+'.fits')
+      dateobs = utdate+'T'+uttime
+      jd = dblarr(nind1)
+      for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
 
       ; Find matches to the reference filter in priority order
       ngdref=0 & refind=-1
@@ -653,10 +670,15 @@ FOR i=0,ndirs-1 do begin
       if ngdref gt 1 then begin
         ; Getting image with longest exptime
         refbase = base[gdref]
-        exptime2 = exptime[gdref]
-        maxind = first_el(maxloc(exptime2))
+        maxind = maxloc(rexptime[gdref])
+        if n_elements(maxind) gt 1 then begin  ; pick chronological first image
+          si = sort(jd[gdref[maxind]])
+          maxind = maxind[si[0]]  
+        endif 
+        ;exptime2 = exptime[gdref]
+        ;maxind = first_el(maxloc(exptime2))
         refimbase = refbase[maxind]
-        refexptime = exptime2[maxind]
+        refexptime = exptime[gdref[maxind]]
 
         printlog,logfile,'Two images in reference filter.'
         printlog,logfile,'Picking the image with the largest exposure time'

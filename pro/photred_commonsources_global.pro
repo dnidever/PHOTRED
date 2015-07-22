@@ -149,6 +149,7 @@ if nfieldfiles gt 0 then begin
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
               stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
+              stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
               stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
               stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
@@ -205,7 +206,7 @@ printlog,logfile,'Concatenating and matching the catalogs'
 printlog,logfile
 printlog,logfile,'Num    File   Nsources  Nmatches'
 allcat_outfile = field+'.cmn.fits'
-if file_test(allcat_outfile) eq 0 or keyword_set(redo) then begin
+if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo) then begin
 
   cat0 = {id:0L,frame:'',amp:0L,ndet:0L,detframes:'',fid:0L,x:0.0d0,y:0.0d0,mag:0.0,err:0.0,sky:0.0,skysig:0.0,$
           sharp:0.0,round:0.0,round2:0.0,ra:0.0d0,dec:0.0d0}

@@ -444,7 +444,7 @@ if nind gt 0 then begin
 
         if (ngd eq 0) then begin
           successarr[i]=0
-          printlog,logfile,file,' NOT FOUND IN apcor.lst'
+          printlog,logfile,fil,' NOT FOUND IN apcor.lst'
         endif  
 
       endif  ; good files
