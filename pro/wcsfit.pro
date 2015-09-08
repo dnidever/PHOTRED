@@ -417,7 +417,7 @@ refals.id = lindgen(nrefcat1)+1
 refals.x = refcat1.x
 refals.y = refcat1.y
 
-; 2MASS stars
+; 2MASS stars, or UCAC4 stars
 if tag_exist(refcat1,'JMAG') then begin
   ;gdmag = where(finite(refcat.jmag) eq 1,ngdmag)
   ;gderr = where(finite(refcat.e_jmag) eq 1,ngderr)
@@ -1970,7 +1970,7 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' then refcatname='USNO-B1'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' then refcatname='USNO-B1'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
@@ -2036,6 +2036,8 @@ if n_elements(refcat) eq 0 then begin
     ; refcat = refcat[gd]
 
   end
+
+  ; UCAC4 ??
 
   nrefcat = n_elements(refcat)
   print,'Nstars = ',strtrim(nrefcat,2)
