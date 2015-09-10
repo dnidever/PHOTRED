@@ -2285,7 +2285,6 @@ print,'Density of stars in image  = ',string(imdensity,format='(F7.2)'),' stars/
 print,'Density of reference stars = ',string(refdensity,format='(F7.2)'),' stars/arcmin^2'
 print,''
 
-
 ; Using just the BRIGHT reference stars
 ;--------------------------------------
 if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
