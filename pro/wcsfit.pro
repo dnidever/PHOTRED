@@ -417,7 +417,7 @@ refals.id = lindgen(nrefcat1)+1
 refals.x = refcat1.x
 refals.y = refcat1.y
 
-; 2MASS stars
+; 2MASS stars, or UCAC4 stars
 if tag_exist(refcat1,'JMAG') then begin
   ;gdmag = where(finite(refcat.jmag) eq 1,ngdmag)
   ;gderr = where(finite(refcat.e_jmag) eq 1,ngderr)
@@ -2036,6 +2036,8 @@ if n_elements(refcat) eq 0 then begin
     ; refcat = refcat[gd]
 
   end
+
+  ; UCAC4 ??
 
   nrefcat = n_elements(refcat)
   print,'Nstars = ',strtrim(nrefcat,2)
