@@ -115,6 +115,12 @@ if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperth
 if strtrim(hyperthread,2) eq '0' then hyperthread=0
 if n_elements(hyperthread) eq 0 then hyperthread=0
 
+; DAOPHOT .opt values
+daopsfva = READPAR(setup,'DAOPSFVA')
+if daopsfva ne '0' and daopsfva ne '' and daopsfva ne '-1' then undefine,daopsfva
+daofitradfwhm = READPAR(setup,'DAOFITRADFWHM')
+if daofitradfwhm ne '0' and daofitradfwhm ne '' and daofitradfwhm ne '-1' then undefine,daofitradfwhm
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -372,6 +378,8 @@ if ntomakeoptlist gt 0 then begin
 
   ; Make commands for daophot
   cmd = "PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
+  if n_elements(daopsfva) gt 0 then cmd+=',va='+strtrim(daopsfva,2)
+  if n_elements(daofitradfwhm) gt 0 then cmd+=',fitradius_fwhm='+strtrim(daofitradfwhm,2)
   ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
