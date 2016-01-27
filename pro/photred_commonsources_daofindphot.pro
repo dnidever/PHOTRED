@@ -47,16 +47,24 @@ if (coolines lt 4 or aplines lt 4 or keyword_set(clobber)) then begin
   optfile = base+'.opt'
   opttest = FILE_TEST(optfile)
   if opttest eq 0 then begin
-    PHOTRED_MKOPT,ifile,fwhm=fwhm,error=mkopterror
-  endif else begin
-    READLINE,optfile,optlines
-    fwhmind = where(stregex(optlines,'FW =',/boolean) eq 1,nfwhmind)
-    fwhmarr = strsplit(optlines[fwhmind[0]],'=',/extract)
-    fwhm = float(fwhmarr[1])
-  endelse
+    print,'No opt files.  Making them.'
+    PHOTRED_MKOPT,file,error=mkopterror
+    ; redo the test
+    optfile = base+'.opt'
+    opttest = FILE_TEST(optfile)
+  endif
 
   ; Problems with .opt file
-  if FILE_TEST(optfile) eq 0 then goto,BOMB_DAOPHOT
+  if FILE_TEST(optfile) eq 0 then begin
+    print,'No opt file.  Cannot proceed.'
+    goto,BOMB_DAOPHOT
+  endif
+
+  ; Load the opt file
+  READLINE,optfile,optlines
+  fwhmind = where(stregex(optlines,'FW =',/boolean) eq 1,nfwhmind)
+  fwhmarr = strsplit(optlines[fwhmind[0]],'=',/extract)
+  fwhm = float(fwhmarr[1])
  
   ; Copy the .opt file daophot.opt 
   if FILE_TEST('daophot.opt') eq 0 then $
@@ -108,20 +116,23 @@ if (coolines lt 4 or aplines lt 4 or keyword_set(clobber)) then begin
   ; Run the program
   SPAWN,[tempfile,base],out,errout,/noshell
 
-  ; Test the coo and ap file
+  ; Test the coo and ap files
   cootest = FILE_TEST(base+'.cmn.coo')
   if cootest eq 1 then coolines=FILE_LINES(base+'.cmn.coo') else coolines=0
+  if coolines gt 0 then print,base+'.cmn.coo created with '+strtrim(coolines,2)+' lines' else $
+    print,base+'.cmn.coo NOT FOUND'
   aptest = FILE_TEST(base+'.cmn.ap')
   if aptest eq 1 then aplines=FILE_LINES(base+'.cmn.ap') else aplines=0
- 
+  if aplines gt 0 then print,base+'.cmn.ap created with '+strtrim(aplines,2)+' lines' else $
+    print,base+'.cmn.ap NOT FOUND'
+
   ; Remove the temporary files
   FILE_DELETE,tempfile,/allow    ; delete the temporary script
-  FILE_DELETE,'daophot.opt',/allow
+  ;FILE_DELETE,'daophot.opt',/allow
+  ; LEAVE IT THERE OTHERWISE THERE COULD BE "RACE" ISSUES
   FILE_DELETE,tphotofile,/allow
   junk = FILE_TEST(base+'jnk.fits')
   if junk eq 1 then FILE_DELETE,base+'jnk.fits'
-  ;FILE_DELETE,base+['.cmn.log','.cmn.coo','.cmn.ap'],/allow
-  ;FILE_DELETE,base+['.opt','.als.opt'],/allow
 
 ; Files already exist and /clobber not set
 endif else begin
