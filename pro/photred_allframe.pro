@@ -269,7 +269,7 @@ endif
 ;-------------------------------------
 ; Checking that the scripts exist
 scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
-           'default.sex','default.param','default.nnw','default.conv','makemag']
+           'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   scriptfile = FILE_SEARCH(scriptsdir+'/'+scripts[i],count=nscriptfile)
