@@ -187,6 +187,11 @@ end
 nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
+; Use NMULTI_DAOPHOT if set
+nmultidaophot = READPAR(setup,'NMULTI_DAOPHOT')
+if nmultidaophot ne '0' and nmultidaophot ne '' and nmultidaophot ne '-1' then if nmulti=long(nmultidaophot)
+nmulti = nmulti > 1  ; must be >=1
+
 
 ; LOAD THE "imagers" FILE
 ;----------------------------

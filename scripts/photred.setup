@@ -5,6 +5,9 @@ telescope   Blanco
 instrument  DECAM
 observatory CTIO
 nmulti      10
+nmulti_wcs  10
+nmulti_daophot  10
+nmulti_allframe  10
 filtref     g,i,r,z,u
 trans       nocalib.trans
 ##### OPTIONAL #####

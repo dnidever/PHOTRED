@@ -513,6 +513,11 @@ if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
 nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
+; Use NMULTI_ALLFRAME if set
+nmultiallframe = READPAR(setup,'NMULTI_ALLFRAME')
+if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then if nmulti=long(nmultiallframe)
+nmulti = nmulti > 1  ; must be >=1
+
 ; What host
 host = getenv('HOST')
 pleione = stregex(host,'pleione',/boolean,/fold_case)
