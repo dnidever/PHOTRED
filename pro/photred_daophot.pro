@@ -119,7 +119,7 @@ if n_elements(hyperthread) eq 0 then hyperthread=0
 daopsfva = READPAR(setup,'DAOPSFVA')
 if daopsfva ne '0' and daopsfva ne '' and daopsfva ne '-1' then undefine,daopsfva
 daofitradfwhm = READPAR(setup,'DAOFITRADFWHM')
-if daofitradfwhm ne '0' and daofitradfwhm ne '' and daofitradfwhm ne '-1' then undefine,daofitradfwhm
+if daofitradfwhm eq '0' or daofitradfwhm eq '' or daofitradfwhm eq '-1' then undefine,daofitradfwhm
 
 
 ;###################
