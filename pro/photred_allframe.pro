@@ -515,7 +515,7 @@ nmulti = long(nmulti)
 
 ; Use NMULTI_ALLFRAME if set
 nmultiallframe = READPAR(setup,'NMULTI_ALLFRAME')
-if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then if nmulti=long(nmultiallframe)
+if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then nmulti=long(nmultiallframe)
 nmulti = nmulti > 1  ; must be >=1
 
 ; What host
