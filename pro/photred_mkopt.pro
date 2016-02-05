@@ -1,4 +1,5 @@
-pro photred_mkopt,input,hilimit=hilimit,va=va,stp=stp,fwhm=fwhm,error=error,verbose=verbose
+pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=inp_fitradius_fwhm,$
+                  error=error,verbose=verbose,stp=stp
 
 ;+
 ;
@@ -8,11 +9,14 @@ pro photred_mkopt,input,hilimit=hilimit,va=va,stp=stp,fwhm=fwhm,error=error,verb
 ; DAOPHOT and ALLSTAR in the PHOTRED pipeline
 ;
 ; INPUTS:
-;  input    Input files. Three formats can be used (1) Name of file
-;             with a list of input filenames.  Must start with an '@';
-;             (2) A name with wildcard characters, such as '*';
-;             (3) An array of filenames.
-;  hilimit  The saturation upper limit, 64,000 by default.
+;  input     Input files. Three formats can be used (1) Name of file
+;              with a list of input filenames.  Must start with an '@';
+;              (2) A name with wildcard characters, such as '*';
+;              (3) An array of filenames.
+;  =hilimit  The saturation upper limit, 64,000 by default.
+;  =va       The spatial variable PSF setting to use
+;  =fitradius_fwhm  The value to use for the fitting radius (FI), in
+;                      units of the FWHM.
 ;  /verbose Output information about what is happening.
 ;  /stp     Stop at the end of the program.
 ;
@@ -46,6 +50,7 @@ if ninput eq 0 then begin
   return
 endif
 
+
 ; Loading input
 LOADINPUT,input,files,count=nfiles
 
@@ -59,7 +64,7 @@ endif
 if nfiles gt 1 then begin
   fwhm = fltarr(nfiles)
   for i=0,nfiles-1 do begin
-    PHOTRED_MKOPT,files[i],hilimit=hilimit,fwhm=fwhm1,verbose=verbose
+    PHOTRED_MKOPT,files[i],hilimit=inp_hilimit,va=inp_va,fitradius_fwhm=inp_fitradius_fwhm,fwhm=fwhm1,verbose=verbose
     fwhm[i] = fwhm1
     if keyword_set(verbose) then print,''
   endfor
@@ -67,6 +72,13 @@ if nfiles gt 1 then begin
 endif
 
 file = strtrim(files[0],2)
+
+; Default settings
+if n_elements(inp_hilimit) gt 0 then hilimit=inp_hilimit else hilimit=6.4e4
+if n_elements(inp_va) gt 0 then VA=inp_va>0 else VA=2 ; PSF varies quadratically in the frame
+if n_elements(inp_fitradius_fwhm) gt 0 then begin
+  if inp_fitradius_fwhm gt 0.0 then fitradius_fwhm=inp_fitradius_fwhm else fitradius_fwhm=1.0  ; can't be >=0
+endif else fitradius_fwhm=1.0
 
 
 ; Processing ONE file
@@ -139,7 +151,6 @@ endif
 
 
 ; Getting saturation limit from the header
-if n_elements(hilimit) eq 0 then hilimit = 6.4e4
 lolimit = 10000.0                                   ; just in case
 saturate = SXPAR(head,'SATURATE',count=nsaturate,/silent)
 ;if nsaturate eq 0 then saturate=(max(im) < hilimit)  ; if not found
@@ -204,7 +215,7 @@ HS =  1.0
 LR = -1.0
 HR =  1.0
 WA = -2
-if n_elements(va) eq 0 then VA=2  ; PSF varies quadratically in the frame 
+; VA  defined above
 AN = -6     ; It will try all PSF models (#1-6) and use the one with the lowest chi value
 EX =  5     ; extra PSF passes
 PE =  0.75
@@ -226,7 +237,7 @@ FW = fwhm
 ; Calculating some things
 FW = FW < 20             ; daophot won't accept anything higher than 20
 RE = RD/GA
-FI = FW < 51             ; daophot won't accept anything higher than 51
+FI = fitradius_fwhm*FW < 51                    ; daophot won't accept anything higher than 51
 PS = (4.0*FW) < 51       ; daophot won't accept anything higher than 51
 IS = (FI - 1.0) < 35     ; daophot won't accept anything higher than 35
 OS = (PS + 1.0) < 100    ; daophot won't accept anything higher than 100
