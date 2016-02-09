@@ -134,7 +134,7 @@ nmulti = long(nmulti)
 
 ; Use NMULTI_WCS if set
 nmultiwcs = READPAR(setup,'NMULTI_WCS')
-if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then if nmulti=long(nmultiwcs)
+if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
 nmulti = nmulti > 1  ; must be >=1
 
 
