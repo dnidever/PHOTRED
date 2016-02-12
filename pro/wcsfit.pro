@@ -720,7 +720,7 @@ case strupcase(proj) of
     bestcd = reform(cdarr[bestind,*,*])
     bestcrval = reform(crvalarr[bestind,*,*])
 
-    print,'INIT WCS rms = ',rmsarr[bestind],' pixels'
+    print,'INIT WCS rms = ',rmsarr[bestind],' arcsec'
 
     wcs2 = wcs
     wcs2.ast.cd = bestcd
@@ -886,7 +886,7 @@ End ; TNX
       bestrms = sqrt(mean(diff^2.0)) * 3600.0
     endif
 
-    print,'INIT WCS rms = ',bestrms,' pixels'
+    print,'INIT WCS rms = ',bestrms,' arcsec'
 
     ; Put new WCS into header
     WCSTPV2HDR, head, wcs2    
@@ -992,7 +992,7 @@ else: begin
   bestcd = reform(cdarr[bestind,*,*])
   bestcrval = reform(crvalarr[bestind,*,*])
 
-  print,'INIT WCS rms = ',rmsarr[bestind],' pixels'
+  print,'INIT WCS rms = ',rmsarr[bestind],' arcsec'
 
   astr2 = astr
   astr2.cd = bestcd
