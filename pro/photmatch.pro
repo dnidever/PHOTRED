@@ -320,7 +320,7 @@ SRCMATCH,str1[ind1].ra,str1[ind1].dec,str2[ind2].ra,str2[ind2].dec,dcr,mind1,min
 
 ; No matches
 if (nmatch eq 0) then begin
-  print,'No matches'
+  if not keyword_(silent) then print,'No matches'
   ind1 = -1
   ind2 = -1
   count = 0
