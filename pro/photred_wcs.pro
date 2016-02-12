@@ -133,6 +133,11 @@ if n_elements(hyperthread) eq 0 then hyperthread=0
 nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
 
+; Use NMULTI_WCS if set
+nmultiwcs = READPAR(setup,'NMULTI_WCS')
+if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
+nmulti = nmulti > 1  ; must be >=1
+
 
 ;###################
 ; GETTING INPUTLIST

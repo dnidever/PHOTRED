@@ -269,7 +269,7 @@ endif
 ;-------------------------------------
 ; Checking that the scripts exist
 scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
-           'default.sex','default.param','default.nnw','default.conv','makemag']
+           'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   scriptfile = FILE_SEARCH(scriptsdir+'/'+scripts[i],count=nscriptfile)
@@ -512,6 +512,11 @@ if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
 ; Getting NMULTI
 nmulti = READPAR(setup,'NMULTI')
 nmulti = long(nmulti)
+
+; Use NMULTI_ALLFRAME if set
+nmultiallframe = READPAR(setup,'NMULTI_ALLFRAME')
+if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then nmulti=long(nmultiallframe)
+nmulti = nmulti > 1  ; must be >=1
 
 ; What host
 host = getenv('HOST')

@@ -548,7 +548,7 @@ for f=0,nfiles-1 do begin
     sz = size(im)
     x = lindgen(sz[1])
     y = lindgen(sz[2])
-    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:0.0,dof:0L,status:0L},ngd)
+    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:0.0,dof:0L,status:0L,fwhm:0.0},ngd)
     gstr.x = xcenarr[gd]
     gstr.y = ycenarr[gd]
     For i=0,ngd-1 do begin
@@ -580,7 +580,8 @@ for f=0,nfiles-1 do begin
       gstr[i].chisq = chisq
       gstr[i].dof = dof
       gstr[i].status = status
-
+      gstr[i].fwhm = 0.5*(pars[2]+pars[3]) * 2  ; FWHM=average of half-widths (times 2)
+      
       ; The 2D Gaussian parameters are:
       ;   A(0)   Constant baseline level
       ;   A(1)   Peak value
@@ -608,7 +609,6 @@ for f=0,nfiles-1 do begin
     okay = where(gstr.pars[1] gt 0.0 AND gstr.chisq lt medchisq+3*sigchisq AND $
                  abs(gstr.pars[2]-medpar2) lt 3*sigpar2 AND $
                  abs(gstr.pars[3]-medpar3) lt 3*sigpar3,nokay)
-
     ; No stars passed, increase threshold, 4 sigma
     if nokay eq 0 then $
       okay = where(gstr.pars[1] gt 0.0 AND gstr.chisq lt medchisq+4*sigchisq AND $
@@ -625,7 +625,8 @@ for f=0,nfiles-1 do begin
       gd = gd[okay]
       ;print,strtrim(nokay,2),'/',strtrim(ngd,2),' sources passed the Gaussian fitting tests'
       ngd = nokay
-    endif
+      gstr2 = gstr[okay]
+   endif
 
     ; There are some good stars
     if ngd ge 2 then begin
@@ -633,8 +634,9 @@ for f=0,nfiles-1 do begin
       ; Maybe randomly sample ~50 peaks and fit them
       ; with a Gaussian
 
-      fwhmarr2 = fwhmarr[gd]
-
+      ; Use the 2D fit values instead!
+      ;fwhmarr2 = fwhmarr[gd]
+       
      ; ; Use sigma-clipped mean to get good indices
      ; meanclip,fwhmarr2,mean,sigma,subs=subs,clipsig=3
      ;
@@ -642,19 +644,20 @@ for f=0,nfiles-1 do begin
      ; fwhm = median(fwhmarr2(subs))
 
        ; Use MEDIAN
-       medfwhm = median([fwhmarr2])
+       medfwhm = median([gstr2.fwhm])
 
        ; Use RESISTANT_MEAN
-       RESISTANT_MEAN,fwhmarr2,3.0,mean,sigma
+       RESISTANT_MEAN,gstr2.fwhm,3.0,mean,sigma
        resfwhm = mean
 
        ; Weighted mean (by flux)
-       wt = fluxarr[gd]>0.0001
-       wtfwhm = total(wt*fwhmarr[gd])/total(wt)
+       ;wt = fluxarr[gd]>0.0001
+       wt = gstr2.pars[0]>0.0001
+       wtfwhm = total(wt*gstr2.fwhm)/total(wt)
 
        ; Weighted mean with outlier rejection
        sig = 1.0/sqrt(wt)
-       ROBUST_MEAN,fwhmarr2,robfwhm,robfwhmsigma,sig=sig
+       ROBUST_MEAN,gstr2.fwhm,robfwhm,robfwhmsigma,sig=sig
 
        ; The four methods don't agree
        ; Use flux-weighted mean with outlier rejection.
