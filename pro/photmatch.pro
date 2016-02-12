@@ -20,6 +20,7 @@
 ;  ind1        The matched indices for str1
 ;  ind2        The matched indices for str2
 ;  =magoffset  The photometric offsets.  magoff = str1 - str2
+;  =magoffsig  The error in the photometric offset.
 ;  =astoffset  The astrometric constant offsets [RAoff, DECoff] in
 ;                degrees.  astoff = str1 - str2
 ;  =count      The number of matches
@@ -99,10 +100,10 @@ end
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 pro photmatch,str1,str2,ind1,ind2,dcr=dcr,magindarr=magindarr,count=count,$
-    stp=stp,silent=silent,error=error,magoffset=magoffset,astlinear=astlinear,$
-    astquad=astquad,astoffset=astoffset
+    stp=stp,silent=silent,error=error,magoffset=magoffset,magoffsig=magoffsig,$
+    astlinear=astlinear,astquad=astquad,astoffset=astoffset
 
-undefine,error,magoffset
+undefine,error,magoffset,magoffsig,astoffset
 ind1 = -1
 ind2 = -1
 count = 0
@@ -595,7 +596,7 @@ IF (nmagindarr gt 0) then begin
     ; The offset is STR1 - STR2
     nmagindarr = n_elements(magindarr)
     magoffset = fltarr(nmagindarr)
-    magsig = fltarr(nmagindarr)
+    magoffsig = fltarr(nmagindarr)
     for i=0,nmagindarr-1 do begin
 
       magdiff = str1m[g1].(magindarr[i])-str2m[g1].(magindarr2[i])
@@ -620,7 +621,7 @@ IF (nmagindarr gt 0) then begin
         ROBUST_MEAN,magdiff[gdmag],magoff1,magoff1err,sig=magerr[gdmag],numrej=numrej
 
         magoffset[i] = magoff1
-        magsig[i] = magoff1err/sqrt(ngdmag-numrej)  ; stdev of mean
+        magoffsig[i] = magoff1err/sqrt(ngdmag-numrej)  ; stdev of mean
         com=''
       endif else begin
         ; No good sources, use 0.0
@@ -630,7 +631,7 @@ IF (nmagindarr gt 0) then begin
       ; Print out the offsets
       if not keyword_set(silent) then $
         print,tags1[magindarr[i]],' offset (1-2) = ',strtrim(string(magoffset[i],format='(F10.4)'),2),$
-              ' +/- '+strtrim(string(magsig[i],format='(F10.4)'),2)+com
+             ' +/- '+strtrim(string(magoffsig[i],format='(F10.4)'),2)+com
     end
 
 
