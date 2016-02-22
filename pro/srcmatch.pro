@@ -346,7 +346,7 @@ if keyword_set(usehist) then begin
   if keyword_set(sph) then begin
     Result = MATCH_SPH([xorig1],[yorig1],[xorig2],[yorig2],dcr2,one_to_one=one_to_one)
   endif else begin  ; Cartesian
-    Result = MATCH_2D([xorig1],[yorig1],[xorig2],[yorig2],dcr2,one_to_one=one_to_one)
+    Result = MATCH_2D([xorig1],[yorig1],[xorig2],[yorig2],dcr2)  ; always one to one
   endelse
 
   ; Get the arrays and matches
