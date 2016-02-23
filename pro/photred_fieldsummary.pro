@@ -117,9 +117,14 @@ printlog,logfile
 ;#########################################
 
 ; Search for files in the directory.
-if thisimager.namps gt 1 then $
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
+if thisimager.namps gt 1 then begin
+  chstring = '' ; make regular expression for the chip number
+  ndig = ceil(alog10(thisimager.namps))
+  for l=0,ndig-1 do chstring+='[0-9]'
+  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+'.fits',count=nfieldfiles)
+endif else begin
   fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
+endelse
 
 ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
 if nfieldfiles gt 0 then begin
