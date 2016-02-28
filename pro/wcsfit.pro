@@ -2277,7 +2277,7 @@ endif
 ; Checking the density of stars
 imarea = (info.nx*pixscale/60.0)*(info.ny*pixscale/60.0)
 drefra = max(double(refcat1b.raj2000))-min(double(refcat1b.raj2000))
-drefra = drefra/cos(median(double(refcat1b.dej2000))/!radeg)
+drefra = drefra*cos(median(double(refcat1b.dej2000))/!radeg)
 drefdec = max(double(refcat1b.dej2000))-min(double(refcat1b.dej2000))
 refarea = drefra*drefdec*3600.
 imdensity = n_elements(cat)/imarea
@@ -2286,7 +2286,6 @@ print,''
 print,'Density of stars in image  = ',string(imdensity,format='(F7.2)'),' stars/arcmin^2'
 print,'Density of reference stars = ',string(refdensity,format='(F7.2)'),' stars/arcmin^2'
 print,''
-
 
 ; Using just the BRIGHT reference stars
 ;--------------------------------------
@@ -2348,7 +2347,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
              rms=matchrms,maxshift=maxshift
 
 endif
-
+stop
 
 
 ; NO MATCHES, If header WCS used, try WCSFIT_ORIENT X/Y
