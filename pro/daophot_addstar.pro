@@ -5,13 +5,18 @@
 ; Add a fake star to an image
 ;
 ; INPUTS:
-;  psffile   The DAOPHOT PSF file.
+;  filebase  The base of the filename for the ".psf", ".fits" and ".opt" files,
+;             INCLUDING the directory path (otherwise it is assumed that they
+;             are in the current directory).
 ;  cat       The input catalog structure of sources to add.  It must have
 ;              AT LEAST these columns:
 ;              X, Y     x/y-coordinates of sources in IRAF/DAOPHOT format (1-indexed)
 ;              MAG      magnitude of star
 ;  outfile   The name of the output FITS file.  If it already exists
 ;              then the star is added to the existing image (unless /clobber set).
+;  /blank    Add the artificial stars to a blank image.  The default
+;              is to add them to the original image.
+;  /nonoise  Don't any Poisson noise to the image, by default ADDSTAR adds Poisson noise.
 ;  /clobber  Delete the output file if it already exists.
 ;  /silent   Don't print anything to the screen.
 ;
@@ -26,21 +31,27 @@
 ; By D.Nidever  March 2016
 ;-
 
-pro daophot_addstar,filebase,cat,outfile,clobber=clobber,error=error,silent=silent
+pro daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent
 
 undefine,error
 
 ; Do we have enough inputs
 if n_elements(filebase) eq 0 or n_elements(cat) eq 0 or n_elements(outfile) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax -  daophot_addstar,filebase,cat,outfile,clobber=clobber,error=error,silent=silent'
+  print,'Syntax - daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent'
   return
 endif
 
-; Make the psf, opt and fits filenames
-psffile = filebase+'.psf'
-optfile = filebase+'.opt'
-fitsfile = filebase+'.fits'
+; Make the psf, opt and fits filenames, with absolute paths
+dir = ( file_search(file_dirname(filebase),/fully_qualify)+'/' )[0]
+psffile = dir+file_basename(filebase)+'.psf'
+optfile = dir+file_basename(filebase)+'.opt'
+fitsfile = dir+file_basename(filebase)+'.fits'
+
+
+;------------------------
+; Perform error checking
+;========================
 
 ; Does the PSF file exist
 if file_test(psffile) eq 0 then begin
@@ -127,18 +138,53 @@ endif
 tags = tag_names(cat)
 reqtags = ['X','Y','MAG']
 for i=0,n_elements(reqtags)-1 do begin
-  if strpos(tags,reqtags[i]) eq -1 then
+  dum = where(tags eq reqtags[i],nreqtags)
+  if nreqtags eq 0 then begin
     error = 'CAT must have '+reqtags[i]+' column'
     if not keyword_set(silent) then print,error
     return
   endif
 endfor
 
+; Does the output file already exist
+if file_test(outfile) eq 1 then begin
+  if not keyword_set(clobber) then begin
+    error = outfile+' ALREADY EXISTS and /clobber not set.'
+    if not keyword_set(silent) then print,error
+    return
+  endif else begin
+    FILE_DELETE,outfile,/allow   ; deleting existing file
+  endelse
+endif
+
+
+;------------------
+; Now run ADDSTAR
+;==================
+
+; Go to the directory with the original files
+CD,current=curdir
+CD,dir
+
 ; Make sure daophot.opt file exists
 if FILE_TEST('daophot.opt') eq 0 then FILE_COPY,optfile,'daophot.opt',/over
 
 ; Base for temporary files
-tmpbase = MKTEMP('psf')
+tmpbase = (MKTEMP('psf'))[0]
+
+; Use blank sky
+if keyword_set(blank) then begin
+  FITS_READ,fitsfile,im,head
+  inptmpfile = tmpbase+'.blank.fits'
+  FILE_DELETE,inptmpfile,/allow
+  MWRFITS,im*0,inptmpfile,head,/create
+  inputimage = inptmpfile
+
+; Add to original file
+endif else begin
+  inputimage = fitsfile
+endelse
+
 
 ; Create input data file for DAOPHOT
 ;  DAOPHOT "header", I don't think the values here actually matter for ADDSTAR
@@ -159,42 +205,55 @@ FILE_DELETE,tcatfile,/allow
 WRITEALS,tcatfile,catals,hdr
 
 ; Make output DAOPHOT script
-
 push,lines,'#!/bin/sh'
 push,lines,'export image=${1}'
-;push,lines,'rm ${image}.temp.log      >& /dev/null'
-;push,lines,'rm ${image}.temp.coo      >& /dev/null'
-;push,lines,'rm ${image}.temp.ap       >& /dev/null'
-push,lines,'daophot << END_DAOPHOT >> ${image}.add.log'
+push,lines,'daophot << END_DAOPHOT >> '+file_basename(tmpbase)+'.log'
 push,lines,'OPTIONS'
 push,lines,'${image}.opt'
 push,lines,''
-push,lines,'ATTACH ${image}.fits'
+push,lines,'ATTACH '+file_basename(inputimage)
 push,lines,'ADDSTAR'
 push,lines,'${image}.psf'
 push,lines,'1'
-push,lines,stringize(gain,ndec=5) ; photons per ADU
-push,lines,tmpfile                ; output picture name
+if keyword_set(nonoise) then push,lines,'99999.' else $   ; no Poisson noise added
+  push,lines,stringize(gain,ndec=5)           ; photons per ADU
+push,lines,file_basename(tcatfile)            ; input data file
+push,lines,file_basename(outfile)             ; output picture name, keep in same directory for now
 push,lines,''
 push,lines,'EXIT'
 push,lines,'END_DAOPHOT'
 scriptfile = tmpbase+'.sh'
 WRITELINE,scriptfile,lines
 FILE_CHMOD,scriptfile,'755'o
+file_delete,filebase+'.add.log',/allow
 
 ; Run the program
-SPAWN,[scriptfile,filebase],out,errout,/noshell
-;FILE_DELETE,scriptfile   ; delete the temporary script
+SPAWN,[scriptfile,file_basename(filebase)],out,errout,/noshell
 
-;; Test the coo and ap file
-;cootest = FILE_TEST(base+'.temp.coo')
-;if cootest eq 1 then coolines=FILE_LINES(base+'.temp.coo') else coolines=0
-;aptest = FILE_TEST(base+'.temp.ap')
-;if aptest eq 1 then aplines=FILE_LINES(base+'.temp.ap') else aplines=0
+; Delete temporary files, absolute filenames
+FILE_DELETE,[scriptfile,tcatfile,tmpbase,tmpbase+'.log',inptmpfile],/allow
 
-; Output file, are we deleting?
+; Back to original directory
+CD,curdir
 
-  
-stop
+; If outfile exists, move to it's originally intended location
+if file_test(dir+file_basename(outfile)) eq 1 then begin
+  FILE_MOVE,dir+file_basename(outfile),outfile,/allow  ; nothing will happen if they are the same filename
+
+; Output file not found
+endif else begin
+  error = outfile+' NOT FOUND'
+  if not keyword_set(silent) then print,error
+  return
+endelse
+
+; There was an error
+if errout ne '' then begin
+  error = 'There was an error in running DAOPHOT/ADDSTAR. '+errout
+  if not keyword_set(silent) then print,error
+  return
+endif
+
+;stop
 
 end
