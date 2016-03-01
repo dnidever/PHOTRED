@@ -2347,7 +2347,6 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
              rms=matchrms,maxshift=maxshift
 
 endif
-stop
 
 
 ; NO MATCHES, If header WCS used, try WCSFIT_ORIENT X/Y
