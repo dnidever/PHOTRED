@@ -1,11 +1,9 @@
 ;+
 ;
-; NAME:
-;  SRCMATCH.PRO
+; SRCMATCH
 ;
-; PURPOSE:
-;  This works like srcor except that it breaks the chunks up into different
-;  domains so it will go faster.
+; This works like srcor except that it breaks the chunks up into different
+; domains so it will go faster.
 ;
 ; INPUTS:
 ;  xarr1     The array of X (RA,LON) values for the 1st set
@@ -13,10 +11,18 @@
 ;  xarr2     The array of X (RA,LON) values for the 2nd set
 ;  yarr2     The array of Y (DEC,LAT) values for the 2nd set
 ;  dcr       The matching radius.  In arcseconds if /sph set.
-;  /sph      Spherical coordinates input;  need to be in DEGREES
+;  /sph      Spherical coordinates input.  Arrays need to be in  *DEGREES*
+;             and dcr in *ARCSECONDS*.
+;  option=   Different options:
+;            OPTION=0  Closest match from list2 is found for each element
+;                       of list1 (within DCR).
+;            OPTION=1  One-to-one mapping.  The default.
+;            OPTION=2  Same as OPTION=1 but DCR is ignored.
 ;  /stp      Stop at the end
 ;  domains=  Specify the number of domains desired.  Otherwise it
 ;              will return the number of domains used.
+;  /usehist  Use the HISTOGRAM_ND programs MATCH_SPH/MATCH_2D to do
+;              faster matching.  This is now the default.
 ;
 ; OUTPUTS:
 ;  ind1      Index of matched objects for 1st set
@@ -24,11 +30,10 @@
 ;  =count    The number of matches.  This is set to -1 if there was an error.
 ;
 ; USAGE:
-;  IDL>srcmatch,xarr1,yarr1,xarr2,yarr2,dcr,ind1,ind2,count=count,sph=sph
+;  IDL>srcmatch,xorig1,yorig1,xorig2,yorig2,dcr,ind1,ind2,count=count,sph=sph
 ;
 ; By D.Nidever   April 2007
 ;-
-
 
 
 PRO srcor2,x1in,y1in,x2in,y2in,dcr,ind1,ind2,option=option,magnitude=magnitude,$
@@ -247,7 +252,7 @@ end
 ;------------------------------------------------------------------------
 
 pro srcmatch,xorig1,yorig1,xorig2,yorig2,dcr,ind1,ind2,sph=sph,stp=stp,$
-             domains=domains,count=count
+             domains=domains,count=count,usehist=usehist
 
 ;+
 ;
@@ -259,7 +264,7 @@ pro srcmatch,xorig1,yorig1,xorig2,yorig2,dcr,ind1,ind2,sph=sph,stp=stp,$
 ; INPUTS:
 ;  xarr1     The array of X (RA,LON) values for the 1st set
 ;  yarr1     The array of Y (DEC,LAT) values for the 1st set
-;  xarr2     The array of X (RA,LON) values for the 2ndset
+;  xarr2     The array of X (RA,LON) values for the 2nd set
 ;  yarr2     The array of Y (DEC,LAT) values for the 2nd set
 ;  dcr       The matching radius.  In arcseconds if /sph set.
 ;  /sph      Spherical coordinates input.  Arrays need to be in  *DEGREES*
@@ -272,6 +277,8 @@ pro srcmatch,xorig1,yorig1,xorig2,yorig2,dcr,ind1,ind2,sph=sph,stp=stp,$
 ;  /stp      Stop at the end
 ;  domains=  Specify the number of domains desired.  Otherwise it
 ;              will return the number of domains used.
+;  /usehist  Use the HISTOGRAM_ND programs MATCH_SPH/MATCH_2D to do
+;              faster matching.  This is now the default.
 ;
 ; OUTPUTS:
 ;  ind1      Index of matched objects for 1st set
@@ -331,6 +338,33 @@ endif else begin
   xdcr = dcr2
   ydcr = dcr2
 endelse
+
+
+; --- Use the HISTOGRAM_ND matching programs instead ---
+if n_elements(usehist) eq 0 then usehist=1  ; default
+if keyword_set(usehist) then begin
+  ; Matching options
+  ;  if option=1 or 2 then one_to_one=0, but default is to use one-to-one
+  if n_elements(option) eq 1 then one_to_one=1-(option ge 1) else one_to_one=1
+ 
+  ; Spherical
+  if keyword_set(sph) then begin
+    Result = MATCH_SPH([xorig1],[yorig1],[xorig2],[yorig2],dcr2,one_to_one=one_to_one)
+  endif else begin  ; Cartesian
+    p1 = dblarr(nx1,2) & p1[*,0]=xorig1 & p1[*,1]=yorig1
+    p2 = dblarr(nx2,2) & p2[*,0]=xorig2 & p2[*,1]=yorig2
+    Result = MATCH_ND(p1,p2,dcr2,one_to_one=one_to_one)
+    ;Result = MATCH_2D([xorig1],[yorig1],[xorig2],[yorig2],dcr2) ; always one to one
+  endelse
+
+  ; Get the arrays and matches
+  ind1 = where(result gt -1,count)
+  if count gt 0 then ind2=result[ind1]
+
+  return
+endif
+
+
 
   ; Ranges
   ; The overlapping range

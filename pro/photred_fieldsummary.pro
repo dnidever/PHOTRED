@@ -117,9 +117,14 @@ printlog,logfile
 ;#########################################
 
 ; Search for files in the directory.
-if thisimager.namps gt 1 then $
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
+if thisimager.namps gt 1 then begin
+  chstring = '' ; make regular expression for the chip number
+  ndig = ceil(alog10(thisimager.namps))
+  for l=0,ndig-1 do chstring+='[0-9]'
+  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+'.fits',count=nfieldfiles)
+endif else begin
   fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
+endelse
 
 ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
 if nfieldfiles gt 0 then begin
@@ -302,14 +307,16 @@ For i=0,nfieldfiles-1 do begin
   ; Load ALS file
   alsfile = base+'.als'
   if file_test(alsfile) eq 1 then begin
-    LOADALS,alsfile,als,alshead
-    chipstr[i].dao_nsources = n_elements(als)
+    LOADALS,alsfile,als,alshead,count=nals
+    chipstr[i].dao_nsources = nals
     ; Calculate "depth"
-    hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=50)
-    xhist += 0.5*0.2
-    DLN_MAXMIN,hist,minarr,maxarr
-    alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-    chipstr[i].dao_depth = alsdepth   ; instrumental "depth"    
+    if nals gt 0 then begin
+      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=50)
+      xhist += 0.5*0.2
+      DLN_MAXMIN,hist,minarr,maxarr
+      alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+      chipstr[i].dao_depth = alsdepth   ; instrumental "depth"    
+    endif
   endif
 
   ; Check list of DAOPHOT PSF stars
@@ -410,14 +417,16 @@ For i=0,nfieldfiles-1 do begin
   ; Load ALF file
   alffile = base+'.alf'
   if file_test(alffile) eq 1 then begin
-    LOADALS,alffile,alf,alfhead
-    chipstr[i].alf_nsources = n_elements(alf)
+    LOADALS,alffile,alf,alfhead,count=nalf
+    chipstr[i].alf_nsources = nalf
     ; Calculate "depth"
-    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
-    xhist += 0.5*0.2
-    DLN_MAXMIN,hist,minarr,maxarr
-    alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-    chipstr[i].alf_depth = alsdepth   ; instrumental "depth"    
+    if nalf gt 0 then begin
+      hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
+      xhist += 0.5*0.2
+      DLN_MAXMIN,hist,minarr,maxarr
+      alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+      chipstr[i].alf_depth = alsdepth   ; instrumental "depth"    
+    endif
   endif
 
   ; Get aperture corretion

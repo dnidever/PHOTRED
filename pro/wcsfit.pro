@@ -720,7 +720,7 @@ case strupcase(proj) of
     bestcd = reform(cdarr[bestind,*,*])
     bestcrval = reform(crvalarr[bestind,*,*])
 
-    print,'INIT WCS rms = ',rmsarr[bestind],' pixels'
+    print,'INIT WCS rms = ',rmsarr[bestind],' arcsec'
 
     wcs2 = wcs
     wcs2.ast.cd = bestcd
@@ -886,7 +886,7 @@ End ; TNX
       bestrms = sqrt(mean(diff^2.0)) * 3600.0
     endif
 
-    print,'INIT WCS rms = ',bestrms,' pixels'
+    print,'INIT WCS rms = ',bestrms,' arcsec'
 
     ; Put new WCS into header
     WCSTPV2HDR, head, wcs2    
@@ -992,7 +992,7 @@ else: begin
   bestcd = reform(cdarr[bestind,*,*])
   bestcrval = reform(crvalarr[bestind,*,*])
 
-  print,'INIT WCS rms = ',rmsarr[bestind],' pixels'
+  print,'INIT WCS rms = ',rmsarr[bestind],' arcsec'
 
   astr2 = astr
   astr2.cd = bestcd
@@ -2277,7 +2277,7 @@ endif
 ; Checking the density of stars
 imarea = (info.nx*pixscale/60.0)*(info.ny*pixscale/60.0)
 drefra = max(double(refcat1b.raj2000))-min(double(refcat1b.raj2000))
-drefra = drefra/cos(median(double(refcat1b.dej2000))/!radeg)
+drefra = drefra*cos(median(double(refcat1b.dej2000))/!radeg)
 drefdec = max(double(refcat1b.dej2000))-min(double(refcat1b.dej2000))
 refarea = drefra*drefdec*3600.
 imdensity = n_elements(cat)/imarea
@@ -2347,7 +2347,6 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
              rms=matchrms,maxshift=maxshift
 
 endif
-
 
 
 ; NO MATCHES, If header WCS used, try WCSFIT_ORIENT X/Y

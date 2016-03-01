@@ -811,9 +811,11 @@ FOR i=0L,ninp-1 do begin
   ; Head columns 
   ;--------------
   finalstar = goodstar[*,0:2]
-  headline = '    ID       X         Y     '
-  ;format = '(2X,I5,2F9.3'
-  format = '(2X,I5,2F10.3'
+  ;headline = '    ID       X         Y     '
+  ;;format = '(2X,I5,2F9.3'
+  ;format = '(2X,I5,2F10.3'
+  headline = '       ID       X         Y     '
+  format = '(2X,I8,2F10.3'
 
 
   ;--------------------------------------------
