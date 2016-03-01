@@ -21,8 +21,9 @@
 ;  /silent   Don't print anything to the screen.
 ;
 ; OUTPUTS:
-;  The fake PSF is added to the output image.  If the output file
-;  already exists then the sources are added to it (unless /clobber set).
+;  The artificial stars are added to an image.  By default, they are
+;  added to the original image unless /blank is set and then they are
+;  added to a blank image.
 ;  =error     The error message if one occurred, otherwise undefined.
 ;
 ; USAGE:
