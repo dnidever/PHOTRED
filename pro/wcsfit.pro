@@ -26,6 +26,8 @@
 ;  =refcat    The reference catalog (IDL structure), normally USNO-B1 or 2MASS-PSC,
 ;               obtained from QUERYVIZIER.PRO.  The structure must contain the
 ;               tags RAJ2000/DEJ2000 or RA/DEC.
+;  =refmaglim  The reference magnitude limit to use.  The default is 16.5 for 2MASS-PSC
+;                and 21.0 for USNO-B1.
 ;  =crpix1    The X value of the reference pixel.  The default is the center of the image.
 ;  =crpix2    The Y value of the reference pixel.  The default is the center of the image.
 ;  /noupdate  Do NOT Update the FITS header with the fitted WCS.  The
@@ -1295,7 +1297,8 @@ end
 
 pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
            cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
-           redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift
+           redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
+           refmaglim=refmaglim
 
 t0 = systime(1)
 undefine,error
@@ -1306,7 +1309,7 @@ if ninput eq 0 then begin
   print,'Syntax - wcsfit,input,up=up,left=left,pixscale=pixscale,cenra=cenra,cendec=cendec,'
   print,'                cat=cat,refcat=refcat,stp=stp,error=error,projection=projection,'
   print,'                noupdate=noupdate,redo=redo,searchdist=searchdist,rmslim=rmslim,'
-  print,'                refname=refname'
+  print,'                refname=refname,refmaglim=refmaglim'
   error = 'Not enough inputs'
   return
 endif
@@ -2133,12 +2136,12 @@ endif
 
 ; Keeping only REFERENCE stars within the magnitude limit
 if tag_exist(refcat1b,'JMAG') then begin
-  maglim = 16.5
+  if n_elements(refmaglim) gt 0 then maglim=refmaglim else maglim=16.5
   print,'Keeping only REFERENCE stars with JMAG < ',strtrim(maglim,2)
   gd = where(refcat1b.jmag lt maglim,ngd)
   refcat1b = refcat1b[gd]
 endif else begin
-  maglim = 21.0
+  if n_elements(refmaglim) gt 0 then maglim=refmaglim else maglim = 21.0
   print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2)
   if tag_exist(refcat1b,'RMAG') then gd = where(refcat1b.rmag lt maglim,ngd) else $
     gd = where(refcat1b.r1mag lt maglim,ngd)
