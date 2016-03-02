@@ -39,7 +39,7 @@
 ;                for which reference stars (USNO-B1) will be acquired.
 ;                The default is 2*imsize > 60.
 ;  =rmslim    The maximum RMS to allow before the fit is "bad" and
-;                rejected.  The default is wcsrmslim=1.0 arcsec
+;                rejected.  The default is rmslim=1.0 arcsec
 ;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS
@@ -1357,7 +1357,7 @@ endif
 
 ; Defaults
 if n_elements(noupdate) eq 0 then noupdate=0       ; updating the header?
-if n_elements(rmslim) eq 0 then rmslim=1.0         ; maximum RMS to allow
+if n_elements(rmslim) eq 0 then rmslim=1.0         ; maximum RMS to allow in arcsec
 
 
 print,''
@@ -2139,21 +2139,21 @@ endif
 ; Keeping only REFERENCE stars within the magnitude limit
 if tag_exist(refcat1b,'JMAG') then begin
   if n_elements(refmaglim) gt 0 then maglim=refmaglim else maglim=16.5
-  print,'Keeping only REFERENCE stars with JMAG < ',strtrim(maglim,2)
   gd = where(refcat1b.jmag lt maglim,ngd)
+  print,'Keeping only REFERENCE stars with JMAG < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
   refcat1b = refcat1b[gd]
 endif else begin
   if n_elements(refmaglim) gt 0 then maglim=refmaglim else maglim = 21.0
-  print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2)
   if tag_exist(refcat1b,'RMAG') then gd = where(refcat1b.rmag lt maglim,ngd) else $
     gd = where(refcat1b.r1mag lt maglim,ngd)
+  print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
   refcat1b = refcat1b[gd]
 endelse
 
 ; Keeping only DETECTED sources within the magnitude limit
 if n_elements(catmaglim) gt 0 then begin
-  print,'Keeping only DETECTED sources with MAG < ',strtrim(catmaglim,2)
   gdcat = where(cat.mag lt catmaglim,ngdcat)
+  print,'Keeping only DETECTED sources with MAG < ',strtrim(catmaglim,2),' ',strtrim(ngdcat,2),' sources'
   if ngdcat lt 5 then begin
     error = 'Not enough detected sources brighter than '+strtrim(catmaglim,2)+' mag to perform WCS fitting.'
     if not keyword_set(silent) then print,error
@@ -2205,7 +2205,7 @@ if (nastr gt 0) then begin
     ymed = median(ydiff,/even)
     diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
     ;initrms = sqrt(mean(diff^2.0)) * pixscale
-    initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0)
+    initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0) * pixscale
 
     print,'Robust RMS = ',strtrim(initrms,2),' arcsec'
 
@@ -2256,7 +2256,7 @@ if (nastr gt 0) then begin
         xmed = median(xdiff,/even)
         ymed = median(ydiff,/even)
         diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
-        initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0)
+        initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0) * pixscale
         print,'Robust RMS = ',strtrim(initrms,2),' arcsec'
       endif else initrms=999999.
     endif ; good XCORR match
@@ -2305,8 +2305,8 @@ print,''
 
 ; Using just the BRIGHT reference stars
 ;--------------------------------------
-if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
-   (refdensity gt imdensity) then begin
+;if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
+if (nmatch lt 3 or initrms gt 1.5*rmslim) and (refdensity gt imdensity) then begin
 
   ; Sorting by magnitude
   if TAG_EXIST(refcat1b,'JMAG') then begin
