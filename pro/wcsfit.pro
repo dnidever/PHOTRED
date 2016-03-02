@@ -28,6 +28,8 @@
 ;               tags RAJ2000/DEJ2000 or RA/DEC.
 ;  =refmaglim  The reference magnitude limit to use.  The default is 16.5 for 2MASS-PSC
 ;                and 21.0 for USNO-B1.
+;  =catmaglim  The magnitude limit to us for the catalog of detected sources.  The default
+;                is to use all "good" sources.
 ;  =crpix1    The X value of the reference pixel.  The default is the center of the image.
 ;  =crpix2    The Y value of the reference pixel.  The default is the center of the image.
 ;  /noupdate  Do NOT Update the FITS header with the fitted WCS.  The
@@ -1298,7 +1300,7 @@ end
 pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
            cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
            redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
-           refmaglim=refmaglim
+           refmaglim=refmaglim,catmaglim=catmaglim
 
 t0 = systime(1)
 undefine,error
@@ -1309,7 +1311,7 @@ if ninput eq 0 then begin
   print,'Syntax - wcsfit,input,up=up,left=left,pixscale=pixscale,cenra=cenra,cendec=cendec,'
   print,'                cat=cat,refcat=refcat,stp=stp,error=error,projection=projection,'
   print,'                noupdate=noupdate,redo=redo,searchdist=searchdist,rmslim=rmslim,'
-  print,'                refname=refname,refmaglim=refmaglim'
+  print,'                refname=refname,refmaglim=refmaglim,catmaglim=catmaglim'
   error = 'Not enough inputs'
   return
 endif
@@ -2148,6 +2150,17 @@ endif else begin
   refcat1b = refcat1b[gd]
 endelse
 
+; Keeping only DETECTED sources within the magnitude limit
+if n_elements(catmaglim) gt 0 then begin
+  print,'Keeping only DETECTED sources with MAG < ',strtrim(catmaglim,2)
+  gdcat = where(cat.mag lt catmaglim,ngdcat)
+  if ngdcat lt 5 then begin
+    error = 'Not enough detected sources brighter than '+strtrim(catmaglim,2)+' mag to perform WCS fitting.'
+    if not keyword_set(silent) then print,error
+    return
+  endif
+  cat1 = cat[gdcat]
+endif else cat1=cat
 
 ;-----------------------------
 ; FLOWCHART FOR MATCHING STARS
@@ -2178,7 +2191,7 @@ if (nastr gt 0) then begin
   HEAD_ADXY,head,refcat1b.raj2000,refcat1b.dej2000,xref,yref,/degree
 
   dcr = ceil(2.0/pixscale)
-  SRCMATCH,xref,yref,cat.x,cat.y,dcr,ind1,ind2,count=nmatch
+  SRCMATCH,xref,yref,cat1.x,cat1.y,dcr,ind1,ind2,count=nmatch
   ;if nmatch lt 10 then SRCMATCH,xref,yref,cat.x,cat.y,2*dcr,ind1,ind2,count=nmatch
   ;if nmatch lt 10 then SRCMATCH,xref,yref,cat.x,cat.y,4*dcr,ind1,ind2,count=nmatch
 
@@ -2186,8 +2199,8 @@ if (nastr gt 0) then begin
   if (nmatch gt 5) then begin
     print,strtrim(nmatch,2),' MATCHES'
 
-    xdiff = xref[ind1]-cat[ind2].x
-    ydiff = yref[ind1]-cat[ind2].y
+    xdiff = xref[ind1]-cat1[ind2].x
+    ydiff = yref[ind1]-cat1[ind2].y
     xmed = median(xdiff,/even)
     ymed = median(ydiff,/even)
     diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
@@ -2225,7 +2238,7 @@ if (nastr gt 0) then begin
 
     print,'Initial RMS bad or not enough matches.  Trying cross-correlation.'
 
-    MATCHSTARS_XCORR,xref,yref,cat.x,cat.y,xsh,ysh,ang,bestcorr,xcorr,xyscale=4,fwhm=4,$
+    MATCHSTARS_XCORR,xref,yref,cat1.x,cat1.y,xsh,ysh,ang,bestcorr,xcorr,xyscale=4,fwhm=4,$
                      smooth=4,nsig=nsig,matchnum=matchnum,maxshift=maxshift
 
     ; Good XCORR match
@@ -2235,11 +2248,11 @@ if (nastr gt 0) then begin
       yref2 = yref-ysh
 
       dcr = ceil(2.0/pixscale)
-      SRCMATCH,xref2,yref2,cat.x,cat.y,dcr,ind1,ind2,count=nmatch
+      SRCMATCH,xref2,yref2,cat1.x,cat1.y,dcr,ind1,ind2,count=nmatch
 
       if (nmatch gt 10) then begin
-        xdiff = xref[ind1]-cat[ind2].x
-        ydiff = yref[ind1]-cat[ind2].y
+        xdiff = xref[ind1]-cat1[ind2].x
+        ydiff = yref[ind1]-cat1[ind2].y
         xmed = median(xdiff,/even)
         ymed = median(ydiff,/even)
         diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
@@ -2262,7 +2275,7 @@ if (nastr gt 0) then begin
     if nbdind gt 0 then REMOVE,bdind,ind1,ind2
 
     refcat2 = refcat1b[ind1]
-    cat2 = cat[ind2]
+    cat2 = cat1[ind2]
 
     trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
 
@@ -2314,7 +2327,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
   print,''
 
   ; Get the matches
-  MATCHSTARS,refcat1b_bright.x,refcat1b_bright.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+  MATCHSTARS,refcat1b_bright.x,refcat1b_bright.y,cat1.x,cat1.y,ind1,ind2,trans,count=nmatch,$
              rms=matchrms,maxshift=maxshift
 
   ; We successed
@@ -2325,7 +2338,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and $
     nmatch1 = nmatch
 
     ; Transform the stars and match them to ALL the reference stars
-    out = TRANS_COO(cat.x,cat.y,trans)
+    out = TRANS_COO(cat1.x,cat1.y,trans)
     xout = reform(out[0,*])
     yout = reform(out[1,*])
     dcr = (3.0*matchrms > 1.0) < 5.0
@@ -2346,7 +2359,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
   print,'-- Matching Stars.  Using ALL reference stars --'
   print,''
 
-  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+  MATCHSTARS,refcat1b.x,refcat1b.y,cat1.x,cat1.y,ind1,ind2,trans,count=nmatch,$
              rms=matchrms,maxshift=maxshift
 
 endif
@@ -2367,7 +2380,7 @@ if ((nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) and usedheadxy eq 1) then b
   refcat1b.y = y
 
   ; Match the stars
-  MATCHSTARS,refcat1b.x,refcat1b.y,cat.x,cat.y,ind1,ind2,trans,count=nmatch,$
+  MATCHSTARS,refcat1b.x,refcat1b.y,cat1.x,cat1.y,ind1,ind2,trans,count=nmatch,$
              rms=matchrms,maxshift=maxshift
 
 endif
@@ -2382,7 +2395,7 @@ if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin
   print,''
 
   ; Match the stars
-  WCSFIT_DAOMATCH,refcat1b,cat,ind1,ind2,trans,count=nmatch,rms=matchrms
+  WCSFIT_DAOMATCH,refcat1b,cat1,ind1,ind2,trans,count=nmatch,rms=matchrms
 
 endif
 
@@ -2397,7 +2410,7 @@ endif
 
 ; These are the matched catalogs
 refcat2 = refcat1b[ind1]
-cat2 = cat[ind2]
+cat2 = cat1[ind2]
 
 
 
