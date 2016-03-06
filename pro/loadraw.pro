@@ -128,17 +128,34 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
 
     ; Loop through the stars
     for j=0l,numstar-1 do begin
-      instr=' '
+      ;instr=' '
+      instr=''
       instr1=' '
       inline = fltarr(2*nmag+5)
-
+      
       ; Loop through the lines per star
       for k=0l,nstarline-1 do begin
         readf, unit, instr1
+        if k gt 0 then instr1=strmid(instr1,25) ; 2nd and later lines have 25 leading spaces
         instr += instr1
       endfor
 
-      reads,instr,inline
+      ; WRITE (1,111) IDMAST(IMASTR), POSIT1, POSIT2,
+      ; .            ((DATUM(J,I), J=1,2), I=1,NFRM), SUMCHI, SUMSHP
+      ;        111       FORMAT (I7, 2A9, 12F9.4:/ (25X, 12F9.4))
+
+      ; formatted read
+      fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)'
+      id = 0L & x='' & y='' & all=fltarr(2*nmag+2)
+      reads,instr,id,x,y,all,format=fmt
+      inline[0] = id
+      inline[1] = x
+      inline[2] = y
+      inline[3:2*nmag+5-1] = all
+
+      ; old method, causes problems when there are no spaces between values
+      ;reads,instr,inline
+
       mastable[j,0:2*nmag+5-1] = inline[0:2*nmag+5-1]
     endfor
 
