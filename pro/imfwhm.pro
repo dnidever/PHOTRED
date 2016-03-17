@@ -626,7 +626,7 @@ for f=0,nfiles-1 do begin
       ;print,strtrim(nokay,2),'/',strtrim(ngd,2),' sources passed the Gaussian fitting tests'
       ngd = nokay
       gstr2 = gstr[okay]
-   endif
+    endif else ngd=0
 
     ; There are some good stars
     if ngd ge 2 then begin
