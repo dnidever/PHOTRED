@@ -2,7 +2,7 @@
 ; for usemap=1, uses the index in map that corresponds to the above
 ; (-1 if it doesn't occur)
 function wsrad_map, ngrid, a0, a1, a2, map, usemap
-  index = a0 + ngrid*(a1 + ngrid*a2)
+  index = ulong64(a0) + ngrid*(ulong64(a1) + ngrid*ulong64(a2))
   if ~usemap then return, index
   result = value_locate(map, index)
   missing = where(map[result] ne index, nmissing)
