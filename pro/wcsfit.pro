@@ -37,7 +37,7 @@
 ;  =projection The type of WCS projection to use.  "TAN" is used by default.
 ;  =searchdist The area (in arcmin) to be searched.  This is the area
 ;                for which reference stars (USNO-B1) will be acquired.
-;                The default is 2*imsize > 60.
+;                The default is the greater of Xsize, Ysize and 10 arcmin.
 ;  =rmslim    The maximum RMS to allow before the fit is "bad" and
 ;                rejected.  The default is rmslim=1.0 arcsec
 ;  /stp       Stop at the end of the program.
@@ -1970,7 +1970,8 @@ if n_elements(refcat) eq 0 then begin
   if keyword_set(searchdist) then dist=float(searchdist)      ; input value
   ;dist = dist > 60.0      ; get at least 1 degree
   ;dist = dist > 30.0      ; get at least 1/2 degree
-  dist = dist > 45.0      ; get at least 3/4 degree
+  ;dist = dist > 45.0      ; get at least 3/4 degree
+  dist = dist > 10.0       ; get at least 10 arcmin
 
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
@@ -2272,8 +2273,12 @@ if (nastr gt 0) then begin
     refcat1b.x = xref
     refcat1b.y = yref
 
-    ; Remove outliers
-    bdind = where( abs(diff) gt 3.0*initrms,nbdind)
+    ; Remove outliers, need at least 6 to continue
+    ndiff = n_elements(diff)
+    sidiff = sort(diff)
+    difforder = lonarr(ndiff)
+    difforder[sidiff] = lindgen(ndiff)  ; where are they in the ordered list
+    bdind = where( abs(diff) gt 3.0*initrms and difforder gt 5,nbdind)
     if nbdind gt 0 then REMOVE,bdind,ind1,ind2
 
     refcat2 = refcat1b[ind1]
@@ -2290,7 +2295,6 @@ if (nastr gt 0) then begin
   endelse
 
 endif
-
 
 ; Checking the density of stars
 imarea = (info.nx*pixscale/60.0)*(info.ny*pixscale/60.0)
