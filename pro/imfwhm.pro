@@ -22,6 +22,7 @@
 ;  fwhm       The median fwhm of stars in the image.  If multiple
 ;             images are processed then this will be an array.
 ;  If "outfile" is set then the FWHM values are written to this file.
+;  =error     The error message, if one occurred.
 ;
 ; USAGE:
 ;  IDL>imfwhm,'test.fits',fwhm
@@ -91,9 +92,9 @@ if ( (xind+hwidth) ge 0 ) and ( (xind-hwidth) le (nx-1) ) $
   ysm1 = hwidth+ybg1-yind
 
   ; Getting part of the image
-  subim(xsm0:xsm1,ysm0:ysm1) = im(xbg0:xbg1,ybg0:ybg1)
+  subim[xsm0:xsm1,ysm0:ysm1] = im[xbg0:xbg1,ybg0:ybg1]
 
-end
+endif
 
 ;stop
 
@@ -122,14 +123,17 @@ end
 ;--------------------------------------------------------
 
 pro imfwhm,input,fwhm,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
-           head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect
+           head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,error=error
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
+undefine,error
+undefine,fwhm
 
 ; Not enough parameters input
 if ninput eq 0 and nim0 eq 0 then begin
   print,'Syntax - imfwhm,input,fwhm,[im=im,exten=exten,silent=silent,stp=stp]'
+  error = 'Not enough inputs'
   return
 endif
 
@@ -167,7 +171,8 @@ if n_elements(outfile) gt 0 then $
   openw,unit,/get_lun,outfile
 
 ; Looping through the files
-for f=0,nfiles-1 do begin
+error = strarr(nfiles)
+FOR f=0,nfiles-1 do begin
 
   fwhm = 99.99  ; bad until proven good
 
@@ -177,16 +182,18 @@ for f=0,nfiles-1 do begin
     ; Test that file exists
     test = FILE_TEST(files[f])
     if (test eq 0) then begin
-      print,files[f],' NOT FOUND'
+      error[f] = files[f]+' NOT FOUND'
+      if not keyword_set(silent) then print,error[f]
       goto,SKIP
     endif
 
     message=''
-    FITS_READ,files(f),im,head,/no_abort,exten=exten,message=message
+    FITS_READ,files[f],im,head,/no_abort,exten=exten,message=message
 
     ; Fits_read error
     if (message ne '') then begin
-      print,files[f],' ERROR: ',message
+      error[f] = files[f]+' ERROR: '+message
+      if not keyword_set(silent) then print,error[f]
       goto,SKIP
     endif
 
@@ -235,10 +242,11 @@ for f=0,nfiles-1 do begin
     ; sometimes "bad" pixels are exactly 0.0
     gdpix = where(im lt satlim*0.95 and im ne 0.0,ngdpix)
     if ngdpix lt 2 then begin
-      print,files[f],' NOT ENOUGH GOOD PIXELS'
+      error[f] = files[f]+' NOT ENOUGH GOOD PIXELS'
+      if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
-      return  
-    end
+      goto,SKIP  ; go to next image 
+    endif
 
     ; Computing sky level and sigma
     sky,im[gdpix],skymode,skysig1,/silent
@@ -341,31 +349,19 @@ for f=0,nfiles-1 do begin
     ; Must be a maximum, 8*sig above the background, but 1/2 the maximum (saturation)
     niter = 0
     detection:
+    if niter gt 0 then bpmask=bpmask_orig   ; restore bpmask since we modify it below to specify these pixels as "done"
     diffth = 0.0 ;skysig  ; sigmap
     ind = where(diffx1 gt diffth and diffx2 gt diffth and diffy1 gt diffth and diffy2 gt diffth $
                    and (im2 gt (nsig*sigmap)) and (im lt 0.5*max),nind)
     ;ind = where(diffx1 gt 0 and diffx2 gt 0 and diffy1 gt 0 and diffy2 gt 0 $
     ;               and (im gt (skymode+nsig*skysig)) and (im lt 0.5*max),nind)
 
-
-    ; No stars this way
-    ;if nind lt 2 then begin
-    ;  find,im2,xx,yy,flux,sharp,round,5*skysig,5.0,[-1,1],[0.2,1.0],/silent
-    ;  nind = n_elements(xx)
-    ;  xind = round(xx)
-    ;  yind = round(yy)
-    ;  ind2 = transpose( [[xind],[yind]])
-    ;endif else begin
-    ;  ind2 = array_indices(im,ind)
-    ;  xind = reform(ind2[0,*])
-    ;  yind = reform(ind2[1,*])
-    ;endelse
-
     ; No "stars" found
     if nind lt 2 then begin
-      print,files[f],' NO STARS FOUND'
+      error[f] = files[f]+' NO STARS FOUND'
+      if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
-      return
+      goto,SKIP
     endif
     ind2 = array_indices(im,ind)
     xind = reform(ind2[0,*])
@@ -375,44 +371,32 @@ for f=0,nfiles-1 do begin
     offs = 10       ; 1/2 width of small subimage
     minfrac = 0.5   ; minimum fraction that neighbors need to be of the central pixel
 
-    ; Creating arrays
-    backgarr = fltarr(nind)
-    ;cenvalarr = fltarr(nind)
-    fluxarr = fltarr(nind)
-    ;magarr = fltarr(nind)
-    fwhmarr = fltarr(nind)-1
-    xcenarr = fltarr(nind)
-    ycenarr = fltarr(nind)
-    roundarr = fltarr(nind)
-    maxarr = fltarr(nind)
-    eliparr = fltarr(nind)
-    ;lofracarr = fltarr(nind)
-    nbelowarr = fltarr(nind)
-    ;sigxarr = fltarr(nind)
-    ;sigyarr = fltarr(nind)
+    ; Creating peak structure
+    peakstr = replicate({backg:0.0,flux:-1.0,fwhm:-1.0,xcen:0.0,ycen:0.0,round:0.0,max:0.0,elip:0.0,nbelow:0.0},nind)
 
-    ; Loop through the stars
+    ; Loop through the peaks
     for i=0LL,nind-1 do begin
 
       ; Checking neighboring pixels
       ; Must >50% of central pixel
-      cen = im2[ind2[0,i],ind2[1,i]]
-      xlo = (ind2[0,i]-1) > 0
-      xhi = (ind2[0,i]+1) < (nx-1)
-      ylo = (ind2[1,i]-1) > 0
-      yhi = (ind2[1,i]+1) < (ny-1)
+      cen = im2[xind[i],yind[i]]
+      xlo = (xind[i]-1) > 0
+      xhi = (xind[i]+1) < (nx-1)
+      ylo = (yind[i]-1) > 0
+      yhi = (yind[i]+1) < (ny-1)
       nbrim = im2[xlo:xhi,ylo:yhi]
       lofrac = min(nbrim/cen)
       nbelow = total(float(nbrim/max(nbrim) le minfrac))
-      nbelowarr[i] = nbelow
+      ;nbelowarr[i] = nbelow
+      peakstr[i].nbelow = nbelow
       ;cenvalarr[i] = cen
 
       ; Checking the bad pixel mask
-      bpmask2 = get_subim(bpmask,ind2[0,i],ind2[1,i],offs)
+      bpmask2 = get_subim(bpmask,xind[i],yind[i],offs)
       nbadpix = total(bpmask2)
 
       ; Smaller image
-      subims = get_subim(im2,ind2[0,i],ind2[1,i],5)
+      subims = get_subim(im2,xind[i],yind[i],5)
       maxsubims = max(subims)
 
       maxnbrim = max(nbrim)  ; maximum within +/-1 pixels
@@ -422,19 +406,20 @@ for f=0,nfiles-1 do begin
       ;  -Not a cosmic ray
       ;  -Must be the maximum within +/-5 pix
       ;  -Not close to the edge
-      ;if (nbadpix eq 0) and (lofrac gt minfrac) and (im2[ind2[0,i],ind2[1,i]] ge maxsubims) and $
-      ;if (nbadpix eq 0) and (nbelow lt 7) and (im2[ind2[0,i],ind2[1,i]] ge maxsubims) and $
+      ;if (nbadpix eq 0) and (lofrac gt minfrac) and (im2[xind[i],yind[i]] ge maxsubims) and $
+      ;if (nbadpix eq 0) and (nbelow lt 7) and (im2[xind[i],yind[i]] ge maxsubims) and $
       if (nbadpix eq 0) and (nbelow lt 7) and (maxnbrim ge maxsubims) and $
-         (ind2[0,i] gt offs) and (ind2[0,i] lt (nx-offs-1)) and (ind2[1,i] gt offs) and $
-         (ind2[1,i] lt (ny-offs-1)) then begin
+         (xind[i] gt offs) and (xind[i] lt (nx-offs-1)) and (yind[i] gt offs) and $
+         (yind[i] lt (ny-offs-1)) then begin
 
-        background = backgim[ind2[0,i],ind2[1,i]]
+        background = backgim[xind[i],yind[i]]
 
         ; Getting Large image
-        subimL = get_subim(im2,ind2[0,i],ind2[1,i],offL,background)
+        subimL = get_subim(im2,xind[i],yind[i],offL,background)
 
         ; Local background in image
-        backgarr[i] = median(subimL)
+        ;backgarr[i] = median(subimL)
+        peakstr[i].backg = median(subimL)
 
         ; Getting small image
         subimS = get_subim(subimL,offL,offL,offS)
@@ -450,7 +435,8 @@ for f=0,nfiles-1 do begin
         maxim = max(subim)
 
         ; What is the flux and magnitude
-        fluxarr[i] = total(subimS-median(subimL))
+        ;fluxarr[i] = total(subimS-median(subimL))
+        peakstr[i].flux = total(subimS-median(subimL))
         ;magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
 
         ; Getting the contours
@@ -462,8 +448,10 @@ for f=0,nfiles-1 do begin
         xmnpath = mean(xpath)
         ymnpath = mean(ypath)
 
-        xcenarr[i] = xcen+xlo
-        ycenarr[i] = ycen+ylo
+        ;peakstr[i].xcen = xcen+xlo  ; THIS WAS WRONG!!
+        ;peakstr[i].ycen = ycen+ylo
+        peakstr[i].xcen = xcen + (xind[i]-offS)
+        peakstr[i].ycen = ycen + (yind[i]-offS)
 
         ; Calculating the FWHM
         dist = sqrt((xpath-xmnpath)^2.0 + (ypath-ymnpath)^2.0)  
@@ -471,20 +459,11 @@ for f=0,nfiles-1 do begin
 
         ; Measuring "ellipticity"
         elip = stdev(dist-fwhm)/fwhm
-        eliparr(i) = elip
+        peakstr[i].elip = elip
 
-        ; THIS GAUSSIAN FITTIN TAKES TOO LONG
-        ; Fitting Gaussian
-        ; par = [constant, ht, sigx, sigy, xcen, ycen,0.0]
-        ;est = [background,maxim-background,fwhm/2.35,fwhm/2.35,xcen,ycen,0.0]
-        ;model = mpfit2dpeak(subims,par,/gaussian,/quiet,estimates=est,chisq=chisq)
-        ;chi = sqrt(chisq)/(2.*offs+1.)^2.   ; sqrt(chisq)/N
-        ;sigxarr[i] = par[2]*2.35
-        ;sigyarr[i] = par[3]*2.35
-
-        ; Putting it in the arrays
-        fwhmarr[i] = fwhm
-        maxarr[i] = maxim
+        ; Putting it in the structure
+        peakstr[i].fwhm = fwhm
+        peakstr[i].max = maxim
 
         ; Computing the "round" factor
         ; round = difference of the heights of the two 1D Gaussians
@@ -498,36 +477,32 @@ for f=0,nfiles-1 do begin
         hty = max(total(subim,2))
         round = abs(htx-hty)/mean([htx,hty])
 
-        roundarr(i) = round
+        peakstr[i].round = round
 
         ; Making these pixels "bad pixels" so they won't be used again
-        xlo = ( 0 > (ind2(0,i)+xcen2-offS) )
-        xhi = ( (nx-1) < (ind2(0,i)+xcen2+offS) )
-        ylo = ( 0 > (ind2(1,i)+ycen2-offS) )
-        yhi = ( (ny-1) < (ind2(1,i)+ycen2+offS) )
+        xlo = ( 0 > (xind[i]+xcen2-offS) )
+        xhi = ( (nx-1) < (xind[i]+xcen2+offS) )
+        ylo = ( 0 > (yind[i]+ycen2-offS) )
+        yhi = ( (ny-1) < (yind[i]+ycen2+offS) )
         bpmask[xlo:xhi,ylo:yhi] = 1.0
 
-        ;if fwhm lt 3 and abs(round) lt 0.2 then stop
-
-        ;stop
-
-        ;if xind[i] gt 3000 then stop
-
      endif                      ; good so far
-
-    endfor ; for i
+    endfor ; peak loop
 
     ; Getting the good ones:
     ;  -If they were bad then FWHM=0
     ;  -Making sure they are "round" stars
     ;  -Ellipticity is low
-    ;gd = where(fwhmarr ne 0.0 and roundarr lt 0.2 and eliparr lt 0.5,ngd)
-    ;gd = where(fwhmarr ne 0.0 and roundarr lt 0.3 and eliparr lt 0.5,ngd)
-    gd = where(fwhmarr gt 0.0 and roundarr lt 0.3 and eliparr lt 0.5 and $
-               fluxarr gt 0.0,ngd)
+    ;;gd = where(fwhmarr ne 0.0 and roundarr lt 0.2 and eliparr lt 0.5,ngd)
+    ;;gd = where(fwhmarr ne 0.0 and roundarr lt 0.3 and eliparr lt 0.5,ngd)
+    ;gd = where(fwhmarr gt 0.0 and roundarr lt 0.3 and eliparr lt 0.5 and $
+    ;           fluxarr gt 0.0,ngd)
+    gd = where(peakstr.fwhm gt 0.0 and peakstr.round lt 0.3 and peakstr.elip lt 0.5 and $
+               peakstr.flux gt 0.0,ngd)
 
     ; If no stars fit this criteria then make it more conservative
-    if ngd eq 0 then gd = where(fwhmarr gt 0.0 and roundarr lt 1.0,ngd)
+    ;if ngd eq 0 then gd = where(fwhmarr gt 0.0 and roundarr lt 1.0,ngd)
+    if ngd eq 0 then gd = where(peakstr.fwhm gt 0.0 and peakstr.round lt 1.0,ngd)
 
     ; Retry with lower detection limit
     if ngd lt 10 and niter lt 5 and nsig gt 2 then begin
@@ -538,21 +513,24 @@ for f=0,nfiles-1 do begin
     endif
 
     if ngd eq 0 then begin
+      error[f] = 'No good sources detected'
+      if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
-      return
+      goto,SKIP
     endif
 
-    ; WE COULD USE FIND.PRO HERE TO GET GOOD STARS
 
-    ; Fit Gaussians to the sources
+    ; Fit Gaussians to the good sources
+    ;------------------------------------
     sz = size(im)
     x = lindgen(sz[1])
     y = lindgen(sz[2])
-    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:0.0,dof:0L,status:0L,fwhm:0.0},ngd)
-    gstr.x = xcenarr[gd]
-    gstr.y = ycenarr[gd]
+    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:999999.0,dof:-1L,status:0L,fwhm:0.0},ngd)
+    gstr.x = peakstr[gd].xcen
+    gstr.y = peakstr[gd].ycen
     For i=0,ngd-1 do begin
 
+      peakstr1 = peakstr[gd[i]]
       ix = gstr[i].x
       iy = gstr[i].y
       xlo = (round(ix)-10)>0
@@ -564,39 +542,54 @@ for f=0,nfiles-1 do begin
       yarr = y[ylo:yhi]
 
       parinfo = replicate({limited:[0,0],limits:[0,0],fixed:0},7)
+      parinfo[1].limited=[1,1]
+      parinfo[1].limits=[0,max(subim)*2]   ; only positive peaks
       parinfo[4].limited=[1,1]    ; constrain X and Y
       ;parinfo[4].limits=[-1,1]+ix
       parinfo[4].limits = [min(xarr),max(xarr)]
       parinfo[5].limited=[1,1]
       ;parinfo[5].limits=[-1,1]+iy
       parinfo[5].limits = [min(yarr),max(yarr)]
-      ;estimates = []
-      fit = MPFIT2DPEAK(subim,pars,xarr,yarr,chisq=chisq,dof=dof,perror=perror,/gaussian,$
+      estimates = [peakstr1.backg, (peakstr1.max-peakstr1.backg) > 0.5,  peakstr1.fwhm/2.35 > 0.5, peakstr1.fwhm/2.35 > 0.5,$
+                   ix, iy, 0.0]
+      fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,$
                         parinfo=parinfo,status=status)
-      gstr[i].x = ix
-      gstr[i].y = iy
-      gstr[i].pars = pars
-      gstr[i].perror = perror
-      gstr[i].chisq = chisq
-      gstr[i].dof = dof
       gstr[i].status = status
-      gstr[i].fwhm = 0.5*(pars[2]+pars[3]) * 2  ; FWHM=average of half-widths (times 2)
+      if status gt 0 then begin
+        gstr[i].x = ix
+        gstr[i].y = iy
+        gstr[i].pars = pars
+        gstr[i].perror = perror
+        gstr[i].chisq = chisq
+        gstr[i].dof = dof
+        gstr[i].fwhm = 0.5*(pars[2]+pars[3]) * 2  ; FWHM=average of half-widths (times 2)
       
-      ; The 2D Gaussian parameters are:
-      ;   A(0)   Constant baseline level
-      ;   A(1)   Peak value
-      ;   A(2)   Peak half-width (x) -- gaussian sigma or half-width at half-max
-      ;   A(3)   Peak half-width (y) -- gaussian sigma or half-width at half-max
-      ;   A(4)   Peak centroid (x)
-      ;   A(5)   Peak centroid (y)
-      ;   A(6)   Rotation angle (radians) if TILT keyword set
+        ; The 2D Gaussian parameters are:
+        ;   A(0)   Constant baseline level
+        ;   A(1)   Peak value
+        ;   A(2)   Peak half-width (x) -- gaussian sigma or half-width at half-max
+        ;   A(3)   Peak half-width (y) -- gaussian sigma or half-width at half-max
+        ;   A(4)   Peak centroid (x)
+        ;   A(5)   Peak centroid (y)
+        ;   A(6)   Rotation angle (radians) if TILT keyword set
 
-      ;display,subim,position=[0,0,0.5,1.0]
-      ;display,fit,position=[0.5,0,1.0,1.0],/noerase
-      ;wait,0.5
-      ;stop
+        ;display,subim,position=[0,0,0.5,1.0]
+        ;display,fit,position=[0.5,0,1.0,1.0],/noerase
+        ;wait,0.5
+      endif
 
     Endfor
+
+    ; Some Gaussian fits converged
+    gdgstr = where(gstr.status gt 0,ngdgstr)
+    if ngdgstr gt 0 then begin
+      gstr = gstr[gdgstr]  ; only keep the good ones
+    endif else begin    ; none converged
+      error[f] = 'No Gaussian fits converged'
+      if not keyword_set(silent) then print,error[f]
+      fwhm = 99.99
+      goto,SKIP
+    endelse
 
     ; Now pick out the "good" ones
     medpar2 = MEDIAN([gstr.pars[2]])
@@ -697,11 +690,11 @@ for f=0,nfiles-1 do begin
     if n_elements(outfile) gt 0 then $
       printf,unit,format=form,files[f],fwhm
 
-  end ; file exists
+  endif     ; file exists
 
   SKIP:
 
-end ; for f
+ENDFOR ; for f
 
 ; Closing output file
 if n_elements(outfile) gt 0 then begin
@@ -712,6 +705,10 @@ endif
 ; Copy ALLFWHM to FWHM
 fwhm = allfwhm
 if n_elements(fwhm) eq 1 then fwhm=fwhm[0]
+
+; Were there any errors
+bderror = where(error ne '',nbderror)
+if nbderror eq 0 then undefine,error
 
 if keyword_set(stp) then stop
 
