@@ -670,7 +670,7 @@ FOR i=0,nfilters-1 do begin
       ; Stuff in the information
       temp.frame = iframe
       temp.frameid = iframe+'-'+strtrim(cat.id,2)
-      temp.id = cat.(cidind)
+      temp.id = strtrim(cat.(cidind),2)
       temp.night = inight
       temp.mag = cat.mag + 2.5*alog10(exptime)   ; CORRECT for exposure time!!!
       temp.err = cat.err
