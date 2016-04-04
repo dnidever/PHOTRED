@@ -460,6 +460,14 @@ FOR i=0,nfilters-1 do begin
         goto,BOMB
       endif
 
+      ; Get MJD night number
+      mjd = PHOTRED_GETMJD(fitsfile,observatory)
+      if (mjd le 0) then begin
+        PUSH,failurelist,longfile
+        printlog,logfile,'NO MJD for ',fitsfile
+        goto,BOMB
+      endif
+      
       ; Get UT-TIME
       uttime = PHOTRED_GETUTTIME(fitsfile)
       if (uttime eq '') then begin
@@ -540,7 +548,7 @@ FOR i=0,nfilters-1 do begin
         bdval = where(cat.mag gt 90,nbdval)
         if nbdval gt 0 then cat[bdval].mag=99.9999
 
-      End  ; DDO51 radial offset
+      Endif  ; DDO51 radial offset
 
 
       ; Figure out what calibrated magnitudes are in the CAT file
@@ -644,7 +652,7 @@ FOR i=0,nfilters-1 do begin
       dum = CREATE_STRUCT(dum,usemagerrname,0.0)
       dum = CREATE_STRUCT(dum,usecolname,0.0)
       dum = CREATE_STRUCT(dum,usecolerrname,0.0)
-      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0)
+      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0)
       if TAG_EXIST(cat,'RPIX') then $
         dum=CREATE_STRUCT(dum,'RPIX',0.0,'XB',0.0,'YB',0.0,'DDO51_RADOFFSET',0.0)
       temp = REPLICATE(dum,ncat)
@@ -704,6 +712,7 @@ FOR i=0,nfilters-1 do begin
       temp.airmass = airmass
 
       temp.nightcount = lindgen(ncat)+nthisnight+1
+      temp.mjd = mjd
       temp.ut = uttime
       temp.weight = weight
 
@@ -748,9 +757,9 @@ FOR i=0,nfilters-1 do begin
                         failurelist=failurelist,/silent
 
 
-    End ; files loop
+    Endfor ; files loop
 
-  End ; night loop
+  Endfor ; night loop
 
 
   ; We have a combined CAT structure
@@ -804,7 +813,7 @@ FOR i=0,nfilters-1 do begin
                     failurelist=failurelist,/silent
 
 
-END ; filter loop
+ENDFOR ; filter loop
 
 
 
