@@ -394,7 +394,7 @@ WHILE (flag ne 1) do begin
     parinfo[npar-1].fixed = 1
   endif  
 
-  par[0:nnights-1] = median(tarr.mag-tarr.cmag)
+  par[0:nnights-1] = median([tarr.mag-tarr.cmag])
 
   fpar = MPFIT(func,par,functargs=fa,status=status,perror=perror,bestnorm=chisq,$
                parinfo=parinfo,dof=dof,autoderivative=1,ftol=ftol,/quiet)
