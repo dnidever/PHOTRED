@@ -244,7 +244,7 @@ endelse
 ; Getting NIGHT and FILTER information
 ;-------------------------------------
 jdarr = fltarr(ninputlines)
-mjdarr = lonarr(inputlines)
+mjdarr = lonarr(ninputlines)
 filtarr = strarr(ninputlines)
 objarr = strarr(ninputlines)
 calibarr = intarr(ninputlines)
@@ -281,7 +281,7 @@ FOR i=0,ninputlines-1 do begin
 
   ; Get MJD night number
   mjdarr[i] = PHOTRED_GETMJD(file,observatory)
-  
+
   ; Is this a calibration image (bias, flat, etc.)?
   ;------------------------------------------------
   ; zero in name?
@@ -339,7 +339,7 @@ if (ngd gt 0) then begin
   ;jdlocal2 = jdlocal-minjd
   ;night = floor(jdlocal2)+1
   night = mjdarr-min(mjdarr)+1
-  
+
   ; unique nights
   ui = uniq(night[gd],sort(night[gd])) ; only care about object frames
   nights = night[gd[ui]]
