@@ -244,6 +244,7 @@ endelse
 ; Getting NIGHT and FILTER information
 ;-------------------------------------
 jdarr = fltarr(ninputlines)
+mjdarr = lonarr(inputlines)
 filtarr = strarr(ninputlines)
 objarr = strarr(ninputlines)
 calibarr = intarr(ninputlines)
@@ -278,6 +279,9 @@ FOR i=0,ninputlines-1 do begin
   jd = JULDAY(month,day,year,hour,min,sec)
   jdarr[i] = jd
 
+  ; Get MJD night number
+  mjdarr[i] = PHOTRED_GETMJD(file,observatory)
+  
   ; Is this a calibration image (bias, flat, etc.)?
   ;------------------------------------------------
   ; zero in name?
@@ -327,17 +331,20 @@ if (ngd gt 0) then begin
 
   ; Getting unique NIGHTS
   ;----------------------
-  ; Correct to LOCAL time
-  timeoff = obs_struct.tz
-  jdlocal = jdarr - timeoff/24.0
-  minjd = floor(min(jdlocal))
-  ; JD starts at NOON, so 0.5 is midnight
-  jdlocal2 = jdlocal-minjd
-  night = floor(jdlocal2)+1
-  ui = uniq(night[gd],sort(night[gd]))  ; only care about object frames
+  ;; Correct to LOCAL time
+  ;timeoff = obs_struct.tz
+  ;jdlocal = jdarr - timeoff/24.0
+  ;minjd = floor(min(jdlocal))
+  ;; JD starts at NOON, so 0.5 is midnight
+  ;jdlocal2 = jdlocal-minjd
+  ;night = floor(jdlocal2)+1
+  night = mjdarr-min(mjdarr)+1
+  
+  ; unique nights
+  ui = uniq(night[gd],sort(night[gd])) ; only care about object frames
   nights = night[gd[ui]]
   nnights = n_elements(nights)
-
+  
   seqnight = intarr(ninputlines)-1      ; nights in a sequence, 1, 2, 3, etc...
 
   ; Make sequential night numbers
@@ -345,14 +352,13 @@ if (ngd gt 0) then begin
     inight = night[gd[i]]
     nightind = where(nights eq inight,nnightind)
     seqnight[gd[i]] = nightind[0]+1
-  end
+  endfor
+
+endif
 
 
-end
 
-
-
-; Initialzing some arrays
+; Initializing some arrays
 newfilearr = strarr(ninputlines)
 
 
@@ -454,7 +460,7 @@ FOR i=0,ninputlines-1 do begin
                       failurelist=failurelist,/silent
   ;stop
 
-END
+ENDFOR
 printlog,logfile,'-------------------------------------------------------------------------------------------------------------'
 
 
