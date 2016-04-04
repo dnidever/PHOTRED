@@ -531,7 +531,6 @@ if keyword_set(logfile) then logf=logfile else logf=-1
 
 
 ; Testing the files
-
 test = file_test(inpfile)
 if test eq 0 then begin
   print,'FILE ',inpfile,' DOES NOT EXIST'
@@ -547,19 +546,20 @@ if ninptrans gt 0 then begin
   numbands = n_elements(trans)
 
   printlog,logf,' TRANSFORMATION EQUATIONS'
-  printlog,logf,'------------------------------------------------------------------'
-  printlog,logf,' BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
-  printlog,logf,'------------------------------------------------------------------'
-  for i=0,numbands-1 do begin
-    form = '(A-5,A8,F10.4,F10.4,F10.4,F10.4,F10.4)'
-    printlog,logf,format=form,'  '+trans[i].band,trans[i].color,trans[i].zpterm,trans[i].amterm,$
-                      trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-    printlog,logf,format=form,'','',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
+  printlog,logf,'--------------------------------------------------------------------------------'
+  printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'--------------------------------------------------------------------------------'
+  for i=0,ntrans-1 do begin
+    form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                      trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    form2 = '(A28,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
                       trans[i].amcoltermsig,trans[i].colsqtermsig
-  end
-  printlog,logf,'------------------------------------------------------------------'
+  endfor
+  printlog,logf,'--------------------------------------------------------------------------------'
   printlog,logf,''
-
+  
 ; Loading transformation equations from file
 endif else begin
 
@@ -582,8 +582,8 @@ endelse
 
 ;###############################
 ;# READ THE INPUT FILE
-;# Read in the input file which has the following information:
-;# photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1 aperture correction, Band2 ...
+;# Read in the input file which metadata information for each
+;#   band/exposure in the RAW input photometry files
 inparr = importascii(inpfile,/noprint)
 ninp = n_elements(inparr)
 
@@ -591,16 +591,49 @@ tags = tag_names(inparr)
 ntags = n_elements(tags)
 
 ; Transferring to a more user-friendly structure
-numobs = (ntags-1)/4
-dum = {magfile:'',outfile:'',band:strarr(numobs),airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
-input = replicate(dum,ninp)
-input.magfile = strtrim(inparr.(0),2)
-for i=0,numobs-1 do begin
-  input.band[i] = strtrim(inparr.(1+i*4),2)
-  input.airmass[i] = double(inparr.(2+i*4))
-  input.exptime[i] = double(inparr.(3+i*4))
-  input.apcorr[i] = double(inparr.(4+i*4))
-end
+dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(nuobs),band:strarr(numobs),$
+       airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
+
+; Old or New format, check if the second value is
+;   an integer (new format, NIGHT) or character (old format, band/filter name)
+;  All lines need to use the same format (old or new)
+newformat = valid_num(inparr[0].(1),/integer)
+
+
+; --- NEW Format ----
+; added NIGHT and CHIP for each band/exposure
+; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture correction, Band2 ...
+if newformat then begin
+
+  numobs = (ntags-1)/6
+  input = replicate(dum,ninp)
+  input.magfile = strtrim(inparr.(0),2)
+  for i=0,numobs-1 do begin
+    input.night[i] = strtrim(inparr.(1+i*6),2)
+    input.chip[i] = strtrim(inparr.(2+i*6),2)
+    input.band[i] = strtrim(inparr.(3+i*6),2)
+    input.airmass[i] = double(inparr.(4+i*6))
+    input.exptime[i] = double(inparr.(5+i*6))
+    input.apcorr[i] = double(inparr.(6+i*6))
+  endfor
+
+; --- OLD Format ----
+; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1 aperture correction, Band2 ...
+endif else begin
+
+  numobs = (ntags-1)/4
+  input = replicate(dum,ninp)
+  input.magfile = strtrim(inparr.(0),2)
+  for i=0,numobs-1 do begin
+    input.night[i] = 1   ; dummy value
+    input.chip[i] = 1  ; dummy value
+    input.band[i] = strtrim(inparr.(1+i*4),2)
+    input.airmass[i] = double(inparr.(2+i*4))
+    input.exptime[i] = double(inparr.(3+i*4))
+    input.apcorr[i] = double(inparr.(4+i*4))
+  endfor
+endelse
+
 
 ; Making the output filename
 ext = 'phot'
@@ -610,7 +643,7 @@ for i=0,ninp-1 do begin
   narr = n_elements(arr)
   outfile = strjoin(arr[0,narr-2],'')+'.'+ext
   input[i].outfile = outfile
-end
+endfor
 
 if not keyword_set(silent) then begin
   printlog,logf,'Running PHOTCALIB on ',strtrim(ninp,2),' input files'
@@ -646,6 +679,10 @@ FOR i=0L,ninp-1 do begin
   ; Print file info
   if not keyword_set(silent) then begin
     printlog,logf,format='(A-9,A-20)','FILE ',input[i].magfile
+    if newformat then begin
+      printlog,logf,format='(A-9,'+strtrim(numobs,2)+'I-7)','NIGHT',input[i].night
+      printlog,logf,format='(A-9,'+strtrim(numobs,2)+'I-7)','CHIP',input[i].chip
+    endif
     printlog,logf,format='(A-9,'+strtrim(numobs,2)+'A-7)','BAND',input[i].band
     printlog,logf,format='(A-9,'+strtrim(numobs,2)+'F-7.4)','AIRMASS',input[i].airmass
     printlog,logf,format='(A-9,'+strtrim(numobs,2)+'F-7.1)','EXPTIME',input[i].exptime
@@ -665,10 +702,7 @@ FOR i=0L,ninp-1 do begin
     ncol = n_tags(phot)
     nextra = ncol - 2*numobs
     mastable = dblarr(numstar,2*numobs+nextra)
-    for j=0,ncol-1 do begin
-      mastable[*,j] = phot.(j)
-    end
-
+    for j=0,ncol-1 do mastable[*,j] = phot.(j)
 
   ; Daophot/ALLframe input
   Endif else begin
@@ -746,42 +780,30 @@ FOR i=0L,ninp-1 do begin
 
   ;########################
   ;# Making the transformation structure for the bands of this input file
-  trans2 = replicate(trans[0],numobs)
+  mastrans = replicate(trans[0],numobs)
 
   ; Associate each observed passband with each trans band
   for j=0,numobs-1 do begin
-    gd = where(trans.band eq inp.band[j],ngd)
-
-    ;if (ngd eq 0) then begin
-    ;
-    ;  ; Checking for I=T2
-    ;  if inp.band[j] eq 'I' then begin
-    ;    gd = where(trans.band eq 'T',ngd)
-    ;    if ngd eq 0 then gd = where(trans.band eq 'T2',ngd)
-    ;  endif
-    ;
-    ;  ; Checking T2=I
-    ;  if inp.band[j] eq 'T2' or inp.band[j] eq 'T' then begin
-    ;    gd = where(trans.band eq 'I',ngd)
-    ;  endif
-    ;endif
+    ;gd = where(trans.band eq inp.band[j],ngd)
+    gd = where(trans.night eq inp.night[j] and trans.chip eq inp.chip[j] and trans.band eq inp.bandj],ngd)
 
     ; Found the transformation for this band
     if (ngd gt 0) then begin
-      trans2[j] = trans[gd[0]]
+      mastrans[j] = trans[gd[0]]
     endif else begin
-      printlog,logf,'NO TRANSFORMATION INPUT FOR ',inp.band[j]
+      printlog,logf,'NO TRANSFORMATION INPUT FOR  NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
+                strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
       return
     endelse
 
     ; Check that the color exists
-    gdcol = where(inp.band eq trans2[j].colband,ngdcol)
+    gdcol = where(inp.band eq mastrans[j].colband,ngdcol)
     if (ngdcol eq 0) then begin
-      printlog,logf,trans2[j].colband,' BAND NOT FOUND. CANNOT FORM ',trans2[j].color,' COLOR FOR BAND ',inp.band[j]
+      printlog,logf,mastrans[j].colband,' BAND NOT FOUND. CANNOT FORM ',mastrans[j].color,' COLOR FOR BAND ',inp.band[j]
       return
     endif
 
-  end
+  endfor
 
 
 
@@ -793,7 +815,7 @@ FOR i=0L,ninp-1 do begin
   ; and then brought out as an average solution (goodstar) and individual measures
   ; (indystar).  After that, frame to frame residuals are calculated
   ; indystar is where the individual solved magnitudes will be stored
-  SOLVESTAR,mastable,trans2,inp,goodstar
+  SOLVESTAR,mastable,mastrans,inp,goodstar
 
 
   ;########################
@@ -801,21 +823,19 @@ FOR i=0L,ninp-1 do begin
   ;########################
 
   ; Getting the unique passbands
-  ;ui = uniq(trans2.band)
-  ui = uniq(trans2.band,sort(trans2.band))
+  ;ui = uniq(mastrans.band)
+  ui = uniq(mastrans.band,sort(mastrans.band))
   ui = ui[sort(ui)]
-  ubands = trans2[ui].band
+  ubands = mastrans[ui].band
   nubands = n_elements(ubands)
 
   ;--------------
   ; Head columns 
   ;--------------
   finalstar = goodstar[*,0:2]
-  ;headline = '    ID       X         Y     '
-  ;;format = '(2X,I5,2F9.3'
-  ;format = '(2X,I5,2F10.3'
-  headline = '       ID       X         Y     '
-  format = '(2X,I8,2F10.3'
+  headline = '    ID       X         Y     '
+  ;format = '(2X,I5,2F9.3'
+  format = '(2X,I5,2F10.3'
 
 
   ;--------------------------------------------
@@ -834,7 +854,7 @@ FOR i=0L,ninp-1 do begin
     instroutband = strarr(numobs)
     instrouterr = strarr(numobs)
     for j=0,nubands-1 do begin
-      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      gdbands = where(mastrans.band eq ubands[j],ngdbands)
       
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
@@ -883,7 +903,7 @@ FOR i=0L,ninp-1 do begin
     outband = strarr(numobs)
     outerr = strarr(numobs)
     for j=0,nubands-1 do begin
-      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      gdbands = where(mastrans.band eq ubands[j],ngdbands)
       
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
@@ -927,7 +947,7 @@ FOR i=0L,ninp-1 do begin
     ;multioutband = strarr(numobs)
     ;multiouterr = strarr(numobs)
     for j=0,nubands-1 do begin
-      gdbands = where(trans2.band eq ubands[j],ngdbands)
+      gdbands = where(mastrans.band eq ubands[j],ngdbands)
       
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
@@ -958,7 +978,7 @@ FOR i=0L,ninp-1 do begin
       ; Looping through the unique bands
       for j=0,nmultibands-1 do begin
 
-        gdband = where(trans2.band+'MAG' eq multibands[j],ngdband)
+        gdband = where(mastrans.band+'MAG' eq multibands[j],ngdband)
 
         ; Multiple exposures in this band
         if (ngdband gt 1) then begin
@@ -1090,7 +1110,7 @@ FOR i=0L,ninp-1 do begin
   BOMB:
 
 
-END ; loop through the magnitude files
+ENDFOR ; loop through the magnitude files
 
 if not keyword_set(silent) then printlog,logf,'PHOTCALIB FINISHED'
 

@@ -1,7 +1,3 @@
-pro photred_photcalib_prep,mchfile,apcor,outfile,silent=silent,$
-                           error=error,observatory=observatory,$
-                           photfile=photfile
-
 ;+
 ;
 ; PHOTRED_photcalib_PREP
@@ -17,6 +13,7 @@ pro photred_photcalib_prep,mchfile,apcor,outfile,silent=silent,$
 ;  mchfile   The MCH file
 ;  apcor     The aperture correction structure
 ;  outfile   The output filename
+;  =imager   The imaging structure.  Needed to find the chip number.
 ;  =observatory  The observatory name.  Might be needed for
 ;                  calculating airmass.
 ;  =photfile The name of the photometry file to use.  Normally
@@ -24,13 +21,17 @@ pro photred_photcalib_prep,mchfile,apcor,outfile,silent=silent,$
 ; 
 ; OUTPUTS
 ;  The input file for PHOTCALIB.PRO
-;  =errpr    The error message if there was an error.
+;  =error    The error message if there was an error.
 ;
 ; USAGE:
 ;  IDL>photred_photcalib_prep,'ccd1001.mch',apcorstr,'ccd1001.input',error=error
 ;
 ; By D.Nidever  March 2008
 ;-
+
+pro photred_photcalib_prep,mchfile,apcor,outfile,silent=silent,$
+                           error=error,imager=imager,observatory=observatory,$
+                           photfile=photfile
 
 undefine,error
 
@@ -59,11 +60,8 @@ files = strtrim(files,2)
 ;files = repstr(files,"'",'')
 nfiles = n_elements(files)
 
-; Initializing arrays
-filtarr = strarr(nfiles)
-amarr = dblarr(nfiles)
-exparr = dblarr(nfiles)
-apcarr = dblarr(nfiles)
+; Initializing structure
+info = replicate({file:'',mjd:0L,chipnum:0L,filter:'',am:0.0d0,exptime:0.0d0,apcorr:0.0d0},nfiles)
 
 ; Loop through the photometry files
 for j=0,nfiles-1 do begin
@@ -75,6 +73,14 @@ for j=0,nfiles-1 do begin
 
   fitsfile = filebase+'.fits'
 
+  ; Get the chip/amp number
+  chipnum = PHOTRED_GETCHIPNUM(fitsfile,imager,error=errorchipnum)
+  if chipnum le 0 or n_elements(errorchipnum) gt 0 then begin
+    error = 'ERROR NO CHIPNUM'
+    print,error
+    goto,BOMB
+  endif
+  
   ; Reading header of FITS file
   undefine,errmsg
   head = HEADFITS(fitsfile,errmsg=errmsg)
@@ -87,20 +93,28 @@ for j=0,nfiles-1 do begin
   ; Getting the filter name
   filt = PHOTRED_GETFILTER(fitsfile)
 
+  ; Getting MJD
+  mjd = PHOTRED_GETMJD(fitsfile,observatory,error=errormjd)
+  if mjd lt 0 or n_elements(errormjd) gt 0 then begin
+    error = 'ERROR NO MJD'
+    print,error
+    goto,BOMB
+  endif
+  
   ; Getting the airmass
   am = PHOTRED_GETAIRMASS(fitsfile,obs=observatory,/update,/recalculate)
   ;am = sxpar(head,'AIRMASS')
   if (am lt 0.9) then begin
-    print,'ERROR NO AIRMASS'
     error = 'ERROR NO AIRMASS'
+    print,error
     goto,BOMB
-  end
+  endif
 
   ; Getting the exposure time
   exp = PHOTRED_GETEXPTIME(fitsfile)
   if strtrim(exp,2) eq '-1' then begin
-    print,'ERROR NO EXPTIME'
     error = 'ERROR NO EXPTIME'
+    print,error
     goto,BOMB
   endif
 
@@ -110,13 +124,16 @@ for j=0,nfiles-1 do begin
   if (ngd gt 0) then apcorr = apcvalue[gd[0]]
   if apcorr lt 0.0 then apcorr=0.0        ; don't want negative correction
 
-  ; Plugging into the arrays
-  filtarr[j] = filt
-  amarr[j] = am
-  exparr[j] = exp
-  apcarr[j] = apcorr
+  ; Plugging into the structure
+  info[j].file = fitsfile
+  info[j].mjd = mjd
+  info[j].chipnum = chipnum
+  info[j].filter = filt
+  info[j].am = am
+  info[j].exptime = exp
+  info[j].apcorr = apcorr
 
-end ; looping through phot files
+endfor ; looping through phot files
 
 arr = strsplit(mchfile,'.',/extract)
 narr = n_elements(arr)
@@ -124,6 +141,7 @@ if narr ge 2 then filebase = strjoin(arr[0,narr-2]) else filebase = mchfile
 
 
 ; OUTPUTTING
+;------------
 ; RAW filename, Band1 name, Band1 airmass, Band1 exptime, Band1 aperture correction, Band2 ...
 tab = '   '
 ;; DAOPHOT, use RAW file
@@ -141,12 +159,15 @@ endif else begin
   out = string(filebase,format='(A15)')+'.ast' + tab
 endelse
 
+; Keep all exposures/bands on ONE line for now
 for j=0,nfiles-1 do begin
-  out = out + string(filtarr[j],format='(A6)') + tab
-  out = out + string(amarr[j],format='(F7.4)') + tab
-  out = out + string(exparr[j],format='(F7.1)') + tab
-  out = out + string(apcarr[j],format='(F7.4)') + tab
-end
+  out = out + string(info[j].mjd,format='(A6)') + tab
+  out = out + string(info[j].chipnum,format='(A6)') + tab
+  out = out + string(info[j].filter,format='(A6)') + tab
+  out = out + string(info[j].am,format='(F7.4)') + tab
+  out = out + string(info[j].exptime,format='(F7.1)') + tab
+  out = out + string(info[j].apcorr,format='(F7.4)') + tab
+endfor
 
 
 ; Opening the output file

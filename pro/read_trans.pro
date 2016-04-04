@@ -24,8 +24,8 @@
 ;     D    M-D  1.3251     0.1403     -0.0147    0.0000   0.0000
 ;               1.001E-02  5.472E-03  2.653E-02  0.0000   0.0000
 ;
-;             If the transfile has chip information then it should
-;             look like this:
+;      If the transfile has chip information then it should
+;      look like this:
 ;  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
 ;              0.0040   -0.0000    0.0001   0.0000   0.0000
 ; 
@@ -35,12 +35,23 @@
 ;  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
 ;              0.0039   -0.0000    0.0001   0.0000   0.0000
 ;
+;      If the transfile has night and chip information then it should
+;      look like this:
+;  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+;                     0.0040   -0.0000    0.0001   0.0000   0.0000
+; 
+;  55975  2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000
+;                     0.0039   -0.0000    0.0001   0.0000   0.0000
+; 
+;  55975  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
+;                     0.0039   -0.0000    0.0001   0.0000   0.0000
 ;  /silent    Don't print anything to the screen.
 ;  =logfile   The name of a logfile to write messages to.
 ;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS:
-;  trans      The transformation structure.
+;  trans      The transformation structure.  NIGHT and CHIP will
+;               always be included even if they are "blank".
 ;
 ; USAGE:
 ;  IDL>read_trans,'n1.trans',trans
@@ -48,12 +59,12 @@
 ; By D.Nidever  Feb.2013
 ;-
 
-pro read_trans,transfile,trans,silent=silent,logfile=logfile,stp=stp
+pro read_trans,transfile,trans,silent=silent,logfile=logfile,error=error,stp=stp
 
 undefine,trans
 
 if n_elements(transfile) eq 0 then begin
-  print,'Syntax - read_trans,transfile,trans,silent=silent,logfile=logfile,stp=stp'
+  print,'Syntax - read_trans,transfile,trans,silent=silent,logfile=logfile,error=error,stp=stp'
   return
 endif
 
@@ -84,16 +95,22 @@ if keyword_set(logfile) then logf=logfile else logf=-1
 ;  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
 ;              0.0039   -0.0000    0.0001   0.0000   0.0000
 
+; What options?
+; 1 - single night, single chip (no NIGHT or CHIP information)
+; 2 - single night, multiple chips (no NIGHT but CHIP information)
+; 3 - multiple nights, multiple chips (NIGHT and CHIP information)
+optcase = -1
+
 openr,unit,/get_lun,transfile
 
 while (~EOF(unit)) do begin
 
-  trans1 = {chip:-1,band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
+  trans1 = {night:-1L,chip:-1,band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
             amcolterm:0.0d,colsqterm:0.0d,zptermsig:0.0d,amtermsig:0.0d,coltermsig:0.0d,$
             amcoltermsig:0.0d,colsqtermsig:0.0d}
 
   ; Reading in the transformation coefficients line
-  line=''
+  line = ''
   readf,unit,line
 
   ; Not a blank line
@@ -101,13 +118,61 @@ while (~EOF(unit)) do begin
     arr = strsplit(line,' ',/extract)
     narr = n_elements(arr)
 
-    ; This has chip information
-    isnum = valid_num(arr[0],chip)
-    if (isnum eq 1) then begin
-      trans1.chip = long(chip)
-      arr = arr[1:*]
-    endif
+    ; This is the format.  NIGHT (MJD), CHIP, BAND, COLOR, ZPTERM, AMTERM,
+    ;                       COLORTERM, AMCOLTERM, AMSQTERM
+    ;  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+    ;                     0.0040   -0.0000    0.0001   0.0000   0.0000
+    ; NIGHT and CHIP are optional.
 
+    ; Are NIGHT and CHIP supplied?
+    case narr of
+       ; ---NIGHT and CHIP---
+       9: begin
+
+         ; Make sure NIGHT and CHIP are numbers
+         if valid_num(arr[0],night) and valid_num(arr[1],chip) then begin
+           trans1.night = long(night)
+           trans1.chip = long(chip)
+           arr = arr[2:*]
+         ; Parsing error
+         endif else begin
+           error = 'NIGHT and CHIP must be numbers.'
+           if not keyword_set(silent) then printlog,logf,error
+           return
+         endelse
+         optcase = 3 > optcase
+
+       end
+       ; ---CHIP---
+       8: begin
+
+         ; Make sure CHIP is a  number
+         if valid_num(arr[0],chip) then begin
+           trans1.chip = long(chip)
+           arr = arr[1:*]
+         ; Parsing error
+         endif else begin
+           error = 'CHIP must be a numbers'
+           if not keyword_set(silent) then printlog,logf,error
+           return
+         endelse
+         optcase = 2 > optcase
+         
+       end
+       ; ---Neither---
+       7: begin
+          ; not much to do
+          optcase = 1 > optcase
+       end
+       ; ---Not enough values---
+       else: begin
+         error = 'Need at least 7 values in the TRANS line.'
+         if not keyword_set(silent) then printlog,logf,error
+         return
+       end
+    endcase
+       
+    ; Parse the rest of the line    
     trans1.band = arr[0]
     trans1.color = arr[1]
     trans1.zpterm = arr[2]
@@ -117,10 +182,20 @@ while (~EOF(unit)) do begin
     trans1.colsqterm = arr[6]
 
     ; Reading in the error line
-    line2=''
+    ;---------------------------
+    line2 = ''
     readf,unit,line2
     arr2 = strsplit(line2,' ',/extract)
+    narr2 = n_elements(arr2)
+    
+    ; Need at least 5 terms
+    if narr2 lt 5 then begin
+      error = 'Need at least 5 values in the ERROR line.'
+      if not keyword_set(silent) then printlog,logf,error
+      return
+    endif
 
+    ; Parse the error line
     trans1.zptermsig = arr2[0]
     trans1.amtermsig = arr2[1]  
     trans1.coltermsig = arr2[2] 
@@ -137,15 +212,20 @@ endwhile
 close,unit
 free_lun,unit
 
-; No chip information, strip CHIP
-gdchip = where(trans.chip ge 0,ngdchip)
-if ngdchip eq 0 then begin
-  oldtrans = trans
-  trans = replicate({band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
-            amcolterm:0.0d,colsqterm:0.0d,zptermsig:0.0d,amtermsig:0.0d,coltermsig:0.0d,$
-            amcoltermsig:0.0d,colsqtermsig:0.0d},n_elements(trans))
-  STRUCT_ASSIGN,oldtrans,trans
-endif
+; Leave in NIGHT and CHIP columns even if they are "blank".  For
+; consistency sake
+
+;; No chip information, strip CHIP
+;gdnight = where(trans.chip ge 0,ngdchip)
+;gdchip = where(trans.chip ge 0,ngdchip)
+;if ngdchip eq 0 then begin
+;  oldtrans = trans
+;  trans = replicate({band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
+;            amcolterm:0.0d,colsqterm:0.0d,zptermsig:0.0d,amtermsig:0.0d,coltermsig:0.0d,$
+;            amcoltermsig:0.0d,colsqtermsig:0.0d},n_elements(trans))
+;  STRUCT_ASSIGN,oldtrans,trans
+;  undefine,oldtrans
+;endif
 
 ntrans = n_elements(trans)
 
@@ -184,39 +264,20 @@ endfor
 
 ; Print the transformation equations
 if not keyword_set(silent) then begin
-  ; Chip information
-  if tag_exist(trans,'CHIP') then begin
-    printlog,logf,' TRANSFORMATION EQUATIONS'
-    printlog,logf,'-------------------------------------------------------------------------'
-    printlog,logf,'  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
-    printlog,logf,'-------------------------------------------------------------------------'
-    for i=0,ntrans-1 do begin
-      form1 = '(I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
-      printlog,logf,format=form1,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,trans[i].amterm,$
-                        trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-      form2 = '(A21,F10.4,F10.4,F10.4,F10.4,F10.4)'
-      printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
-                        trans[i].amcoltermsig,trans[i].colsqtermsig
-    end
-    printlog,logf,'-------------------------------------------------------------------------'
-    printlog,logf,''
-
-  ; No chip information
-  endif else begin
-    printlog,logf,' TRANSFORMATION EQUATIONS'
-    printlog,logf,'------------------------------------------------------------------'
-    printlog,logf,' BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
-    printlog,logf,'------------------------------------------------------------------'
-    for i=0,ntrans-1 do begin
-      form = '(A-5,A8,F10.4,F10.4,F10.4,F10.4,F10.4)'
-      printlog,logf,format=form,'  '+trans[i].band,trans[i].color,trans[i].zpterm,trans[i].amterm,$
-                        trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-      printlog,logf,format=form,'','',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
-                        trans[i].amcoltermsig,trans[i].colsqtermsig
-    end
-    printlog,logf,'------------------------------------------------------------------'
-    printlog,logf,''
-  endelse
+  printlog,logf,' TRANSFORMATION EQUATIONS'
+  printlog,logf,'--------------------------------------------------------------------------------'
+  printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'--------------------------------------------------------------------------------'
+  for i=0,ntrans-1 do begin
+    form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                      trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    form2 = '(A28,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
+                      trans[i].amcoltermsig,trans[i].colsqtermsig
+  endfor
+  printlog,logf,'--------------------------------------------------------------------------------'
+  printlog,logf,''
 endif
 
 if keyword_set(stp) then stop
