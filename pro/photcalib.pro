@@ -105,7 +105,7 @@ newerr = fltarr(numstar)+9.9999
 
 tmag = mag
 terr = err
-tflux = 2.5118865d0^tmag
+tflux = 2.5118864d0^tmag
 twt = 1.0/(terr^2.0)
 bd = where(tmag gt 50,nbd)
 if nbd gt 0 then begin
