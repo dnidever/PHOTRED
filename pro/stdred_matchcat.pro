@@ -182,9 +182,14 @@ stdstr = replicate({name:'',varname:'',ra:0.0d0,dec:0.0,size:0.0},nstdfiles)
 for i=0,nstdfiles-1 do begin
   dum = strsplit(stdfiles[i],'.',/extract)
   ext = first_el(dum,/last)
+  if ext eq 'gz' then begin
+    pos = strpos(stdfiles[i],'.')
+    ext = strmid(stdfiles[i],pos+1)
+  endif
   case ext of
   'cat': std = IMPORTASCII(stdfiles[i],/header,/noprint)
   'fits': std = MRDFITS(stdfiles[i],1,/silent)
+  'fits.gz': std = MRDFITS(stdfiles[i],1,/silent)
   else: stop,'Extension ',ext,' NOT SUPPORTED'
   endcase
 
@@ -219,7 +224,7 @@ for i=0,nstdfiles-1 do begin
 
   print,stdstr[i].name,stdstr[i].ra,stdstr[i].dec
 
-end
+endfor
 
 
 ;##################################################
@@ -278,7 +283,7 @@ FOR i=0,ninputlines-1 do begin
   mindist = min(dist)
   minind = first_el(minloc(dist))
   dist_thresh = 2.0 > stdstr[minind].size
-  
+
   ; This frame is of a standard field
   if (mindist lt dist_thresh) then begin
 
