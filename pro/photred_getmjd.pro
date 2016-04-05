@@ -52,7 +52,7 @@ endif
 ; More than one filename name input
 if nfile gt 1 then begin
   mjd = lonarr(nfile)
-  for i=0,nfile-1 do mjd[i] = photred_getmjd(file[i])
+  for i=0,nfile-1 do mjd[i] = photred_getmjd(file[i],obs)
   return,mjd
 endif
 
