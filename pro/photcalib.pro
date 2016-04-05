@@ -425,8 +425,7 @@ WHILE (converge eq 0) do begin
 
     endelse  ; one or no color band
 
-
-  endfor ; looping through the bands
+  endfor ; looping through the bands/exposures
 
 
   ; ############################
@@ -434,16 +433,11 @@ WHILE (converge eq 0) do begin
 
   ; Loop through the stars
   for f=0,numobs-1 do begin
-
     ; Run simplestar to calculate the tranformed magnitudes
-    newmag = SIMPLESTAR(inmag[*,f],inp.airmass[f],clr[*,f],inp.apcorr[f],inp.exptime[f],trans[f])
-    tempmag[*,f] = newmag
-
+    tempmag[*,f] = SIMPLESTAR(inmag[*,f],inp.airmass[f],clr[*,f],inp.apcorr[f],inp.exptime[f],trans[f])
   
     ; Run simplerr to calculate the error in the transformed magnitudes
-    newerr = SIMPLERR(inerr[*,f],inp.airmass[f],clr[*,f],clrerr[*,f],trans[f])
-    temperr[*,f] = newerr
-
+    temperr[*,f] = SIMPLERR(inerr[*,f],inp.airmass[f],clr[*,f],clrerr[*,f],trans[f])
   endfor
 
 
