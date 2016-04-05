@@ -549,7 +549,7 @@ if ninptrans gt 0 then begin
   printlog,logf,'--------------------------------------------------------------------------------'
   printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
   printlog,logf,'--------------------------------------------------------------------------------'
-  for i=0,ntrans-1 do begin
+  for i=0,ninptrans-1 do begin
     form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
     printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
                       trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
@@ -577,12 +577,24 @@ endif else begin
 
 endelse
 
+; Do we have NIGHT information
+transnightinfo = 0
+if tag_exist(trans,'NIGHT') then begin
+  gdtransnight = where(trans.night ge 0,ngdtransnight)
+  if ngdtransnight gt 0 then transnightinfo=1
+endif
+; Do we have CHIP information
+transchipinfo = 0
+if tag_exist(trans,'CHIP') then begin
+  gdtranschip = where(trans.chip ge 0,ngdtranschip)
+  if ngdtranschip gt 0 then transchipinfo=1
+endif
 
 
 
 ;###############################
 ;# READ THE INPUT FILE
-;# Read in the input file which metadata information for each
+;# Read in the input file with metadata information for each
 ;#   band/exposure in the RAW input photometry files
 inparr = importascii(inpfile,/noprint)
 ninp = n_elements(inparr)
@@ -590,15 +602,12 @@ ninp = n_elements(inparr)
 tags = tag_names(inparr)
 ntags = n_elements(tags)
 
-; Transferring to a more user-friendly structure
-dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(nuobs),band:strarr(numobs),$
-       airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
-
-; Old or New format, check if the second value is
-;   an integer (new format, NIGHT) or character (old format, band/filter name)
-;  All lines need to use the same format (old or new)
+; ---- Transferring to a more user-friendly structure ----
+;
+;   Old or New format, check if the second value is
+;     an integer (new format, NIGHT) or character (old format, band/filter name)
+;    All lines need to use the same format (old or new)
 newformat = valid_num(inparr[0].(1),/integer)
-
 
 ; --- NEW Format ----
 ; added NIGHT and CHIP for each band/exposure
@@ -606,6 +615,8 @@ newformat = valid_num(inparr[0].(1),/integer)
 if newformat then begin
 
   numobs = (ntags-1)/6
+  dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(numobs),band:strarr(numobs),$
+         airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
   input = replicate(dum,ninp)
   input.magfile = strtrim(inparr.(0),2)
   for i=0,numobs-1 do begin
@@ -622,6 +633,8 @@ if newformat then begin
 endif else begin
 
   numobs = (ntags-1)/4
+  dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(numobs),band:strarr(numobs),$
+         airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
   input = replicate(dum,ninp)
   input.magfile = strtrim(inparr.(0),2)
   for i=0,numobs-1 do begin
@@ -784,9 +797,10 @@ FOR i=0L,ninp-1 do begin
 
   ; Associate each observed passband with each trans band
   for j=0,numobs-1 do begin
-    ;gd = where(trans.band eq inp.band[j],ngd)
-    gd = where(trans.night eq inp.night[j] and trans.chip eq inp.chip[j] and trans.band eq inp.bandj],ngd)
-
+    ; ignore night and chip info if we don't have that in the trans file
+    gd = where( ( (trans.night eq inp.night[j]) or transnightinfo eq 0) and $
+                ( (trans.chip eq inp.chip[j]) or transchipinfo eq 0) and $
+                (trans.band eq inp.band[j]),ngd)
     ; Found the transformation for this band
     if (ngd gt 0) then begin
       mastrans[j] = trans[gd[0]]
