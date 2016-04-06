@@ -476,9 +476,23 @@ For i=0,nchips-1 do begin
     phtags = tag_names(phot)
     LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
     READLINE,inputfile,inputlines
-    ; F1-00277654_01.ast g 1.1306 60.0 0.0127 g 1.1296 30.0 0.0142
     inputarr = strsplit(inputlines[0],' ',/extract)
-    alsfilter = inputarr[1:*:4]  ; filters
+    ;   Old or New format, check if the second value is
+    ;     an integer (new format, NIGHT) or character (old format,
+    ;     band/filter name)
+    ;    All lines need to use the same format (old or new)
+    newformat = valid_num(inputarr[1],/integer)
+    ; -- NEW Format --
+    ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture
+    ;   correction, Band2 ... 
+    if newformat then begin
+      alsfilter = inputarr[3:*:6]  ; filters
+    ; -- OLD Format --
+    ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
+    ;   aperture correction, Band2 ... 
+    endif else begin
+      alsfilter = inputarr[1:*:4]  ; filters
+    endelse
 
     printlog,logfile,i+1,photfile,n_elements(phot),format='(I5,A22,I8)'
 

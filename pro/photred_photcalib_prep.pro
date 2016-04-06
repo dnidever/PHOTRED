@@ -161,8 +161,8 @@ endelse
 
 ; Keep all exposures/bands on ONE line for now
 for j=0,nfiles-1 do begin
-  out = out + string(info[j].mjd,format='(A6)') + tab
-  out = out + string(info[j].chipnum,format='(A6)') + tab
+  out = out + string(info[j].mjd,format='(I8)') + tab
+  out = out + string(info[j].chipnum,format='(I5)') + tab
   out = out + string(info[j].filter,format='(A6)') + tab
   out = out + string(info[j].am,format='(F7.4)') + tab
   out = out + string(info[j].exptime,format='(F7.1)') + tab
@@ -179,7 +179,6 @@ PRINTF,unit,out
 ; Closing the output file
 CLOSE,unit
 FREE_LUN,unit
-
 
 BOMB:
 

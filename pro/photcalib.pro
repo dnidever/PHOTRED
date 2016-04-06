@@ -105,7 +105,7 @@ newerr = fltarr(numstar)+9.9999
 
 tmag = mag
 terr = err
-tflux = 2.511864^tmag
+tflux = 2.5118864d0^tmag
 twt = 1.0/(terr^2.0)
 bd = where(tmag gt 50,nbd)
 if nbd gt 0 then begin
@@ -300,16 +300,9 @@ PRO solvestar,instar,trans,inp,outstar
 ; Setting up some important arrays
 numobs = n_elements(inp.band)
 numstar = n_elements(instar[*,0])
-;passband = inp.band
 passband = trans.band
 colband = trans.colband
 colsign = trans.colsign
-
-; Information about the observations
-; The some for all stars and bands
-airmass = inp.airmass
-exptime = inp.exptime
-apcorr = inp.apcorr
 
 ; The input magnitudes and errors
 inmag = instar[*,2*lindgen(numobs)+3]
@@ -327,7 +320,7 @@ laststar = inmag*0.
 ;# First we set the color terms to zero, then solve for the magnitudes using
 ;#   simplestar
 
-; Loop through the bands
+; Loop through the exposures
 for a=0,numobs-1 do begin
 
   ; Assume an initial color and color error of zero
@@ -335,16 +328,14 @@ for a=0,numobs-1 do begin
   clrerr[*,a] = 0
 
   ; Run simplestar to calculate the tranformed magnitudes
-  newmag = SIMPLESTAR(inmag[*,a],airmass[a],clr[*,a],apcorr[a],exptime[a],trans[a])
+  newmag = SIMPLESTAR(inmag[*,a],inp.airmass[a],clr[*,a],inp.apcorr[a],inp.exptime[a],trans[a])
   tempmag[*,a] = newmag
 
-
   ; Run simplerr to calculate the error in the transformed magnitudes
-  newerr = SIMPLERR(inerr[*,a],airmass[a],clr[*,a],clrerr[*,a],trans[a])
+  newerr = SIMPLERR(inerr[*,a],inp.airmass[a],clr[*,a],clrerr[*,a],trans[a])
   temperr[*,a] = newerr
 
 endfor
-
 
 
 ;##################################
@@ -361,7 +352,7 @@ WHILE (converge eq 0) do begin
   ; First set the color term.
   ; Passbands with an indefinite color will have it set to zero.
 
-  ; Loop through the bands
+  ; Loop through the bands/exposures
   for d=0,numobs-1 do begin
 
     ; Index of the passband to use for the color
@@ -397,7 +388,6 @@ WHILE (converge eq 0) do begin
         clr[bd,d] = 0.0  
         clrerr[bd,d] = 0.0
       endif
-
 
     ; One or No color band
     ;----------------------
@@ -446,12 +436,12 @@ WHILE (converge eq 0) do begin
   for f=0,numobs-1 do begin
 
     ; Run simplestar to calculate the tranformed magnitudes
-    newmag = SIMPLESTAR(inmag[*,f],airmass[f],clr[*,f],apcorr[f],exptime[f],trans[f])
+    newmag = SIMPLESTAR(inmag[*,f],inp.airmass[f],clr[*,f],inp.apcorr[f],inp.exptime[f],trans[f])
     tempmag[*,f] = newmag
 
   
     ; Run simplerr to calculate the error in the transformed magnitudes
-    newerr = SIMPLERR(inerr[*,f],airmass[f],clr[*,f],clrerr[*,f],trans[f])
+    newerr = SIMPLERR(inerr[*,f],inp.airmass[f],clr[*,f],clrerr[*,f],trans[f])
     temperr[*,f] = newerr
 
   endfor
@@ -465,17 +455,21 @@ WHILE (converge eq 0) do begin
 
   converge = 1  ; assume good at first
 
-  bd = where( abs(tempmag-laststar) gt 0.002,nbd)
+  maxiter = 50      ; 30
+  maxdiff = 0.0001  ;0.002
+  absdiff = abs(tempmag-laststar)
+  bd = where( absdiff gt maxdiff,nbd)
   if nbd gt 0 then converge=0
 
   ; Copying current solution to "last" solution
   if (converge eq 0) then laststar = tempmag
 
-  ; Go up to 30 iterations, send out an error message if it doesn't converge
-  if (niter gt 30) then begin
+  ; Go up to 50 iterations, send out a warning message if it doesn't converge
+  if (niter gt maxiter) then begin
     bd2 = array_indices(tempmag,bd)
     nbdstars = n_elements(bd2[0,*])
-    print,strtrim(nbdstars,2),'/',strtrim(numstar,2),' failed to converge.'
+    ;print,strtrim(nbdstars,2),'/',strtrim(numstar,2),' failed to converge.'
+    print,strtrim(nbdstars,2),'/',strtrim(numstar,2),' failed to converge after ',strtrim(maxiter,2),' iterations.  Max differences of ',strtrim(max(absdiff),2),' mag'
     converge = 1
   endif
 
@@ -483,7 +477,6 @@ WHILE (converge eq 0) do begin
   niter = niter+1
 
 ENDWHILE
-
 
 ; Putting together the output array
 outstar = instar*0.
@@ -549,7 +542,7 @@ if ninptrans gt 0 then begin
   printlog,logf,'--------------------------------------------------------------------------------'
   printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
   printlog,logf,'--------------------------------------------------------------------------------'
-  for i=0,ntrans-1 do begin
+  for i=0,ninptrans-1 do begin
     form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
     printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
                       trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
@@ -577,12 +570,24 @@ endif else begin
 
 endelse
 
+; Do we have NIGHT information
+transnightinfo = 0
+if tag_exist(trans,'NIGHT') then begin
+  gdtransnight = where(trans.night ge 0,ngdtransnight)
+  if ngdtransnight gt 0 then transnightinfo=1
+endif
+; Do we have CHIP information
+transchipinfo = 0
+if tag_exist(trans,'CHIP') then begin
+  gdtranschip = where(trans.chip ge 0,ngdtranschip)
+  if ngdtranschip gt 0 then transchipinfo=1
+endif
 
 
 
 ;###############################
 ;# READ THE INPUT FILE
-;# Read in the input file which metadata information for each
+;# Read in the input file with metadata information for each
 ;#   band/exposure in the RAW input photometry files
 inparr = importascii(inpfile,/noprint)
 ninp = n_elements(inparr)
@@ -590,15 +595,12 @@ ninp = n_elements(inparr)
 tags = tag_names(inparr)
 ntags = n_elements(tags)
 
-; Transferring to a more user-friendly structure
-dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(nuobs),band:strarr(numobs),$
-       airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
-
-; Old or New format, check if the second value is
-;   an integer (new format, NIGHT) or character (old format, band/filter name)
-;  All lines need to use the same format (old or new)
+; ---- Transferring to a more user-friendly structure ----
+;
+;   Old or New format, check if the second value is
+;     an integer (new format, NIGHT) or character (old format, band/filter name)
+;    All lines need to use the same format (old or new)
 newformat = valid_num(inparr[0].(1),/integer)
-
 
 ; --- NEW Format ----
 ; added NIGHT and CHIP for each band/exposure
@@ -606,6 +608,8 @@ newformat = valid_num(inparr[0].(1),/integer)
 if newformat then begin
 
   numobs = (ntags-1)/6
+  dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(numobs),band:strarr(numobs),$
+         airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
   input = replicate(dum,ninp)
   input.magfile = strtrim(inparr.(0),2)
   for i=0,numobs-1 do begin
@@ -622,6 +626,8 @@ if newformat then begin
 endif else begin
 
   numobs = (ntags-1)/4
+  dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(numobs),band:strarr(numobs),$
+         airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
   input = replicate(dum,ninp)
   input.magfile = strtrim(inparr.(0),2)
   for i=0,numobs-1 do begin
@@ -782,11 +788,12 @@ FOR i=0L,ninp-1 do begin
   ;# Making the transformation structure for the bands of this input file
   mastrans = replicate(trans[0],numobs)
 
-  ; Associate each observed passband with each trans band
+  ; Associate transformation equations with each observation
   for j=0,numobs-1 do begin
-    ;gd = where(trans.band eq inp.band[j],ngd)
-    gd = where(trans.night eq inp.night[j] and trans.chip eq inp.chip[j] and trans.band eq inp.bandj],ngd)
-
+    ; ignore night and chip info if we don't have that in the trans file
+    gd = where( ( (trans.night eq inp.night[j]) or transnightinfo eq 0) and $
+                ( (trans.chip eq inp.chip[j]) or transchipinfo eq 0) and $
+                (trans.band eq inp.band[j]),ngd)
     ; Found the transformation for this band
     if (ngd gt 0) then begin
       mastrans[j] = trans[gd[0]]
@@ -802,9 +809,7 @@ FOR i=0L,ninp-1 do begin
       printlog,logf,mastrans[j].colband,' BAND NOT FOUND. CANNOT FORM ',mastrans[j].color,' COLOR FOR BAND ',inp.band[j]
       return
     endif
-
   endfor
-
 
 
   ;##################

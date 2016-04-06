@@ -549,7 +549,7 @@ FOR i=0,ninputlines-1 do begin
   ;------------------------------------------------
   inpfile = base+'.input'
   printlog,logfile,'Making input file: ',inpfile
-  PHOTRED_PHOTCALIB_PREP,mchfile,apcor,inpfile,error=error,$
+  PHOTRED_PHOTCALIB_PREP,mchfile,apcor,inpfile,error=error,imager=thisimager,$
                          observatory=observatory,photfile=photfile
 
   ; Make sure the input file exists
@@ -567,13 +567,21 @@ FOR i=0,ninputlines-1 do begin
   ;*****************************************************
   ; I think PHOTCALIB deals with this
 
-  ; CHIP-SPECIFIC transformation equations
+  ; Check info there's CHIP information in the trans eqns.
+  ;  CHIP=-1 means there's no info
+  chipinfo = 0
   if tag_exist(trans,'CHIP') then begin
+    gchip = where(trans.chip ge 1,ngchip)
+    if ngchip gt 0 then chipinfo=1
+  endif
+
+  ; CHIP-SPECIFIC transformation equations
+  if chipinfo eq 1 then begin
     inptransfile = ''
     ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
     chip = long(ext)
     ind = where(trans.chip eq chip,nind)
-    
+
     ; Nothing for this chip
     if nind eq 0 then begin
       PUSH,failurelist,longfile

@@ -28,35 +28,38 @@ COMMON photred,setup
 undefine,error
 
 nfile = n_elements(file)
+nobs = n_elements(obs)
 ; Not enough inputs
-if nfile eq 0 then begin
+if nfile eq 0 or nobs eq 0 then begin
+  error = 'Not enough inputs'
   print,'Syntax - mjd = photred_getmjd(file,obs,stp=stp,error=error)'
   return,-1
 endif
 
 ; Get observatory
 if obs eq '' then begin
-  if not keyword_set(silent) then $
-    print,'Error OBS(ERVATORY) not input'
+  error = 'Error OBS(ERVATORY) not input'
+  if not keyword_set(silent) then print,error
   return,-1.0
 endif
 OBSERVATORY,obs,obs_struct
 if obs_struct.observatory eq '' then begin
-  if not keyword_set(silent) then $
-    print,'Observatory "',obs,'" NOT FOUND'
+  error = 'Observatory "'+obs+'" NOT FOUND'
+  if not keyword_set(silent) then print,error
   return,-1.0
 endif
 
 ; More than one filename name input
 if nfile gt 1 then begin
   mjd = lonarr(nfile)
-  for i=0,nfile-1 do mjd[i] = photred_getmjd(file[i])
+  for i=0,nfile-1 do mjd[i] = photred_getmjd(file[i],obs)
   return,mjd
 endif
 
 test = file_test(file)
 if test eq 0 then begin
-  print,file,' NOT FOUND'
+  error = file+' NOT FOUND'
+  if not keyword_set(silent) then print,error
   return,-1
 endif
 

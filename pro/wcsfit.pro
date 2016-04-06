@@ -1300,7 +1300,7 @@ end
 pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
            cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
            redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
-           refmaglim=refmaglim,catmaglim=catmaglim
+           refmaglim=refmaglim,catmaglim=catmaglim,inpfwhm=inpfwhm
 
 t0 = systime(1)
 undefine,error
@@ -1834,7 +1834,7 @@ if n_elements(cat) eq 0 then begin
  ; endelse
 
   ; Find the sources
-  WCSFIT_FIND,filename,cat,error=finderror
+  WCSFIT_FIND,filename,cat,error=finderror,inpfwhm=inpfwhm
 
   ; There was an error
   if n_elements(finderror) gt 0 then begin
