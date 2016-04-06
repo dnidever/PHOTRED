@@ -195,7 +195,8 @@ IF keyword_set(normal) then begin
 
     ; Float
     if type eq 4 then begin
-      maximum = long64(max(str.(i))+1.0)
+      ;maximum = long64(max(str.(i))+1.0)
+      maximum = long64(max(abs(str.(i)))+1.0)
       maxlen = strlen(strtrim(maximum,2))
       totlen = (maxlen+5+2) > 11
       fmt = 'F'+strtrim(totlen,2)+'.4'
@@ -203,7 +204,8 @@ IF keyword_set(normal) then begin
 
     ; Double
     if type eq 5 then begin
-      maximum = long64(max(str.(i))+1.0)
+      ;maximum = long64(max(str.(i))+1.0)
+      maximum = long64(max(abs(str.(i)))+1.0)
       maxlen = strlen(strtrim(maximum,2))
       totlen = (maxlen+7+2) > 11
       fmt = 'F'+strtrim(totlen,2)+'.6'
@@ -211,7 +213,7 @@ IF keyword_set(normal) then begin
 
     format[i] = fmt
     outarr[i,*] = string(str.(i),format='('+fmt+')')
-  end
+  endfor 
 
   ; Make 1D output structure
   outarr1 = strarr(nrec)
