@@ -42,10 +42,10 @@ case typ of
 ;3:  form = 'I13'      ; Long
 ;4:  form = 'G15.7'    ; Float
 ;5:  form = 'G20.13'   ; Double
-4:  form = 'F11.4'    ; Float
-5:  form = 'F11.6'    ; Double
+4:  form = 'F13.4'    ; Float
+5:  form = 'F15.6'    ; Double
 6:  form = 'G15.7'    ; Complex
-7:  form = 'A20'      ; String
+7:  form = 'A22'      ; String
 8:  form = ''         ; Struct
 9:  form = 'G20.13'   ; DComplex
 10: form = ''         ; Pointer
