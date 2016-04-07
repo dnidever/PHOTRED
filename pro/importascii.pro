@@ -66,106 +66,131 @@ Function imp_datatypes,arr
 
 ; No Parmaters input
 if n_params() eq 0 then begin
-  print,'Syntax - typearr = datatypes(array)'
+  print,'Syntax - typearr = imp_datatypes(array)'
   return,-1
 endif
 
 
 npar = n_elements(arr)
-typearr = lonarr(npar)
+typearr = lonarr(npar)-1
+validnum = valid_num(arr)
+validint = valid_num(arr,/integer)
+var = strtrim(arr,2)
+nvar = strlen(var)
 
 ; Figuring out each column's data type
 for i=0,npar-1 do begin
-  var = strtrim(arr(i),2)
-  bvar = byte(var)
-  nvar = n_elements(bvar)
-
-  ; If the string has only 0-9, -, +, ., E, e then it's a float, otherwise a string
-  ; 0-9 is 48-57 (in bytes)
-  ; "-" is 45
-  ; "+" is 43
-  ; "." is 46
-  ; "E" is 69
-  ; "e" is 101
-  ; "D" is 68
-  ; "d" is 100
-  bfloat = [bindgen(10)+48B,43B,45B,46B,69B,101B,68B,100B]
-  bint = [bindgen(10)+48B,43B,45B]
-
-  ; Checking each character in "bvar"
-  ; Are there any non-"number" characters?
-  badfloat = 0           ; float until proven otherwise
-  badint = 0
-  last = 0B
-  for j=0,nvar-1 do begin
-    ; Checking for float characters
-    g = where(bvar(j) eq bfloat,ng)  ; is this character a float characters
-    if ng eq 0 then badfloat=1
-
-    ; Checking for integer characters
-    g = where(bvar(j) eq bint,ng)    ; is this character an integer characters
-    if ng eq 0 then badint=1
-
-    ; Checking for plus or minus, must be at beginning, okay after 'E' or 'e'
-    if (bvar(j) eq 43B) or (bvar(j) eq 45B) then begin
-         if (j ne 0) and (last ne 69B) and (last ne 101B) then badfloat=1
-         badint = 1
-    endif
-
-    ; Checking for period, CAN'T be at beginning
-    if (bvar(j) eq 46B) then begin
-      if (j eq 0) then badfloat=1
-      badint = 1
-    endif
-
-    last = bvar(j)
-  end
-
-
-  ; Use VALID_NUM.PRO as a double-check
-  if valid_num(var) eq 1 then badfloat=0
-  if valid_num(var,/integer) eq 1 then badint=0
-
-  if valid_num(var) eq 0 then badfloat=1
-  if valid_num(var,/integer) eq 0 then badint=1
-
+  ;var = strtrim(arr[i],2)
+  ;bvar = byte(var)
+  ;nvar = n_elements(bvar)
 
   ; String
-  if (badfloat eq 1) then type = 7   ; String
-
+  if validnum[i] eq 0 then type=7
   ; Float
-  if (badfloat eq 0 and badint eq 1) then begin
-
+  if validnum[i] eq 1 and validint[i] eq 0 then begin
     ; Float or Double?
-    dec = first_el(strsplit(var,'.',/extract),/last)
+    dec = first_el(strsplit(var[i],'.',/extract),/last)
     ndec = strlen(dec)
-
-    ;; type = 5, Double
-    ;; type = 4, Float
-    ;if (ndec ge 6) then type=5 else type=4
-
     ; What matters is the number of significant digits
     ;  not the decimal places
     ; subtract 1 to get rid of the decimal
-    ndig = nvar-1                   ; number of digits
-    if var[0] eq '-' then ndig-=1   ; don't count the negative sign
+    ndig = nvar[i]-1                   ; number of digits
+    if strmid(var[i],0,1) eq '-' then ndig-=1   ; don't count the negative sign
     if ndig gt 7 then type=5 else type=4
-    ;if (nvar-1) gt 6 then type=5 else type=4
-
   endif
-
-  ; Long Integer
-  if (badfloat eq 0 and badint eq 0) then type = 3   ; Integer (Long)
-
+  ; Long integer
+  if validint[i] eq 1 and nvar[i] le 9 then type=3
   ; Long64 integer
-  if (badfloat eq 0 and badint eq 0 and nvar gt 9) then type = 14   ; Long64
-
+  if validint[i] eq 1 and nvar[i] gt 9 then type=14
   ; NAN's are floats
-  if strtrim(strupcase(var),2) eq 'NAN' then type = 4     ; float
+  if strtrim(strupcase(var[i]),2) eq 'NAN' then type=4     ; float
 
-  typearr(i) = type
+  typearr[i] = type
 
-end
+;  ; If the string has only 0-9, -, +, ., E, e then it's a float, otherwise a string
+;  ; 0-9 is 48-57 (in bytes)
+;  ; "-" is 45
+;  ; "+" is 43
+;  ; "." is 46
+;  ; "E" is 69
+;  ; "e" is 101
+;  ; "D" is 68
+;  ; "d" is 100
+;  bfloat = [bindgen(10)+48B,43B,45B,46B,69B,101B,68B,100B]
+;  bint = [bindgen(10)+48B,43B,45B]
+;
+;  ; Checking each character in "bvar"
+;  ; Are there any non-"number" characters?
+;  badfloat = 0           ; float until proven otherwise
+;  badint = 0
+;  last = 0B
+;  for j=0,nvar-1 do begin
+;    ; Checking for float characters
+;    g = where(bvar[j] eq bfloat,ng)  ; is this character a float characters
+;    if ng eq 0 then badfloat=1
+;
+;    ; Checking for integer characters
+;    g = where(bvar[j] eq bint,ng)    ; is this character an integer characters
+;    if ng eq 0 then badint=1
+;
+;    ; Checking for plus or minus, must be at beginning, okay after 'E' or 'e'
+;    if (bvar[j] eq 43B) or (bvar[j] eq 45B) then begin
+;         if (j ne 0) and (last ne 69B) and (last ne 101B) then badfloat=1
+;         badint = 1
+;    endif
+;
+;    ; Checking for period, CAN'T be at beginning
+;    if (bvar[j] eq 46B) then begin
+;      if (j eq 0) then badfloat=1
+;      badint = 1
+;    endif
+;
+;    last = bvar[j]
+;  endfor
+;
+;  ; Use VALID_NUM.PRO as a double-check
+;  if valid_num(var) eq 1 then badfloat=0
+;  if valid_num(var,/integer) eq 1 then badint=0
+;
+;  if valid_num(var) eq 0 then badfloat=1
+;  if valid_num(var,/integer) eq 0 then badint=1
+;
+;  ; String
+;  if (badfloat eq 1) then type = 7   ; String
+;
+;  ; Float
+;  if (badfloat eq 0 and badint eq 1) then begin
+;
+;    ; Float or Double?
+;    dec = first_el(strsplit(var,'.',/extract),/last)
+;    ndec = strlen(dec)
+;
+;    ;; type = 5, Double
+;    ;; type = 4, Float
+;    ;if (ndec ge 6) then type=5 else type=4
+;
+;    ; What matters is the number of significant digits
+;    ;  not the decimal places
+;    ; subtract 1 to get rid of the decimal
+;    ndig = nvar-1                   ; number of digits
+;    if var[0] eq '-' then ndig-=1   ; don't count the negative sign
+;    if ndig gt 7 then type=5 else type=4
+;    ;if (nvar-1) gt 6 then type=5 else type=4
+;
+;  endif
+;
+;  ; Long Integer
+;  if (badfloat eq 0 and badint eq 0) then type = 3   ; Integer (Long)
+;
+;  ; Long64 integer
+;  if (badfloat eq 0 and badint eq 0 and nvar gt 9) then type = 14   ; Long64
+;
+;  ; NAN's are floats
+;  if strtrim(strupcase(var),2) eq 'NAN' then type = 4     ; float
+;
+;  typearr[i] = type
+
+endfor
 
 ;stop
 
@@ -233,7 +258,7 @@ if keyword_set(dbformat) then begin
     print,dbformat,' NOT FOUND'
   endelse
 
-end
+endif
 
 
 ; Searching for the file
@@ -251,7 +276,7 @@ openr,unit,fname,/get_lun
 if (data_start gt 0) then begin
   dum=''
   for i=0,data_start-1 do readf,unit,dum
-end
+endif
 
 ; Making sure the line IS NOT commented out
 readf,unit,str1
@@ -259,7 +284,7 @@ first = strmid(str1,0,1)
 while((first eq comment) and (eof(unit) eq 0)) do begin
   readf,unit,str1
   first = strmid(str1,0,1)
-end
+endwhile
 
 close,unit
 free_lun,unit
@@ -282,7 +307,7 @@ if not keyword_set(delimit) then begin
     delimit = 9B
     arr1 = arr2
     if n_elements(preserve_null) eq 0 then preserve_null=1  ; use preserve_null
-  end
+  endif
 
 ; Using INPUT delimiter
 endif else begin
@@ -304,7 +329,7 @@ typearr = imp_datatypes(arr1)
 bd = where(typearr eq 7,nbd)
 if (nbd eq 0) then begin
   if not keyword_set(noprint) then print,'ALL FLOATS?'
-end
+endif
 
 ; Using the header line
 if keyword_set(header) then begin
@@ -435,7 +460,7 @@ IF not keyword_set(allfloat) THEN BEGIN
       ;bd = where(col eq 'INDEF' or col eq "'INDEF'",nbd)
       ;if nbd gt 0 then str(bd).(i) = '999999'
       bd = where(col eq 'INDEF' or col eq "'INDEF'" or col eq 'null',nbd)
-      if nbd gt 0 then str(bd).(i) = 'NAN'
+      if nbd gt 0 then str[bd].(i) = 'NAN'
       nbad = nbad + nbd
     endfor
 
@@ -459,7 +484,7 @@ IF not keyword_set(allfloat) THEN BEGIN
         ;type = datatypes(str(0).(i))
         type100 = imp_datatypes(str[0:99<(nrow-1)].(i))    ; using first 100 rows 
         type = max(type100)                            ; use the maximum 
-        typearr(i) = type
+        typearr[i] = type
       endfor
     endif else begin
       typearr = fieldtypes
