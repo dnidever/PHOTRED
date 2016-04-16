@@ -2477,6 +2477,7 @@ endelse
 diff = trans_coo_dev(trans,x1=refcat2.x,y1=refcat2.y,x2=cat2.x,y2=cat2.y)
 rms = sqrt(mean(diff^2.0))
 gg = where(diff lt rms,ngg)
+if ngg lt 3 then gg=(sort(diff))[0:2]  ; need at least 3
 refcat3 = refcat2[gg]
 cat3 = cat2[gg]
 
