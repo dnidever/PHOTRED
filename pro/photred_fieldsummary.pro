@@ -131,6 +131,7 @@ if nfieldfiles gt 0 then begin
   fbases = FILE_BASENAME(fieldfiles,'.fits')
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
+              stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 header file from splitting 
               stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
@@ -461,9 +462,11 @@ For i=0,nchips-1 do begin
 
   ; Load PHOT file
   if thisimager.namps gt 1 then begin
-    photfile = refbase+thisimager.separator+string(ichip,format='(i02)')+'.phot'
-    mchfile = refbase+thisimager.separator+string(ichip,format='(i02)')+'.mch'
-    inputfile = refbase+thisimager.separator+string(ichip,format='(i02)')+'.input'
+    ndig = floor(alog10(thisimager.namps))+1
+    fmt = '(i0'+strtrim(ndig,2)+')'
+    photfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.phot'
+    mchfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.mch'
+    inputfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.input'
   endif else begin
     photfile = refbase+'.phot'
     mchfile = refbase+'.mch'
