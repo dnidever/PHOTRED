@@ -1,5 +1,5 @@
 pro phot_overlap,inpstr1,inpstr2,outstr,dcr=dcr,stp=stp,silent=silent,$
-    s1=s1,s2=s2,magindarr=magindarr,error=error
+    s1=s1,s2=s2,magindarr=magindarr,error=error,posonly=posonly
 
 ;+
 ;
@@ -13,6 +13,7 @@ pro phot_overlap,inpstr1,inpstr2,outstr,dcr=dcr,stp=stp,silent=silent,$
 ;  =magindarr  The structure field indices for the magnitudes.
 ;              If this is not input then the structures must be in this format:
 ;              ID, X, Y, MAG1, ERR1, MAG2, ERR2, ..., CHI, SHARP, other tags
+;  /posonly    Only use astrometric positions for the matching.
 ;  /stp        Stop at end of program
 ;  /silent     Don't print anything
 ; 
@@ -206,7 +207,7 @@ end
 ;#####################################
 ;# STARTING THE COMBINATION PROCESS
 if n_elements(dcr) eq 0 then dcr=0.5
-PHOTMATCH,str1,str2,match1,match2,dcr=dcr,count=nmatch,silent=silent,magindarr=magindarr
+PHOTMATCH,str1,str2,match1,match2,dcr=dcr,count=nmatch,silent=silent,magindarr=magindarr,posonly=posonly
 
 
 ; No overlap, just concatenate

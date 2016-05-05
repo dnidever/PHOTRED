@@ -13,6 +13,8 @@
 ;              ID, X, Y, MAG1, ERR1, MAG2, ERR2, ..., CHI, SHARP, other tags
 ;  /astlinear  Use a linear astrometric fit instead of constant
 ;  /astquad    Use a quadratic astrometric fit instead of constant
+;  /posonlly   Only use positions to match and don't remove any
+;                astrometric or photometric offsets.
 ;  /stp        Stop at end of program
 ;  /silent     Don't print anything
 ; 
@@ -101,7 +103,7 @@ end
 
 pro photmatch,str1,str2,ind1,ind2,dcr=dcr,magindarr=magindarr,count=count,$
     stp=stp,silent=silent,error=error,magoffset=magoffset,magoffsig=magoffsig,$
-    astlinear=astlinear,astquad=astquad,astoffset=astoffset
+    astlinear=astlinear,astquad=astquad,astoffset=astoffset,posonly=posonly
 
 undefine,error,magoffset,magoffsig,astoffset
 ind1 = -1
@@ -115,7 +117,7 @@ nstr2 = n_elements(str2)
 ;--------------------
 if nstr1 eq 0 or nstr2 eq 0 then begin
   print,'Syntax - photmatch,str1,str2,ind1,ind2,dcr=dcr,magindarr=magindarr,count=count,'
-  print,'    stp=stp,silent=silent,error=error,astlinear=astlinear'
+  print,'    stp=stp,silent=silent,error=error,astlinear=astlinear,posonly=posonly'
   error = 'Not enough inputs'
   return
 endif
@@ -334,6 +336,15 @@ match2 = ind2[mind2]
 if not keyword_set(silent) then begin
   print,strtrim(nmatch,2),' initial matches within ',stringize(dcr,ndec=2),' arcsec'
   print,''
+endif
+
+; Only use astrometric positions for matching
+if keyword_set(posonly) then begin
+  ; Final Matches
+  ind1 = match1
+  ind2 = match2
+  count = n_elements(ind1)
+  return
 endif
 
 
@@ -661,7 +672,6 @@ IF (nmagindarr gt 0) then begin
     ; Check all bands for possible bad matches
     bdall = MAX(bdarr,dim=1)
     bdmatch = where(bdall eq 1,nbdmatch)
-
 
     ; REMEMBER THESE COULD ALSO BE VARIABLES!!!
 
