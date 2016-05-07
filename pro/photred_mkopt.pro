@@ -130,7 +130,7 @@ if rdnoise lt 0 then begin
 endif
 
 ; Run IMFWHM to get the FWHM
-if n_elements(inpfwhm) eq 0 then begin
+if n_elements(inp_fwhm) eq 0 then begin
   undefine,im,fwhm
   IMFWHM,file,fwhm,im=im,/silent
 
