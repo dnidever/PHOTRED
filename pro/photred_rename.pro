@@ -86,6 +86,10 @@ if strlowcase(telescope) eq 'swope' then observatory='lco'
 if strlowcase(telescope) eq 'magellan' then observatory='lco'
 if strlowcase(telescope) eq 'lbt' then observatory='mgio'
 
+; Separate field directories
+spefielddir = READPAR(setup,'SEPFIELDDIR')
+if sepfielddir eq '0' or sepfielddir eq '-1' or sepfielddir eq '' then undefine,sepfielddir else sepfielddir=1
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -306,10 +310,10 @@ FOR i=0,ninputlines-1 do begin
   ; Check for standards against standard file
   stdfile=readpar(setup,'STDFILE')
   if (FILE_TEST(stdfile) eq 1) then begin
-    readcol,stdfile,stdname,stdra,stdec,f='a,a,a',/silent
+    ;readcol,stdfile,stdname,stdra,stdec,f='a,a,a',/silent
+    readcol,stdfile,stdname,f='a',/silent
     stdcheck = max(stregex(stdname,object2,/fold_case,/boolean))
-
-  endif
+  endif else stdcheck=0
   ; This is a non-object frame
   if (zeroname eq 1) or (biasname eq 1) or (flatname eq 1) or $
      (zeroobj eq 1) or (biasobj eq 1) or (flatobj eq 1) or $
@@ -320,7 +324,7 @@ FOR i=0,ninputlines-1 do begin
   if (sa98 eq 1) or (sa110 eq 1) or (sa114 eq 1) or $
      (n3680 eq 1) or (stdcheck eq 1) then stdarr[i] = 1
 
-end
+ENDFOR
 
 ; Making object fieldname list
 ;-------------------------------
@@ -373,6 +377,10 @@ if (ngd gt 0) then begin
 
   fields = newfields
   nfields = n_elements(fields)
+
+  ; Make separate field directories
+  if keyword_set(sepfielddir) then $
+    for i=0,nfields-1 do FILE_MKDIR,shortnames[i]
 
 ; No object frames
 endif else begin
@@ -452,6 +460,7 @@ FOR i=0,ninputlines-1 do begin
 
     sep = '-'   ; '.'
     newfile = shfield+sep+file
+    if keyword_set(sepfielddir) then newfile=shfield+'/'+newfile  ; separate field directory
     newfilearr[i] = newfile
 
 
