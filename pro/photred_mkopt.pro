@@ -1,5 +1,5 @@
 pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=inp_fitradius_fwhm,$
-                  error=error,verbose=verbose,stp=stp
+                  inp_fwhm=inp_fwhm,error=error,verbose=verbose,stp=stp
 
 ;+
 ;
@@ -17,6 +17,7 @@ pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=i
 ;  =va       The spatial variable PSF setting to use
 ;  =fitradius_fwhm  The value to use for the fitting radius (FI), in
 ;                      units of the FWHM.
+;  =inp_fwhm  Use this FWHM.
 ;  /verbose Output information about what is happening.
 ;  /stp     Stop at the end of the program.
 ;
@@ -129,14 +130,17 @@ if rdnoise lt 0 then begin
 endif
 
 ; Run IMFWHM to get the FWHM
-undefine,im,fwhm
-IMFWHM,file,fwhm,im=im,/silent
+if n_elements(inpfwhm) eq 0 then begin
+  undefine,im,fwhm
+  IMFWHM,file,fwhm,im=im,/silent
 
-if fwhm gt 90.0 then begin
-  print,'Error with FWHM'
-  error = 'ERROR with FWHM'
-  return
-endif
+  if fwhm gt 90.0 then begin
+    print,'Error with FWHM'
+    error = 'ERROR with FWHM'
+    return
+  endif
+
+endif else fwhm=inp_fwhm
 
 ; Load the image
 message=''
