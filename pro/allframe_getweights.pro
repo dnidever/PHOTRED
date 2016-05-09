@@ -27,7 +27,7 @@
 ;-
 
 
-pro allframe_getweights,mchfile,actweight,scales,medsky,raw2=raw2,stp=stp
+pro allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp
 
 ; OUTPUTS:
 ;  actweight  The weight for each frame
@@ -168,6 +168,13 @@ nrefstars = n_elements(gdrefstars)
 ; Getting the "good" frames
 totframe = total(mag[*,gdrefstars] lt 50,2)
 gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
+; no good frames, lower number of reference stars
+if ngdframe eq 0 then begin
+  gdrefstars = si[0:(29<(nstars-1))]
+  nrefstars = n_elements(gdrefstars)
+  totframe = total(mag[*,gdrefstars] lt 50,2)
+  gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
+endif
 
 ; Calculate the weights
 actweight = fltarr(nfiles)
