@@ -154,7 +154,7 @@ endif else im=float(inpim)
 ; Get the FWHM
 ;IMFWHM,filename,fwhm,im=im
 if n_elements(inpfwhm) eq 0 then begin
-  IMFWHM,filename,fwhm,silent=silent,exten=exten,im=im,head=head
+  IMFWHM,filename,fwhm,ellip,silent=silent,exten=exten,im=im,head=head
 endif else fwhm=inpfwhm
 ;if fwhm gt 50 then fwhm=10
 if fwhm gt 50 then begin
@@ -190,7 +190,10 @@ if nbdpix gt 0 then tempim[bdpix]=skymode
 
 ; Find the sources
 ; X/Y start at 0, while daophot coordinates start at 1.
-FIND,tempim,x,y,flux,sharp,round,4.0*skysig,fwhm,[-1.0,1.0],[0.2,1.0],/silent
+roundlim = [-1.0,1.0]* (ellip*2.5 > 1.0)  ; larger cutoff for high-ellipicity
+;roundlim = [-1.0,1.0]
+sharplim = [0.2,1.0]
+FIND,tempim,x,y,flux,sharp,round,4.0*skysig,fwhm,roundlim,sharplim,/silent
 ;FIND,im,x,y,flux,sharp,round,4.0*skysig,fwhm,[-1.0,1.0],[0.2,1.0],/silent
 
 ; NO stars found
@@ -2294,7 +2297,9 @@ if (nastr gt 0) then begin
     print,'Initial WCS not good enough'
   endelse
 
-endif
+endif else initrms=99999.
+
+stop
 
 ; Checking the density of stars
 imarea = (info.nx*pixscale/60.0)*(info.ny*pixscale/60.0)
@@ -2354,7 +2359,6 @@ if (nmatch lt 3 or initrms gt 1.5*rmslim) and (refdensity gt imdensity) then beg
   endif
 
 endif  ; use bright stars
-
 
 
 ; Match the stars with MATCHSTARS

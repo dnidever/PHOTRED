@@ -23,6 +23,9 @@
 ;             images are processed then this will be an array.
 ;  If "outfile" is set then the FWHM values are written to this file.
 ;  ellipticity  The ellipticity (1-a/b).  
+;  =gstr      The structure of Gaussian fits to the sources used
+;               to measure FWHM and ELLIPTICITY.  This only works
+;               if there's only ONE input file.
 ;  =error     The error message, if one occurred.
 ;
 ; USAGE:
@@ -124,16 +127,19 @@ end
 ;--------------------------------------------------------
 
 pro imfwhm,input,fwhm,ellipticity,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
-           head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,error=error
+           head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,$
+           gstr=gstr,error=error
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
 undefine,error
 undefine,fwhm
+undefine,ellipticity
+undefine,gstr
 
 ; Not enough parameters input
 if ninput eq 0 and nim0 eq 0 then begin
-  print,'Syntax - imfwhm,input,fwhm,ellipticity,[im=im,exten=exten,silent=silent,stp=stp]'
+  print,'Syntax - imfwhm,input,fwhm,ellipticity,[im=im,exten=exten,silent=silent,stp=stp,gstr=gstr]'
   error = 'Not enough inputs'
   return
 endif
@@ -484,7 +490,7 @@ FOR f=0,nfiles-1 do begin
         ; round>0 object elongated in y-direction
         htx = max(total(subim,1))
         hty = max(total(subim,2))
-        round = (htx-hty)/mean([htx,hty])
+        round = (hty-htx)/mean([htx,hty])
 
         peakstr[i].round = round
 
@@ -535,7 +541,7 @@ FOR f=0,nfiles-1 do begin
     sz = size(im)
     x = lindgen(sz[1])
     y = lindgen(sz[2])
-    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:999999.0,dof:-1L,status:0L,fwhm:0.0,elip:0.0},ngd)
+    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:999999.0,dof:-1L,status:0L,fwhm:0.0,elip:0.0,round:0.0,sharp:0.0},ngd)
     gstr.x = peakstr[gd].xcen
     gstr.y = peakstr[gd].ycen
     For i=0,ngd-1 do begin
@@ -573,8 +579,16 @@ FOR f=0,nfiles-1 do begin
         gstr[i].chisq = chisq
         gstr[i].dof = dof
         gstr[i].fwhm = 0.5*(pars[2]+pars[3]) * 2  ; FWHM=average of half-widths (times 2)
-        gstr[i].elip = (1-min(pars[2:3])/max(pars[2:3]))
-      
+        gstr[i].elip = (1-min(pars[2:3])/max(pars[2:3]))   ; 1-a/b
+        htx = max(total(fit-pars[0],1))
+        hty = max(total(fit-pars[0],2))
+        round = (hty-htx)/mean([htx,hty])  ; see definition above
+        gstr[i].round = round
+        ; This is a slightly different "sharp" since the normal
+        ;  Stetson one is height of delta function / height
+        ;  of symmetric Gaussian
+        gstr[i].sharp = peakstr1.max / pars[1]
+
         ; The 2D Gaussian parameters are:
         ;   A(0)   Constant baseline level
         ;   A(1)   Peak value
@@ -726,6 +740,8 @@ fwhm = allfwhm
 if n_elements(fwhm) eq 1 then fwhm=fwhm[0]
 ellipticity = allellip
 if n_elements(ellipticity) eq 1 then ellipticity=ellipticity[0]
+; Output GSTR
+if n_elements(gstr2) gt 0 then gstr=gstr2
 
 ; Were there any errors
 bderror = where(error ne '',nbderror)
