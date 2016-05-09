@@ -22,6 +22,7 @@
 ;  fwhm       The median fwhm of stars in the image.  If multiple
 ;             images are processed then this will be an array.
 ;  If "outfile" is set then the FWHM values are written to this file.
+;  ellipticity  The ellipticity (1-a/b).  
 ;  =error     The error message, if one occurred.
 ;
 ; USAGE:
@@ -122,7 +123,7 @@ end
 
 ;--------------------------------------------------------
 
-pro imfwhm,input,fwhm,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
+pro imfwhm,input,fwhm,ellipticity,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
            head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,error=error
 
 ninput = n_elements(input)
@@ -132,7 +133,7 @@ undefine,fwhm
 
 ; Not enough parameters input
 if ninput eq 0 and nim0 eq 0 then begin
-  print,'Syntax - imfwhm,input,fwhm,[im=im,exten=exten,silent=silent,stp=stp]'
+  print,'Syntax - imfwhm,input,fwhm,ellipticity,[im=im,exten=exten,silent=silent,stp=stp]'
   error = 'Not enough inputs'
   return
 endif
@@ -160,6 +161,7 @@ endif
 
 ; Starting ALLFWHM
 allfwhm = fltarr(nfiles)+99.99
+allellip = fltarr(nfiles)+99.99
 
 ; Detection threshoold
 if n_elements(nsigdetect) gt 0 then if nsigdetect[0] gt 0 then nsig=nsigdetect[0]
@@ -175,6 +177,7 @@ error = strarr(nfiles)
 FOR f=0,nfiles-1 do begin
 
   fwhm = 99.99  ; bad until proven good
+  ellipticity = 99.99
 
   ; Loading image from file
   if n_elements(inpim) eq 0 then begin
@@ -245,6 +248,7 @@ FOR f=0,nfiles-1 do begin
       error[f] = files[f]+' NOT ENOUGH GOOD PIXELS'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
+      ellipticity = 99.99
       goto,SKIP  ; go to next image 
     endif
 
@@ -361,6 +365,7 @@ FOR f=0,nfiles-1 do begin
       error[f] = files[f]+' NO STARS FOUND'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
+      ellipticity = 99.99
       goto,SKIP
     endif
     ind2 = array_indices(im,ind)
@@ -455,14 +460,16 @@ FOR f=0,nfiles-1 do begin
 
         ; Calculating the FWHM
         dist = sqrt((xpath-xmnpath)^2.0 + (ypath-ymnpath)^2.0)  
-        fwhm = 2.0 * mean(dist)
+        fwhm1 = 2.0 * mean(dist)
 
         ; Measuring "ellipticity"
-        elip = stdev(dist-fwhm)/fwhm
+        ; DLN 5/9/16, added 2x factor to make it close
+        ;  to "real" ellipticity (1-a/b)
+        elip = 2*stdev(dist-fwhm1)/fwhm1
         peakstr[i].elip = elip
 
         ; Putting it in the structure
-        peakstr[i].fwhm = fwhm
+        peakstr[i].fwhm = fwhm1
         peakstr[i].max = maxim
 
         ; Computing the "round" factor
@@ -473,9 +480,11 @@ FOR f=0,nfiles-1 do begin
         ; Where the 1D Gaussians are of the marginal sums, i.e. sum
         ; along either the x or y dimensions
         ; round~0 is good
+        ; round<0 object elongated in x-direction
+        ; round>0 object elongated in y-direction
         htx = max(total(subim,1))
         hty = max(total(subim,2))
-        round = abs(htx-hty)/mean([htx,hty])
+        round = (htx-hty)/mean([htx,hty])
 
         peakstr[i].round = round
 
@@ -497,12 +506,12 @@ FOR f=0,nfiles-1 do begin
     ;;gd = where(fwhmarr ne 0.0 and roundarr lt 0.3 and eliparr lt 0.5,ngd)
     ;gd = where(fwhmarr gt 0.0 and roundarr lt 0.3 and eliparr lt 0.5 and $
     ;           fluxarr gt 0.0,ngd)
-    gd = where(peakstr.fwhm gt 0.0 and peakstr.round lt 0.3 and peakstr.elip lt 0.5 and $
+    gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 0.3 and peakstr.elip lt 1.0 and $
                peakstr.flux gt 0.0,ngd)
 
     ; If no stars fit this criteria then make it more conservative
     ;if ngd eq 0 then gd = where(fwhmarr gt 0.0 and roundarr lt 1.0,ngd)
-    if ngd eq 0 then gd = where(peakstr.fwhm gt 0.0 and peakstr.round lt 1.0,ngd)
+    if ngd eq 0 then gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 1.0,ngd)
 
     ; Retry with lower detection limit
     if ngd lt 10 and niter lt 5 and nsig gt 2 then begin
@@ -516,6 +525,7 @@ FOR f=0,nfiles-1 do begin
       error[f] = 'No good sources detected'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
+      ellipticity = 99.99
       goto,SKIP
     endif
 
@@ -525,7 +535,7 @@ FOR f=0,nfiles-1 do begin
     sz = size(im)
     x = lindgen(sz[1])
     y = lindgen(sz[2])
-    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:999999.0,dof:-1L,status:0L,fwhm:0.0},ngd)
+    gstr = REPLICATE({x:0.0,y:0.0,pars:fltarr(7),perror:fltarr(7),chisq:999999.0,dof:-1L,status:0L,fwhm:0.0,elip:0.0},ngd)
     gstr.x = peakstr[gd].xcen
     gstr.y = peakstr[gd].ycen
     For i=0,ngd-1 do begin
@@ -563,6 +573,7 @@ FOR f=0,nfiles-1 do begin
         gstr[i].chisq = chisq
         gstr[i].dof = dof
         gstr[i].fwhm = 0.5*(pars[2]+pars[3]) * 2  ; FWHM=average of half-widths (times 2)
+        gstr[i].elip = (1-min(pars[2:3])/max(pars[2:3]))
       
         ; The 2D Gaussian parameters are:
         ;   A(0)   Constant baseline level
@@ -588,6 +599,7 @@ FOR f=0,nfiles-1 do begin
       error[f] = 'No Gaussian fits converged'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
+      ellipticity = 99.99
       goto,SKIP
     endelse
 
@@ -638,19 +650,22 @@ FOR f=0,nfiles-1 do begin
 
        ; Use MEDIAN
        medfwhm = median([gstr2.fwhm])
+       medellip = median([gstr2.elip])
 
        ; Use RESISTANT_MEAN
-       RESISTANT_MEAN,gstr2.fwhm,3.0,mean,sigma
-       resfwhm = mean
+       RESISTANT_MEAN,gstr2.fwhm,3.0,resfwhm,fwhm_sigma
+       RESISTANT_MEAN,gstr2.elip,3.0,resellip,ellip_sigma
 
        ; Weighted mean (by flux)
        ;wt = fluxarr[gd]>0.0001
        wt = gstr2.pars[0]>0.0001
        wtfwhm = total(wt*gstr2.fwhm)/total(wt)
+       wtellip = total(wt*gstr2.elip)/total(wt)
 
        ; Weighted mean with outlier rejection
        sig = 1.0/sqrt(wt)
        ROBUST_MEAN,gstr2.fwhm,robfwhm,robfwhmsigma,sig=sig
+       ROBUST_MEAN,gstr2.elip,robellip,robellipsigma,sig=sig
 
        ; The four methods don't agree
        ; Use flux-weighted mean with outlier rejection.
@@ -660,10 +675,12 @@ FOR f=0,nfiles-1 do begin
 
          if not keyword_set(silent) then print,'Using Flux-weighted Mean with outlier rejection'
          fwhm = robfwhm
+         ellipticity = robellip
 
        ; Use resistant mean
        endif else begin
          fwhm = resfwhm
+         ellipticity = resellip
        endelse
 
 
@@ -674,21 +691,23 @@ FOR f=0,nfiles-1 do begin
       ;FIND,im2,x,y,flux,sharp,round,4.0*skysig,5.0,[-1.0,1.0],[0.2,1.0],/silent
 
       fwhm = 99.99
+      ellipticity = 99.99
     endelse
 
     ; Print results
     if not keyword_set(silent) then begin
       form = '(A15,F10.3)'
       len = strlen(files)
-      if max(len) gt 15 then form = '(A'+strtrim(max(len),2)+',F10.3)'
-      print,format=form,files(f),fwhm
+      if max(len) gt 15 then form = '(A'+strtrim(max(len),2)+',F10.3,F10.3)'
+      print,format=form,files(f),fwhm,ellipticity
     endif
 
     ; Input into IMFWHMARR
     allfwhm[f] = fwhm
+    allellip[f] = ellipticity
 
     if n_elements(outfile) gt 0 then $
-      printf,unit,format=form,files[f],fwhm
+      printf,unit,format=form,files[f],fwhm,ellipticity
 
   endif     ; file exists
 
@@ -705,6 +724,8 @@ endif
 ; Copy ALLFWHM to FWHM
 fwhm = allfwhm
 if n_elements(fwhm) eq 1 then fwhm=fwhm[0]
+ellipticity = allellip
+if n_elements(ellipticity) eq 1 then ellipticity=ellipticity[0]
 
 ; Were there any errors
 bderror = where(error ne '',nbderror)
