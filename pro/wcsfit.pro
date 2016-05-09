@@ -1847,9 +1847,11 @@ if n_elements(cat) eq 0 then begin
   endif
 
   ; Only keep "good" stars
-  gd = where(cat.sharp ge 0.2 and cat.sharp le 1.0 and $
-             cat.round ge -1.0 and cat.round le 1.0 and $
-             cat.mag lt 50.0 and cat.err lt 1.0,ngd)
+  ;gd = where(cat.sharp ge 0.2 and cat.sharp le 1.0 and $
+  ;           cat.round ge -1.0 and cat.round le 1.0 and $
+  ; appropriate SHARP and ROUND cuts are already applied
+  ; in WCSFIT_FIND
+  gd = where(cat.mag lt 50.0 and cat.err lt 1.0,ngd)
   if (ngd eq 0) then begin
     print,'NO good stars'
     error = 'NO good stars'
@@ -2298,8 +2300,6 @@ if (nastr gt 0) then begin
   endelse
 
 endif else initrms=99999.
-
-stop
 
 ; Checking the density of stars
 imarea = (info.nx*pixscale/60.0)*(info.ny*pixscale/60.0)
