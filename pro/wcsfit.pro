@@ -155,7 +155,10 @@ endif else im=float(inpim)
 ;IMFWHM,filename,fwhm,im=im
 if n_elements(inpfwhm) eq 0 then begin
   IMFWHM,filename,fwhm,ellip,silent=silent,exten=exten,im=im,head=head
-endif else fwhm=inpfwhm
+endif else begin
+  fwhm = inpfwhm
+  ellip = 0.1
+endelse
 ;if fwhm gt 50 then fwhm=10
 if fwhm gt 50 then begin
   error = 'Bad FWHM'
