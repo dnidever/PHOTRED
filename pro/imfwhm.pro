@@ -512,9 +512,9 @@ FOR f=0,nfiles-1 do begin
     ;;gd = where(fwhmarr ne 0.0 and roundarr lt 0.3 and eliparr lt 0.5,ngd)
     ;gd = where(fwhmarr gt 0.0 and roundarr lt 0.3 and eliparr lt 0.5 and $
     ;           fluxarr gt 0.0,ngd)
-    gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 0.3 and peakstr.elip lt 1.0 and $
+    ;gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 0.3 and peakstr.elip lt 1.0 and $
+    gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 1.0 and peakstr.elip lt 1.0 and $
                peakstr.flux gt 0.0,ngd)
-
     ; If no stars fit this criteria then make it more conservative
     ;if ngd eq 0 then gd = where(fwhmarr gt 0.0 and roundarr lt 1.0,ngd)
     if ngd eq 0 then gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 1.0,ngd)
@@ -710,7 +710,7 @@ FOR f=0,nfiles-1 do begin
 
     ; Print results
     if not keyword_set(silent) then begin
-      form = '(A15,F10.3)'
+      form = '(A15,F10.3,F10.3)'
       len = strlen(files)
       if max(len) gt 15 then form = '(A'+strtrim(max(len),2)+',F10.3,F10.3)'
       print,format=form,files(f),fwhm,ellipticity
