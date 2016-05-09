@@ -168,12 +168,34 @@ nrefstars = n_elements(gdrefstars)
 ; Getting the "good" frames
 totframe = total(mag[*,gdrefstars] lt 50,2)
 gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
-; no good frames, lower number of reference stars
+; No good frames, lower number of reference stars
 if ngdframe eq 0 then begin
   gdrefstars = si[0:(29<(nstars-1))]
   nrefstars = n_elements(gdrefstars)
   totframe = total(mag[*,gdrefstars] lt 50,2)
   gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
+endif
+; No good frames again, say the frame with the most detections is "good"
+;   get weights relative to that one for the others
+if ngdframe eq 0 then begin
+  ; say the frame with the most detections is "good" and
+  ;  the rest are bad, get weights relative to this one frame
+  totstarsframe = total(mag lt 50,2)
+  gdframe = first_el(maxloc(totstarsframe))
+  bdframe = lindgen(nfiles,1)
+  remove,gdframe,bdframe
+  nbdframe = n_elements(bdframe)
+  ; Get stars that are good in this frames and in ALL of the others
+  gdrefstars = where(reform(mag[gdframe,*]) lt 50 and totstars eq nfiles,nrefstars)
+  ;  lower threshold, at least half
+  if nrefstars eq 0 then gdrefstars = where(reform(mag[gdframe,*]) lt 50 and totstars gt 0.5*nfiles,nrefstars)
+  ;  just the good ones
+  if nrefstars eq 0 then begin
+    gdrefstars = where(reform(mag[gdframe,*]) lt 50,nrefstars)
+    si = reverse(sort(totstars[gdrefstars]))           ; order by how many other frames they are detected in
+    gdrefstars = gdrefstars[si[0:(49>(nrefstars-1))]]  ; only want 50
+    nrefstars = n_elements(gdrefstars)
+  endif
 endif
 
 ; Calculate the weights
@@ -181,7 +203,7 @@ actweight = fltarr(nfiles)
 scales = fltarr(nfiles)
 mag2 = mag[gdframe,*] & mag2 = mag2[*,gdrefstars]
 err2 = err[gdframe,*] & err2 = err2[*,gdrefstars]
-allframe_calcweights,mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe],$
+ALLFRAME_CALCWEIGHTS,mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe],$
          actweight1,scales1
 actweight[gdframe] = actweight1
 scales[gdframe] = scales1
