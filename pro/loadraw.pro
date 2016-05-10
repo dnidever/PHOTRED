@@ -101,12 +101,12 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   ;if (nmag lt 12) then begin
   if (continuation eq 0) then begin
 
-    fieldtypes = [3,lonarr(nmag-1)+4]
+    fieldtypes = [3,lonarr(ncol-1)+4]
     fieldnames = ['ID','X','Y']
     for i=1,nmag do fieldnames = [fieldnames,'MAG'+strtrim(i,2),'ERR'+strtrim(i,2)]
     fieldnames = [fieldnames,'CHI','SHARP']
 
-    phot = importascii(filename,fieldtype=types,fieldnames=fieldnames,skip=3,/noprint)
+    phot = importascii(filename,fieldtype=fieldtypes,fieldnames=fieldnames,skip=3,/noprint)
     head = [line1,line2]
 
   ; nfiles >= 12
