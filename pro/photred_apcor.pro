@@ -148,6 +148,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,''
 
 ; How many nights are there?                                                                                                                                                        
+printlog,logfile,'Getting night information'
 allnight = lonarr(ninputlines)
 for i=0,ninputlines-1 do allnight[i] = PHOTRED_GETMJD(inputlines[i],observatory)
 ui = uniq(allnight,sort(allnight))
