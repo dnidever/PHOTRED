@@ -149,12 +149,19 @@ for i=0,nfiles-1 do begin
 end
 
 ; Calculating the Median CHI and SHARP
-chi = MEDIAN(chiarr,dim=2)
-sharp = MEDIAN(sharparr,dim=2)
-
-; The fortran makemag code used the mean
-chimean = total(chiarr,2,/nan)/countarr
-sharpmean = total(sharparr,2,/nan)/countarr
+if nfiles gt 1 then begin
+  chi = MEDIAN([chiarr],dim=2)
+  sharp = MEDIAN([sharparr],dim=2)
+  ; The fortran makemag code used the mean
+  chimean = total(chiarr,2,/nan)/countarr
+  sharpmean = total(sharparr,2,/nan)/countarr
+; only 1 file
+endif else begin
+  chi = chiarr
+  sharp = sharparr
+  chimean = chiarr
+  sharpmean = sharparr
+endelse
 
 ; Creating mag/magerr output array
 magoutarr = fltarr(nstars,nfiles*2)
