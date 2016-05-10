@@ -311,6 +311,9 @@ for i=1,nfiles-1 do begin
       ymed1 = median([ydiff1],/even)
       ; redo the search
       SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,20,ind1,ind2,count=count
+      if count eq 0 then begin
+        SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,100,ind1,ind2,count=count
+      endif
       xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
       xmed = median([xdiff],/even)
