@@ -428,6 +428,7 @@ if n_elements(outlines) lt 9 then begin
     ;outlines = header1       ; restart the output array
     mindist = mindist*1.5
     nrepeat++
+    goto,compare
 
   ; Just add the middle 10 sources
   endif else begin
