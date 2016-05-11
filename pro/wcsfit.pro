@@ -28,8 +28,10 @@
 ;               tags RAJ2000/DEJ2000 or RA/DEC.
 ;  =refmaglim  The reference magnitude limit to use.  The default is 16.5 for 2MASS-PSC
 ;                and 21.0 for USNO-B1.
-;  =catmaglim  The magnitude limit to us for the catalog of detected sources.  The default
+;  =catmaglim  The magnitude limit to use for the catalog of detected sources.  The default
 ;                is to use all "good" sources.
+;  =caterrlim  The error limit to use for the catalog of detected sources.  The default
+;                is to use all sources with err<1.0 mag.
 ;  =crpix1    The X value of the reference pixel.  The default is the center of the image.
 ;  =crpix2    The Y value of the reference pixel.  The default is the center of the image.
 ;  /noupdate  Do NOT Update the FITS header with the fitted WCS.  The
@@ -40,6 +42,8 @@
 ;                The default is the greater of Xsize, Ysize and 10 arcmin.
 ;  =rmslim    The maximum RMS to allow before the fit is "bad" and
 ;                rejected.  The default is rmslim=1.0 arcsec
+;  =inpfwhm   Use this input FWHM for this image.  The default is to
+;                derive it with IMFWHM.PRO.
 ;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS
@@ -1306,7 +1310,7 @@ end
 pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
            cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
            redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
-           refmaglim=refmaglim,catmaglim=catmaglim,inpfwhm=inpfwhm
+           refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,inpfwhm=inpfwhm
 
 t0 = systime(1)
 undefine,error
@@ -1317,7 +1321,8 @@ if ninput eq 0 then begin
   print,'Syntax - wcsfit,input,up=up,left=left,pixscale=pixscale,cenra=cenra,cendec=cendec,'
   print,'                cat=cat,refcat=refcat,stp=stp,error=error,projection=projection,'
   print,'                noupdate=noupdate,redo=redo,searchdist=searchdist,rmslim=rmslim,'
-  print,'                refname=refname,refmaglim=refmaglim,catmaglim=catmaglim'
+  print,'                refname=refname,refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,'
+  print,'                inpfwhm=inpfwhm'
   error = 'Not enough inputs'
   return
 endif
@@ -2165,6 +2170,18 @@ if n_elements(catmaglim) gt 0 then begin
   print,'Keeping only DETECTED sources with MAG < ',strtrim(catmaglim,2),' ',strtrim(ngdcat,2),' sources'
   if ngdcat lt 5 then begin
     error = 'Not enough detected sources brighter than '+strtrim(catmaglim,2)+' mag to perform WCS fitting.'
+    if not keyword_set(silent) then print,error
+    return
+  endif
+  cat1 = cat[gdcat]
+endif else cat1=cat
+
+; Keeping only DETECTED sources within the error limit
+if n_elements(caterrlim) gt 0 then begin
+  gdcat = where(cat.err lt caterrlim,ngdcat)
+  print,'Keeping only DETECTED sources with ERR < ',strtrim(caterrlim,2),' ',strtrim(ngdcat,2),' sources'
+  if ngdcat lt 5 then begin
+    error = 'Not enough detected sources brighter than '+strtrim(catmerrlim,2)+' mag to perform WCS fitting.'
     if not keyword_set(silent) then print,error
     return
   endif

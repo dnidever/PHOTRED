@@ -99,6 +99,11 @@ if wcsrmslim ne '0' and wcsrmslim ne '' and wcsrmslim ne '-1' then $
    wcsrmslim=float(wcsrmslim) else undefine,wcsrmslim
 if n_elements(wcsrmslim) gt 0 then if wcsrmslim lt 0. then undefine,wcsrmslim
 
+; WCS catalog err limit
+wcscaterrlim = READPAR(setup,'WCSCATERRLIM')
+if wcscaterrlim ne '0' and wcscaterrlim ne '' and wcscaterrlim ne '-1' then $
+   wcscaterrlim=float(wcscaterrlim) else undefine,wcscaterrlim
+
 ; Pixel scale, this is only used for non-standard setups
 wcspixscale = READPAR(setup,'PIXSCALE')
 if wcspixscale ne '0' and wcspixscale ne '' and wcspixscale ne '-1' then $
@@ -292,6 +297,7 @@ FOR i=0,ninputlines-1 do begin
     cmd1 = "WCSFIT,'"+file+"',up='E',left='S',refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if n_elements(wcscaterrlim) gt 0 then cmd1+=",caterrlim="+strtrim(wcscaterrlim,2)
     if keyword_set(redo) then cmd1+=',/redo'
     PUSH,cmd,cmd1
     PUSH,cmddir,filedir
@@ -310,6 +316,7 @@ FOR i=0,ninputlines-1 do begin
     cmd1 = "WCSFIT_IMACS,'"+file+"',refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if n_elements(wcscaterrlim) gt 0 then cmd1+=",caterrlim="+strtrim(wcscaterrlim,2)
     if keyword_set(redo) then cmd1+=',/redo'
     PUSH,cmd,cmd1
     PUSH,cmddir,filedir
@@ -354,6 +361,7 @@ FOR i=0,ninputlines-1 do begin
     cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if n_elements(wcscaterrlim) gt 0 then cmd1+=",caterrlim="+strtrim(wcscaterrlim,2)
     if keyword_set(redo) then cmd1+=',/redo'
     PUSH,cmd,cmd1
     PUSH,cmddir,filedir
@@ -392,6 +400,7 @@ FOR i=0,ninputlines-1 do begin
     cmd1 = "WCSFIT,'"+file+"',up='"+up+"',left='"+left+"',pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if n_elements(wcscaterrlim) gt 0 then cmd1+=",caterrlim="+strtrim(wcscaterrlim,2)
     if keyword_set(redo) then cmd1+=',/redo'
     PUSH,cmd,cmd1
     PUSH,cmddir,filedir
@@ -425,6 +434,7 @@ FOR i=0,ninputlines-1 do begin
     if n_elements(wcsup) gt 0 then cmd1+=",up='"+wcsup+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
+    if n_elements(wcscaterrlim) gt 0 then cmd1+=",caterrlim="+strtrim(wcscaterrlim,2)
     if keyword_set(redo) then cmd1+=',/redo'
     PUSH,cmd,cmd1
     PUSH,cmddir,filedir
