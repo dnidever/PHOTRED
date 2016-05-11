@@ -274,7 +274,15 @@ for i=1,nfiles-1 do begin
     head_xyad,head2,als.x,als.y,a2,d2,/deg
 
     SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
- 
+  
+    ; If no matches, try with looser cuts
+    if count eq 0 then begin
+      print,'No matches, trying looser cuts'
+      gdref = where(refals.mag lt 50.0 and refals.err lt 1.0,ngdref)
+      gdals = where(als.mag lt 50.0 and als.err lt 1.0,ngdals)
+      SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
+    endif
+
     if count gt 0 then begin 
       xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
@@ -292,7 +300,7 @@ for i=1,nfiles-1 do begin
     endif
 
     BOMB1:
-  endif
+  endif ; use WCS
 
 
   ; Match stars with X/Y coordinates
