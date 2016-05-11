@@ -325,6 +325,7 @@ wcsrefname | The name of the WCS reference catalog to use. The two options are '
 searchdist | This sets the search distance (in arcmin) for WCS fitting (PHOTRED_WCS). Normally this is not needed. The default is 2*image size > 60 arcmin (i.e. whichever is greater). This is normally sufficient. If the WCS isn't fitting correctly then try setting "searchdist" to a larger value.
 wcsrmslim | This is the maximum RMS (in arcseconds) allowed for an acceptable WCS fit. The default is 1.0 arcseconds. Normally the RMS values are ~0.2-0.3 arcseconds.
 hyperthread | This allows multiple jobs to be running (daophot and allframe only) on a computer (such as halo or stream) that has multiple processors. It's similar to running it on a cluster.
+wcscaterrlim | This is an error limit on the detected sources in an image used to match to an astrometric reference catalog.
 daopsfva | The DAOPHOT .opt VA option, which is for the spatially-varying analytical PSF (0: constant, 1: linear, 2: quadratic).  The default internal value is 2.
 daofitradfwhm | The DAOPHOT .opt file PSF Fitting Radius to use in terms of the FWHM.  1.0 x FWHM is the default option.  Smaller values are often better in crowded regions.
 psfcomsrc | If this is set to 1 then only sources detected in other frames of the same field are used as PSF stars. This makes sure that your PSF stars are not contaminated by cosmic rays or other junk. HIGHLY RECOMMENDED.
