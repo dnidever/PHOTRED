@@ -36,7 +36,13 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp
 
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
-  print,'Input MCH file'
+  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp'
+  return
+endif
+
+; MCH file not found
+if file_test(mchfile) eq 0 then begin
+  print,mchfile,' NOT FOUND'
   return
 endif
 
@@ -275,7 +281,7 @@ for i=0,nbdframe-1 do begin
   indframes = [igdframe,iframe]
   mag3 = (mag[indframes,*])[*,igdrefstars]
   err3 = (err[indframes,*])[*,igdrefstars]
-  allframe_calcweights,mag3,err3,fwhm[indframes],rdnoise[indframes],medsky[indframes],$
+  ALLFRAME_CALCWEIGHTS,mag3,err3,fwhm[indframes],rdnoise[indframes],medsky[indframes],$
                        actweight3,scales3
 
   ; Scale these relative to the original ones
