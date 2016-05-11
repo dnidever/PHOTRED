@@ -139,6 +139,9 @@ if strtrim(alftrimcomb,2) eq '1' then alftrimcomb=1 else undefine,alftrimcomb
 alfexclude = READPAR(setup,'alfexclude')
 if alfexclude eq '0' or alfexclude eq '' or alfexclude eq '-1' then undefine,alfexclude
 
+; Use common sources file from the reference image
+alfusecmn = READPAR(setup,'alfusecmn')
+if alfusecmn eq '0' or alfusecmn eq '' or alfusecmn eq '-1' then undefine,alfusecmn
 
 
 ; Get the IRAF directory from the setup file
@@ -508,6 +511,7 @@ cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+ira
       ",detectprog='"+alfdetprog+"'"
 if keyword_set(alfnocmbimscale) then cmd=cmd+",/nocmbimscale"
 if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
+if keyword_set(alfusecmn) then cmd=cmnd+",/usecmn"
 
 ; Getting NMULTI
 nmulti = READPAR(setup,'NMULTI')

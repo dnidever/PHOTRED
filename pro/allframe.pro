@@ -27,6 +27,7 @@
 ;  =scriptsdir    The directory that contains all of the necessary scripts.
 ;  =irafdir       The IRAF home directory.
 ;  =logfile       A logfile to print to output to.
+;  /usecmn        Use the common sources file of the reference image.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -44,7 +45,8 @@
 
 pro allframe,file,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
-             irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb
+             irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
+             usecmn=usecmn
 
 COMMON photred,setup
 
@@ -55,7 +57,7 @@ nfile = n_elements(file)
 if (nfile eq 0) then begin
   print,'Syntax - allframe,file,stp=stp,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
-  print,'                  irafdir=irafdir,trimcomb=trimcomb'
+  print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn'
   return
 endif
 
@@ -260,7 +262,7 @@ printlog,logf,'------------------------'
 
 ;-----------------------------------
 ; Computs Weights
-ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky,raw2=raw2
+ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky ;,raw2=raw2
 invscales = 1.0/scales
 bdscale = where(scales lt 1e-5 or invscales gt 900,nbdscale)
 if nbdscale gt 0 then begin
@@ -403,6 +405,8 @@ if n_elements(imshifterror) ne 0 then begin
   error = imshifterror
   return
 endif
+
+;stop
 
 ; Trim the images
 if keyword_set(trimcomb) then begin
@@ -776,7 +780,7 @@ printlog,logf,'----------------------------------------'
 ; Make .opt files, set saturation just below the mask data level
 MKOPT,combfile,satlevel=maskdatalevel-1000
 ; Using CMN.LST of reference frame if it exists
-if file_test(mchbase+'.cmn.lst') then begin
+if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
   print,'Using reference image COMMON SOURCE file'
   file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
 endif
