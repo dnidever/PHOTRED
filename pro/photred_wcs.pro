@@ -389,7 +389,7 @@ FOR i=0,ninputlines-1 do begin
     endelse
 
     ; Add to the PBS command list
-    cmd1 = "WCSFIT,'"+file+"',up="+up+",left="+left+",pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
+    cmd1 = "WCSFIT,'"+file+"',up='"+up+"',left='"+left+"',pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
@@ -421,8 +421,8 @@ FOR i=0,ninputlines-1 do begin
 
     ; Add to the PBS command list
     cmd1 = "WCSFIT,'"+file+"',pixscale="+strtrim(pixscale,2)+",refname='"+wcsrefname+"'"
-    if n_elements(wcsleft) gt 0 then cmd1+=",left="+wcsleft
-    if n_elements(wcsup) gt 0 then cmd1+=",up="+wcsup
+    if n_elements(wcsleft) gt 0 then cmd1+=",left='"+wcsleft+"'"
+    if n_elements(wcsup) gt 0 then cmd1+=",up='"+wcsup+"'"
     if n_elements(searchdist) gt 0 then cmd1+=",searchdist="+strtrim(searchdist,2)
     if n_elements(wcsrmslim) gt 0 then cmd1+=",rmslim="+strtrim(wcsrmslim,2)
     if keyword_set(redo) then cmd1+=',/redo'
