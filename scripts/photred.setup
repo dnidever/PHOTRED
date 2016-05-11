@@ -32,6 +32,7 @@ finditer      2
 #alfdetprog   sextractor
 #alfnocmbimscale 0
 #alfexclude   F1,F3
+alfusecmn     1
 ddo51radoffset  1
 keepinstr   1
 avgmag      1
