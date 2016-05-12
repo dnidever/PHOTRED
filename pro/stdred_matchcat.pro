@@ -159,8 +159,18 @@ gd = where(stdtest2 eq 1,ngd)
 if (ngd gt 0) then begin
   printlog,logfile,strtrim(ngd,2)+' standard star catalogs found'
   printlog,logfile,'Copying '+stdfiles1[gd]
-  FILE_COPY,scriptsdir+'/'+stdfiles1[gd],'.',/overwrite,/allow_same
+  ;FILE_COPY,scriptsdir+'/'+stdfiles1[gd],'.',/overwrite,/allow_same
   stdfiles = stdfiles1[gd]
+  ; Copy the files, leave ones that already exist locally
+  for i=0,ngd-1 do begin
+    ;if file_test(stdfiles1[gd[i]]) eq 0 or keyword_set(redo) then begin
+    if file_test(stdfiles[i]) eq 0 then begin
+      FILE_COPY,scriptsdir+'/'+stdfiles[i],'.'
+    endif else begin
+      printlog,logfile,'Using local copy of '+stdfiles[i]
+    endelse
+  endfor
+
 
 ; No standard star catalog files
 endif else begin
