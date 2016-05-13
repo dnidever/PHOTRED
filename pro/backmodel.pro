@@ -12,6 +12,8 @@
 ;             The default is 2.
 ;  =maxiter The maximum number of outer rejection iterations
 ;             to use.  The default is 2.
+;  =nsigrej The sigma clipping value to use for outlier
+;             rejection. The default is 2.5.
 ;  /stp     Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -34,7 +36,8 @@ ny = sz[2]
 xstep = round(nx/nbins)
 ystep = round(ny/nbins)
 medim = fltarr(nbins,nbins)
-medstr = replicate({x:0.0,y:0.0,value:0.0,sig:0.0,xlo:0L,xhi:0L,ylo:0L,yhi:0L},nbins,nbins)
+medstr = replicate({x:0.0,y:0.0,med:0.0,sig:0.0,mode:0.0,value:0.0,$
+                    xlo:0L,xhi:0L,ylo:0L,yhi:0L},nbins,nbins)
 ;medstr = replicate({x:0.0,y:0.0,value:0.0,xlo:0L,xhi:0L,ylo:0L,yhi:0L},nbins,nbins)
 
 for i=0,nbins-1 do begin
@@ -50,8 +53,28 @@ for i=0,nbins-1 do begin
     medstr[i,j].x = mean([xlo,xhi])
     medstr[i,j].y = mean([ylo,yhi])
     subim = im[xlo:xhi,ylo:yhi]
-    medstr[i,j].value = median([subim],/even)
-    medstr[i,j].sig = mad([subim])
+    med = median([subim],/even)
+    medstr[i,j].med = med
+    sig = mad([subim-med],/zero)
+    medstr[i,j].sig = sig
+    ; Use histogram to get Mode
+    bin1 = sig/3.
+    hist1 = histogram(subim,bin=bin1,min=med-2.5*sig,max=med+2.5*sig,locations=xhist1)
+    xhist1 += 0.5*bin1
+    maxind1 = first_el(maxloc(hist1))
+    mode1 = xhist1[maxind1]
+    ; A second time around the mode to refine the value
+    bin2 = sig/6.
+    hist = histogram(subim,bin=bin2,min=mode1-1.5*sig,max=med+1.5*sig,locations=xhist)
+    xhist += 0.5*bin2
+    maxind = first_el(maxloc(hist))
+    mode = xhist[maxind]
+    medstr[i,j].mode = mode
+    medstr[i,j].value = mode
+    ;MMM,subim,skymod,sigma,skew
+    ;medstr[i,j].mode = skymod
+    ;medstr[i,j].sigma = sigma
+    ;medstr[i,j].skew = skew
   endfor
 endfor
 
@@ -79,13 +102,14 @@ end
 ;----------
 
 
-pro backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,maxiter=maxiter,stp=stp
+pro backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,maxiter=maxiter,$
+              nsigrej=nsigrej,stp=stp
 
 undefine,model,medstr
 
 ; Not enough inputs
 if n_elements(im) eq 0 then begin
-  print,'Syntax - backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,stp=stp'
+  print,'Syntax - backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,nsigrej=nsigrej,stp=stp'
   return
 endif
 
@@ -101,24 +125,32 @@ ny = sz[2]
 if n_elements(nbins) eq 0 then nbins=12
 if n_elements(ngrow) eq 0 then ngrow=2
 if n_elements(maxiter) eq 0 then maxiter=2
+if n_elements(nsigrej) eq 0 then nsigrej=2.5
+
+; Determine medians in large bins
+BACKMODEL_MEDIM,im,medstr,nbins=nbins
+
+; 2D linear interpolation
+model = CONGRID(medstr.value,nx,ny,/interp,/center)
 
 ; Outlier rejection loop
 tempim = im
-lastmodel = im*0
+lastmodel = model
+threshold = 0.01*median(medstr.value)  ; 1% of the background
 niter = 0
 flag = 0
 WHILE (flag eq 0) do begin
 
-  ; Determine medians in large bins
-  BACKMODEL_MEDIM,tempim,medstr1,nbins=nbins
-
-  ; 2D linear interpolation
-  model1 = CONGRID(medstr1.value,nx,ny,/interp,/center)
+  ;; Determine medians in large bins
+  ;BACKMODEL_MEDIM,tempim,medstr1,nbins=nbins
+  ;
+  ;; 2D linear interpolation
+  ;model1 = CONGRID(medstr1.value,nx,ny,/interp,/center)
 
   ; Get the residuals and their scatter
-  BACKMODEL_MEDIM,tempim-model1,medstr2,nbins=nbins
+  BACKMODEL_MEDIM,tempim-model,medstr2,nbins=nbins
   ; use the sigma of the residuals
-  sig = medstr1.sig < medstr2.sig  ; use the lower of the two values
+  sig = medstr.sig < medstr2.sig  ; use the lower of the two values
   sig1 = CONGRID(sig,nx,ny,/interp,/center)
 
   ; Remove outliers and fit again
@@ -127,7 +159,7 @@ WHILE (flag eq 0) do begin
   ;rnd = sort(randomu(seed,nsample))
   ;sig = mad((im-model1)(rnd))
   tempim = im
-  bdpix = where( abs(im-model1) gt 2.5*sig1,nbdpix)
+  bdpix = where( abs(im-model) gt nsigrej*sig1,nbdpix)
   if nbdpix gt 0 then begin
     ; Grow the bad pixel regions
     if ngrow gt 0 then begin
@@ -145,16 +177,10 @@ WHILE (flag eq 0) do begin
 
     ; Final 2D linear interpolation
     model = CONGRID(medstr.value,nx,ny,/interp,/center)
-
-  ; Nothing to mask
-  endif else begin
-    model = model1
-    medstr = medstr1
-  endelse
+  endif
 
   ; Ready to stop?
   diff = lastmodel-model
-  threshold = 50
   if nbdpix eq 0 or max(abs(diff)) lt threshold or niter ge maxiter then flag=1
 
   lastmodel = model
