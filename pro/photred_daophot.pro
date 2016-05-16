@@ -1,4 +1,4 @@
-pro photred_daophot,redo=redo,stp=stp
+pro photred_daophot,redo=redo,stp=stp,fake=fake
 
 ;+
 ;
@@ -274,7 +274,7 @@ for i=0,ninputlines-1 do begin
     testing = 1
   endif
 
-end
+endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
@@ -288,6 +288,11 @@ if (headerproblem eq 1) then begin
   RETALL
 endif
 
+; FAKE, artificial star tests
+if keyword_set(fake) then begin
+  successarr[*] = 1
+  goto,rundaophot
+endif
 
 
 printlog,logfile,'Checking which files to make DAOPHOT/ALLSTAR option files for'
@@ -638,10 +643,15 @@ Endif ; some done already?
 ;----------------------
 ; RUNNING THE COMMANDS
 ;----------------------
+rundaophot:
 
 ; Make commands for daophot
-cmd = './daophot.sh '+procbaselist
-
+if not keyword_set(fake) then begin
+  cmd = './daophot.sh '+procbaselist
+endif else begin
+  cmd = './daophot_fake.sh '+procbaselist
+endelse
+  
 ; Submit the jobs to the daemon
 PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=30,/cdtodir
 
