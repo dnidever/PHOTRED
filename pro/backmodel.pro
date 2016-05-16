@@ -19,6 +19,7 @@
 ; OUTPUTS:
 ;  model    The 2D background model
 ;  =medstr  The structure with the median values in the spatial bins.
+;  =maskim  The masked image.  Masked pixels are set to NAN.
 ;
 ; USAGE:
 ;  IDL>backmodel,im,model
@@ -103,13 +104,13 @@ end
 
 
 pro backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,maxiter=maxiter,$
-              nsigrej=nsigrej,stp=stp
+              nsigrej=nsigrej,maskim=maskim,stp=stp
 
 undefine,model,medstr
 
 ; Not enough inputs
 if n_elements(im) eq 0 then begin
-  print,'Syntax - backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,nsigrej=nsigrej,stp=stp'
+  print,'Syntax - backmodel,im,model,medstr=medstr,nbins=nbins,ngrow=ngrow,nsigrej=nsigrej,maskim=maskim,stp=stp'
   return
 endif
 
@@ -128,20 +129,20 @@ if n_elements(maxiter) eq 0 then maxiter=1
 if n_elements(nsigrej) eq 0 then nsigrej=2.5
 
 ; Initial rough masking
-tempim = im
+maskim = im
 med = median(im)
 sig = mad(im-med,/zero)
 bdpix = where( abs(im-med) gt 3*sig,nbdpix)
-if nbdpix gt 0 then tempim[bdpix] = !values.f_nan
+if nbdpix gt 0 then maskim[bdpix] = !values.f_nan
 
 ; Determine medians in large bins
-BACKMODEL_MEDIM,tempim,medstr,nbins=nbins
+BACKMODEL_MEDIM,maskim,medstr,nbins=nbins
 
 ; 2D linear interpolation
 model = CONGRID(medstr.value,nx,ny,/interp,/center)
 
 ; Outlier rejection loop
-;tempim = im
+;maskim = im
 lastmodel = model
 threshold = 0.01*median(medstr.value)  ; 1% of the background
 niter = 0
@@ -149,13 +150,13 @@ flag = 0
 WHILE (flag eq 0) do begin
 
   ;; Determine medians in large bins
-  ;BACKMODEL_MEDIM,tempim,medstr1,nbins=nbins
+  ;BACKMODEL_MEDIM,maskim,medstr1,nbins=nbins
   ;
   ;; 2D linear interpolation
   ;model1 = CONGRID(medstr1.value,nx,ny,/interp,/center)
 
   ; Get the residuals and their scatter
-  BACKMODEL_MEDIM,tempim-model,medstr2,nbins=nbins
+  BACKMODEL_MEDIM,maskim-model,medstr2,nbins=nbins
   ; use the sigma of the residuals
   sig = medstr.sig < medstr2.sig  ; use the lower of the two values
   sig1 = CONGRID(sig,nx,ny,/interp,/center)
@@ -165,7 +166,7 @@ WHILE (flag eq 0) do begin
   ;nsample = 1000 > round(0.05*nx*ny) < (nx*ny)
   ;rnd = sort(randomu(seed,nsample))
   ;sig = mad((im-model1)(rnd))
-  tempim = im
+  maskim = im
   bdpix = where( abs(im-model) gt nsigrej*sig1,nbdpix)
   if nbdpix gt 0 then begin
     ; Grow the bad pixel regions
@@ -177,10 +178,10 @@ WHILE (flag eq 0) do begin
       mask = mask/(mask>1)
       bdpix = where(mask eq 1,nbdpix)
     endif
-    tempim[bdpix] = !values.f_nan
+    maskim[bdpix] = !values.f_nan
 
     ; Determine medians in large bins again
-    BACKMODEL_MEDIM,tempim,medstr,nbins=nbins
+    BACKMODEL_MEDIM,maskim,medstr,nbins=nbins
 
     ; Final 2D linear interpolation
     model = CONGRID(medstr.value,nx,ny,/interp,/center)
