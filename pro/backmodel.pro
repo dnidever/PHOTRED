@@ -11,7 +11,7 @@
 ;  =ngrow   The number of pixels to grow the bad pixel mask.
 ;             The default is 2.
 ;  =maxiter The maximum number of outer rejection iterations
-;             to use.  The default is 2.
+;             to use.  The default is 1.
 ;  =nsigrej The sigma clipping value to use for outlier
 ;             rejection. The default is 2.5.
 ;  /stp     Stop at the end of the program.
@@ -124,7 +124,7 @@ ny = sz[2]
 ; Defaults
 if n_elements(nbins) eq 0 then nbins=12
 if n_elements(ngrow) eq 0 then ngrow=2
-if n_elements(maxiter) eq 0 then maxiter=2
+if n_elements(maxiter) eq 0 then maxiter=1
 if n_elements(nsigrej) eq 0 then nsigrej=2.5
 
 ; Initial rough masking
