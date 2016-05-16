@@ -1,4 +1,4 @@
-pro photred_match,redo=redo,stp=stp
+pro photred_match,redo=redo,fake=fake,stp=stp
 
 ;+
 ;
@@ -9,6 +9,7 @@ pro photred_match,redo=redo,stp=stp
 ;
 ; INPUTS:
 ;  /redo Redo files that were already done.
+;  /fake Run for artificial star tests.
 ;  /stp  Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -294,7 +295,7 @@ FOR i=0,ndirs-1 do begin
         PUSH,failurelist,dirs[i]+'/'+base[k]+'.als'
         foundarr[k] = 0
       endif
-    end
+    endfor
     ; Are any left?
     gd = where(foundarr eq 1,ngd)
     if (ngd gt 0) then begin
@@ -432,65 +433,86 @@ FOR i=0,ndirs-1 do begin
 
       ; Getting the REFERENCE Image
       ;---------------------------------
-      ; Get filters for first amp
-      ind1 = where(amp eq amps[0],nind1)
-      base1 = base[ind1]
-      filters = PHOTRED_GETFILTER(base1+'.fits')
-      exptime = PHOTRED_GETEXPTIME(base1+'.fits')
-      rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
-      utdate = PHOTRED_GETDATE(base1+'.fits')
-      uttime = PHOTRED_GETUTTIME(base1+'.fits')
-      dateobs = utdate+'T'+uttime
-      jd = dblarr(nind1)
-      for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
+      if not keyword_set(fake) then begin
+        ; Get filters for first amp
+        ind1 = where(amp eq amps[0],nind1)
+        base1 = base[ind1]
+        filters = PHOTRED_GETFILTER(base1+'.fits')
+        exptime = PHOTRED_GETEXPTIME(base1+'.fits')
+        rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
+        utdate = PHOTRED_GETDATE(base1+'.fits')
+        uttime = PHOTRED_GETUTTIME(base1+'.fits')
+        dateobs = utdate+'T'+uttime
+        jd = dblarr(nind1)
+        for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
       
-      ; Find matches to the reference filter in priority order
-      ngdref=0 & refind=-1
-      repeat begin
-        refind++
-        gdref = where(filters eq filtref[refind],ngdref)
-      endrep until (ngdref gt 0) or (refind eq nfiltref-1)
-      if ngdref gt 0 then usefiltref=filtref[refind]
-      ;gdref = where(filters eq filtref,ngdref)
-      ; No reference filters
-      if ngdref eq 0 then begin
-        printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
-        printlog,logfile,'MODIFY >>photred.setup<< file parameter FILTREF'
-        printlog,logfile,'FILTERS AVAILABLE: '+filters[uniq(filters,sort(filters))]
-        printlog,logfile,'Failing field '+thisfield+' and going to the next'
-        PUSH,failurelist,dirs[i]+'/'+base+'.als'
-        goto,BOMB
-      endif
+        ; Find matches to the reference filter in priority order
+        ngdref=0 & refind=-1
+        repeat begin
+          refind++
+          gdref = where(filters eq filtref[refind],ngdref)
+        endrep until (ngdref gt 0) or (refind eq nfiltref-1)
+        if ngdref gt 0 then usefiltref=filtref[refind]
+        ;gdref = where(filters eq filtref,ngdref)
+        ; No reference filters
+        if ngdref eq 0 then begin
+          printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
+          printlog,logfile,'MODIFY >>photred.setup<< file parameter FILTREF'
+          printlog,logfile,'FILTERS AVAILABLE: '+filters[uniq(filters,sort(filters))]
+          printlog,logfile,'Failing field '+thisfield+' and going to the next'
+          PUSH,failurelist,dirs[i]+'/'+base+'.als'
+          goto,BOMB
+        endif
 
-      ; More than one exposure in reference filter
-      ; Use image with LONGEST exptime
-      if ngdref gt 1 then begin
-        ; Getting image with longest exptime
-        refbase = base1[gdref]
-        maxind = maxloc(rexptime[gdref])
-        if n_elements(maxind) gt 1 then begin  ; pick chronological first image
-          si = sort(jd[gdref[maxind]])
-          maxind = maxind[si[0]]  
-        endif 
-        ;exptime2 = exptime[gdref]
-        ;maxind = first_el(maxloc(exptime2))
-        refimbase = refbase[maxind]
-        refexptime = exptime[gdref[maxind]]
+        ; More than one exposure in reference filter
+        ; Use image with LONGEST exptime
+        if ngdref gt 1 then begin
+          ; Getting image with longest exptime
+          refbase = base1[gdref]
+          maxind = maxloc(rexptime[gdref])
+          if n_elements(maxind) gt 1 then begin  ; pick chronological first image
+            si = sort(jd[gdref[maxind]])
+            maxind = maxind[si[0]]  
+          endif 
+          ;exptime2 = exptime[gdref]
+          ;maxind = first_el(maxloc(exptime2))
+          refimbase = refbase[maxind]
+          refexptime = exptime[gdref[maxind]]
 
-        printlog,logfile,'Two images in reference filter.'
-        printlog,logfile,'Picking the image with the longest exposure time'
+          printlog,logfile,'Two images in reference filter.'
+          printlog,logfile,'Picking the image with the longest exposure time'
 
-      ; Single frame
+        ; Single frame
+        endif else begin
+          refimbase = base1[gdref[0]]
+          refexptime = exptime[gdref[0]]
+        endelse
+
+        ; Getting just the base, without the extension, e.g. "_1"
+        len = strlen(refimbase)
+        lenend = strlen(thisimager.separator+amps[0])
+        refimbase = strmid(refimbase,0,len-lenend)
+
+      ; FAKE, pick reference image of existing MCH file
       endif else begin
-        refimbase = base1[gdref[0]]
-        refexptime = exptime[gdref[0]]
+        ind1 = where(amp eq amps[0],nind1)
+        base1 = base[ind1]
+        filters = PHOTRED_GETFILTER(base1+'.fits')
+        exptime = PHOTRED_GETEXPTIME(base1+'.fits')
+        gdref = where(file_test(base1+'.mch') eq 1,ngdref)
+        if ngdref eq 0 then begin
+          printlog,logfile,'/FAKE, no existing MCH file for '+amps[0]
+          goto,BOMB1
+        endif
+        if ngdref gt 1 then begin
+          printlog,logfile,'/FAKE, '+strtrim(ngdref,2)+' MCH files for '+amps[0]+'. Too many!'
+          goto,BOMB1
+        endif
+        refimbase = base1[gdref]
+        usefiltref = filters[gdref]
+        refexptime = exptime[gdref]
       endelse
-
-      ; Getting just the base, without the extension, e.g. "_1"
-      len = strlen(refimbase)
-      lenend = strlen(thisimager.separator+amps[0])
-      refimbase = strmid(refimbase,0,len-lenend)
-
+        
       ; Reference image information
       printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+usefiltref+' Exptime='+strtrim(refexptime,2)
 
@@ -522,7 +544,7 @@ FOR i=0,ndirs-1 do begin
           inlist = inlist+'.als'
           
           ; Running daomatch
-          DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,/verbose
+          DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,fake=fake,/verbose
 
           ; Were we successful?
           mchfile = ampfiles[gdref[0]]+'.mch'
@@ -637,58 +659,77 @@ FOR i=0,ndirs-1 do begin
 
       ; Getting the REFERENCE Image
       ;----------------------------------
-      ; Get filters 
-      filters = PHOTRED_GETFILTER(base+'.fits')
-      exptime = PHOTRED_GETEXPTIME(base+'.fits')
-      rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
-      utdate = PHOTRED_GETDATE(base1+'.fits')
-      uttime = PHOTRED_GETUTTIME(base1+'.fits')
-      dateobs = utdate+'T'+uttime
-      jd = dblarr(nind1)
-      for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
+      if not keyword_set(fake) then begin
+        ; Get filters 
+        filters = PHOTRED_GETFILTER(base+'.fits')
+        exptime = PHOTRED_GETEXPTIME(base+'.fits')
+        rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
+        utdate = PHOTRED_GETDATE(base1+'.fits')
+        uttime = PHOTRED_GETUTTIME(base1+'.fits')
+        dateobs = utdate+'T'+uttime
+        jd = dblarr(nind1)
+        for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
 
-      ; Find matches to the reference filter in priority order
-      ngdref=0 & refind=-1
-      repeat begin
-        refind++
-        gdref = where(filters eq filtref[refind],ngdref)
-      endrep until (ngdref gt 0) or (refind eq nfiltref-1)
-      if ngdref gt 0 then usefiltref=filtref[refind]
-      ;gdref = where(filters eq filtref,ngdref)
-      ; No reference filters
-      if ngdref eq 0 then begin
-        printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
-        printlog,logfile,'MODIFY photred.setup file parameter FILTREF'
-        printlog,logfile,'FILTERS AVAILABLE: '+filters[uniq(filters,sort(filters))]
-        printlog,logfile,'Failing field '+thisfield+' and going to the next'
-        PUSH,failurelist,dirs[i]+'/'+base+'.als'
-        goto,BOMB
-      endif
+        ; Find matches to the reference filter in priority order
+        ngdref=0 & refind=-1
+        repeat begin
+          refind++
+          gdref = where(filters eq filtref[refind],ngdref)
+        endrep until (ngdref gt 0) or (refind eq nfiltref-1)
+        if ngdref gt 0 then usefiltref=filtref[refind]
+        ;gdref = where(filters eq filtref,ngdref)
+        ; No reference filters
+        if ngdref eq 0 then begin
+          printlog,logfile,'NO IMAGES IN REFERENCE FILTER - '+filtref
+          printlog,logfile,'MODIFY photred.setup file parameter FILTREF'
+          printlog,logfile,'FILTERS AVAILABLE: '+filters[uniq(filters,sort(filters))]
+          printlog,logfile,'Failing field '+thisfield+' and going to the next'
+          PUSH,failurelist,dirs[i]+'/'+base+'.als'
+          goto,BOMB
+        endif
 
-      ; More than one exposure in reference filter
-      ; Use image with LONGEST exptime
-      if ngdref gt 1 then begin
-        ; Getting image with longest exptime
-        refbase = base[gdref]
-        maxind = maxloc(rexptime[gdref])
-        if n_elements(maxind) gt 1 then begin  ; pick chronological first image
-          si = sort(jd[gdref[maxind]])
-          maxind = maxind[si[0]]  
-        endif 
-        ;exptime2 = exptime[gdref]
-        ;maxind = first_el(maxloc(exptime2))
-        refimbase = refbase[maxind]
-        refexptime = exptime[gdref[maxind]]
+        ; More than one exposure in reference filter
+        ; Use image with LONGEST exptime
+        if ngdref gt 1 then begin
+          ; Getting image with longest exptime
+          refbase = base[gdref]
+          maxind = maxloc(rexptime[gdref])
+          if n_elements(maxind) gt 1 then begin  ; pick chronological first image
+            si = sort(jd[gdref[maxind]])
+            maxind = maxind[si[0]]  
+          endif 
+          ;exptime2 = exptime[gdref]
+          ;maxind = first_el(maxloc(exptime2))
+          refimbase = refbase[maxind]
+          refexptime = exptime[gdref[maxind]]
 
-        printlog,logfile,'Two images in reference filter.'
-        printlog,logfile,'Picking the image with the largest exposure time'
+          printlog,logfile,'Two images in reference filter.'
+          printlog,logfile,'Picking the image with the largest exposure time'
 
-      ; Single frame
+        ; Single frame
+        endif else begin
+          refimbase = base[gdref[0]]
+          refexptime = exptime[gdref[0]]
+        endelse
+
+      ; FAKE, pick reference image of existing MCH file
       endif else begin
-        refimbase = base[gdref[0]]
-        refexptime = exptime[gdref[0]]
+        filters = PHOTRED_GETFILTER(base+'.fits')
+        exptime = PHOTRED_GETEXPTIME(base+'.fits')
+        gdref = where(file_test(base+'.mch') eq 1,ngdref)
+        if ngdref eq 0 then begin
+          printlog,logfile,'/FAKE, no existing MCH file.'
+          goto,BOMB1
+        endif
+        if ngdref gt 1 then begin
+          printlog,logfile,'/FAKE, '+strtrim(ngdref,2)+' MCH files. Too many!'
+          goto,BOMB1
+        endif
+        refimbase = base[gdref]
+        usefiltref = filters[gdref]
+        refexptime = exptime[gdref]
       endelse
-
+        
       ; Reference image information
       printlog,logfile,'REFERENCE IMAGE = '+refimbase+' Filter='+usefiltref+' Exptime=',strtrim(refexptime,2)
 
@@ -708,7 +749,7 @@ FOR i=0,ndirs-1 do begin
       inlist = [base[gdref[0]],inlist]+'.als'
 
       ; Running daomatch
-      DAOMATCH,inlist,logfile=logfile,error=daoerror,/verbose
+      DAOMATCH,inlist,logfile=logfile,error=daoerror,maxshift=maxshift,fake=fake,/verbose
 
       ; Were we successful?
       mchfile = base[gdref[0]]+'.mch'

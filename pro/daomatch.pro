@@ -8,9 +8,12 @@
 ;
 ; INPUTS:
 ;  files     Array of ALS files,  The first file will be used
-;            as the reference.
+;            as the reference.  If /fake set then the first ALS file
+;            in "files" should already have an associated MCH file.
 ;  =maxshift Constraints on the initial X/Y shifts.
 ;  /usewcs   Use the WCS for initial matching.  This is the default.
+;  /fake     Run for artificial stars.  The MCH file should be input
+;              and daomaster run to create raw/tfr files.
 ;  /verbose  Verbose output
 ;  /stp      Stop at the end of the program
 ;  =hi       Not used anymore.
@@ -80,7 +83,7 @@ end
 ;---------------------------------------------------------------
 
 pro daomatch,files,usewcs=usewcs,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
-             maxshift=maxshift
+             maxshift=maxshift,fake=fake
 
 t0 = systime(1)
 
@@ -88,7 +91,7 @@ undefine,error
 
 nfiles = n_elements(files)
 if nfiles eq 0 then begin
-  print,'Syntax - daomatch,files,usewcs=usewcs,stp=stp,verbose=verbose'
+  print,'Syntax - daomatch,files,usewcs=usewcs,fake=fake,stp=stp,verbose=verbose'
   error = 'Not enough inputs'
   return
 end
@@ -118,6 +121,27 @@ CD,dir
 
 files2 = FILE_BASENAME(files,'.als')
 
+; FAKE, running for artificial star tests
+if keyword_set(fake) then begin
+
+  ; Check that MCH file exists
+  if file_test(files2[0]+'.mch') eq 0 then begin
+    error = '/fake set but '+files2[0]+'.mch NOT FOUND'
+    printlog,logf,error
+    return
+  endif
+   
+  ; Keep backup of original mch file
+  FILE_DELETE,files2[0]+'.mch.orig',/allow_nonexistent
+  FILE_COPY,files2[0]+'.mch',files2[0]+'.mch.orig' 
+   
+  ; Remove the output files
+  FILE_DELETE,files2[0]+'.raw',/allow_nonexistent
+  FILE_DELETE,files2[0]+'.tfr',/allow_nonexistent
+   
+  goto,rundaomaster
+endif
+
 ; Remove the output files
 FILE_DELETE,files2[0]+'.mch',/allow_nonexistent
 FILE_DELETE,files2[0]+'.raw',/allow_nonexistent
@@ -128,16 +152,16 @@ undefine,mchfinal
 ; Check that the reference file exists
 test = FILE_TEST(files[0])
 if (test eq 0) then begin
-  printlog,logf,'REFERENCE FILE ',files[0],' NOT FOUND'
   error = 'REFERENCE FILE '+files[0]+' NOT FOUND'
+  printlog,logf,error
   return
 endif
 
 ; Load the reference data
 LOADALS,files[0],refals,count=count
 if (count lt 1) then begin
-  printlog,logf,'PROBLEM LOADING ',files[0]
   error = 'PROBLEM LOADING '+files[0]
+  printlog,logf,error
   return
 endif
 
@@ -200,16 +224,16 @@ for i=1,nfiles-1 do begin
   ; Check that the file exists
   test = FILE_TEST(files[i])
   if (test eq 0) then begin
-    printlog,logf,'FILE ',files[i],' NOT FOUND'
     error = 'FILE '+files[i]+' NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Load the current data
   LOADALS,files[i],als,alshead,count=count
   if (count lt 1) then begin
-    printlog,logf,'PROBLEM LOADING ',files[i]
     error = 'PROBLEM LOADING '+files[i]
+    printlog,logf,error
     return
   endif
 
@@ -232,8 +256,8 @@ for i=1,nfiles-1 do begin
                   refals.err lt 1.0,ngdref)
   endif
   if (ngdref eq 0) then begin
-    print,'NO good reference stars '+files[0]
     error = 'NO good reference stars '+files[0]
+    printlog,logf,error
     return
   endif
   ; Cuts for ALS
@@ -248,8 +272,8 @@ for i=1,nfiles-1 do begin
                   als.err lt 1.0,ngdals)
   endif
   if (ngdals eq 0) then begin
-    print,'NO good stars for '+files[i]
     error = 'NO good stars for '+files[i]
+    printlog,logf,error
     return
   endif
 
@@ -259,13 +283,13 @@ for i=1,nfiles-1 do begin
     ; Checking WCS of second file
     fitsfile2 = file_basename(files[i],'.als')+'.fits'
     if file_test(fitsfile2) eq 0 then begin
-      print,fitsfile2,' NOT FOUND. Cannot use WCS for matching'
+      printlog,logf,fitsfile2+' NOT FOUND. Cannot use WCS for matching'
       goto,BOMB1
     endif
     head2 = headfits(fitsfile2)
     extast,head2,astr2,noparams2
     if noparams2 lt 1 then begin
-      print,fitsfile2,' has NO WCS.  Cannot use WCS for matching'
+      printlog,logf,fitsfile2+' has NO WCS.  Cannot use WCS for matching'
       goto,BOMB1
     endif
 
@@ -277,7 +301,7 @@ for i=1,nfiles-1 do begin
   
     ; If no matches, try with looser cuts
     if count eq 0 then begin
-      print,'No matches, trying looser cuts'
+      printlog,logf,'No matches, trying looser cuts'
       gdref = where(refals.mag lt 50.0 and refals.err lt 1.0,ngdref)
       gdals = where(als.mag lt 50.0 and als.err lt 1.0,ngdals)
       SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
@@ -370,6 +394,7 @@ WRITELINE,files2[0]+'.mch',mchfinal
 ;#####################
 ; Running DAOMASTER
 ;#####################
+rundaomaster:
 
 ; DAOMASTER has problems with files that have extra dots in them 
 ; (i.e. F1.obj1123_1.mch).
@@ -441,8 +466,8 @@ if (nmchfile gt 0) then begin
   FILE_COPY,mchfile[0],files2[0]+'.mch',/overwrite,/allow
   FILE_DELETE,mchfile,/allow
 endif else begin
-  printlog,logf,'NO FINAL MCH FILE'
   error = 'NO FINAL MCH FILE'
+  printlog,logf,error
   return
 endelse
 ; TFR file
@@ -451,8 +476,8 @@ if (ntfrfile gt 0) then begin
   FILE_COPY,tfrfile[0],files2[0]+'.tfr',/overwrite,/allow
   FILE_DELETE,tfrfile,/allow
 endif else begin
-  printlog,logf,'NO FINAL TFR FILE'
   error = 'NO FINAL TFR FILE'
+  printlog,logf,error
   return
 endelse
 ; RAW file
@@ -461,10 +486,16 @@ if (nrawfile gt 0) then begin
   FILE_COPY,rawfile[0],files2[0]+'.raw',/overwrite,/allow
   FILE_DELETE,rawfile,/allow
 endif else begin
-  printlog,logf,'NO FINAL RAW FILE'
   error = 'NO FINAL RAW FILE'
+  printlog,logf,error
   return
 endelse
+
+; FAKE, copy back the original MCH file
+if keyword_set(fake) then begin
+  FILE_COPY,files2[0]+'.mch',files2[0]+'.mch.daomaster',/overwrite,/allow
+  FILE_MOVE,files2[0]+'.mch.orig',files2[0]+'.mch',/overwrite,/allow
+endif
 
 ; Were there any errors
 if (errout2[0] ne '') then begin

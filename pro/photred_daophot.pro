@@ -1,4 +1,4 @@
-pro photred_daophot,redo=redo,stp=stp,fake=fake
+pro photred_daophot,redo=redo,fake=fake,stp=stp
 
 ;+
 ;
@@ -11,6 +11,7 @@ pro photred_daophot,redo=redo,stp=stp,fake=fake
 ;
 ; INPUTS:
 ;  /redo Redo files that were already done.
+;  /fake Run with artificial star tests.
 ;  /stp  Stop at the end of the program.
 ;
 ; OUTPUTS:
