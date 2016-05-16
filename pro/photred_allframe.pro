@@ -1,4 +1,4 @@
-pro photred_allframe,redo=redo
+pro photred_allframe,redo=redo,fake=fake
 
 ;+
 ;
@@ -11,6 +11,7 @@ pro photred_allframe,redo=redo
 ;
 ; INPUTS:
 ;  /redo Redo files that were already done.
+;  /fake Run for artificial star tests.
 ;  /stp  Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -511,7 +512,8 @@ cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+ira
       ",detectprog='"+alfdetprog+"'"
 if keyword_set(alfnocmbimscale) then cmd=cmd+",/nocmbimscale"
 if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
-if keyword_set(alfusecmn) then cmd=cmnd+",/usecmn"
+if keyword_set(alfusecmn) then cmd=cmd+",/usecmn"
+if keyword_set(fake) then cmd=cmd+",/fake"
 
 ; Getting NMULTI
 nmulti = READPAR(setup,'NMULTI')

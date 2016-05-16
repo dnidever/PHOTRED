@@ -494,6 +494,7 @@ FOR i=0,ndirs-1 do begin
         refimbase = strmid(refimbase,0,len-lenend)
 
       ; FAKE, pick reference image of existing MCH file
+      ;  This ensures that we use exactly the same reference frame.
       endif else begin
         ind1 = where(amp eq amps[0],nind1)
         base1 = base[ind1]
@@ -713,6 +714,7 @@ FOR i=0,ndirs-1 do begin
         endelse
 
       ; FAKE, pick reference image of existing MCH file
+      ;  This ensures that we use exactly the same reference frame.
       endif else begin
         filters = PHOTRED_GETFILTER(base+'.fits')
         exptime = PHOTRED_GETEXPTIME(base+'.fits')
