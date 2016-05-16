@@ -55,7 +55,7 @@ for i=0,nbins-1 do begin
     subim = im[xlo:xhi,ylo:yhi]
     med = median([subim],/even)
     medstr[i,j].med = med
-    sig = mad([subim-med],/zero)
+    sig = mad([subim-med],/zero) > 0.1
     medstr[i,j].sig = sig
     ; Use histogram to get Mode
     bin1 = sig/3.
@@ -127,14 +127,21 @@ if n_elements(ngrow) eq 0 then ngrow=2
 if n_elements(maxiter) eq 0 then maxiter=2
 if n_elements(nsigrej) eq 0 then nsigrej=2.5
 
+; Initial rough masking
+tempim = im
+med = median(im)
+sig = mad(im-med,/zero)
+bdpix = where( abs(im-med) gt 3*sig,nbdpix)
+if nbdpix gt 0 then tempim[bdpix] = !values.f_nan
+
 ; Determine medians in large bins
-BACKMODEL_MEDIM,im,medstr,nbins=nbins
+BACKMODEL_MEDIM,tempim,medstr,nbins=nbins
 
 ; 2D linear interpolation
 model = CONGRID(medstr.value,nx,ny,/interp,/center)
 
 ; Outlier rejection loop
-tempim = im
+;tempim = im
 lastmodel = model
 threshold = 0.01*median(medstr.value)  ; 1% of the background
 niter = 0
