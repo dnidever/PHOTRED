@@ -28,6 +28,7 @@
 ;  =irafdir       The IRAF home directory.
 ;  =logfile       A logfile to print to output to.
 ;  /usecmn        Use the common sources file of the reference image.
+;  /fake          Run for artificial star tests.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -46,7 +47,7 @@
 pro allframe,file,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn
+             usecmn=usecmn,fake=fake
 
 COMMON photred,setup
 
@@ -57,7 +58,7 @@ nfile = n_elements(file)
 if (nfile eq 0) then begin
   print,'Syntax - allframe,file,stp=stp,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
-  print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn'
+  print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake'
   return
 endif
 
@@ -138,7 +139,7 @@ for i=0,nscripts-1 do begin
   if info.size ne curinfo.size then begin
     FILE_COPY,info.name,curinfo.name,/overwrite
   endif
-end ; scripts loop
+endfor ; scripts loop
 
 
 ; Check that the ALLFRAME program exists
@@ -245,11 +246,22 @@ for i=0,nfiles-1 do begin
   ; REMOVE ALF if it exists
   if FILE_TEST(base+'.alf') then FILE_DELETE,base+'.alf',/allow,/quiet
 
-end
+endfor
 
 ; REMOVE the .mag file if it exists
 if FILE_TEST(mchbase+'.mag') then FILE_DELETE,mchbase+'.mag',/allow,/quiet
 
+; FAKE, check that we have all the files that we need
+if keyword_set(fake) then begin
+   ; weights, scale, zero, comb_psf, _shift.mch
+   chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
+   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
+   if nbdfiles gt 0 then begin
+     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
+     printlog,logf,error
+     return
+   endif
+endif
 
 
 
@@ -262,64 +274,79 @@ printlog,logf,'------------------------'
 
 ;-----------------------------------
 ; Computs Weights
-ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky ;,raw2=raw2
-invscales = 1.0/scales
-bdscale = where(scales lt 1e-5 or invscales gt 900,nbdscale)
-if nbdscale gt 0 then begin
-  scales[bdscale] = 1.0
-  invscales[bdscale] = 1.0
-  weights[bdscale] = 0.0
-endif
-weightfile = mchbase+'.weights'
-WRITECOL,weightfile,weights,fmt='(F10.6)'
-scalefile = mchbase+'.scale'
-WRITECOL,scalefile,invscales,fmt='(F10.5)'  ; want to scale it UP
-zerofile = mchbase+'.zero'
-WRITECOL,zerofile,-sky,fmt='(F10.2)'  ; want to remove the background, set to 1st frame
+if not keyword_set(fake) then begin
+  ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky ;,raw2=raw2
+  invscales = 1.0/scales
+  bdscale = where(scales lt 1e-5 or invscales gt 900,nbdscale)
+  if nbdscale gt 0 then begin
+    scales[bdscale] = 1.0
+    invscales[bdscale] = 1.0
+    weights[bdscale] = 0.0
+  endif
+  weightfile = mchbase+'.weights'
+  WRITECOL,weightfile,weights,fmt='(F10.6)'
+  scalefile = mchbase+'.scale'
+  WRITECOL,scalefile,invscales,fmt='(F10.5)'  ; want to scale it UP
+  zerofile = mchbase+'.zero'
+  WRITECOL,zerofile,-sky,fmt='(F10.2)'  ; want to remove the background, set to 1st frame
 
+; FAKE, use existing ones
+endif else begin
+  weightfile = mchbase+'.weights'
+  scalefile = mchbase+'.scale'
+  zerofile = mchbase+'.zero'
+  READCOL,weightfile,weights,format='F',/silent
+  READCOL,scalefile,invscales,format='F',/silent
+  scales = 1.0/invscales
+  READCOL,zerofile,sky,format='F',/silent
+  sky = -sky
+endelse
+  
 
 ;---------------------------------------
 ; Get X/Y translations using DAOMASTER
 ;  NO ROTATION ONLY SHIFTS
 ;  Need these shifts for IMSHIFT
-print,'Measuring X/Y shifts'
 shiftmch = mchbase+'_shift'
-FILE_COPY,mchbase+'.mch',shiftmch+'.mch',/overwrite,/allow
-; Make the DAOMASTER script
-undefine,cmdlines
-PUSH,cmdlines,'#!/bin/csh'
-PUSH,cmdlines,'set input=${1}'
-PUSH,cmdlines,'daomaster << DONE'
-PUSH,cmdlines,'${input}.mch'
-PUSH,cmdlines,'1,1,1'
-PUSH,cmdlines,'99.'
-PUSH,cmdlines,'2'
-PUSH,cmdlines,'10'
-PUSH,cmdlines,'5'
-PUSH,cmdlines,'4'
-PUSH,cmdlines,'3'
-PUSH,cmdlines,'2'
-PUSH,cmdlines,'1'
-PUSH,cmdlines,'0'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'y'
-PUSH,cmdlines,''
-PUSH,cmdlines,''
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'DONE'
-tempscript = MKTEMP('daomaster')   ; absolute filename
-WRITELINE,tempscript,cmdlines
-FILE_CHMOD,tempscript,'755'o
-; Run DAOMASTER                                                                                                                           
-cmd2 = tempscript+' '+shiftmch
-SPAWN,cmd2,out2,errout2
-; Remove temporary DAOMASTER script
-FILE_DELETE,tempscript,/allow_non
+if not keyword_set(fake) then begin
+  print,'Measuring X/Y shifts'
+  FILE_COPY,mchbase+'.mch',shiftmch+'.mch',/overwrite,/allow
+  ; Make the DAOMASTER script
+  undefine,cmdlines
+  PUSH,cmdlines,'#!/bin/csh'
+  PUSH,cmdlines,'set input=${1}'
+  PUSH,cmdlines,'daomaster << DONE'
+  PUSH,cmdlines,'${input}.mch'
+  PUSH,cmdlines,'1,1,1'
+  PUSH,cmdlines,'99.'
+  PUSH,cmdlines,'2'
+  PUSH,cmdlines,'10'
+  PUSH,cmdlines,'5'
+  PUSH,cmdlines,'4'
+  PUSH,cmdlines,'3'
+  PUSH,cmdlines,'2'
+  PUSH,cmdlines,'1'
+  PUSH,cmdlines,'0'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'y'
+  PUSH,cmdlines,''
+  PUSH,cmdlines,''
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'n'
+  PUSH,cmdlines,'DONE'
+  tempscript = MKTEMP('daomaster')   ; absolute filename
+  WRITELINE,tempscript,cmdlines
+  FILE_CHMOD,tempscript,'755'o
+  ; Run DAOMASTER
+  cmd2 = tempscript+' '+shiftmch
+  SPAWN,cmd2,out2,errout2
+  ; Remove temporary DAOMASTER script
+  FILE_DELETE,tempscript,/allow_non
+endif
 LOADMCH,shiftmch+'.mch',files2,trans2
 
 xshift = reform(trans2[*,0])
@@ -526,7 +553,7 @@ for i=0,nfiles-1 do begin
   endif else begin
     bpm = bpm+im
   endelse
-end
+endfor
 ;bpm = bpm/float(nfiles)
 
 ;; masks have 0-bad, 1-good.
@@ -557,7 +584,7 @@ if not keyword_set(nocmbimscale) then begin
     head = headfits(outfiles[i])
     sxaddpar,head,'BPM',outmaskfiles[i]
     modfits,outfiles[i],0,head
-  end
+  endfor
 
   ; Combine the frames WITH scaling/offset/masking, for the bright stars
   ;printlog,logf,'Creating SCALED image'
@@ -777,24 +804,25 @@ FILE_DELETE,[maskinfile,maskoutfile,maskshiftsfile,imshiftscript],/allow
 printlog,logf,'----------------------------------------'
 printlog,logf,'STEP 6: Getting PSF for Combined Image'
 printlog,logf,'----------------------------------------'
-; Make .opt files, set saturation just below the mask data level
-MKOPT,combfile,satlevel=maskdatalevel-1000
-; Using CMN.LST of reference frame if it exists
-if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
-  print,'Using reference image COMMON SOURCE file'
-  file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
-endif
-; Get the PSF of the combined image
-SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
-
-; If getpsf failed, lower the spatial PSF variations to linear
-if file_test(file_basename(combfile,'.fits')+'.psf') eq 0 then begin
-  printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
-  MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
+if not keyword_set(fake) then begin
+  ; Make .opt files, set saturation just below the mask data level
+  MKOPT,combfile,satlevel=maskdatalevel-1000
+  ; Using CMN.LST of reference frame if it exists
+  if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
+    print,'Using reference image COMMON SOURCE file'
+    file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
+  endif
+  ; Get the PSF of the combined image
   SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
-stop
-endif
 
+  ; If getpsf failed, lower the spatial PSF variations to linear
+  if file_test(file_basename(combfile,'.fits')+'.psf') eq 0 then begin
+    printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
+    MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
+    SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
+  stop
+  endif
+endif
 
 
 ;###########################################
