@@ -50,8 +50,8 @@ if [ ! -s ${image}.als.opt ]; then
    echo "ERROR: ${image}.als.opt required to run ALLSTAR."
    exit 1
 fi
-if [ ! -s ${image}.psf ]; then
-   echo "ERROR: ${image}.psf required to run ALLSTAR."
+if [ ! -s ${image}.psf1 ]; then
+   echo "ERROR: ${image}.psf1 required to run ALLSTAR."
    exit 1
 fi
 #
@@ -69,10 +69,14 @@ echo "   Running 1st step ...."
 #
 rm ${image}.log      >& /dev/null
 rm ${image}.coo      >& /dev/null
-rm ${image}.ap       >& /dev/null
+rm ${image}.ap      >& /dev/null
+rm ${image}.psf.tmp      >& /dev/null
+# Temporarily move the psf file out of the way
+#   otherwise we can't do aperture photometry the normal way
+mv ${image}.psf ${image}.psf.tmp     >& /dev/null
 #
 echo "===================================" >> ${image}.log
-echo "== Step 1 : Find and Phot        ==" >> ${image}.log
+echo "== Step 1 : Detection            ==" >> ${image}.log
 echo "===================================" >> ${image}.log
 echo "" >> ${image}.log
 #
@@ -115,6 +119,8 @@ END_DAOPHOT
 ######################################################
 #
 echo "   Running 2nd step ...."
+# Move the psf file back
+mv ${image}.psf.tmp ${image}.psf     >& /dev/null
 #
 # If allstar.opt does NOT exist, create it
 #
