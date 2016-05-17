@@ -55,21 +55,23 @@ for i=0,nbins-1 do begin
     medstr[i,j].y = mean([ylo,yhi])
     subim = im[xlo:xhi,ylo:yhi]
     med = median([subim],/even)
-    medstr[i,j].med = med
-    sig = mad([subim-med],/zero) > 0.1
-    medstr[i,j].sig = sig
-    ; Use histogram to get Mode
-    bin1 = sig/3.
-    hist1 = histogram(subim,bin=bin1,min=med-2.5*sig,max=med+2.5*sig,locations=xhist1)
-    xhist1 += 0.5*bin1
-    maxind1 = first_el(maxloc(hist1))
-    mode1 = xhist1[maxind1]
-    ; A second time around the mode to refine the value
-    bin2 = sig/6.
-    hist = histogram(subim,bin=bin2,min=mode1-1.5*sig,max=med+1.5*sig,locations=xhist)
-    xhist += 0.5*bin2
-    maxind = first_el(maxloc(hist))
-    mode = xhist[maxind]
+    if finite(med) eq 1 then begin
+      medstr[i,j].med = med
+      sig = mad([subim-med],/zero) > 0.1
+      medstr[i,j].sig = sig
+      ; Use histogram to get Mode
+      bin1 = sig/3.
+      hist1 = histogram(subim,bin=bin1,min=med-2.5*sig,max=med+2.5*sig,locations=xhist1)
+      xhist1 += 0.5*bin1
+      maxind1 = first_el(maxloc(hist1))
+      mode1 = xhist1[maxind1]
+      ; A second time around the mode to refine the value
+      bin2 = sig/6.
+      hist = histogram(subim,bin=bin2,min=mode1-1.5*sig,max=med+1.5*sig,locations=xhist)
+      xhist += 0.5*bin2
+      maxind = first_el(maxloc(hist))
+      mode = xhist[maxind]
+    endif else mode=!values.f_nan
     medstr[i,j].mode = mode
     medstr[i,j].value = mode
     ;MMM,subim,skymod,sigma,skew
@@ -194,6 +196,8 @@ WHILE (flag eq 0) do begin
   lastmodel = model
   niter++
 ENDWHILE
+
+;stop
 
 if keyword_set(stp) then stop
 
