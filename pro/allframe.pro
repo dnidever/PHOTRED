@@ -286,9 +286,9 @@ if not keyword_set(fake) then begin
   weightfile = mchbase+'.weights'
   WRITECOL,weightfile,weights,fmt='(F10.6)'
   scalefile = mchbase+'.scale'
-  WRITECOL,scalefile,invscales,fmt='(F10.5)'  ; want to scale it UP
+  WRITECOL,scalefile,invscales,fmt='(F10.6)'  ; want to scale it UP
   zerofile = mchbase+'.zero'
-  WRITECOL,zerofile,-sky,fmt='(F10.2)'  ; want to remove the background, set to 1st frame
+  WRITECOL,zerofile,-sky,fmt='(F12.4)'  ; want to remove the background, set to 1st frame
 
 ; FAKE, use existing ones
 endif else begin
@@ -822,7 +822,12 @@ if not keyword_set(fake) then begin
     SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
   stop
   endif
-endif
+
+; FAKE, use existing comb.psf file
+endif else begin
+  printlog,logf,'Using existing '+file_basename(combfile,'.fits')+'.psf file'
+  printlog,logf,' '
+endelse
 
 
 ;###########################################
@@ -832,12 +837,13 @@ endif
 printlog,logf,'--------------------------------'
 printlog,logf,'STEP 7: Running allframe prep'
 printlog,logf,'--------------------------------'
+; Make sure we have an allstar.opt file
+if file_test('allstar.opt') eq 0 then file_copy,base[0]+'.als.opt','allstar.opt'
 
 ALLFPREP,combfile,als,xoff,yoff,logfile=logfile,error=error,$
          detectprog=detectprog,scriptsdir=scriptsdir,maxiter=finditer,$
          maskfile=combweightfile
 if n_elements(error) gt 0 then goto,BOMB
-
 
 
 ;###########################################
