@@ -1,6 +1,6 @@
 Pro	PS_Close, $
 		PRINT=prt, $
-		HELP=help
+		HELP=help, silent=silent
 
 SccsId = '@(#)ps_close.pro 28 Apr 1994 2.2 Fen Tamanaha'
 ;+
@@ -23,6 +23,8 @@ SccsId = '@(#)ps_close.pro 28 Apr 1994 2.2 Fen Tamanaha'
 ;			
 ;	/PRINT:		Set this switch if you want the PostScript file to
 ;			be closed and sent the printer named 'PostScript'.
+;
+;       /SILENT:        Don't print any messages to the screen.
 ;
 ; COMMON BLOCKS:
 ;	fen_ps_common:	The common block hold the PostScript file name and
@@ -75,7 +77,7 @@ SccsId = '@(#)ps_close.pro 28 Apr 1994 2.2 Fen Tamanaha'
 ; Print usage if /HELP set.
 ;
     If ( Keyword_Set(help) ) Then Begin
-	Message, 'Usage: PS_Close [,/PRINT]', /Info
+	Message, 'Usage: PS_Close [,/PRINT, /SILENT]', /Info
 	Return
     EndIf
 
@@ -105,7 +107,7 @@ SccsId = '@(#)ps_close.pro 28 Apr 1994 2.2 Fen Tamanaha'
 	Spawn, cmd, /Sh
 	Print, ps_file + ' closed and sent to the default printer.'
     EndIf Else Begin
-	Print, ps_file + ' closed.'
+        if not keyword_set(silent) then Print, ps_file + ' closed.'
     EndElse
 
 ;
