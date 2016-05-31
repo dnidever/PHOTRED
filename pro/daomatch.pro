@@ -316,7 +316,8 @@ for i=1,nfiles-1 do begin
       ; Fit rotation if there are enough stars
       if count gt 10 then begin
         fa = {x1:refals[gdref[ind1]].x,y1:refals[gdref[ind1]].y,x2:als[gdals[ind2]].x,y2:als[gdals[ind2]].y}
-        initpar = fltarr(6)
+        ;initpar = fltarr(6)
+        initpar = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
         fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
                       bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
         trans = fpar
@@ -325,7 +326,6 @@ for i=1,nfiles-1 do begin
 
     BOMB1:
   endif ; use WCS
-
 
   ; Match stars with X/Y coordinates
   if (count lt 1) then begin
@@ -452,6 +452,7 @@ FILE_CHMOD,tempscript,'755'o
 cmd2 = tempscript+' '+tempbase
 SPAWN,cmd2,out2,errout2
 
+;stop
 
 ; Remove temporary DAOMASTER script
 ;-----------------------------------
