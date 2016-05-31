@@ -608,9 +608,22 @@ FOR f=0,nfiles-1 do begin
     ; Some Gaussian fits converged
     gdgstr = where(gstr.status gt 0,ngdgstr)
     if ngdgstr gt 0 then begin
+      gstr0 = gstr
       gstr = gstr[gdgstr]  ; only keep the good ones
     endif else begin    ; none converged
       error[f] = 'No Gaussian fits converged'
+      if not keyword_set(silent) then print,error[f]
+      fwhm = 99.99
+      ellipticity = 99.99
+      goto,SKIP
+    endelse
+
+    ; First make a bad pixel or CR cut on width, FWHM>1.1 pixels
+    gdgstrwid = where(gstr.pars[2]*2.0 gt 1.1 and gstr.pars[3]*2.0 gt 1.1,ngdgstrwid)
+    if ngdgstrwid gt 0 then begin
+      gstr = gstr[gdgstrwid]   ; only keep ones with FWHM>1.1 pixels
+    endif else begin
+      error[f] = 'No Gaussian fits with FWHM>1.1 pixels'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
       ellipticity = 99.99
