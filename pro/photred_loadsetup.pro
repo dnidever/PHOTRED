@@ -1,22 +1,24 @@
-pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,stp=stp
+pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,fake=fake,stp=stp
 
 ;+
 ;
 ; PHOTRED_LOADSETUP
 ;
 ; INPUTS:
-;  /stp     Stop at the end of the program.
+;  /std       Load the stdred.setup file.
+;  /fake      Load the fakered.setup file.
+;  =setupdir  The directory in which to look for the setup file.
+;  /stp      Stop at the end of the program.
 ;
 ; OUTPUTS:
-;  setup    The setup file.  It is a string array with
-;             dimensions of 2xN_parameters.  READPAR can be
-;             used to read the parameters.
-;  /std     Load the stdred.setup file.
-;  =count   The number of parameters.  count is -1 if there
-;             was a problem.
+;  setup      The setup file.  It is a string array with
+;               dimensions of 2xN_parameters.  READPAR can be
+;               used to read the parameters.
+;  =count     The number of parameters.  count is -1 if there
+;               was a problem.
 ;
 ; USAGE:
-;  IDL>photred_loadsetup,setup,count=count,std=std,stp=stp
+;  IDL>photred_loadsetup,setup,count=count,std=std,fake=fake,setupdir=setupdir,stp=stp
 ;
 ; By D.Nidever  March 2008
 ;-
@@ -24,27 +26,26 @@ pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,stp=stp
 count = 0
 setup = strarr(2,2)+'-1'         ; no setup
 
+if n_elements(setupdir) eq 0 then setupdir = '.'  ; default setup directory
+
+; Type of setup file
+setupfile = 'photred'
+if keyword_set(std) then setupfile = 'stdred'
+if keyword_set(fake) then setupfile = 'fakered'
 
 ; LOAD THE SETUP FILE
 ;--------------------
 ; This is a 2xN array.  First colume are the keywords
 ; and the second column are the values.
 ; Use READPAR.PRO to read it
-if n_elements(setupdir) gt 0 then setupfiles=FILE_SEARCH(setupdir+'/photred.*setup',count=nsetupfiles) else $
-  setupfiles = FILE_SEARCH('photred.*setup',count=nsetupfiles)
-if keyword_set(std) then begin
-  if n_elements(setupdir) gt 0 then setupfiles=FILE_SEARCH(setupdir+'/stdred.*setup',count=nsetupfiles)
-  setupfiles = FILE_SEARCH('stdred.*setup',count=nsetupfiles)
-endif
+setupfiles = FILE_SEARCH(setupdir+'/'+setupfile+'.*setup',count=nsetupfiles)
 if (nsetupfiles lt 1) then begin
-  if keyword_set(std) then print,'NO STDRED SETUP FILE' else $
-    print,'NO PHOTRED SETUP FILE'
+  print,'NO '+strupcase(setupfile)+' SETUP FILE'
   count = -1             ; there was a problem
   return
 endif
 if (nsetupfiles gt 1) then begin
-  if keyword_set(std) then print,'MORE THAN ONE STDRED SETUP FILE FOUND' else $
-    print,'MORE THAN ONE PHOTRED SETUP FILE FOUND'
+  print,'MORE THAN ONE '+strupcase(setupfile)+' SETUP FILE FOUND'
   print,setupfiles
   count = -1              ; there was a problem
   return
