@@ -243,7 +243,7 @@ for i=0,nfiles-1 do begin
     return
   endif
 
-  ; Checking RAW file
+  ; Checking PSF file
   psftest = file_test(base+'.psf')
   if psftest eq 0 then begin
     printlog,logf,base+'.psf NOT FOUND'
