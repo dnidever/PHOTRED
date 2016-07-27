@@ -188,7 +188,7 @@ endif
 ; Load the MCH file
 LOADMCH,mchfile,files,trans
 
-; Check that the fits, als, and opt files exist
+; Check that the fits, als, opt, and psf files exist
 nfiles = n_elements(files)
 for i=0,nfiles-1 do begin
   ;dir = file_dirname(mchfile)
@@ -238,8 +238,15 @@ for i=0,nfiles-1 do begin
 
   ; Checking RAW file
   rawtest = file_test(base+'.raw')
-  if logtest eq 0 then begin
+  if rawtest eq 0 then begin
     printlog,logf,base+'.raw NOT FOUND'
+    return
+  endif
+
+  ; Checking PSF file
+  psftest = file_test(base+'.psf')
+  if psftest eq 0 then begin
+    printlog,logf,base+'.psf NOT FOUND'
     return
   endif
 
@@ -253,14 +260,14 @@ if FILE_TEST(mchbase+'.mag') then FILE_DELETE,mchbase+'.mag',/allow,/quiet
 
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
-   ; weights, scale, zero, comb_psf, _shift.mch
-   chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
-   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
-   if nbdfiles gt 0 then begin
-     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
-     printlog,logf,error
-     return
-   endif
+  ; weights, scale, zero, comb_psf, _shift.mch
+  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
+  bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
+  if nbdfiles gt 0 then begin
+    error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
+    printlog,logf,error
+    return
+  endif
 endif
 
 
