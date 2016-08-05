@@ -1220,7 +1220,7 @@ if (nsig lt 5.) then begin
       yshiftarr2[j] = yshift
       nmatcharr2[j] = matchnum
 
-    end  ; rotations
+    endfor  ; rotations
 
     ; Find best rotation, spline
     rotarr2b = scale_vector(findgen(100),min(rotarr2),max(rotarr2))
@@ -1240,7 +1240,7 @@ if (nsig lt 5.) then begin
 
     ;stop
 
-  end  ; 8 orientations
+  endfor  ; 8 orientations
 
   ; Find best rotation
   bestind1 = first_el(maxloc(nsigarr1))
@@ -1305,7 +1305,7 @@ if (nsig lt 5.) then begin
   endelse
 
 
-end  ; not a good fit
+endif  ; not a good fit
 
 
 
@@ -1363,7 +1363,7 @@ if (nsig lt 5.) then begin
     yshiftarr1[i] = yshift
     nmatcharr1[i] = matchnum
 
-  end
+  endfor
 
   ; Find best rotation, spline
   rotarr1b = scale_vector(findgen(3600),min(rotarr1),max(rotarr1))
