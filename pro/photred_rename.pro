@@ -87,7 +87,7 @@ if strlowcase(telescope) eq 'magellan' then observatory='lco'
 if strlowcase(telescope) eq 'lbt' then observatory='mgio'
 
 ; Separate field directories
-spefielddir = READPAR(setup,'SEPFIELDDIR')
+sepfielddir = READPAR(setup,'SEPFIELDDIR')
 if sepfielddir eq '0' or sepfielddir eq '-1' or sepfielddir eq '' then undefine,sepfielddir else sepfielddir=1
 
 

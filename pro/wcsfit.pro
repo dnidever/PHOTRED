@@ -2380,7 +2380,6 @@ if (nmatch lt 3 or initrms gt 1.5*rmslim) and (refdensity gt imdensity) then beg
 
 endif  ; use bright stars
 
-
 ; Match the stars with MATCHSTARS
 ;--------------------------------
 if (nmatch lt 3 or matchrms*pixscale gt 1.5*rmslim) then begin

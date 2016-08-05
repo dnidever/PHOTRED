@@ -148,6 +148,7 @@ if nfieldfiles gt 0 then begin
   fbases = FILE_BASENAME(fieldfiles,'.fits')
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
+              stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 head file from split
               stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
               stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
@@ -286,8 +287,8 @@ if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo)
 
       ; Now match to the existing sources
       ;----------------------------------
-      if n_elements(all) gt 0 then begin
-        SRCMATCH,all.ra,all.dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch,domains=100
+      if cntall gt 0 then begin
+        SRCMATCH,all[0:cntall-1].ra,all[0:cntall-1].dec,cat.ra,cat.dec,0.5,ind1,ind2,/sph,count=nmatch,domains=100,usehist=0
         cat_old = cat
         if nmatch gt 0 then begin
           all[ind1].ndet++

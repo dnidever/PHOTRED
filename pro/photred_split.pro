@@ -274,7 +274,7 @@ FOR i=0,ninputlines-1 do begin
 
     ; Erase the MEF file
     ;-------------------
-    if (keepmef eq 0) then begin
+    if (keepmef eq 0) and (nsplitfiles eq next) then begin
       printlog,logfile,'Deleting the MEF file ',file
       FILE_DELETE,file,/allow,/quiet
     endif

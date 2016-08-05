@@ -220,6 +220,7 @@ if (nfieldfiles lt 2) then begin
     fbases = FILE_BASENAME(fieldfiles,'.fits')
     bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
                 stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
+                stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 head file from split 
                 stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
                 stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
                 stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file

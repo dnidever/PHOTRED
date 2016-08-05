@@ -1,6 +1,6 @@
 pro robust_mean,vector,robmean,robsigma,sig=sig0,error=error,$
                 ind=ind,rejind=rejind,numrej=numrej,verbose=verbose,$
-                numused=numused,stp=stp
+                numused=numused,stp=stp,usemad=usemad
 
 ;+
 ;
@@ -13,6 +13,7 @@ pro robust_mean,vector,robmean,robsigma,sig=sig0,error=error,$
 ;  vector    The vector of values for which to compute the mean of.
 ;  =sig      Optional uncertainties in the vector values.  These
 ;              will be used for weighting.
+;  /usemad   Use the MAD sigma to determine the robust sigma.
 ;  /verbose  Verbose output.
 ;  /stp      Stop at the end of the program.
 ;
@@ -36,7 +37,7 @@ undefine,error,robmean,robsigma,ind,rejind,numrej,numused
 ; Not enough inputs
 nvector = n_elements(vector)
 if nvector eq 0 then begin
-  print,'Syntax - robust_mean,vector,robmean,robsigma,sig=sig,error=error,verbose=verbose,'
+  print,'Syntax - robust_mean,vector,robmean,robsigma,sig=sig,usemad=usemad,error=error,verbose=verbose,'
   print,'                     ind=ind,rejind=rejind,numrej=numrej,numused=numused'
   error = 'Not enough inputs'
   return
@@ -79,10 +80,9 @@ count = 0
 done = 0
 WHILE (done eq 0) do begin
 
-
   ; Remove outliers from the whole array
   ; Make sure we have a decent SIGMA
-  if (robsigma gt 0.0) then begin
+  if (robsigma gt 0.0) then begin 
     rejind = where(abs(vector-robmean) gt 2.5*robsigma,numrej)
     ind = where(abs(vector-robmean) le 2.5*robsigma,nind)
 
@@ -108,6 +108,7 @@ WHILE (done eq 0) do begin
 
   ; Use WMEANERR to get weighted mean
   WMEANERR,vector[ind],sig[ind],NEW_mean,NEW_sigma
+  if keyword_set(usemad) then NEW_sigma=mad([vector])  ; use MAD instead, on all otherwise too many are rejected
 
   ; What's the change
   dmean = abs(robmean-NEW_mean)

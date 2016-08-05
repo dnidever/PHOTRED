@@ -421,12 +421,12 @@ For i=0,nfieldfiles-1 do begin
     LOADALS,alffile,alf,alfhead,count=nalf
     chipstr[i].alf_nsources = nalf
     ; Calculate "depth"
-    if nalf gt 0 then begin
+    if nalf gt 1 then begin
       hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
       xhist += 0.5*0.2
       DLN_MAXMIN,hist,minarr,maxarr
       alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-      chipstr[i].alf_depth = alsdepth   ; instrumental "depth"    
+      chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
     endif
   endif
 
