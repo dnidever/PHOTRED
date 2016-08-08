@@ -151,7 +151,7 @@ for i=0,ninputlines-1 do begin
   filtarr[i] = prefixarr[0]
   nightarr[i] = prefixarr[1]
   framearr[i] = filarr[1]
-end
+endfor
 
 ui = uniq(filtarr,sort(filtarr))
 filters = filtarr[ui]
@@ -492,6 +492,21 @@ FOR i=0,nfilters-1 do begin
         goto,BOMB
       endif
 
+      ; Get FWHM from the opt file
+      optfile = base+'.opt'
+      testopt = FILE_TEST(optfile)
+      if testopt eq 1 then begin
+        READCOL,optfile,opttags,dum,optvals,format='A,A,F',/silent
+        ; Checking rdnoise, gain and fwhm
+        ;rdnoise = optvals[0]           ; RDNOISE, 1st line
+        ;gain = optvals[1]              ; GAIN, 2nd line
+        fwhm = optvals[4]              ; FWHM, 5th line
+        ;ps = optvals[12]               ; PSF radius, 13th line
+      endif else begin
+        printlog,logfile,'No FWHM for ',fitsfile
+        fwhm = -99.99
+      endelse
+
       ; Loading the CAT file
       ;---------------------
       cat = IMPORTASCII(file,/header,/noprint)
@@ -652,7 +667,7 @@ FOR i=0,nfilters-1 do begin
       dum = CREATE_STRUCT(dum,usemagerrname,0.0)
       dum = CREATE_STRUCT(dum,usecolname,0.0)
       dum = CREATE_STRUCT(dum,usecolerrname,0.0)
-      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0)
+      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0,'fwhm',0.0)
       dum = CREATE_STRUCT(dum,'ra',0.0d0,'dec',0.0d0,'stdfield','')
       if TAG_EXIST(cat,'RPIX') then $
         dum=CREATE_STRUCT(dum,'RPIX',0.0,'XB',0.0,'YB',0.0,'DDO51_RADOFFSET',0.0)
@@ -677,6 +692,7 @@ FOR i=0,nfilters-1 do begin
       temp.err = cat.err
       temp.chip = ichip
       temp.exptime = exptime
+      temp.fwhm = fwhm
       temp.ra = cat.ra
       temp.dec = cat.dec
       temp.stdfield = cat.stdfield
