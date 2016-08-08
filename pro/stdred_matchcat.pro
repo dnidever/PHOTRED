@@ -197,13 +197,22 @@ for i=0,nstdfiles-1 do begin
     ext = strmid(stdfiles[i],pos+1)
   endif
   case ext of
-  'cat': std = IMPORTASCII(stdfiles[i],/header,/noprint)
-  'fits': std = MRDFITS(stdfiles[i],1,/silent)
-  'fits.gz': std = MRDFITS(stdfiles[i],1,/silent)
+  'cat': begin
+       std = IMPORTASCII(stdfiles[i],/header,/noprint)
+       fname = FILE_BASENAME(stdfiles[i],'.cat')
+     end
+  'fits': begin
+       std = MRDFITS(stdfiles[i],1,/silent)
+       fname = FILE_BASENAME(stdfiles[i],'.fits')
+     end
+  'fits.gz': begin
+       std = MRDFITS(stdfiles[i],1,/silent)
+       fname = FILE_BASENAME(stdfiles[i],'.fits.gz')
+     end
   else: stop,'Extension ',ext,' NOT SUPPORTED'
   endcase
 
-  fname = FILE_BASENAME(stdfiles[i],'.cat')
+  ;fname = FILE_BASENAME(stdfiles[i],'.cat')
   ;(SCOPE_VARFETCH(fname+'cat',/enter)) = std
   ;;stdnames[i] = fname+'cat'
   ;stdnames[i] = fname
@@ -329,6 +338,7 @@ FOR i=0,ninputlines-1 do begin
       ; Make new structure
       dum = photmatch[0]
       for k=0,nstd_tags-1 do dum=CREATE_STRUCT(dum,new_tags[k],fix(0,type=types[k]))
+      dum = CREATE_STRUCT(dum,'stdfield','')  ; add standard field name column
       cat = REPLICATE(dum,count)
       ncat_tags = N_TAGS(cat)
 
@@ -339,6 +349,9 @@ FOR i=0,ninputlines-1 do begin
 
       ; Copy in the calibrated data
       for k=0,nstd_tags-1 do cat.(k+nphot_tags)=stdmatch.(k)
+
+      ; Add the field name
+      cat.stdfield = stdstr[minind[0]].name
 
       ; Now save the matched catalog
       catfile = filedir+'/'+base+'.cat'
