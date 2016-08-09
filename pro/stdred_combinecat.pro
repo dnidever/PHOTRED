@@ -507,6 +507,9 @@ FOR i=0,nfilters-1 do begin
         fwhm = -99.99
       endelse
 
+      ; Get pixel scale
+      GETPIXSCALE,fitsfile,pixscale
+      
       ; Loading the CAT file
       ;---------------------
       cat = IMPORTASCII(file,/header,/noprint)
@@ -667,7 +670,7 @@ FOR i=0,nfilters-1 do begin
       dum = CREATE_STRUCT(dum,usemagerrname,0.0)
       dum = CREATE_STRUCT(dum,usecolname,0.0)
       dum = CREATE_STRUCT(dum,usecolerrname,0.0)
-      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0,'fwhm',0.0)
+      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0,'seeing',0.0)
       dum = CREATE_STRUCT(dum,'ra',0.0d0,'dec',0.0d0,'stdfield','')
       if TAG_EXIST(cat,'RPIX') then $
         dum=CREATE_STRUCT(dum,'RPIX',0.0,'XB',0.0,'YB',0.0,'DDO51_RADOFFSET',0.0)
@@ -692,7 +695,7 @@ FOR i=0,nfilters-1 do begin
       temp.err = cat.err
       temp.chip = ichip
       temp.exptime = exptime
-      temp.fwhm = fwhm
+      temp.seeing = fwhm*pixscale
       temp.ra = cat.ra
       temp.dec = cat.dec
       temp.stdfield = cat.stdfield
