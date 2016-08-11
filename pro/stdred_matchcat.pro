@@ -397,7 +397,7 @@ FOR i=0,ninputlines-1 do begin
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                     failurelist=failurelist,/silent
 
-END
+ENDFOR
 
 
 ;#####################
@@ -410,8 +410,6 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
 printlog,logfile,'STDRED_MATCHCAT Finished  ',systime(0)
 
 if keyword_set(stp) then stop
-
-
 
 
 end

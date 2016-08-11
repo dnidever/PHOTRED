@@ -221,6 +221,14 @@ if nz gt 0 then begin
 ; No color input
 endif else begin ; colors input
 
+  ; Put x-errors on
+  if n_elements(xerr) gt 0 then $
+    for i=0,n_elements(xerr)-1 do oplot,[-1,1]*xerr[i]+x[i],[0,0]+y[i],thick=thick
+  ; Put y-errors on
+  if n_elements(yerr) gt 0 then $
+    for i=0,n_elements(yerr)-1 do oplot,[0,0]+x[i],[-1,1]*yerr[i]+y[i],thick=thick
+
+  ; Overplot the points
   oplot,x,y,_extra=extra,psym=psym,symsize=symsize
 
 endelse
