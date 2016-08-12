@@ -8,6 +8,8 @@
 ; INPUTS:
 ;  file      FITS filename
 ;  obs       The observatory name.
+;  
+;  =dateobs  The DATE-OBS string.  This is used to determine the MJD.
 ;  /stp      Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -21,18 +23,17 @@
 ; By D.Nidever  January 2016
 ;  much of it copied from APOGEE getmjd5.pro
 ;-
-function photred_getmjd,file,obs,stp=stp,error=error
-  
-COMMON photred,setup
+function photred_getmjd,file,obs,dateobs=dateobs,stp=stp,error=error
 
 undefine,error
 
 nfile = n_elements(file)
 nobs = n_elements(obs)
+ndateobs = n_elements(dateobs)
 ; Not enough inputs
-if nfile eq 0 or nobs eq 0 then begin
+if (nfile eq 0 and ndateobs eq 0) or nobs eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - mjd = photred_getmjd(file,obs,stp=stp,error=error)'
+  print,'Syntax - mjd = photred_getmjd(file,obs,dateobs=dateobs,stp=stp,error=error)'
   return,-1
 endif
 
@@ -57,16 +58,22 @@ if nfile gt 1 then begin
 endif
 
 test = file_test(file)
-if test eq 0 then begin
+if test eq 0 and ndateobs eq 0 then begin
   error = file+' NOT FOUND'
   if not keyword_set(silent) then print,error
   return,-1
 endif
 
-head = HEADFITS(file)
+; Load file
+if ndateobs eq 0 then head = HEADFITS(file)
 
 ; --- Get the DATE ---
-date = photred_getdate(file)
+if ndateobs eq 0 then begin
+  date = photred_getdate(file)
+endif else begin  ; use DATE-OBS
+  dum = strsplit(dateobs,'T',/extract)
+  date = dum[0]
+endelse
 
 ; parse the date information
 datearr = strsplit(date,'-',/extract)
@@ -113,7 +120,12 @@ if day_num lt 1 or day_num gt 31 then begin
 endif
 
 ; --- Get the TIME ---
-time = photred_getuttime(file)
+if ndateobs eq 0 then begin
+  time = photred_getuttime(file)
+endif else begin  ; use DATE-OBS
+  dum = strsplit(dateobs,'T',/extract)
+  time = dum[1]
+endelse
 
 ; parse the time information
 timearr = strsplit(time,':',/extract)
