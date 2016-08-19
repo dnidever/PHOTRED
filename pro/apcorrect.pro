@@ -1,6 +1,3 @@
-pro apcorrect,aper0,final,adopt,cum,cumsig,grofile=grofile,$
-              gronum=gronum,silent=silent,stp=stp,error=error
-
 ;+
 ;
 ; APCORRECT
@@ -41,9 +38,9 @@ pro apcorrect,aper0,final,adopt,cum,cumsig,grofile=grofile,$
 ;                          0.0153   0.0095   0.0065   0.0053   0.0048   0.0046 ...
 ;
 ; It goes on to output the "good" magnitudes and errors for all of the
-; for that frame.  If there are Nap number of apertures then there
+; stars for that frame.  If there are Nap number of apertures then there
 ; will be Nap-1 elements in the growth curves.  There will be Nap
-; cumulative aperture corrections (one for each aperture) and but only
+; cumulative aperture corrections (one for each aperture) but only
 ; sigma errors for the first Nap-1 corrections.
 ;
 ; INPUTS:
@@ -74,6 +71,9 @@ pro apcorrect,aper0,final,adopt,cum,cumsig,grofile=grofile,$
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro apcorrect,aper0,final,adopt,cum,cumsig,grofile=grofile,$
+              gronum=gronum,silent=silent,stp=stp,error=error
 
 undefine,error,final
 
@@ -180,7 +180,7 @@ if (ngrofile gt 0 and ngronum gt 0) then begin
   if not keyword_set(silent) then $
     print,'Sigma(C) ',cumsig,format='(A-10,'+strtrim(ncumsig,2)+'F9.4)'
 
-end  ; getting aperture correction
+endif  ; getting aperture correction
 
 
 
@@ -269,7 +269,7 @@ for k=0,nstars-1 do begin
       SIGMIN = SIGSQ
     endif
 
-  End
+  Endfor
 
   bestap[k] = JFINAL+1
   finalmag[k] = FINAL
@@ -279,7 +279,7 @@ for k=0,nstars-1 do begin
 
   ;if aper[k].id eq 7879 then stop
 
-end
+endfor
 
 ;  ; More than 1 good ap
 ;  if (nap gt 1) then begin

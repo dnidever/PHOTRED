@@ -166,7 +166,7 @@ for i=0,ninputlines-1 do begin
   prefix = first_el(strsplit(base[i],'-',/extract))
   prefixarr = strsplit(prefix,'n',/extract)
   nightarr[i] = fix(prefixarr[1])
-end
+endfor
 
 ui = uniq(nightarr,sort(nightarr))
 nights = nightarr[ui]
@@ -303,7 +303,7 @@ FOR i=0,nnights-1 do begin
 
     CD,curdir
 
-  end
+  endfor
 
   ncopy = long(total(successarr))
   printlog,logfile,strtrim(ncopy,2),'/',strtrim(nnightind,2),' successfully copied to '+nightname+'/'
@@ -362,7 +362,7 @@ FOR i=0,nnights-1 do begin
         PUSH,failurelist,longfile
         printlog,logfile,'NO AIRMASS'
         goto,BOMB2
-      end
+      endif
 
       ; Getting EXPTIME
       exp = PHOTRED_GETEXPTIME(fitsfile)
@@ -419,14 +419,11 @@ FOR i=0,nnights-1 do begin
 
 
   ; Run daogrow on all the a.ap files, that have the stars picked by
-  ; PSFPIXK.
-  ; Use the aperture correction to correct all the stars in the .ap
-  ; files.
-  ; Get the cumulative aperture correction and its error from the
-  ; dagrow.gro file.
-  ; Use the aperture with the minimum error,
+  ; PICKPSF. Use the aperture correction to correct all the stars in the
+  ; .ap files. Get the cumulative aperture correction and its error from
+  ; the dagrow.gro file.  Use the aperture with the minimum error,
   ; err = sqrt( aperr^2.0 + cumerr^2.)
-  ; since the aperture goes UP with radius and the correction error
+  ; since the aperture error goes UP with radius and the correction error
   ; goes down with radius, it might not be the first aperture.
 
 
@@ -573,7 +570,7 @@ FOR i=0,nnights-1 do begin
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                       failurelist=failurelist,/silent
 
-END   ; night loop
+ENDFOR   ; night loop
 
 
 ;#####################
