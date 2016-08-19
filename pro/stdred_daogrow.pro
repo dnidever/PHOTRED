@@ -475,10 +475,6 @@ FOR i=0,nnights-1 do begin
         totfile = filedir+'/'+base+'.tot'
         totafile = base+'a.tot'
 
-        ; What number are we in the .INF file
-        infind = where(infnames eq base+'a',ninfind)
-        num = string(infind[0]+1,format='(I04)')
-
         ; Check the A.TOT file
         totatest = FILE_TEST(totafile)
         if totatest eq 1 then totalines = FILE_LINES(totafile) else totalines=0
@@ -495,7 +491,7 @@ FOR i=0,nnights-1 do begin
         ; Apply the aperture correction
         printlog,logfile,'Applying aperture Correction to >>'+base+'.ap<<'
         undefine,final,error
-        APCORRECT,aper,final,grofile=nightname+'.gro',gronum=infind[0]+1,error=error
+        APCORRECT,aper,final,grofile=nightname+'.gro',apername=base+'a.ap',error=error
         nfinal = n_elements(final)
         printlog,logfile,''
 

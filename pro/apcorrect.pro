@@ -54,8 +54,8 @@
 ;  cumsig    The errors for "cum".  Normally this is one element
 ;              less than "cum".
 ;  =grofile  The filename of the .GRO to use for the aperture
-;              correction.  "gronum" must also be input.
-;  =gronum   The frame number in the .GRO file to use, starting with 1.
+;              correction.  "apername" must also be input.
+;  =apername The name of the aperture file, e.g. "gn10-00278875_50a.ap".
 ;  /silent   Don't print anything to the screen.
 ;  /stp      Stop at the end of the program.
 ;
@@ -66,14 +66,14 @@
 ;  =error    Error message if any errors occured.
 ;
 ; USAGE:
-;  IDL>apcorrect,aper,final,adopt,cum,cumsig,grofile=grofile,gronum=gronum,
+;  IDL>apcorrect,aper,final,adopt,cum,cumsig,grofile=grofile,apername=apername,
 ;                silent=silent,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
 
 pro apcorrect,aper0,final,adopt,cum,cumsig,grofile=grofile,$
-              gronum=gronum,silent=silent,stp=stp,error=error
+              apername=apername,silent=silent,stp=stp,error=error
 
 undefine,error,final
 
@@ -82,12 +82,12 @@ nadopt = n_elements(adopt)
 ncum = n_elements(cum)
 ncumsig = n_elements(cumsig)
 ngrofile = n_elements(grofile)
-ngronum = n_elements(gronum)
+napername = n_elements(apername)
 
 ; Not enough inputs
 if NOT (naper gt 0 and nadopt gt 0 and ncum gt 0 and ncumsig gt 0) and $
-   NOT (naper gt 0 and ngrofile gt 0 and ngronum gt 0) then begin
-  print,'Syntax - apcorrect,aper,final,adopt,cum,cumsig,grofile=grofile,gronum=gronum,'
+   NOT (naper gt 0 and ngrofile gt 0 and napername gt 0) then begin
+  print,'Syntax - apcorrect,aper,final,adopt,cum,cumsig,grofile=grofile,apername=apername,'
   print,'                   silent=silent,stp=stp'
   error = 'Not enough inputs'
   return
@@ -96,7 +96,7 @@ endif
 
 ; Grab the cumulative aperture correction and the errors
 ;-------------------------------------------------------
-if (ngrofile gt 0 and ngronum gt 0) then begin
+if (ngrofile gt 0 and napername gt 0) then begin
 
   ; Load the .GRO file
   grotest = FILE_TEST(grofile[0])
@@ -105,27 +105,37 @@ if (ngrofile gt 0 and ngronum gt 0) then begin
     error = grofile[0]+' NOT FOUND'
     return
   endif
-  READLINE,grofile,grolines,count=count
+  READLINE,grofile,grolines,count=ngrolines
   if not keyword_set(silent) then print,'DAOGROW .GRO FILE = ',grofile[0]
 
-  if (count eq 0) then begin
+  if (ngrolines eq 0) then begin
     print,grofile[0],' IS EMPTY'
     error = grofile[0]+' IS EMPTY'
     return
   endif
 
   ; Frame number in .GRO file
-  if VALID_NUM(gronum,/integer) eq 0 then begin
-    print,'GRONUM='+gronum+' IS NOT A VALID INTEGER'
-    error = 'GRONUM='+gronum+' IS NOT A VALID INTEGER'
+  if VALID_NUM(apername) eq 1 then begin
+    print,'APERNAME='+apername+' MUST BE A STRING'
+    error = 'APERNAME='+apername+' MUST BE A STRING'
     return
   endif
-  if long(gronum) lt 1 then begin
-    print,'GRONUM MUST BE >=1'
-    error = 'GRONUM MUST BE >=1'
+
+  ; The frame number is not reliable, it can change with respect to
+  ; the INF list if there are "bad" frames, i.e. no good stars.
+  ; Use the frame name to identify the right frame number
+  ;   --> 4254 gn10-00278875_50a.ap 
+  frameind = where(stregex(grolines,'--> ',/boolean) eq 1 and $
+                   stregex(grolines,apername,/boolean) eq 1,nframeind)
+  if nframeind eq 0 then begin
+    error = apername+' NOT FOUND in '+grofile
+    print,error
     return
   endif
-  if not keyword_set(silent) then print,'Frame number = ',strtrim(gronum,2)
+  gronum = long((strsplit(grolines[frameind[0]],' ',/extract))[1])  ; pull out the GRO frame number
+  framegrolines = grolines[frameind[0]:(frameind[0]+12)<(ngrolines-1)]
+
+  if not keyword_set(silent) then print,'Frame number = ',strtrim(gronum,2),'   ',apername
   num = string(gronum,format='(I04)')
 
   ; --> 0001           Adopted  -0.1188  -0.0680  -0.0365  -0.0208  -0.0128  -0.0092  -0.0077 ...
@@ -136,14 +146,14 @@ if (ngrofile gt 0 and ngronum gt 0) then begin
   ; "Sigma(C)" has one less element than "Cumulative"
 
   ; Getting adopted growth curve
-  adoptind = where(stregex(grolines,'--> '+num,/boolean) eq 1 and $
-                   stregex(grolines,'Adopted',/boolean) eq 1,nadoptind)
+  adoptind = where(stregex(framegrolines,'--> '+num,/boolean) eq 1 and $
+                   stregex(framegrolines,'Adopted',/boolean) eq 1,nadoptind)
   if (nadoptind eq 0) then begin
     print,'Adopted growth-curve for frame '+gronum+' NOT FOUND'
     error = 'Adopted growth-curve for frame '+gronum+' NOT FOUND'
     return
   endif
-  stradopt = grolines[adoptind[0]]
+  stradopt = framegrolines[adoptind[0]]
   stradoptarr = strsplit(stradopt,' ',/extract)
   adopt = float(stradoptarr[3:*])
   nadopt = n_elements(adopt)
@@ -151,14 +161,14 @@ if (ngrofile gt 0 and ngronum gt 0) then begin
     print,'Adopted ',adopt,format='(A-10,'+strtrim(nadopt,2)+'F9.4)'
 
   ; Getting cumulative aperture correction
-  cumind = where(stregex(grolines,'--> '+num,/boolean) eq 1 and $
-                 stregex(grolines,'Cumulative',/boolean) eq 1,ncumind)
+  cumind = where(stregex(framegrolines,'--> '+num,/boolean) eq 1 and $
+                 stregex(framegrolines,'Cumulative',/boolean) eq 1,ncumind)
   if (ncumind eq 0) then begin
     print,'Cumulative aperture corrections for frame '+gronum+' NOT FOUND'
     error = 'Cumulative aperture corrections for frame '+gronum+' NOT FOUND'
     return
   endif
-  strcum = grolines[cumind[0]]
+  strcum = framegrolines[cumind[0]]
   strcumarr = strsplit(strcum,' ',/extract)
   cum = float(strcumarr[3:*])
   ncum = n_elements(cum)
@@ -166,14 +176,14 @@ if (ngrofile gt 0 and ngronum gt 0) then begin
     print,'Cumulative ',cum,format='(A-10,'+strtrim(ncum,2)+'F9.4)'
 
   ; Getting cumulative aperture correction errors
-  csigind = where(stregex(grolines,'--> '+num,/boolean) eq 1 and $
-                  stregex(grolines,'Sigma\(C\)',/boolean) eq 1,ncsigind)
+  csigind = where(stregex(framegrolines,'--> '+num,/boolean) eq 1 and $
+                  stregex(framegrolines,'Sigma\(C\)',/boolean) eq 1,ncsigind)
   if (ncsigind eq 0) then begin
     print,'Cumulative aperture correction errors for frame '+gronum+' NOT FOUND'
     error = 'Cumulative aperture correction errors for frame '+gronum+' NOT FOUND'
     return
   endif
-  strcsig = grolines[csigind[0]]
+  strcsig = framegrolines[csigind[0]]
   strcsigarr = strsplit(strcsig,' ',/extract)
   cumsig = float(strcsigarr[3:*])
   ncumsig = n_elements(cumsig)
@@ -194,7 +204,8 @@ if not keyword_set(silent) then print,strtrim(napertures,2),' apertures'
 
 ; Get only stars with "good" photometry
 aper = aper0
-gdphot = where(aper.err[0] lt 9.99,ngdphot)
+;gdphot = where(aper.err[0] lt 9.99,ngdphot)
+gdphot = where(aper.err[0] lt 9.0,ngdphot)
 ; No stars with good photometry
 if (ngdphot eq 0) then begin
   if not keyword_set(silent) then print,'NO stars with good photometry'
@@ -248,6 +259,7 @@ for k=0,nstars-1 do begin
   w = fltarr(nap)
   obs = fltarr(nap)
   wobs = fltarr(nap)
+  sigsq = fltarr(nap)
   For j=0,nap-1 do begin
 
     if (j ne 0) then begin
@@ -259,25 +271,23 @@ for k=0,nstars-1 do begin
     endelse
     ;SIGSQ = WCUM[J+1] + SIG[J]^2.0/W[J]
     ;OBS[J] = MAG[J]+CUM[J+1]
-    SIGSQ = WCUM[J] + (SIG[J]^2.0)/W[J]
+    SIGSQ[J] = WCUM[J] + (SIG[J]^2.0)/W[J]
     OBS[J] = MAG[J]+CUM[J]
-    WOBS[J] = MIN( [9.999, SQRT(SIGSQ)] )
-    if (sigsq lt sigmin) then begin
+    WOBS[J] = MIN( [9.999, SQRT(SIGSQ[J])] )
+    if (sigsq[j] lt sigmin) then begin
       FINAL = MAG[J]
       SFINAL1 = WOBS[J]
       JFINAL = J
-      SIGMIN = SIGSQ
+      SIGMIN = SIGSQ[J]
     endif
 
-  Endfor
+  Endfor  ; aperture loop
 
   bestap[k] = JFINAL+1
   finalmag[k] = FINAL
   sfinal[k] = SFINAL1
   apcorr[k] = cum[JFINAL]
   totmag[k] = finalmag[k] + apcorr[k]
-
-  ;if aper[k].id eq 7879 then stop
 
 endfor
 

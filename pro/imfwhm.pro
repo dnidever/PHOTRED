@@ -26,6 +26,8 @@
 ;  =gstr      The structure of Gaussian fits to the sources used
 ;               to measure FWHM and ELLIPTICITY.  This only works
 ;               if there's only ONE input file.
+;  =peakstr   The structure of detected peaks and quick shape
+;               measurements.
 ;  =error     The error message, if one occurred.
 ;
 ; USAGE:
@@ -128,7 +130,7 @@ end
 
 pro imfwhm,input,fwhm,ellipticity,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
            head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,$
-           gstr=gstr,error=error
+           gstr=gstr,peakstr=peakstr,error=error
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
