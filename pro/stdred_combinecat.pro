@@ -516,6 +516,28 @@ FOR i=0,nfilters-1 do begin
       ncat = n_elements(cat)
       printlog,logfile,'Nstars = ',strtrim(ncat,2)
 
+
+      ; Remove bad DECam chip 31 data
+      ;------------------------------
+      ;   went bad at beg of Jan 2014 sometime
+      if (telescope eq 'BLANCO') and (instrument eq 'DECAM') and (ichip eq 31) and (mjd gt 56660) then begin
+        printlog,logfile,'Removing bad photometry for DECam chip 31'
+        ; X: 1-1024 okay
+        ; X: 1025-2049 bad
+        bdind = where(cat.x gt 1024,nbdind,comp=gdind,ncomp=ngdind)
+        if nbdind gt 0 then begin  ; some bad ones found
+          if ngdind eq 0 then begin   ; all bad
+            printlog,logfile,'NO useful measurements in ',file,' CAT file'
+            PUSH,failurelist,longfile
+            goto,BOMB
+          endif
+          printlog,logfile,'Removing '+strtrim(nbdind,2)+' bad measurements, '+strtrim(ngdind,2)+' left.'
+          REMOVE,bdind,cat
+          ncat = n_elements(cat)
+        endif
+      endif
+
+
       ; DDO51 Radial Offset Correction
       ;-------------------------------
       undefine,photfile
@@ -670,7 +692,8 @@ FOR i=0,nfilters-1 do begin
       dum = CREATE_STRUCT(dum,usemagerrname,0.0)
       dum = CREATE_STRUCT(dum,usecolname,0.0)
       dum = CREATE_STRUCT(dum,usecolerrname,0.0)
-      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0,'seeing',0.0)
+      ;dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0,'seeing',0.0)
+      dum = CREATE_STRUCT(dum,'airmass',0.0,'nightcount',0L,'mjd',0L,'ut','','weight',0.0,'chip',0L,'exptime',0.0)
       dum = CREATE_STRUCT(dum,'ra',0.0d0,'dec',0.0d0,'stdfield','')
       if TAG_EXIST(cat,'RPIX') then $
         dum=CREATE_STRUCT(dum,'RPIX',0.0,'XB',0.0,'YB',0.0,'DDO51_RADOFFSET',0.0)
@@ -695,7 +718,7 @@ FOR i=0,nfilters-1 do begin
       temp.err = cat.err
       temp.chip = ichip
       temp.exptime = exptime
-      temp.seeing = fwhm*pixscale
+      ;temp.seeing = fwhm*pixscale
       temp.ra = cat.ra
       temp.dec = cat.dec
       temp.stdfield = cat.stdfield
