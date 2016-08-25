@@ -88,13 +88,48 @@ nfiles = n_elements(files)
 
 ; Transformation info
 tlines = tfrlines[brkind[0]+1:*]
-nstars = n_elements(tlines)
+ntlines = n_elements(tlines)
 tarr = strsplitter(tlines,' ',/extract)
+allid = long(reform(tarr[0,*]))
+allx = float(reform(tarr[1,*]))
+ally = float(reform(tarr[2,*]))
+index = tarr[3:*,*]
+nindexcol = (size(index,/dimensions))[0]
+
+; Get unique star IDs and X/Y values
+ui = uniq(allid,sort(allid))
+uid = allid[ui]
+ux = allx[ui]
+uy = ally[ui]
+nstars = n_elements(uid)
+; Create structure and stuff in ID, X, Y
 str = replicate({id:0L,x:0.0,y:0.0,index:lonarr(nfiles)},nstars)
-str.id = reform(tarr[0,*])
-str.x = reform(tarr[1,*])
-str.y = reform(tarr[2,*])
-str.index = tarr[3:*,*]
+str.id = uid
+str.x = ux
+str.y = uy
+
+; Load the INDEX information
+nlinesperstar = ntlines / nstars
+
+; Load the index information
+uindex = lonarr(nfiles,nstars)
+For i=0,nstars-1 do begin
+  ; Pull out the Nlinesperstar from INDEX for this star
+  index1 = index[*,i*nlinesperstar:(i+1)*nlinesperstar-1]
+  ; Reformat from 2D to 1D
+  index2 = reform(index1,nlinesperstar*nindexcol)
+  ; Take only the lines we need
+  ;   there might be extra blank elements
+  uindex[*,i] = long(index2[0:nfiles-1])
+Endfor
+str.index = uindex
+
+;nstars = n_elements(tlines)
+;str = replicate({id:0L,x:0.0,y:0.0,index:lonarr(nfiles)},nstars)
+;str.id = reform(tarr[0,*])
+;str.x = reform(tarr[1,*])
+;str.y = reform(tarr[2,*])
+;str.index = tarr[3:*,*]
 
 if keyword_set(stp) then stop
 
