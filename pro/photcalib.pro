@@ -832,9 +832,11 @@ FOR i=0L,ninp-1 do begin
   ; Head columns 
   ;--------------
   finalstar = goodstar[*,0:2]
-  headline = '    ID       X         Y     '
-  ;format = '(2X,I5,2F9.3'
-  format = '(2X,I5,2F10.3'
+  headline = '     ID       X         Y     '
+  ;headline = '    ID       X         Y     '
+  ;;format = '(2X,I5,2F9.3'
+  ;format = '(2X,I5,2F10.3'
+  format = '(2X,I6,2F10.3'
 
 
   ;--------------------------------------------
@@ -1050,7 +1052,7 @@ FOR i=0L,ninp-1 do begin
       if tags[j] eq 'PROB' and type eq 4 then form='F7.2'
 
       format = format+','+form
-    end
+    endfor
 
     format = format+')'
 
