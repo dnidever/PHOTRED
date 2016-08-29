@@ -300,11 +300,13 @@ for i=1,nfiles-1 do begin
     SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
   
     ; If no matches, try with looser cuts
-    if count eq 0 then begin
+    if count lt 3 then begin
       printlog,logf,'No matches, trying looser cuts'
       gdref = where(refals.mag lt 50.0 and refals.err lt 1.0,ngdref)
       gdals = where(als.mag lt 50.0 and als.err lt 1.0,ngdals)
       SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
+      if count lt 3 then $
+        SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],3.0,ind1,ind2,count=count,/sph
     endif
 
     if count gt 0 then begin 
@@ -312,17 +314,21 @@ for i=1,nfiles-1 do begin
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
       xmed = median([xdiff],/even)
       ymed = median([ydiff],/even)
-      coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)  ; fit rotation term
-      coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)  ; fit rotation term
-      theta = mean([-coef1[1],coef2[1]])
-      ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
-      ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-      trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
-      ; Adjust Xoff, Yoff with this transformation
-      xyout = trans_coo(als[gdals[ind2]].x,als[gdals[ind2]].y,trans)
-      trans[0] += median([refals[gdref[ind1]].x - xyout[0,*]],/even) 
-      trans[1] += median([refals[gdref[ind1]].y - xyout[1,*]],/even)
-      ; Fit rotation if there are enough stars
+      ; Fit rotation with linear fits if enough points
+      if count gt 1 then begin
+        coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)  ; fit rotation term
+        coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)  ; fit rotation term
+        theta = mean([-coef1[1],coef2[1]])
+        ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
+        ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+        trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
+        ; Adjust Xoff, Yoff with this transformation
+        xyout = trans_coo(als[gdals[ind2]].x,als[gdals[ind2]].y,trans)
+        trans[0] += median([refals[gdref[ind1]].x - xyout[0,*]],/even) 
+        trans[1] += median([refals[gdref[ind1]].y - xyout[1,*]],/even)
+      endif else trans=[xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+
+      ; Fit full six parameters if there are enough stars
       if count gt 10 then begin
         fa = {x1:refals[gdref[ind1]].x,y1:refals[gdref[ind1]].y,x2:als[gdals[ind2]].x,y2:als[gdals[ind2]].y}
         ;initpar = fltarr(6)
