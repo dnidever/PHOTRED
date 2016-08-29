@@ -31,7 +31,7 @@
 ;-
 
 pro daomatch_dummy
-FORWARD_FUNCTION test_trans
+FORWARD_FUNCTION test_trans, trans_coo
 end
 
 ;---------------------------------------------------------------
@@ -312,12 +312,23 @@ for i=1,nfiles-1 do begin
       ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
       xmed = median([xdiff],/even)
       ymed = median([ydiff],/even)
-      trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+      coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)  ; fit rotation term
+      coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)  ; fit rotation term
+      theta = mean([-coef1[1],coef2[1]])
+      ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
+      ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+      trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
+      ; Adjust Xoff, Yoff with this transformation
+      xyout = trans_coo(als[gdals[ind2]].x,als[gdals[ind2]].y,trans)
+      trans[0] += median([refals[gdref[ind1]].x - xyout[0,*]],/even) 
+      trans[1] += median([refals[gdref[ind1]].y - xyout[1,*]],/even)
       ; Fit rotation if there are enough stars
       if count gt 10 then begin
         fa = {x1:refals[gdref[ind1]].x,y1:refals[gdref[ind1]].y,x2:als[gdals[ind2]].x,y2:als[gdals[ind2]].y}
         ;initpar = fltarr(6)
-        initpar = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+        ;initpar = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+        ;initpar = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
+        initpar = trans
         fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
                       bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
         trans = fpar
