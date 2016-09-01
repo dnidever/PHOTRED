@@ -527,7 +527,7 @@ als.y = als.y + yoff
 WRITEALS,base+'_allf.als',als,alshead
 printlog,logf,'Final ALS file = '+base+'_allf.als'
 if FILE_TEST(sexfile) eq 1 then $
-  printlog,logf,'Final SEextractor file = '+sexfile
+  printlog,logf,'Final SExtractor file = '+sexfile
 
 if keyword_set(stp) then stop
 
