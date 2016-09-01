@@ -29,7 +29,8 @@
 ;
 ; KEYWORDS:
 ;   BOOTSTRAP:  Perform a bootstrap analysis to determine the 1-sigma
-;               errors for the returned parameters (SIGMA).
+;               errors for the returned parameters (SIGMA).  This only
+;               works if there are more than 2 points.
 ;
 ;   NBOOTSTRAP: The number of of bootstrap iterations to use.
 ;               The default is 50.
@@ -291,7 +292,7 @@ done:
     ENDIF
 
     ; Perform bootstrap error analysis
-    if keyword_set(bootstrap) then begin
+    if keyword_set(bootstrap) and n gt 2 then begin
       ; Number of iterations
       if n_elements(nbootstrap) gt 0 then begin
         numbootstrap = nbootstrap > 2
@@ -319,7 +320,6 @@ done:
         med = median([btcoef[gdboot,i]],/even)
         sigma[i] = robust_sigma(btcoef[gdboot,i]-med,/zero)
       Endfor      
-
     endif  ;  bootstrap
 
     RETURN, result
