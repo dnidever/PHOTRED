@@ -93,6 +93,10 @@ endif
 cmbforce = READPAR(setup,'CMBFORCE')
 cmbforce = strupcase(strtrim(cmbforce,2))
 if keyword_set(force) or (cmbforce ne '-1' and cmbforce ne '0') then force=1
+; CMBPOSONLY, only use astrometry for matching
+cmbposonly = READPAR(setup,'CMBPOSONLY')
+if cmbposonly eq '0' or cmbposonly eq '' or cmbposonly eq '-1' then cmbposonly=0
+if cmbposonly eq '1' then cmbposonly=1 else cmbposonly=0
 
 
 ; Get the scripts directory from setup
@@ -247,7 +251,6 @@ FOR i=0,nsfields-1 do begin
     PUSH,failurelist,inputlines[gd]
     goto,BOMB1
   endelse
-
 
 
 
@@ -483,7 +486,7 @@ FOR i=0,nsfields-1 do begin
       ; "combine" stars properly.
       if (n_elements(all) gt 0) then begin
 
-        PHOT_OVERLAP,all,str,outstr,silent=silent
+        PHOT_OVERLAP,all,str,outstr,silent=silent,posonly=cmbposonly
         noutstr = n_elements(outstr)
 
         ; There was a problem
@@ -504,7 +507,7 @@ FOR i=0,nsfields-1 do begin
 
       BOMB2:
 
-    End  ; loop through the individual PHO files
+    Endfor  ; loop through the individual PHOT files
 
     ; At least one file failed
     ; Field and files are successful only if *ALL* succeeded
