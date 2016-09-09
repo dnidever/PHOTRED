@@ -555,7 +555,7 @@ FOR f=0,nfiles-1 do begin
       xhi = (round(ix)+10)<(sz[1]-1)
       ylo = (round(iy)-10)>0
       yhi = (round(iy)+10)<(sz[2]-1)
-      subim = im[xlo:xhi,ylo:yhi]
+      subim = im2[xlo:xhi,ylo:yhi]  ; use background subtracted image
       xarr = x[xlo:xhi]
       yarr = y[ylo:yhi]
 
