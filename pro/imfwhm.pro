@@ -237,14 +237,15 @@ FOR f=0,nfiles-1 do begin
     ;diffy2 = im-shift(im,0,-1)
 
     ; Saturation limit
-    satlim = max(im)
+    satlim = max(im)        ; starting point
+    nsaturate = 0
     if n_elements(head) gt 0 then begin
       saturate = sxpar(head,'SATURATE',count=nsaturate,/silent)
       if nsaturate gt 0 then satlim = saturate
     endif
-    satlim = satlim < max(im)
-    satlim = satlim < 65000.   ; this is a realistic limit for now
-    satlim = satlim > 40000.   ; make sure it's pretty high
+    if nsaturate eq 0 then begin
+      satlim = 40000. > satlim < 65000.   ; this is a realistic limit for now
+    endif
 
     ; Set NAN/Inf pixels to above the saturation limit
     bdnan = where(finite(im) eq 0,nbdnan)
@@ -454,7 +455,7 @@ FOR f=0,nfiles-1 do begin
         ;magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
 
         ; Getting the contours
-        CONTOUR,subim,levels=[maxsumim*0.5],path_xy=pathxy,/path_data_coords
+        CONTOUR,subim,levels=[maxsubim*0.5],path_xy=pathxy,/path_data_coords
 
         ; Getting the path
         xpath = reform(pathxy[0,*])
