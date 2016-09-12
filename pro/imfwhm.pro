@@ -367,12 +367,17 @@ FOR f=0,nfiles-1 do begin
     diffth = 0.0 ;skysig  ; sigmap
     ind = where(diffx1 gt diffth and diffx2 gt diffth and diffy1 gt diffth and diffy2 gt diffth $
                    and (im2 gt (nsig*sigmap)) and (im lt 0.5*satlim),nind)
-    ;ind = where(diffx1 gt 0 and diffx2 gt 0 and diffy1 gt 0 and diffy2 gt 0 $
-    ;               and (im gt (skymode+nsig*skysig)) and (im lt 0.5*max),nind)
 
-    ; No "stars" found
-    if nind lt 2 then begin
-      error[f] = files[f]+' NO STARS FOUND'
+    ; No "stars" found, try lower threshold
+    if nind lt 2 and niter lt 5 then begin
+      nsig *= 0.7  ; smaller drop
+      if not keyword_set(silent) then print,'No good sources detected.  Lowering detection limts to ',strtrim(nsig,2),' sigma'
+      niter++
+      goto,detection
+    endif
+    ; No "stars" found, giving up
+    if nind lt 2 and niter ge 5 then begin
+      error[f] = files[f]+' NO STARS FOUND. GIVING UP!'
       if not keyword_set(silent) then print,error[f]
       fwhm = 99.99
       ellipticity = 99.99
@@ -524,8 +529,10 @@ FOR f=0,nfiles-1 do begin
     if ngd eq 0 then gd = where(peakstr.fwhm gt 0.0 and abs(peakstr.round) lt 1.0,ngd)
 
     ; Retry with lower detection limit
-    if ngd lt 10 and niter lt 5 and nsig gt 2 then begin
-      nsig *= 0.5
+    ;if ngd lt 10 and niter lt 5 and nsig gt 2 then begin
+    if ngd lt 50 and niter lt 5 and nsig gt 2 then begin
+      ;nsig *= 0.5
+      nsig *= 0.7  ; smaller drop
       if not keyword_set(silent) then print,'No good sources detected.  Lowering detection limts to ',strtrim(nsig,2),' sigma'
       niter++
       goto,detection
