@@ -244,6 +244,7 @@ FOR f=0,nfiles-1 do begin
     endif
     satlim = satlim < max(im)
     satlim = satlim < 65000.   ; this is a realistic limit for now
+    satlim = satlim > 40000.   ; make sure it's pretty high
 
     ; Set NAN/Inf pixels to above the saturation limit
     bdnan = where(finite(im) eq 0,nbdnan)
@@ -264,7 +265,7 @@ FOR f=0,nfiles-1 do begin
     sky,im[gdpix],skymode,skysig1,/silent
     if skysig1 lt 0.0 then skysig1 = mad(im[gdpix])
     if skysig1 lt 0.0 then skysig1 = mad(im)
-    max = max(im)
+    maxim = max(im)
     ;satlim = max     ; saturation limit
     ;med = median(im)
     ;std = stddev(im)
@@ -364,7 +365,7 @@ FOR f=0,nfiles-1 do begin
     if niter gt 0 then bpmask=bpmask_orig   ; restore bpmask since we modify it below to specify these pixels as "done"
     diffth = 0.0 ;skysig  ; sigmap
     ind = where(diffx1 gt diffth and diffx2 gt diffth and diffy1 gt diffth and diffy2 gt diffth $
-                   and (im2 gt (nsig*sigmap)) and (im lt 0.5*max),nind)
+                   and (im2 gt (nsig*sigmap)) and (im lt 0.5*satlim),nind)
     ;ind = where(diffx1 gt 0 and diffx2 gt 0 and diffy1 gt 0 and diffy2 gt 0 $
     ;               and (im gt (skymode+nsig*skysig)) and (im lt 0.5*max),nind)
 
@@ -445,7 +446,7 @@ FOR f=0,nfiles-1 do begin
 
         ; Getting flux-centered small image
         subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS)
-        maxim = max(subim)
+        maxsubim = max(subim)
 
         ; What is the flux and magnitude
         ;fluxarr[i] = total(subimS-median(subimL))
@@ -453,7 +454,7 @@ FOR f=0,nfiles-1 do begin
         ;magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
 
         ; Getting the contours
-        CONTOUR,subim,levels=[maxim*0.5],path_xy=pathxy,/path_data_coords
+        CONTOUR,subim,levels=[maxsumim*0.5],path_xy=pathxy,/path_data_coords
 
         ; Getting the path
         xpath = reform(pathxy[0,*])
@@ -478,7 +479,7 @@ FOR f=0,nfiles-1 do begin
 
         ; Putting it in the structure
         peakstr[i].fwhm = fwhm1
-        peakstr[i].max = maxim
+        peakstr[i].max = maxsubim
 
         ; Computing the "round" factor
         ; round = difference of the heights of the two 1D Gaussians
