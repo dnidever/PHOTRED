@@ -19,11 +19,11 @@
 ;               This can sometimes be obtained from the image header.
 ;  =cendec    An estimate of the central DEC of the image.  This can
 ;               sometimes be obtained from the image header.
-;  =cat       The catalog (IDL structure) of detected sources in the image.
+;  =inpcat    The catalog (IDL structure) of detected sources in the image.
 ;               The structure must contain the tags X and Y.
-;  =refname   The name of the reference catalog to use.  The two choices
-;               are 'USNO-B1' or '2MASS-PSC'.  USNO-B1 is the default.
-;  =refcat    The reference catalog (IDL structure), normally USNO-B1 or 2MASS-PSC,
+;  =refname   The name of the reference catalog to use.  The choices are
+;               'USNO-B1', '2MASS-PSC', 'UCAC4' or 'GAIA'.  USNO-B1 is the default.
+;  =inprefcat  The reference catalog (IDL structure), normally USNO-B1 or 2MASS-PSC,
 ;               obtained from QUERYVIZIER.PRO.  The structure must contain the
 ;               tags RAJ2000/DEJ2000 or RA/DEC.
 ;  =refmaglim  The reference magnitude limit to use.  The default is 16.5 for 2MASS-PSC
@@ -47,11 +47,11 @@
 ;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS
-;  =cat       The catalog of detected sources in the image.
-;  =refcat    The reference catalog of sources.
+;  =outcat       The catalog of detected sources in the image.
+;  =outrefcat    The reference catalog of sources.
 ;  =matchrefcat  Matched reference catalog used for the final fitting
 ;  =matchcat     Matched image catalog used for the final fitting
-;  =error     The error message if there was one, else undefined
+;  =error        The error message if there was one, else undefined
 ;
 ; USAGE
 ;  IDL>wcsfit,'ccd1001.fits',up='N',left='E',pixscale=0.6995,cenra=90.55,cendec=-75.00
@@ -71,9 +71,20 @@ function wcsfit_devcoo,par,x=x,y=y,ra=ra,dec=dec,astr=astr,wcs=wcs
 
 ; Make temporary astrometry structure
 temp = astr
-temp.cd[0,*] = par[0:1]
-temp.cd[1,*] = par[2:3]
-temp.crval = par[4:5]
+if n_elements(par) gt 4 then begin
+  temp.cd[0,*] = par[0:1]
+  temp.cd[1,*] = par[2:3]
+  temp.crval = par[4:5]
+endif else begin
+  scale = par[0]
+  theta = par[1]
+  temp.cd[0,0] = scale*cos(theta)
+  temp.cd[0,1] = scale*sin(theta)
+  temp.cd[1,0] = -scale*sin(theta)
+  temp.cd[1,1] = scale*cos(theta)
+  temp.crval = par[2:3]
+endelse
+
 ;temp.crpix = par[4:5]    ; Fixed now
 ;temp.crval = par[6:7]
 
@@ -1030,7 +1041,7 @@ end
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-pro wcsfit_refine,head,refcat,cat,iterate=iterate,maxiter=maxiter,error=error,rms=rms
+pro wcsfit_refine,head,refcat,cat,iterate=iterate,maxiter=maxiter,error=error,rms=rms,nmatch=nmatch,stp=stp
 
 ; This refines the WCS solution
 ;
@@ -1158,13 +1169,12 @@ WHILE (flag ne 1) do begin
                  abs(decdiff-median(decdiff)) le 5.0*decrms,ngd)
     endif
     if ngd lt 6 then begin
-      gd = (sort(absdiff))[0:5]
-      ngd = 6
+      gd = (sort(absdiff))[0:n_elements(absdiff)-1]
+      ngd = n_elements(gd)
     endif
-
+  
     refcatM = refcatM[gd]
     catM = catM[gd]
-
   endif
 
   ; Inputs
@@ -1176,7 +1186,19 @@ WHILE (flag ne 1) do begin
 
   ; Initial parameters
   ;par = [reform(nastr.cd[0,*]), reform(nastr.cd[1,*]), nastr.crpix, nastr.crval]
-  par = [reform(nastr.cd[0,*]), reform(nastr.cd[1,*]), nastr.crval]
+  if n_elements(catM) ge 6 then begin
+    par = [reform(nastr.cd[0,*]), reform(nastr.cd[1,*]), nastr.crval]
+  endif else begin
+    ; not enough points to fit
+    ;  just fix x/y offset and scale/rotation
+    theta = atan(nastr.cd[0,1],nastr.cd[0,0])
+    scale = nastr.cd[0,0] / cos(theta)
+    par = [scale, theta, nastr.crval]
+    ; cd[0,0] = scale*cos(theta)
+    ; cd[0,1] = scale*sin(theta)
+    ; cd[1,0] = -scale*sin(theta)
+    ; cd[1,1] = scale*cos(theta)
+  endelse
 
   ;parinfo = replicate({RELSTEP:0.0001},8)
 
@@ -1195,9 +1217,19 @@ WHILE (flag ne 1) do begin
 
   ; Getting new fitted values
   ;nastr = astr
-  nastr.cd[0,*] = fpar[0:1]
-  nastr.cd[1,*] = fpar[2:3]
-  nastr.crval = fpar[4:5]
+  if n_elements(fpar) gt 4 then begin
+    nastr.cd[0,*] = fpar[0:1]
+    nastr.cd[1,*] = fpar[2:3]
+    nastr.crval = fpar[4:5]
+  endif else begin
+    fscale = fpar[0]
+    ftheta = fpar[1]
+    nastr.cd[0,0] = fscale*cos(ftheta)
+    nastr.cd[0,1] = fscale*sin(ftheta)
+    nastr.cd[1,0] = -fscale*sin(ftheta)
+    nastr.cd[1,1] = fscale*cos(ftheta)
+    nastr.crval = fpar[2:3]
+  endelse
   ;nastr.crpix = fpar[4:5]          ; These is fixed now
   ;nastr.crval = fpar[6:7]
 
@@ -1242,7 +1274,7 @@ WHILE (flag ne 1) do begin
 
   ;stop
 
-END  ; outlier rejection loop
+ENDWHILE       ; outlier rejection loop
 
 
 ; Final Statistics
@@ -1307,10 +1339,10 @@ end
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
-           cat=cat0,refcat=refcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
+pro wcsfit,input,up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,outcat=cat,outrefcat=refcat,$
+           inpcat=inpcat0,inprefcat=inprefcat0,stp=stp,error=error,projection=projection,noupdate=noupdate,$
            redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
-           refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,inpfwhm=inpfwhm
+           refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,inpfwhm=inpfwhm,head=head
 
 t0 = systime(1)
 undefine,error
@@ -1319,10 +1351,10 @@ undefine,error
 ninput = n_elements(input)
 if ninput eq 0 then begin
   print,'Syntax - wcsfit,input,up=up,left=left,pixscale=pixscale,cenra=cenra,cendec=cendec,'
-  print,'                cat=cat,refcat=refcat,stp=stp,error=error,projection=projection,'
+  print,'                inpcat=inpcat,inprefcat=inprefcat,stp=stp,error=error,projection=projection,'
   print,'                noupdate=noupdate,redo=redo,searchdist=searchdist,rmslim=rmslim,'
   print,'                refname=refname,refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,'
-  print,'                inpfwhm=inpfwhm'
+  print,'                inpfwhm=inpfwhm,outcat=outcat,outrefcat=outrefcat'
   error = 'Not enough inputs'
   return
 endif
@@ -1343,15 +1375,15 @@ endif
 
 
 ; Loading the input
-LOADINPUT,input,files
-nfiles = n_elements(files)
+LOADINPUT,input,files,count=nfiles
 
 ; Multiple files input
 if nfiles gt 1 then begin
   for i=0,nfiles-1 do $
   WCSFIT,files[i],up=up0,left=left0,pixscale=pixscale0,cenra=cenra0,cendec=cendec0,$
-           cat=cat0,refcat=refcat0,stp=stp,projection=projection,noupdate=noupdate,$
-           redo=redo,searchdist=searchdist,rmslim=rmslim
+           inpcat=inpcat0,inprefcat=inprefcat0,stp=stp,projection=projection,noupdate=noupdate,$
+           redo=redo,searchdist=searchdist,rmslim=rmslim,refname=refname,maxshift=maxshift,$
+           refmaglim=refmaglim,catmaglim=catmaglim,caterrlim=caterrlim,inpfwhm=inpfwhm
   return
 endif
 
@@ -1651,19 +1683,19 @@ print,'------------------------------------------------------'
 ;--------------------------------------------------------
 ; Image Catalog
 ;--------------------------------------------------------
-if n_elements(cat0) gt 0 then begin
+if n_elements(inpcat0) gt 0 then begin
 
-  type = size(cat0,/type)
+  type = size(inpcat0,/type)
   if type eq 8 then begin
 
     ; Check for X/Y tags
-    tags = tag_names(cat0)
+    tags = tag_names(inpcat0)
     xtag = where(stregex(tags,'^X',/boolean) eq 1,nxtag)
     ytag = where(stregex(tags,'^Y',/boolean) eq 1,nytag)
 
     ; We have X/Y tags
     if nxtag ge 0 and nytag ge 0 then begin
-      cat = cat0
+      cat = inpcat0
       ncat = n_elements(cat)
 
       print,'Using INPUT image star list, Nstars=',strtrim(ncat,2)
@@ -1671,7 +1703,7 @@ if n_elements(cat0) gt 0 then begin
 
     if n_elements(cat) eq 0 then print,'INPUT catalog does NOT have X/Y tags'
 
-  ; cat0 is NOT a structure
+  ; inpcat0 is NOT a structure
   endif else begin
     print,'INPUT catalog is NOT a structure'
   endelse
@@ -1890,22 +1922,22 @@ print,''
 ;--------------------------------------------------------
 
 ; Reference catalog input
-if n_elements(refcat0) gt 0 then begin
+if n_elements(inprefcat0) gt 0 then begin
 
-  type = size(cat0,/type)
+  type = size(inprefcat0,/type)
   if type eq 8 then begin
 
     ; Check for RAJ2000/DEJ2000 or RA/DEC tags
-    tags = tag_names(cat0)
+    tags = tag_names(inprefcat0)
     ra2000tag = first_el(where(strpos(tags,'RAJ2000') ne -1,nra2000tag))
     de2000tag = first_el(where(strpos(tags,'DEJ2000') ne -1,nde2000tag))
 
     ; We have RAJ2000/DEJ2000
     if nra2000tag ge 0 and nde2000tag ge 0 then begin
-      cat = cat0
-      ncat = n_elements(cat)
+      refcat = inprefcat0
+      nrefcat = n_elements(refcat)
 
-      print,'Using INPUT image star list, Nstars=',strtrim(ncat,2)
+      print,'Using INPUT reference star list, Nstars=',strtrim(nrefcat,2)
 
     ; NO RAJ2000/DEJ2000, check RA/DEC
     endif else begin
@@ -1916,25 +1948,25 @@ if n_elements(refcat0) gt 0 then begin
       ; The structure is okay, adding the RAJ2000/DEJ2000 tags
       if nratag ge 0 and ndectag ge 0 then begin
        
-        cat = cat0
-        ncat = n_elements(cat)
+        refcat = inprefcat0
+        nrefcat = n_elements(refcat)
 
-        ADD_TAG,cat,'RAJ2000',0.0d0,cat
-        ADD_TAG,cat,'DEJ2000',0.0d0,cat
-        cat.raj2000 = cat.ra
-        cat.dej2000 = cat.dec
+        ADD_TAG,refcat,'RAJ2000',0.0d0,refcat
+        ADD_TAG,refcat,'DEJ2000',0.0d0,refcat
+        refcat.raj2000 = refcat.ra
+        refcat.dej2000 = refcat.dec
 
-        print,'Uing INPUT image star list, Nstars=',strtrim(ncat,2)
+        print,'Uing INPUT reference star list, Nstars=',strtrim(nrefcat,2)
         print,'Using RA/DEC tags in INPUT structure' 
 
       endif  ; structure okay
     endelse  ; no raj2000/dej2000
 
-    if n_elements(cat) eq 0 then print,'INPUT structure does NOT have RAJ2000/DEJ2000 or RA/DEC tags'
+    if n_elements(refcat) eq 0 then print,'INPUT reference structure does NOT have RAJ2000/DEJ2000 or RA/DEC tags'
 
-  ; cat0 is NOT a structure
+  ; inprefcat0 is NOT a structure
   endif else begin
-    print,'INPUT catalog is NOT a structure'
+    print,'INPUT reference catalog is NOT a structure'
   endelse
 
 endif
@@ -1989,11 +2021,11 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' then refcatname='USNO-B1'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='USNO-B1'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
-  canada = 0 ; 1
+  canada = 1  ;0 ; 1
   refcat = QUERYVIZIER(refcatname, [cenra,cendec], [dist,dist], canada=canada, /allcolumns)
   nrefcat = n_elements(refcat)
   type = size(refcat,/type)
@@ -2056,6 +2088,16 @@ if n_elements(refcat) eq 0 then begin
 
   end
 
+  ; GAIA
+  if (refcatname eq 'GAIA/GAIA') then begin
+    ; they are probably all good
+    ; Add RAJ2000 and DEJ2000 tags
+    ADD_TAG,refcat,'RAJ2000',0.0d0,refcat
+    ADD_TAG,refcat,'DEJ2000',0.0d0,refcat
+    refcat.raj2000 = refcat.ra_icrs
+    refcat.dej2000 = refcat.de_icrs
+  endif
+
   ; UCAC4 ??
 
   nrefcat = n_elements(refcat)
@@ -2068,6 +2110,16 @@ if n_elements(refcat) eq 0 then begin
 
 endif
 
+; Reference catalog type
+if n_elements(refname) eq 0 then begin
+  ; 2MASS-PSC has _2MASS tag
+  if tag_exist(refcat,'_2MASS') then refname='2MASS-PSC'
+  ; USNO-B1 has USNO_B1_0 tag
+  if tag_exist(refcat,'USNO_B1_0') then refname='USNO-B1'
+  ; UCAC4 has UCAC4 tag
+  if tag_exist(refcat,'UCAC4') then refname='UCAC4'
+  if n_elements(refname) gt 0 then print,'Reference catalog type is ',refname else print,'Reference catalog type UNKNOWN'
+endif
 
 
 ;########################################################
@@ -2145,8 +2197,10 @@ endelse
 dum = where(stregex(reftags,'PMRA',/boolean) eq 1,npmra)
 dum = where(stregex(reftags,'PMDE',/boolean) eq 1,npmde)
 ; The structure has proper motion
+;  GAIA-DR1 has NAN for most stars
 if (npmra gt 0 and npmde gt 0) then begin
-  gd = where(abs(refcat1b.pmra) lt 200 and abs(refcat1b.pmde) lt 200,ngd)
+  gd = where( (finite(refcat1b.pmra) and abs(refcat1b.pmra) lt 200 and abs(refcat1b.pmde) lt 200) or $
+              (not finite(refcat1b.pmra)),ngd)
   refcat1b = refcat1b[gd]
 endif
 
@@ -2157,10 +2211,17 @@ if tag_exist(refcat1b,'JMAG') then begin
   print,'Keeping only REFERENCE stars with JMAG < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
   refcat1b = refcat1b[gd]
 endif else begin
+  gd = lindgen(n_elements(refcat1b))
   if n_elements(refmaglim) gt 0 then maglim=refmaglim else maglim = 21.0
-  if tag_exist(refcat1b,'RMAG') then gd = where(refcat1b.rmag lt maglim,ngd) else $
-    gd = where(refcat1b.r1mag lt maglim,ngd)
-  print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
+  if tag_exist(refcat1b,'RMAG') then begin
+    gd = where(refcat1b.rmag lt maglim,ngd)
+    print,'Keeping only REFERENCE stars with RMAG < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
+  endif else begin
+    if tag_exist(refcat1b,'R1MAG') then begin
+      gd = where(refcat1b.r1mag lt maglim,ngd)
+      print,'Keeping only REFERENCE stars with RMAG1 < ',strtrim(maglim,2),'  ',strtrim(ngd,2),' sources'
+    endif
+  endelse
   refcat1b = refcat1b[gd]
 endelse
 
@@ -2178,15 +2239,15 @@ endif else cat1=cat
 
 ; Keeping only DETECTED sources within the error limit
 if n_elements(caterrlim) gt 0 then begin
-  gdcat = where(cat.err lt caterrlim,ngdcat)
-  print,'Keeping only DETECTED sources with ERR < ',strtrim(caterrlim,2),' ',strtrim(ngdcat,2),' sources'
-  if ngdcat lt 5 then begin
+  gdcat2 = where(cat1.err lt caterrlim,ngdcat2)
+  print,'Keeping only DETECTED sources with ERR < ',strtrim(caterrlim,2),' ',strtrim(ngdcat2,2),' sources'
+  if ngdcat2 lt 5 then begin
     error = 'Not enough detected sources brighter than '+strtrim(catmerrlim,2)+' mag to perform WCS fitting.'
     if not keyword_set(silent) then print,error
     return
   endif
-  cat1 = cat[gdcat]
-endif else cat1=cat
+  cat1 = cat1[gdcat2]
+endif
 
 ;-----------------------------
 ; FLOWCHART FOR MATCHING STARS
@@ -2229,6 +2290,16 @@ if (nastr gt 0) then begin
     ydiff = yref[ind1]-cat1[ind2].y
     xmed = median(xdiff,/even)
     ymed = median(ydiff,/even)
+
+    ; Rematch
+    if max(abs([xmed,ymed])) gt 1.0 then begin
+      SRCMATCH,xref-xmed,yref-ymed,cat1.x,cat1.y,dcr,ind1,ind2,count=nmatch
+      xdiff = xref[ind1]-cat1[ind2].x
+      ydiff = yref[ind1]-cat1[ind2].y
+      xmed = median(xdiff,/even)
+      ymed = median(ydiff,/even)
+    endif
+
     diff = sqrt( (xdiff-xmed)^2.0 + (ydiff-ymed)^2.0 )
     ;initrms = sqrt(mean(diff^2.0)) * pixscale
     initrms = sqrt( mad(xdiff)^2.0 + mad(ydiff)^2.0) * pixscale
@@ -2344,7 +2415,13 @@ if (nmatch lt 3 or initrms gt 1.5*rmslim) and (refdensity gt imdensity) then beg
     si = sort(refcat1b.jmag)
     refcat1b = refcat1b[si]
   endif else begin
-    if tag_exist(refcat1b,'RMAG') then si=sort(refcat1b.rmag) else si=sort(refcat1b.r1mag)
+    if tag_exist(refcat1b,'RMAG') then begin
+      si = sort(refcat1b.rmag)
+    endif else begin
+      if tag_exist(refcat1b,'R1MAG') then si=sort(refcat1b.r1mag)
+      if tag_exist(refcat1b,'_GMAG_') then si=sort(refcat1b._gmag_)
+    endelse
+    if n_elements(si) eq 0 then si=lindgen(n_elemetns(refcat1b))
     refcat1b = refcat1b[si]
   endelse
 
@@ -2528,6 +2605,12 @@ if n_elements(referror) gt 0 then begin
   return
 endif
 
+; Put the RMS in the header
+SXADDHIST,'WCSFIT: RMS='+string(rms,format='(F5.3)')+' arcsec on '+systime(),head
+SXADDHIST,'WCSFIT: NMATCH='+strtrim(nmatch,2),head
+if n_elements(refname) gt 0 then $
+  SXADDHIST,'WCSFIT: Reference catalog='+strtrim(refname,2),head
+
 
 ;-------------------------------
 ; UPDATING THE FITS HEADER
@@ -2536,9 +2619,6 @@ if not keyword_set(noupdate) then begin
 
   ; The final RMS is low enough
   if (rms le rmslim) then begin
-
-    ; Put the RMS in the header
-    SXADDHIST,'WCSFIT: RMS='+string(rms,format='(F5.3)')+' arcsec on '+systime(),head
 
     print,'Updating WCS in ',filename
     MWRFITS,im,filename,head,/create
