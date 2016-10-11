@@ -78,6 +78,16 @@ endif
 
 if n_elements(framecolor) eq 0 then if !d.name eq 'X' then framecolor=255 else framecolor=0
 
+; Check the sizes
+if n_elements(yerr) gt 0 then if n_elements(yerr) ne n_elements(y) then begin
+  print,'YERR and Y must have same number of elements'
+  return
+endif
+if n_elements(xerr) gt 0 then if n_elements(xerr) ne n_elements(x) then begin
+  print,'XERR and X must have same number of elements'
+  return
+endif
+
 ; Original plot
 position = [0.08,0.08,0.95,0.85]
 if keyword_set(nocolorbar) then position = [0.08,0.05,0.95,0.98]
