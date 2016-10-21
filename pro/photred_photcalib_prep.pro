@@ -154,9 +154,13 @@ tab = '   '
 
 ; Photfile input
 if n_elements(photfile) gt 0 then begin
-  out = string(photfile,format='(A19)') + tab
+  len = strlen(photfile)
+  out = string(photfile,format='(A'+strtrim(len,2)+')') + tab
+  ;out = string(photfile,format='(A19)') + tab
 endif else begin
-  out = string(filebase,format='(A15)')+'.ast' + tab
+  len = strlen(filebase)
+  out = string(filebase,format='(A'+strtrim(len,2)+')')+'.ast' + tab
+  ;out = string(filebase,format='(A15)')+'.ast' + tab
 endelse
 
 ; Keep all exposures/bands on ONE line for now
