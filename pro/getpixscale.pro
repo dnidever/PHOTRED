@@ -1,4 +1,4 @@
-pro getpixscale,file,scale,stp=stp
+pro getpixscale,file,scale,head=head,stp=stp
 
 ;+
 ;
@@ -8,6 +8,7 @@ pro getpixscale,file,scale,stp=stp
 ;
 ; INPUTS:
 ;  file   FITS filename
+;  =head  The image header for which to determine the pixel scale.
 ;  /stp   Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -23,19 +24,19 @@ scale = -1         ; bad until proven good
 
 ; Not enough inputs
 nfile = n_elements(file)
-if nfile eq 0 then begin
-  print,'Syntax - getpixscale,file,scale'
+if nfile eq 0 and n_elements(head) eq 0 then begin
+  print,'Syntax - getpixscale,file,scale,head=head'
   return
 endif
 
 test = file_test(file)
-if test eq 0 then begin
+if test eq 0 and n_elements(head) eq 0 then begin
   print,file,' NOT FOUND'
   return
 endif
 
 ; Read the header
-head = headfits(file)
+if n_elements(head) eq 0 then head = headfits(file)
 
 ; Does the image have a SCALE parameter
 hscale = sxpar(head,'SCALE',/silent)
