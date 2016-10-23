@@ -294,8 +294,8 @@ for i=1,nfiles-1 do begin
     endif
 
     ; Get coordinates for the stars
-    head_xyad,head1,refals.x,refals.y,a1,d1,/deg
-    head_xyad,head2,als.x,als.y,a2,d2,/deg
+    head_xyad,head1,refals.x-1,refals.y-1,a1,d1,/deg
+    head_xyad,head2,als.x-1,als.y-1,a2,d2,/deg
 
     SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
   
@@ -317,8 +317,12 @@ for i=1,nfiles-1 do begin
       ; Fit rotation with linear fits if enough points
       if count gt 1 then begin
         coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)  ; fit rotation term
+        coef1b = dln_poly_fit(als[gdals[ind2]].y,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap)
         coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)  ; fit rotation term
-        theta = mean([-coef1[1],coef2[1]])
+        coef2b = dln_poly_fit(als[gdals[ind2]].x,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err,/bootstrap)
+        ;theta = mean([-coef1[1],coef2[1]])
+        WMEANERR,[-coef1[1],coef2[1]],[coef1err[1],coef2err[1]],theta,thetaerr
+
         ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
         ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
         trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
@@ -340,7 +344,8 @@ for i=1,nfiles-1 do begin
         trans = fpar
       endif
     endif
-
+;print,files[i],' ',count
+;stop
     BOMB1:
   endif ; use WCS
 
