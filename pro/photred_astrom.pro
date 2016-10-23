@@ -147,7 +147,13 @@ FOR i=0,ninputlines-1 do begin
     base = FILE_BASENAME(file,'.mag')
     mchfile = base+'.mch'
     magfile = base+'.mag'
-    fitsfile = base+'.fits'
+    ; Switched to the stacked/comb file for the WCS, 10/23/16
+    ;  in the original combination procedure these two files ahd
+    ;  the identical WCS, in the new combination procedure they
+    ;  are very different but the "reference frame" is the 
+    ;  combined frame.
+    ;fitsfile = base+'.fits'
+    fitsfile = base+'_comb.fits'
     photfile = magfile
   Endif ; 'mag' file
 
