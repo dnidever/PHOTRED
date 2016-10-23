@@ -1667,7 +1667,6 @@ if n_elements(fpar1) eq 0 or rms1 gt 100 then begin
   count=0
   return
 endif
-
 ; Match them using the newer transformation
 out = trans_coo(xx2,yy2,fpar1)
 xx2c = reform(out[0,*])
@@ -1699,10 +1698,23 @@ endif
 ; since there are 6 parameters
 if (nind1b lt 6) then begin
   if not keyword_set(silent) then $
-    print,'Not enough matches'
-  undefine,ind1,ind2,trans
-  count=0
-  rms = 999999.
+    print,'Not enough matches for MPFIT'
+
+  ; Return what we got so far
+  if rms1 lt 100 and nind1b gt 0 then begin
+    ; Refit trans with original coordinates (w/o minx/miny offsets)
+    MATCHSTARS_LINEFIT,fpar1,xx1m+minx,yy1m+miny,xx2m+minx,yy2m+miny,fpar,rms
+    ind1 = ind1b
+    ind2 = ind2b
+    trans = fpar
+    count = nind1b
+    rms = rms
+  ; Noting useful to return
+  endif else begin
+    undefine,ind1,ind2,trans
+    count=0
+    rms = 999999.
+  endelse
   return
 endif
 
