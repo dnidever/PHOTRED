@@ -13,7 +13,7 @@
 ;              ID, X, Y, MAG1, ERR1, MAG2, ERR2, ..., CHI, SHARP, other tags
 ;  /astlinear  Use a linear astrometric fit instead of constant
 ;  /astquad    Use a quadratic astrometric fit instead of constant
-;  /posonlly   Only use positions to match and don't remove any
+;  /posonly    Only use positions to match and don't remove any
 ;                astrometric or photometric offsets.
 ;  /stp        Stop at end of program
 ;  /silent     Don't print anything
