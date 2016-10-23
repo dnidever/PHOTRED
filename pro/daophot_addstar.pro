@@ -27,7 +27,7 @@
 ;  =error     The error message if one occurred, otherwise undefined.
 ;
 ; USAGE:
-;  IDL>daophot_addstar,'F1-0087651_01.psf',cat,'fake.fits',error=error
+;  IDL>daophot_addstar,'F1-0087651_01',cat,'fake.fits',error=error
 ;
 ; By D.Nidever  March 2016
 ;-
@@ -97,7 +97,7 @@ if errmsg ne '' then begin
 endif
 ; check that there's an image
 nx = sxpar(head,'NAXIS1')
-ny = sxpar(head,'NAXIS1')
+ny = sxpar(head,'NAXIS2')
 if nx le 0 or ny le 0 then begin
   error = fitsfile+' has no image.'
   if not keyword_set(silent) then print,error
