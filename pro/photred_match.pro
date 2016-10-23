@@ -476,8 +476,8 @@ FOR i=0,ndirs-1 do begin
           endif 
           ;exptime2 = exptime[gdref]
           ;maxind = first_el(maxloc(exptime2))
-          refimbase = refbase[maxind]
-          refexptime = exptime[gdref[maxind]]
+          refimbase = refbase[maxind[0]]
+          refexptime = exptime[gdref[maxind[0]]]
 
           printlog,logfile,'Two images in reference filter.'
           printlog,logfile,'Picking the image with the longest exposure time'
@@ -509,9 +509,9 @@ FOR i=0,ndirs-1 do begin
           printlog,logfile,'/FAKE, '+strtrim(ngdref,2)+' MCH files for '+amps[0]+'. Too many!'
           goto,BOMB1
         endif
-        refimbase = base1[gdref]
-        usefiltref = filters[gdref]
-        refexptime = exptime[gdref]
+        refimbase = base1[gdref[0]]
+        usefiltref = filters[gdref[0]]
+        refexptime = exptime[gdref[0]]
       endelse
         
       ; Reference image information
