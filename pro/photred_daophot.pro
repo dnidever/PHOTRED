@@ -1,4 +1,4 @@
-pro photred_daophot,redo=redo,fake=fake,stp=stp
+pro photred_daophot,redo=redo,fake=fake,nmulti=nmulti,stp=stp
 
 ;+
 ;
@@ -91,8 +91,10 @@ endif
 
 
 ; Are we redoing?
-doredo = READPAR(setup,'REDO')
-if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1 else redo=0
+if n_elements(redo) eq 0 then begin
+  doredo = READPAR(setup,'REDO')
+  if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1 else redo=0
+endif
 
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
@@ -184,14 +186,16 @@ for i=0,ndirs-1 do begin
   FILE_COPY,scriptsdir+'/'+scripts,dirs[i],/overwrite
 end
 
-; Getting NMULTI
-nmulti = READPAR(setup,'NMULTI')
-nmulti = long(nmulti)
+; Getting NMULTI from setup file if not given on command line
+if n_elements(nmulti) eq 0 then begin
+  nmulti = READPAR(setup,'NMULTI')
+  nmulti = long(nmulti)
 
-; Use NMULTI_DAOPHOT if set
-nmultidaophot = READPAR(setup,'NMULTI_DAOPHOT')
-if nmultidaophot ne '0' and nmultidaophot ne '' and nmultidaophot ne '-1' then nmulti=long(nmultidaophot)
-nmulti = nmulti > 1  ; must be >=1
+  ; Use NMULTI_DAOPHOT if set
+  nmultidaophot = READPAR(setup,'NMULTI_DAOPHOT')
+  if nmultidaophot ne '0' and nmultidaophot ne '' and nmultidaophot ne '-1' then nmulti=long(nmultidaophot)
+  nmulti = nmulti > 1  ; must be >=1
+endif
 
 
 ; LOAD THE "imagers" FILE
@@ -604,7 +608,7 @@ If not keyword_set(redo) then begin
     if aalstest eq 1 then aalslines=FILE_LINES(base+'a.als') else aalslines=0
     ; Done properly?
     if (alslines gt 3 and aalslines gt 3) then donearr[i]=1
-  end
+  endfor
 
   ; Some done already. DO NOT REDO
   bd = where(donearr eq 1,nbd)
