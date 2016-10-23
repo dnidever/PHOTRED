@@ -1,4 +1,4 @@
-pro photred_combine,redo=redo,stp=stp,force=force
+pro photred_combine,redo=redo,stp=stp,force=force,posonly=cmbposonly
 
 ;+
 ;
@@ -94,10 +94,11 @@ cmbforce = READPAR(setup,'CMBFORCE')
 cmbforce = strupcase(strtrim(cmbforce,2))
 if keyword_set(force) or (cmbforce ne '-1' and cmbforce ne '0') then force=1
 ; CMBPOSONLY, only use astrometry for matching
-cmbposonly = READPAR(setup,'CMBPOSONLY')
-if cmbposonly eq '0' or cmbposonly eq '' or cmbposonly eq '-1' then cmbposonly=0
-if cmbposonly eq '1' then cmbposonly=1 else cmbposonly=0
-
+if n_elements(cmbposonly) eq 0 then begin
+  cmbposonly = READPAR(setup,'CMBPOSONLY')
+  if cmbposonly eq '0' or cmbposonly eq '' or cmbposonly eq '-1' then cmbposonly=0
+  if cmbposonly eq '1' then cmbposonly=1 else cmbposonly=0
+endif
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
