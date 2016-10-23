@@ -1,4 +1,4 @@
-pro photred_allframe,redo=redo,fake=fake
+pro photred_allframe,redo=redo,fake=fake,nmulti=nmulti
 
 ;+
 ;
@@ -426,7 +426,7 @@ For i=0,ninputlines-1 do begin
 
   CD,curdir
 
-end  ; loop through MCH files
+endfor  ; loop through MCH files
 
 
 ; Files with okay option files
@@ -515,14 +515,16 @@ if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
 if keyword_set(alfusecmn) then cmd=cmd+",/usecmn"
 if keyword_set(fake) then cmd=cmd+",/fake"
 
-; Getting NMULTI
-nmulti = READPAR(setup,'NMULTI')
-nmulti = long(nmulti)
+; Getting NMULTI from setup file if not input
+if n_elements(nmulti) eq 0 then begin
+  nmulti = READPAR(setup,'NMULTI')
+  nmulti = long(nmulti)
 
-; Use NMULTI_ALLFRAME if set
-nmultiallframe = READPAR(setup,'NMULTI_ALLFRAME')
-if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then nmulti=long(nmultiallframe)
-nmulti = nmulti > 1  ; must be >=1
+  ; Use NMULTI_ALLFRAME if set
+  nmultiallframe = READPAR(setup,'NMULTI_ALLFRAME')
+  if nmultiallframe ne '0' and nmultiallframe ne '' and nmultiallframe ne '-1' then nmulti=long(nmultiallframe)
+  nmulti = nmulti > 1  ; must be >=1
+endif
 
 ; What host
 host = getenv('HOST')
@@ -553,8 +555,6 @@ endelse
 ; IT WOULD BE BETTER TO UPDATE THE LISTS
 ; AFTER EACH FILE IS PROCESSED!!!!!
 ; CAN PBS_DAOMON DO THAT?????
-
-
 
 ;-------------------
 ; Checking OUTPUTS
@@ -589,7 +589,7 @@ for i=0,ninputlines-1 do begin
 
   CD,curdir
 
-end
+endfor
 
 
 
