@@ -1,7 +1,3 @@
-pro allfprep,file,als,xoff,yoff,maxiter=maxiter,scriptsdir=scriptsdir,$
-             detectprog=detectprog0,logfile=logfile,stp=stp,error=error,$
-             maskfile=maskfile
-
 ;+
 ;
 ; ALLFPREP
@@ -39,6 +35,10 @@ pro allfprep,file,als,xoff,yoff,maxiter=maxiter,scriptsdir=scriptsdir,$
 ;
 ; By D. Nidever    February 2008 (copied from Jamie's allfprep.cl)
 ;-
+
+pro allfprep,file,als,xoff,yoff,maxiter=maxiter,scriptsdir=scriptsdir,$
+             detectprog=detectprog0,logfile=logfile,stp=stp,error=error,$
+             maskfile=maskfile
 
 ;scriptsdir = '/net/home/dln5q/daophot/'
 undefine,als,error
