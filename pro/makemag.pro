@@ -146,7 +146,7 @@ for i=0,nfiles-1 do begin
     countarr[gd]++
   endif
 
-end
+endfor
 
 ; Calculating the Median CHI and SHARP
 if nfiles gt 1 then begin

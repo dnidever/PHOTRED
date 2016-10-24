@@ -29,6 +29,8 @@
 ;                               to the combined frame.
 ;  =maskdatalevel  The "bad" data level above the highest "good" value
 ;                    in the combined image. 
+;  =filestr        Information on all of the files used for the
+;                    stacked iamge.
 ;  =error  The error message, if there was one, else undefined
 ;
 ; USAGE:
@@ -42,7 +44,7 @@
 
 pro allframe_combine,file,tile=tileinp,stp=stp,scriptsdir=scriptsdir,error=error,$
              logfile=logfile,irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,$
-             fake=fake,maskdatalevel=maskdatalevel
+             fake=fake,maskdatalevel=maskdatalevel,filestr=filestr
 
 COMMON photred,setup
 
@@ -365,7 +367,7 @@ CASE tile.type of
     rmask = BILINEAR(mask,xx,yy,missing=0)
 
     ; Contruct final image
-    fim = fltarr(tile.nx,tile.ny)+filestr[i].background
+    fim = fltarr(tile.nx,tile.ny)+filestr[i].saturate
     fim[xoutmin:xoutmax,youtmin:youtmax] = rim
     fmask = bytarr(tile.nx,tile.ny)
     fmask[xoutmin:xoutmax,youtmin:youtmax] = rmask
@@ -376,8 +378,8 @@ CASE tile.type of
     sxaddpar,fhead,'NAXIS1',tile.nx
     sxaddpar,fhead,'NAXIS2',tile.ny
     sxaddpar,fhead,'BPM',filestr[i].resampmask
-    printlog,logf,filestr[i].resampfile,' [',strtrim(xoutmin,2),':',strtrim(xoutmax,2),',',$
-                  strtrim(youtmin,2),':',strtrim(youtmax,2),']'
+    printlog,logf,filestr[i].resampfile,' ['+strtrim(xoutmin,2)+':'+strtrim(xoutmax,2)+','+$
+                  strtrim(youtmin,2)+':'+strtrim(youtmax,2)+']'
     MWRFITS,fim,filestr[i].resampfile,fhead,/create
     mhead = fhead
     sxaddpar,mhead,'BITPIX',8

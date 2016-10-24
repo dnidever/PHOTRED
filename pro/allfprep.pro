@@ -494,6 +494,7 @@ WHILE (flag eq 0) do begin
   cmdfile = MKTEMP('temp')
   WRITELINE,cmdfile,cmd
   SPAWN,'allstar < '+cmdfile,out,errout
+
   FILE_DELETE,cmdfile,/allow
 
   ; Load ALS file
