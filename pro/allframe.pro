@@ -21,7 +21,7 @@
 ;  =nocmbimscale  Don't scale the images when combining them.  Not
 ;                   recommended, but the old way of doing it.  Bright
 ;                   stars can be missed this way.
-;  /combtrim      Trim the combined images to the overlapping region.
+;  /trimcomb      Trim the combined images to the overlapping region.
 ;                   This used to be the default, but now the default
 ;                   is to keep the entire original region.
 ;  =scriptsdir    The directory that contains all of the necessary scripts.
@@ -99,8 +99,8 @@ endif
 
 ; No irafdir
 if n_elements(scriptsdir) eq 0 then begin
-  printlog,logf,'IRAFDIR NOT INPUT'
-  error = 'IRAFDIR NOT INPUT'
+  printlog,logf,'SCRIPTSDIR NOT INPUT'
+  error = 'SCRIPTSDIR NOT INPUT'
   return
 endif
 
@@ -180,6 +180,12 @@ if mchtest eq 0 then begin
   return
 endif
 
+; Checking RAW file
+rawtest = file_test(mchbase+'.raw')
+if rawtest eq 0 then begin
+  printlog,logf,mchbase+'.raw NOT FOUND'
+  return
+endif
 
 
 ;###########################################
@@ -233,13 +239,6 @@ for i=0,nfiles-1 do begin
   logtest = file_test(base+'.log')
   if logtest eq 0 then begin
     printlog,logf,base+'.log NOT FOUND'
-    return
-  endif
-
-  ; Checking RAW file
-  rawtest = file_test(base+'.raw')
-  if rawtest eq 0 then begin
-    printlog,logf,base+'.raw NOT FOUND'
     return
   endif
 
@@ -803,7 +802,6 @@ FILE_DELETE,shiftedfiles,/allow,/quiet
 ; Delete mask files
 FILE_DELETE,[maskfiles,outmaskfiles],/allow
 FILE_DELETE,[maskinfile,maskoutfile,maskshiftsfile,imshiftscript],/allow
-
 
 
 ;###########################################
