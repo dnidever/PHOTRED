@@ -18,6 +18,8 @@
 ;  =irafdir       The IRAF home directory.
 ;  =logfile       A logfile to print to output to.
 ;  /fake          Run for artificial star tests.
+;  /usecmn        Use the individual cmn.lst files to construct a
+;                   cmn.lst file for the combined image.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -44,7 +46,7 @@
 
 pro allframe_combine,file,tile=tileinp,stp=stp,scriptsdir=scriptsdir,error=error,$
              logfile=logfile,irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,$
-             fake=fake,maskdatalevel=maskdatalevel,filestr=filestr
+             fake=fake,maskdatalevel=maskdatalevel,usecmn=usecmn,filestr=filestr
 
 COMMON photred,setup
 
@@ -58,7 +60,7 @@ nfile = n_elements(file)
 if (nfile eq 0) then begin
   print,'Syntax - allframe_combine,file,stp=stp,scriptsdir=scriptsdir,satlevel=satlevel,'
   print,'                  nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
-  print,'                  irafdir=irafdir,fake=fake'
+  print,'                  irafdir=irafdir,fake=fake,usecmn=usecmn'
   return
 endif
 
@@ -733,8 +735,47 @@ Endif else begin
 Endelse ; no scaling of images for combining
 
 ; Delete the resampled images
-;FILE_DELETE,filestr.resampfile,/allow,/quiet
-;FILE_DELETE,filestr.resampmask,/allow,/quiet
+FILE_DELETE,filestr.resampfile,/allow,/quiet
+FILE_DELETE,filestr.resampmask,/allow,/quiet
+
+; Make the common source file for the combined image
+;---------------------------------------------------
+if keyword_set(usecmn) then begin
+  print,'Combining COMMON SOURCE files for the combined image.'
+  ; Loop through the files and convert to coordinates to the comined file
+  undefine,allcmn
+  for i=0,nfiles-1 do begin
+    cmnfile1 = file_basename(filestr[i].fitsfile,'.fits')+'.cmn.lst'
+    if file_test(cmnfile1) eq 1 then begin
+      cmn1 = IMPORTASCII(cmnfile1,fieldnames=['id','x','y','mag','err','sky','skysig','sharp','round','round2'],$
+                         skipline=3,/silent)
+      READLINE,cmnfile1,cmnlines1
+      coohead1 = cmnlines1[0:1]
+      ncmn1 = n_elements(cmn1)
+      ; Get coordinates on the resampled/combined image grid
+      out = trans_coo(cmn1.x,cmn1.y,filestr[i].resamptrans)
+      newx = reform(out[0,*])
+      newy = reform(out[1,*])
+      cmn1.x = newx
+      cmn1.y = newy
+      if n_elements(allcmn) eq 0 then begin
+        allcmn = cmn1
+      endif else begin
+        ; Remove any duplicates
+        SRCMATCH,allcmn.x,allcmn.y,cmn1.x,cmn1.y,2.0,ind1,ind2,count=nmatch
+        if nmatch gt 0 then begin
+          if nmatch lt ncmn1 then remove,ind2,cmn1 else undefine,cmn1
+        endif
+        if n_elements(cmn1) gt 0 then push,allcmn,cmn1
+      endelse
+    endif
+  endfor
+  if n_elements(allcmn) gt 0 then begin
+    WRITECOL,mchbase+'_comb.cmn.lst',allcmn.id,allcmn.x,allcmn.y,allcmn.mag,allcmn.err,allcmn.sky,allcmn.skysig,$
+             allcmn.sharp,allcmn.round,allcmn.round2,fmt='(I7,2F9.2,3F9.3,F9.2,3F9.3)'
+    WRITELINE,mchbase+'_comb.cmn.lst',[coohead1,''],/prepend  ; prepend the COO header
+  endif else printlog,logf,'No common file to combine'
+endif
 
 BOMB:
 

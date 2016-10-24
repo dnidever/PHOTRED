@@ -21,6 +21,8 @@
 ;  =irafdir        The IRAF home directory.
 ;  =logfile        A logfile to print to output to.
 ;  /fake           Run for artificial star tests.
+;  /usecmn         Use the cmn.lst file of the reference image for the
+;                    combined image.
 ;  /stp            Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -46,7 +48,7 @@
 pro allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile=logfile,$
                           irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,$
                           trimcomb=trimcomb,fake=fake,maskdatalevel=maskdatalevel,$
-                          xoff=xoff,yoff=yoff
+                          xoff=xoff,yoff=yoff,usecmn=usecmn
 
 COMMON photred,setup
 
@@ -761,6 +763,12 @@ FILE_DELETE,[maskinfile,maskoutfile,maskshiftsfile,imshiftscript],/allow
 
 ; Copy the original MCH file to COMB.MCH
 FILE_COPY,file,mchdir+'/'+mchbase+'.comb.mch',/allow,/over
+
+; Using CMN.LST of reference frame if it exists
+if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
+  print,'Using reference image COMMON SOURCE file'
+  FILE_COPY,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
+endif
 
 ; CD back to the original directory
 cd,curdir
