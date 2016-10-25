@@ -82,9 +82,13 @@ end
 
   ; NO AST structure, check other needed values
   endif else begin
-    ; Need CRVAL, CRPIX, CTYPE, CDELT
+    ; Need NAXIS, CRVAL, CRPIX, CTYPE, CDELT
+    if tag_exist(tile,'NAXIS') eq 0 then begin
+       error = 'TYPE "WCS" requires AST or NAXIS'
+       return,0
+    endif
     if tag_exist(tile,'CRVAL') eq 0 then begin
-      error = 'TYPE "WCS" requires AST or CRVAL'
+       error = 'TYPE "WCS" requires AST or CRVAL'
        return,0
     endif
     if tag_exist(tile,'CRPIX') eq 0 then begin
