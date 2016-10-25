@@ -230,7 +230,7 @@ endfor
 ;#################################################
 ; Create default reference frame if TILE not input
 if n_elements(tileinp) gt 0 then tile=tileinp else tile={type:'WCS'}
-if allframe_validtile(tile) eq 0 then begin
+if tile.type eq 'WCS' and n_tags(tile) eq 1 then begin
   printlog,logf,'Creating TILE projection'
   ; The default projection is a tangent plane centered
   ; at halfway between the ra/dec min/max of all of
@@ -270,10 +270,53 @@ if allframe_validtile(tile) eq 0 then begin
   printlog,logf,'NY = ',strtrim(ny,2)
 
   ; Create the TILE structure
-  tile = {type:'WCS',ast:tileast,head:tilehead,xrange:[0,nx-1],nx:nx,yrange:[0,ny-1],ny:ny}
-
+  tile = {type:'WCS',naxis:long([nx,ny]),cdelt:double([step,step]),crpix:double([xref+1L,yref+1L]),$
+          crval:double([cenra,cendec]),ctype:['RA--TAN','DEC--TAN'],$
+          head:tilehead,ast:tileast,xrange:[0,nx-1],yrange:[0,ny-1],nx:nx,ny:ny}
 endif
 
+; Check that the TILE is valid
+if allframe_validtile(tile,error=tilerror) eq 0 then begin
+  error = tilerror
+  if not keyword_set(silent) then printlog,logf,error
+  return
+endif
+
+; Add HEAD/AST to TILE if needed
+if tag_exist(tile,'HEAD') eq 0 then begin
+  MKHDR,tilehead,fltarr(5,5)
+  SXADDPAR,tilehead,'NAXIS1',tile.naxis[0]
+  SXADDPAR,tilehead,'CDELT1',tile.cdelt[0]
+  SXADDPAR,tilehead,'CRPIX1',tile.crpix[0]
+  SXADDPAR,tilehead,'CRVAL1',tile.crval[0]
+  SXADDPAR,tilehead,'CTYPE1',tile.ctype[0]
+  SXADDPAR,tilehead,'NAXIS2',tile.naxis[1]
+  SXADDPAR,tilehead,'CDELT2',tile.cdelt[1]
+  SXADDPAR,tilehead,'CRPIX2',tile.crpix[1]
+  SXADDPAR,tilehead,'CRVAL2',tile.crval[1]
+  SXADDPAR,tilehead,'CTYPE2',tile.crval[1]
+  if tag_exist(tile,'CD') then begin
+    SXADDPAR,tilehead,'CD1_1',tile.cd[0,0]
+    SXADDPAR,tilehead,'CD1_2',tile.cd[0,1]
+    SXADDPAR,tilehead,'CD2_1',tile.cd[1,0]
+    SXADDPAR,tilehead,'CD2_2',tile.cd[1,1]
+  endif
+  EXTAST,tile.head,tileast
+  tileast.equinox = 2000
+  tile = CREATE_STRUCT(tile,'HEAD',tilehead,'AST',tileast)
+endif
+if tag_exist(tile,'AST') eq 0 then begin
+  EXTAST,tile.head,tileast
+  tileast.equinox = 2000
+  tile = CREATE_STRUCT(tile,'AST',ast)
+endif
+; Add XRANGE/YRANGE
+if tag_exist(tile,'XRANGE') eq 0 then begin
+  tile = CREATE_STRUCT(tile,'XRANGE',long([0,tile.naxis[0]-1]),'NX',tile.naxis[0])
+endif
+if tag_exist(tile,'YRANGE') eq 0 then begin
+  tile = CREATE_STRUCT(tile,'YRANGE',long([0,tile.naxis[1]-1]),'NY',tile.naxis[1])
+endif
 
 
 ;###########################################
@@ -330,9 +373,10 @@ CASE tile.type of
 ; --- WCS projection on the sky ---
 'WCS': begin
 
-  ; Convert x/y and ra/dec grid for entire tile image, ~15sec
-  xb = lindgen(tile.nx)#replicate(1,tile.ny)
-  yb = replicate(1,tile.nx)#lindgen(tile.ny)
+  ; Convert x/y and ra/dec grid for entire tile image
+  ;  that we'll be using, ~15sec
+  xb = (lindgen(tile.nx)+tile.xrange[0])#replicate(1,tile.ny)
+  yb = replicate(1,tile.nx)#(lindgen(tile.ny)+tile.yrange[0])
   HEAD_XYAD,tile.head,xb,yb,rab,decb,/deg
 
   ; Loop through the files
@@ -350,19 +394,14 @@ CASE tile.type of
 
     ; Get X/Y range for this image in the final coordinate system
     HEAD_ADXY,tile.head,filestr[i].vertices_ra,filestr[i].vertices_dec,vx,vy,/deg
-    xoutmin = floor(min(vx))-2 > tile.xrange[0]
-    xoutmax = ceil(max(vx))+2 < tile.xrange[1]
-    nxout = xoutmax-xoutmin+1 > tile.yrange[0]
-    youtmin = floor(min(vy))-2 < tile.yrange[1]
-    youtmax = ceil(max(vy))+2
-    nyout = youtmax-youtmin+1
-    ;xx2 = (lindgen(nxout)+xoutmin)#replicate(1,nyout)
-    ;yy2 = replicate(1,nxout)#(lindgen(nyout)+youtmin)
-    ;HEAD_XYAD,tile.head,xx2,yy2,rr,dd,/deg
-    rr = rab[xoutmin:xoutmax,youtmin:youtmax]
-    dd = decb[xoutmin:xoutmax,youtmin:youtmax]
-    ; ~35-48 sec, it takes 220sec with adxy.pro
-    ;HEAD_ADXY,head1,rr,dd,xx,yy,/deg
+    xout = [floor(min(vx))-2 > tile.xrange[0], ceil(max(vx))+2 < tile.xrange[1]]
+    xoutrel = xout-tile.xrange[0] ; relative to xrange[0]
+    nxout = xout[1]-xout[0]+1
+    yout = [floor(min(vy))-2 > tile.yrange[0], ceil(max(vy))+2 < tile.yrange[1]]
+    youtrel = yout-tile.yrange[0] ; relative to yrange[0]
+    nyout = yout[1]-yout[0]+1
+    rr = rab[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]]
+    dd = decb[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]]
     ALLFRAME_ADXYINTERP,head1,rr,dd,xx,yy,nstep=10
 
     ; The x/y position to bilinear need to be in the original system, ~1sec
@@ -371,9 +410,9 @@ CASE tile.type of
 
     ; Contruct final image
     fim = fltarr(tile.nx,tile.ny)+filestr[i].saturate
-    fim[xoutmin:xoutmax,youtmin:youtmax] = rim
+    fim[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rim
     fmask = bytarr(tile.nx,tile.ny)
-    fmask[xoutmin:xoutmax,youtmin:youtmax] = rmask
+    fmask[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rmask
 
     ; Contruct the final header
     fhead = head1
@@ -381,8 +420,8 @@ CASE tile.type of
     sxaddpar,fhead,'NAXIS1',tile.nx
     sxaddpar,fhead,'NAXIS2',tile.ny
     sxaddpar,fhead,'BPM',filestr[i].resampmask
-    printlog,logf,filestr[i].resampfile,' ['+strtrim(xoutmin,2)+':'+strtrim(xoutmax,2)+','+$
-                  strtrim(youtmin,2)+':'+strtrim(youtmax,2)+']'
+    printlog,logf,filestr[i].resampfile,' ['+strtrim(xout[0],2)+':'+strtrim(xout[1],2)+','+$
+                  strtrim(yout[0],2)+':'+strtrim(yout[1],2)+']'
     MWRFITS,fim,filestr[i].resampfile,fhead,/create
     mhead = fhead
     sxaddpar,mhead,'BITPIX',8
