@@ -753,6 +753,11 @@ Endif else begin
 
 Endelse ; no scaling of images for combining
 
+; Add TILETYPE to the combined image
+combhead = headfits(combfile)
+sxaddpar,combhead,'AFTILTYP','ORIG'
+MODFITS,combfile,0,combhead
+
 ; Delete the shifted images
 READLINE,outfile,shiftedfiles
 FILE_DELETE,shiftedfiles,/allow,/quiet
