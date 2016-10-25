@@ -48,7 +48,37 @@ CASE strupcase(strtrim(tile.type,2)) of
 end
 'WCS': begin
   ; AST structure exists
-  if tag_exist(tile,'AST')
+  if tag_exist(tile,'AST') then begin
+    ; AST must be a structure
+    if size(tile.ast,/type) ne 8 then begin
+      error = 'TYPE "WCS" AST must be a structure'
+      return,0
+    endif
+    ; Need NAXIS, CD, CDELT, CRPIX, CRVAL, CTYPE
+    if tag_exist(tile.ast,'NAXIS') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing NAXIS'
+       return,0
+    endif
+    if tag_exist(tile.ast,'CD') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing CD'
+       return,0
+    endif
+    if tag_exist(tile.ast,'CDELT') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing CDELT'
+      return,0
+    endif
+    if tag_exist(tile.ast,'CRPIX') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing CRPIX'
+      return,0
+    endif
+    if tag_exist(tile.ast,'CRVAL') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing CRVAL'
+       return,0
+    endif
+    if tag_exist(tile.ast,'CTYPE') eq 0 then begin
+      error = 'TYPE "WCS" AST structure is missing CTYPE'
+      return,0
+    endif
 
   ; NO AST structure, check other needed values
   endif else begin
@@ -56,7 +86,7 @@ end
     if tag_exist(tile,'CRVAL') eq 0 then begin
       error = 'TYPE "WCS" requires AST or CRVAL'
        return,0
-   endif
+    endif
     if tag_exist(tile,'CRPIX') eq 0 then begin
       error = 'TYPE "WCS" requires AST or CRPIX'
       return,0
@@ -70,6 +100,15 @@ end
       return,0
     endif
   endelse
+  ; Need XRANGE, YRANGE
+  if tag_exist(tile,'XRANGE') eq 0 then begin
+    error = 'TYPE "WCS" requires XRANGE'
+    return,0
+  endif
+  if tag_exist(tile,'YRANGE') eq 0 then begin
+    error = 'TYPE "WCS" requires YRANGE'
+    return,0
+  endif
 end
 else: stop,strtrim(tile.type,2)+' not supported yet'
 ENDCASE
