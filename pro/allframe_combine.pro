@@ -820,6 +820,7 @@ if keyword_set(usecmn) then begin
              allcmn.sharp,allcmn.round,allcmn.round2,fmt='(I7,2F9.2,3F9.3,F9.2,3F9.3)'
     WRITELINE,mchbase+'_comb.cmn.lst',[coohead1,''],/prepend  ; prepend the COO header
   endif else printlog,logf,'No common file to combine'
+
 ; Don't use common file 
 endif else begin
   ; Make sure it doesn't exist otherwise it will be used
