@@ -178,7 +178,7 @@ nfiles = n_elements(files)
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
   ; weights, scale, zero, comb_psf, _shift.mch
-  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
+  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf']
   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
   if nbdfiles gt 0 then begin
     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
@@ -229,7 +229,8 @@ endfor
 
 ;#################################################
 ; Create default reference frame if TILE not input
-if n_elements(tileinp) eq 0 then begin
+if n_elements(tileinp) gt 0 then tile=tileinp else tile={type:'WCS'}
+if allframe_validtile(tile) eq 0 then begin
   printlog,logf,'Creating TILE projection'
   ; The default projection is a tangent plane centered
   ; at halfway between the ra/dec min/max of all of
@@ -271,7 +272,7 @@ if n_elements(tileinp) eq 0 then begin
   ; Create the TILE structure
   tile = {type:'WCS',ast:tileast,head:tilehead,xrange:[0,nx-1],nx:nx,yrange:[0,ny-1],ny:ny}
 
-endif else tile=tileinp
+endif
 
 
 
@@ -733,6 +734,11 @@ Endif else begin
   FITS_WRITE,combfile,combim2,combhead
 
 Endelse ; no scaling of images for combining
+
+; Add TILETYPE to the combined image
+combhead = headfits(combfile)
+sxaddpar,combhead,'AFTILTYP',tile.type
+MODFITS,combfile,0,combhead
 
 ; Delete the resampled images
 FILE_DELETE,filestr.resampfile,/allow,/quiet
