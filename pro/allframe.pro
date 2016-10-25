@@ -310,6 +310,11 @@ endif else begin
   yoff = 0.0
   combmch = mchbase+'_comb.mch'
 endelse
+;  There was an error in combination
+if n_elements(error) gt 0 then begin
+  printlog,logf,error
+  return
+endif
 combfile = mchbase+'_comb.fits'
 combweightfile = mchbase+'_comb.mask.fits'
 
