@@ -1,5 +1,3 @@
-pro photred_allframe,redo=redo,fake=fake,nmulti=nmulti
-
 ;+
 ;
 ; ALLFRAME
@@ -10,15 +8,19 @@ pro photred_allframe,redo=redo,fake=fake,nmulti=nmulti
 ; See daophot_setup.pro for how to make the pleione scripts
 ;
 ; INPUTS:
-;  /redo Redo files that were already done.
-;  /fake Run for artificial star tests.
-;  /stp  Stop at the end of the program.
+;  =tiletype  The type of tiling scheme to use in the combination.
+;               The default is "ORIG'.
+;  /redo      Redo files that were already done.
+;  /fake      Run for artificial star tests.
+;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The ALLFRAME/SEXTRACTOR MAG file
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
+pro photred_allframe,redo=redo,fake=fake,nmulti=nmulti,tiletype=tiletype
 
 COMMON photred,setup
 
@@ -144,6 +146,11 @@ if alfexclude eq '0' or alfexclude eq '' or alfexclude eq '-1' then undefine,alf
 alfusecmn = READPAR(setup,'alfusecmn')
 if alfusecmn eq '0' or alfusecmn eq '' or alfusecmn eq '-1' then undefine,alfusecmn
 
+; Type of combination tiling scheme to use
+if n_elements(tiletype) eq 0 then begin
+  alftiletype = READPAR(setup,'alftiletype')
+  if alftiletype eq '0' or alftiletype eq '' or alftiletype eq '-1' then tiletype='ORIG' else tiletype=alftiletype
+endif
 
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------
@@ -509,11 +516,11 @@ Endif ; some done already?
 
 ; Make commands for allframe
 cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
-      ",detectprog='"+alfdetprog+"'"
-if keyword_set(alfnocmbimscale) then cmd=cmd+",/nocmbimscale"
-if keyword_set(alftrimcomb) then cmd=cmd+",/trimcomb"
-if keyword_set(alfusecmn) then cmd=cmd+",/usecmn"
-if keyword_set(fake) then cmd=cmd+",/fake"
+      ",detectprog='"+alfdetprog+"',tile={type:'"+strupcase(tiletype)+"'}"
+if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
+if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
+if keyword_set(alfusecmn) then cmd+=",/usecmn"
+if keyword_set(fake) then cmd+=",/fake"
 
 ; Getting NMULTI from setup file if not input
 if n_elements(nmulti) eq 0 then begin
