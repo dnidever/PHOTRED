@@ -416,6 +416,12 @@ CASE tile.type of
 
     ; Contruct the final header
     fhead = head1
+    ; Delete any previous WCS keywords
+    sxdelpar,fhead,['CRVAL1','CRVAL2','CRPIX1','CRPIX2','CDELT1','CDELT2','CTYPE1','CTYPE2']
+    sxdelpar,fhead,['CD1_1','CD1_2','CD2_1','CD2_2']
+    pvind = where(stregex(strmid(fhead,0,5),'PV[0-9]_+[0-9]',/boolean) eq 1,npvind)
+    if npvind gt 0 then remove,pvind,fhead
+    ; Add the new WCS
     PUTAST,fhead,tile.ast
     sxaddpar,fhead,'NAXIS1',tile.nx
     sxaddpar,fhead,'NAXIS2',tile.ny
