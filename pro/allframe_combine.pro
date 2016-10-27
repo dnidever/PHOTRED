@@ -500,13 +500,16 @@ print,'Deriving new transformation equations for the resampled coordinate system
 for i=0,nfiles-1 do begin
 
   ; Convert X/Y of this system into the combined reference frame
+  ;  The pixel values are 1-indexed like DAOPHOT uses.
   ngridbin = 50
   nxgrid = filestr[i].nx / ngridbin
   nygrid = filestr[i].ny / ngridbin
-  xgrid = (lindgen(nxgrid)*ngridbin)#replicate(1,nygrid)
-  ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin)
-  HEAD_XYAD,(*filestr[i].head),xgrid,ygrid,ragrid,decgrid,/deg
+  xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid)
+  ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1)
+  HEAD_XYAD,(*filestr[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
   HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
+  refxgrid += 1  ; convert 0-indexed to 1-indexed
+  refygrid += 1
 
   ; Now fit the transformation
   xdiff = refxgrid-xgrid
@@ -542,13 +545,19 @@ for i=0,nfiles-1 do begin
   filestr[i].resamptransrms = rms
 
   ; The output is:
-  ; filename, xshift, yshift, 4 trans, FRAD (from als file), 0.0
-  format = '(A2,A-30,A1,2F10.2,4F10.5,2F10.3)'
-  newline = STRING("'",filestr[i].catfile,"'",trans, filestr[i].magoff[0], rms, format=format)
+  ; filename, xshift, yshift, 4 trans, mag offset, magoff sigma
+  format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)'
+  ; In daomaster.f the translations are 10 digits with at most 4
+  ; decimal places (with a leading space), the transformation
+  ; coefficients are 12 digits with at most 9 decimal places.
+  ; Need a leading space to separate the numbers.
+  strans = ' '+[strtrim(string(trans[0:1],format='(F30.4)'),2),$
+               strtrim(string(trans[2:5],format='(F30.9)'),2)]
+  newline = STRING("'",filestr[i].catfile,"'", strans, filestr[i].magoff[0], rms, format=format)
   PUSH,mchfinal,newline
 
   ; Printing the transformation
-  printlog,logf,format='(A-20,2F10.4,4F12.8,2F10.3)',filestr[i].catfile,trans,filestr[i].magoff[0],rms
+  printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms
 endfor
 ; Write to the new MCH file
 combmch = mchbase+'_comb.mch'
