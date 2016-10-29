@@ -253,7 +253,7 @@ FOR f=0,nfiles-1 do begin
 
     ; Not enough "good" pixels
     ; sometimes "bad" pixels are exactly 0.0
-    gdpix = where(im lt satlim*0.95 and im ne 0.0,ngdpix)
+    gdpix = where(im lt satlim*0.90 and im ne 0.0,ngdpix)
     if ngdpix lt 2 then begin
       error[f] = files[f]+' NOT ENOUGH GOOD PIXELS'
       if not keyword_set(silent) then print,error[f]
@@ -263,7 +263,7 @@ FOR f=0,nfiles-1 do begin
     endif
 
     ; Computing sky level and sigma
-    sky,im[gdpix],skymode,skysig1,/silent
+    sky,im,skymode,skysig1,highbad=satlim,/silent
     if skysig1 lt 0.0 then skysig1 = mad(im[gdpix])
     if skysig1 lt 0.0 then skysig1 = mad(im)
     maxim = max(im)
@@ -318,7 +318,7 @@ FOR f=0,nfiles-1 do begin
 
     ; Computing sky level and sigma AGAIN with
     ;  background subtracted image
-    sky,im2[gdpix],skymode2,skysig,/silent
+    sky,im2,skymode2,skysig,highbad=satlim,/silent
 
 
     ; Gaussian smooth the image to allow detection of fainter sources
