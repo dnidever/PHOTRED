@@ -336,8 +336,8 @@ finditer | The number of times to iteratively find sources in ALLFRAME (allfprep
 alfdetprog | The program to use for source detection in the ALLFRAME stage (allfprep). The options are "sextractor" and "daophot". The default is "sextractor". SExtractor is generally better at finding faint sources and returns a stellaricity probability value which is very useful. HOWEVER, SExtractor fails in VERY crowded regions. It's best to use DAOPHOT for very crowded images.
 alfnocmbimscale | Do not "scale" the combined images in the ALLFRAME prep stage.
 alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from ALLFRAME processing.
-alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
 alfusecmn  |  Use the reference image common sources file to pick PSF stars for the combined image.
+alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
 ddo51radoffset  |  There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
 keepinstr | CALIB should keep the instrumental magnitudes in the final output file.
 avgmag | CALIB should calculate average magnitudes in filters that were observed multiple times. The individual magnitudes are also kept.
