@@ -185,7 +185,7 @@ endif
 ; Find the background
 skymode = -999999.
 skysig = -999999.
-SKY,im,skymode,skysig,/silent
+SKY,im,skymode,skysig,/silent,highbad=max(im)-5000
 if skysig lt 0.0 then skysig = mad(im)
 if skymode lt 0.0 then skymode = median(im)
 
