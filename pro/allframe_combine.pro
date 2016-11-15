@@ -235,9 +235,18 @@ if tile.type eq 'WCS' and n_tags(tile) eq 1 then begin
   ; The default projection is a tangent plane centered
   ; at halfway between the ra/dec min/max of all of
   ; the images.  The mean pixel scale is used.
-  rar = minmax(filestr.vertices_ra)
+  ;  near RA=0 line
+  if range(filestr.vertices_ra) gt 180 then begin
+    vertices_ra = filestr.vertices_ra
+    over = where(vertices_ra gt 180,nover,comp=under,ncomp=nunder)
+    if nover gt 0 then vertices_ra[over]-=360
+    rar = minmax(vertices_ra)
+    cenra = mean(rar)
+  endif else begin
+    rar = minmax(filestr.vertices_ra)
+    cenra = mean(rar)
+  endelse
   decr = minmax(filestr.vertices_dec)
-  cenra = mean(rar)
   cendec = mean(decr)
   pixscale = mean(filestr.pixscale)
   ; Set up the tangent plane projection
