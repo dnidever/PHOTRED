@@ -86,7 +86,7 @@ instrument = strlowcase(READPAR(setup,'INSTRUMENT'))
 ; Reference Catalog Name
 wcsrefname = READPAR(setup,'WCSREFNAME')
 if wcsrefname ne 'USNO-B1' and wcsrefname ne '2MASS-PSC' and wcsrefname ne 'UCAC4' and $
-   wcsrefname ne 'GAIA/GAIA' then wcsrefname='2MASS-PSC'
+   wcsrefname ne 'GAIA/GAIA' then wcsrefname='GAIA/GAIA'
 
 ; WCSFIT Search distance
 searchdist = READPAR(setup,'SEARCHDIST')
