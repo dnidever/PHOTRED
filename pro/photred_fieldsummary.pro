@@ -18,7 +18,7 @@ pro photred_fieldsummary,field,setupdir=setupdir,redo=redo
 ;  IDL>photred_fieldsummary,'F1',setupdir=setupdir
 ;
 ; By D.Nidever  May 2015
-;+
+;-
   
 COMMON photred,setup
 
