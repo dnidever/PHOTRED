@@ -1,6 +1,6 @@
 ;+
 ;
-; ALLFRAME
+; PHOTRED_ALLFRAME
 ;
 ; This runs allframe for photred
 ; Can be on pleione or just a single machine depending
@@ -337,6 +337,19 @@ For i=0,ninputlines-1 do begin
     goto,BOMB
   endif
 
+  ; Check that the RAW file exists
+  mchbase = file_basename(file,'.mch')
+  test = FILE_TEST(mchbase+'.raw')
+  if test eq 1 then nlines=FILE_LINES(mchbase+'.raw')
+
+  ; NO or BAD RAW file
+  if (test eq 0) or (nlines eq 0) then begin
+    successarr[i]=0
+    if test eq 0 then printlog,logfile,mchbase,'.raw NOT FOUND'
+    if test eq 1 and nlines eq 0 then printlog,logfile,mchbase,'.raw HAS 0 LINES'
+    goto,BOMB
+  endif
+
   ; Load the MCH file
   LOADMCH,file,files,trans
 
@@ -417,14 +430,7 @@ For i=0,ninputlines-1 do begin
       successarr[i] = 0
     endif
 
-    ; Checking RAW file
-    rawtest = FILE_TEST(base+'.raw')
-    if logtest eq 0 then begin
-      printlog,logfile,base+'.raw NOT FOUND'
-      successarr[i] = 0
-    endif
-
-  end  ; files in MCH file loop
+  endfor  ; files in MCH file loop
 
   ; Is everything okay for this file
   if (successarr[i] ne 0) then successarr[i]=1
