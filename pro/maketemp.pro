@@ -53,9 +53,11 @@ while (dum(0) ne '') do begin
 end
 
 ; Create an empty file
-openw,unit,file,/get_lun
-close,unit
-free_lun,unit
+if not keyword_set(directory) then begin
+  openw,unit,file,/get_lun
+  close,unit
+  free_lun,unit
+endif else FILE_MKDIR,file
 
 ;stop
 
