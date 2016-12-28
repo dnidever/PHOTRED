@@ -1,5 +1,3 @@
-pro photred_wcs,redo=redo,stp=stp,testing=testing,std=std
-
 ;+
 ;
 ; PHOTRED_WCS
@@ -15,6 +13,7 @@ pro photred_wcs,redo=redo,stp=stp,testing=testing,std=std
 ;
 ; By D.Nidever  Feb 2008
 ;-
+pro photred_wcs,redo=redo,stp=stp,testing=testing,std=std
 
 COMMON photred,setup
 
@@ -247,7 +246,6 @@ FOR i=0,ninputlines-1 do begin
   endif
 
 
-
   ; Make sure that |BITPIX| > 16
   ; Only works for single chip images
   bitpix = long(SXPAR(head,'BITPIX',/silent))
@@ -275,7 +273,6 @@ FOR i=0,ninputlines-1 do begin
     endif
 
   endif
-
 
 
   ;---------------------------------------------------------------
@@ -452,6 +449,7 @@ ENDFOR
 ; Run WCSFIT with PBS_DEAMON
 ;----------------------------
 printlog,logfile,'Running WCSFIT on images'
+printlog,logfile,systime(0)
 ncmd = n_elements(cmd)
 printlog,logfile,strtrim(ncmd,2),' files to run WCSFIT on'
 

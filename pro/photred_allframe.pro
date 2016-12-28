@@ -174,7 +174,6 @@ endif
 
 
 
-
 ;###################
 ; GETTING INPUTLIST
 ;###################
@@ -288,12 +287,11 @@ for i=0,nscripts-1 do begin
     print,scriptsdir+'/'+scripts[i],' NOT FOUND'
     return
   endif
-end
+endfor
 ; Copy the scripts to the directories
 for i=0,ndirs-1 do begin
   FILE_COPY,scriptsdir+'/'+scripts,dirs[i],/overwrite
-end
-
+endfor
 
 
 
@@ -306,6 +304,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 successarr = intarr(ninputlines)-1         ; 0-bad, 1-good
 undefine,outputarr
@@ -480,7 +479,7 @@ If not keyword_set(redo) then begin
     if magtest eq 1 then maglines=FILE_LINES(magfile) else maglines=0
     ; Done properly?
     if (maglines gt 3) then donearr[i]=1
-  end
+  endfor
 
   ; Some done already. DO NOT REDO
   bd = where(donearr eq 1,nbd)
@@ -519,6 +518,11 @@ Endif ; some done already?
 ;-----------------------------
 ; Running ALLFRAME.PRO
 ;-----------------------------
+
+printlog,logfile,''
+printlog,logfile,'Running ALLFRAME on '+strtrim(n_elements(procbaselist),2)+' files'
+printlog,logfile,''
+printlog,logfile,systime(0)
 
 ; Make commands for allframe
 cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$

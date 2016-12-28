@@ -1,6 +1,3 @@
-pro photred_rename,redo=redo,stp=stp,testing=testing,$
-     continue_on_error=continue_on_error
-
 ;+
 ;
 ; PHOTRED_RENAME
@@ -18,6 +15,8 @@ pro photred_rename,redo=redo,stp=stp,testing=testing,$
 ;
 ; By D.Nidever  Feb 2008
 ;-
+pro photred_rename,redo=redo,stp=stp,testing=testing,$
+     continue_on_error=continue_on_error
 
 COMMON photred,setup
 
@@ -135,7 +134,7 @@ bd1 = where(stregex(FILE_BASENAME(inputlines),'^F[1-9]',/boolean) eq 1,nbd1)
 if nbd1 gt 0 then begin
   printlog,logfile,'Removed ',strtrim(nbd1,2),' files that already start with F#'
   PUSH,bad,bd1
-end
+endif
 bd2 = where(stregex(FILE_BASENAME(inputlines),'_0.fits$',/boolean) eq 1,nbd2)
 if nbd2 gt 0 then begin
   printlog,logfile,'Removed ',strtrim(nbd2,2),' files that end in _0.fits'
@@ -174,6 +173,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,systime(0)
 
 ; Initializing arrays
 fieldarr = strarr(ninputlines)
@@ -238,7 +238,7 @@ for i=0,ninputlines-1 do begin
     if not keyword_set(continue_on_error) then testing = 1
   endif
 
-end
+endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
@@ -497,7 +497,7 @@ FOR i=0,ninputlines-1 do begin
                       failurelist=failurelist,/silent
   ;stop
 
-END
+ENDFOR
 printlog,logfile,'-------------------------------------------------------------------------------------------------------------'
 
 

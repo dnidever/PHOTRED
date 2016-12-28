@@ -1,5 +1,3 @@
-pro photred_combine,redo=redo,stp=stp,force=force,posonly=cmbposonly
-
 ;+
 ;
 ; PHOTRED_COMBINE
@@ -17,6 +15,8 @@ pro photred_combine,redo=redo,stp=stp,force=force,posonly=cmbposonly
 ;
 ; By D.Nidever  Mar 2008
 ;-
+
+pro photred_combine,redo=redo,stp=stp,force=force,posonly=cmbposonly
 
 COMMON photred,setup
 
@@ -179,8 +179,6 @@ inputlines = lists.inputlines
 
 
 
-
-
 ;##################################################
 ;#  PROCESSING THE FILES
 ;##################################################
@@ -188,7 +186,7 @@ printlog,logfile,''
 printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
-
+printlog,logfile,systime(0)
 
 undefine,outlist,successlist,failurelist
 
@@ -235,6 +233,7 @@ FOR i=0,nsfields-1 do begin
   printlog,logfile,'Combining photometry files for '+ishortfield
   printlog,logfile,'==================================='
   printlog,logfile,''
+  printlog,logfile,systime(0)
 
   gd = where(shortfieldarr eq ishortfield,ngd)
   fieldlines = inputlines[gd]
@@ -645,7 +644,7 @@ FOR i=0,nsfields-1 do begin
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                       failurelist=failurelist,/silent
 
-END
+ENDFOR
 
 
 ;#####################

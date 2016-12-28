@@ -1,5 +1,3 @@
-pro photred_split,redo=redo,stp=stp,std=std
-
 ;+
 ;
 ; PHOTRED_SPLIT
@@ -16,6 +14,7 @@ pro photred_split,redo=redo,stp=stp,std=std
 ;
 ; By D.Nidever  Feb 2008
 ;-
+pro photred_split,redo=redo,stp=stp,std=std
 
 COMMON photred,setup
 
@@ -87,7 +86,6 @@ if iraftest eq 0 then begin
 endif
 
 
-
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
@@ -129,7 +127,6 @@ inputlines = lists.inputlines
 
 
 
-
 ;######################################
 ;#  PROCESSING THE FILES
 ;######################################
@@ -138,6 +135,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 ; SPLIT MEF frames and pass through single chip files
 
@@ -315,7 +313,7 @@ FOR i=0,ninputlines-1 do begin
   ;stop
 
 
-END
+ENDFOR
 
 
 ;#####################

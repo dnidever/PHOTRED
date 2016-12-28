@@ -176,7 +176,7 @@ printlog,logf,'====================================='
 printlog,logf,'RUNNING ALLFRAME on ',file
 printlog,logf,'====================================='
 printlog,logf,''
-
+printlog,logf,systime(0)
 
 ; FILENAME
 mchfile = file_basename(file)
@@ -294,6 +294,7 @@ endif
 printlog,logf,'--------------------------'
 printlog,logf,'STEP 1: Combine the images'
 printlog,logf,'--------------------------'
+printlog,logf,systime(0)
 
 ; Use the original combine code
 if keyword_set(cmborig) then begin
@@ -324,6 +325,7 @@ combweightfile = mchbase+'_comb.mask.fits'
 printlog,logf,'----------------------------------------'
 printlog,logf,'STEP 2: Getting PSF for Combined Image'
 printlog,logf,'----------------------------------------'
+printlog,logf,systime(0)
 if not keyword_set(fake) then begin
   ; Make .opt files, set saturation just below the mask data level
   MKOPT,combfile,satlevel=maskdatalevel-1000
@@ -358,6 +360,7 @@ endelse
 printlog,logf,'--------------------------------'
 printlog,logf,'STEP 3: Running allframe prep'
 printlog,logf,'--------------------------------'
+printlog,logf,systime(0)
 ; Make sure we have an allstar.opt file
 if file_test('allstar.opt') eq 0 then file_copy,base[0]+'.als.opt','allstar.opt'
 
@@ -372,6 +375,7 @@ if n_elements(error) gt 0 then goto,BOMB
 printlog,logf,'----------------------------'
 printlog,logf,'STEP 4: Running ALLFRAME'
 printlog,logf,'----------------------------'
+printlog,logf,systime(0)
 
 ; What we need
 ; allf.mag     List of coordinates made by allfprep
@@ -426,6 +430,7 @@ FILE_DELETE,file_basename(files,'.als')+'j.fits',/allow   ; delete subtracted im
 printlog,logf,'--------------------------'
 printlog,logf,'STEP 5: Running MAKEMAG'
 printlog,logf,'--------------------------'
+printlog,logf,systime(0)
 
 ;FILE_COPY,scriptsdir+'makemag','.',/overwrite
 FILE_DELETE,mchbase+'.makemag',/allow
@@ -469,6 +474,7 @@ WRITELINE,magfile,head,/prepend
 printlog,logf,'----------------------------------------'
 printlog,logf,'STEP 6: Adding SExtractor information'
 printlog,logf,'----------------------------------------'
+printlog,logf,systime(0)
 
 ; combfile_allf.sex can be matched to the makemag file using IDs
 ; Load the SExtractor file
@@ -526,6 +532,7 @@ endif else begin
 endelse
 
 printlog,logf,'FINAL ALLFRAME file = ',finalfile
+printlog,logf,systime(0)
 
 BOMB:
 
