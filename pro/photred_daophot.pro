@@ -17,6 +17,7 @@
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
 pro photred_daophot,redo=redo,fake=fake,nmulti=nmulti,stp=stp
 
 COMMON photred,setup

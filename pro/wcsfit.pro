@@ -2026,7 +2026,9 @@ if n_elements(refcat) eq 0 then begin
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
   cfa = 1  ;0 ; 1
-  refcat = QUERYVIZIER(refcatname, [cenra,cendec], [dist,dist], cfa=cfa, /allcolumns)
+  userefcatname = refcatname
+  if refcatname eq '2MASS-PSC' and cfa eq 1 then userefcatname='II/246'   ; cfa issue
+  refcat = QUERYVIZIER(userefcatname, [cenra,cendec], [dist,dist], cfa=cfa, /allcolumns)
   nrefcat = n_elements(refcat)
   type = size(refcat,/type)
 

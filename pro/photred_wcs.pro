@@ -13,6 +13,7 @@
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
 pro photred_wcs,redo=redo,stp=stp,testing=testing,std=std
 
 COMMON photred,setup

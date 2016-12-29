@@ -15,6 +15,7 @@
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
 pro photred_match,redo=redo,fake=fake,stp=stp
 
 COMMON photred,setup

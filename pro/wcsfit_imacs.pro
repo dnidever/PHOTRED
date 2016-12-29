@@ -310,7 +310,9 @@ filebase = FILE_BASENAME(ifile,'.fits')
     print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
          '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
     cfa = 1
-    usno = QUERYVIZIER(refcatname,[cenra,cendec],[dist,dist],cfa=cfa,/allcolumn)
+    userefcatname = refcatname
+    if refcatname eq '2MASS-PSC' and cfa eq 1 then userefcatname='II/246'   ; cfa issue
+    usno = QUERYVIZIER(userefcatname, [cenra,cendec], [dist,dist], cfa=cfa,/allcolumns)
     nusno = n_elements(usno)
     type = size(usno,/type)
 
