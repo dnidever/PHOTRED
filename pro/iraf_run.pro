@@ -1,5 +1,3 @@
-pro iraf_run,scriptname,irafdir,silent=silent,out=out,error=error
-
 ;+
 ; 
 ; IRAF_RUN
@@ -24,6 +22,8 @@ pro iraf_run,scriptname,irafdir,silent=silent,out=out,error=error
 ; By D.Nidever  August 2007
 ;  Similar to a perl script written by Armin Rest
 ;-
+
+pro iraf_run,scriptname,irafdir,silent=silent,out=out,error=error
 
 undefine,error
 
