@@ -212,6 +212,7 @@ FOR i=0,ninputlines-1 do begin
  
     ; Making IRAF script
     undefine,iraflines
+    push,iraflines,'print("")' ; adorta: FIRST LINE WILL BE IGNORED!!
     push,iraflines,'cd '+filedir
     push,iraflines,'mscred'
     push,iraflines,'mscsplit(input="'+name+'",output="",mefext=".fits",delete=no,verbose=yes)'

@@ -469,6 +469,7 @@ WRITELINE,maskshiftsfile,strxyshifts
 ;  set boundary to 0=BAD
 printlog,logf,'Shifting masks'
 undefine,iraflines
+push,iraflines,'print("")'   ; first line will be ignored
 push,iraflines,'cd '+curdir
 push,iraflines,'images'
 push,iraflines,'imgeom'
@@ -571,6 +572,7 @@ if not keyword_set(nocmbimscale) then begin
   FILE_DELETE,mchbase+'_comb.bpm.fits',/allow
   undefine,lines
   cd,current=curdir
+  push,lines,'print("")'   ; first line will be ignored
   push,lines,'cd '+curdir
   push,lines,'imcopy '+mchbase+'_comb.bpm.pl '+mchbase+'_comb.bpm.fits'
   push,lines,'logout'

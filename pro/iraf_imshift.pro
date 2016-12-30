@@ -180,6 +180,7 @@ sboundary_type = strtrim(boundary_type,2)
 sconstant = strtrim(constant,2)
 
 ; Write IRAF script
+push,cmd,'print("")'   ; first line will be ignored
 push,cmd,'cd '+curdir
 push,cmd,'immatch'
 push,cmd,'imshift.input=""'

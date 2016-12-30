@@ -1,5 +1,3 @@
-pro photred,dirs,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED
@@ -355,6 +353,7 @@ pro photred,dirs,redo=redo,stp=stp
 ; By D. Nidever  Jan-May 2008
 ;-
 
+pro photred,dirs,redo=redo,stp=stp
 
 
 COMMON photred,setup
