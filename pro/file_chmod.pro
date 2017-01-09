@@ -1,4 +1,9 @@
-
+;+
+;
+; FILE_CHMOD
+;
+; This program changes file permissiosn on unix-like systems.
+;
 ; Bit Octal Mask   Meaning
 ; 12  '4000'o  Setuid: Set user ID on execution.
 ; 11  '2000'o  Setgid: Set group ID on execution.
@@ -12,6 +17,34 @@
 ; 3  '0004'o  Allow read by others.
 ; 2  '0002'o  Allow write by others.
 ; 1  '0001'o  Allow execute by others.
+;
+; INPUTS:
+;  file         A file name or list of file names for which permissions should be modifie.d
+;  mode         A bit mask mode specifying the permissions, e.g. '755'o.
+;  =a_execute   Execute permissions for all groups (other, group, user).
+;  =a_write     Write permissions for all groups (other, group, user).
+;  =a_read      Read permissions for all gropus (other, group, user).
+;  =o_execute   Execute permission for all others.
+;  =o_write     Write permissions for all others.
+;  =o_read      Read permissions for all others.
+;  =g_execute   Execute permission for group.
+;  =g_write     Write permissions for group.
+;  =g_read      Read permissions for group.
+;  =u_execute   Execute permission for user.
+;  =u_write     Write permissions for user.
+;  =u_read      Read permissions for user.
+;  =sticky_bit  Set the sticky bit.
+;  =setgui      Set group ID bit.
+;  =setuid      Set user ID bit.
+;  
+; OUTPUTS:
+;  The permissions of the specified files are modified.
+;
+; USAGE:
+;  IDL>file_chmod,'file.txt','644'o
+;
+; By D. Nidever  Jan 2017, tried to implement intrinsic IDL routine
+;-
 
 pro file_chmod,file,mode,a_execute=a_execute,a_read=a_read,a_write=a_write,$
                g_execute=g_execute,g_read=g_read,g_write=g_write,$
@@ -117,7 +150,7 @@ For i=0,nfile-1 do begin
   if n_elements(setuid) gt 0 and not keyword_set(setuid) and (('4000'o and dec_mode) eq '4000'o) then dec_mode-='4000'o
 
   ; Convert from decimal to octal
-  octal_mode = string(format='(O)',dec_mode)  
+  octal_mode = strtrim(string(format='(O)',dec_mode),2)
 
   ; Perform the action
   spawn,['chmod',octal_mode,file],out,errout,/noshell
