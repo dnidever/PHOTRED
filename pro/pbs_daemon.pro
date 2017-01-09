@@ -71,9 +71,18 @@ endif
 ; Which IDL are we using?
 if keyword_set(idle) then begin
   SPAWN,'which idl',out,errout
-  if STRPOS(out[0],'aliased to') ne -1 then $
-    out = first_el(strsplit(out[0],' ',/extract),/last)
-  idlprog = FILE_SEARCH(out[0],count=nidlprog)
+  if STRPOS(out[0],'aliased to') ne -1 then begin
+    aliasto = first_el(strsplit(out[0],' ',/extract),/last)
+    idlprog = FILE_SEARCH(aliasto,count=nidlprog)
+    ; aliased to another program, e.g. gdl
+    if nidlprog eq 0 then begin
+      spawn,'which '+aliasto,out2,errout2
+      idlprog = FILE_SEARCH(out2[0],count=nidlprog)
+    endif
+  ; no alias
+  endif else begin
+    idlprog = FILE_SEARCH(out[0],count=nidlprog)
+  endelse
   if (nidlprog eq 0) then begin
     print,'IDL PROGRAM NOT AVAILABLE'
     return
