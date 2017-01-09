@@ -1,5 +1,3 @@
-pro photred_daophot,redo=redo,fake=fake,nmulti=nmulti,stp=stp
-
 ;+
 ;
 ; PHOTRED_DAOPHOT
@@ -19,6 +17,8 @@ pro photred_daophot,redo=redo,fake=fake,nmulti=nmulti,stp=stp
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
+pro photred_daophot,redo=redo,fake=fake,nmulti=nmulti,stp=stp
 
 COMMON photred,setup
 
@@ -149,8 +149,6 @@ endif
 inputlines = lists.inputlines
 
 
-
-
 fitsdirlist = FILE_DIRNAME(inputlines)
 fitsbaselist = FILE_BASENAME(inputlines)
 nfitsbaselist = n_elements(fitsbaselist)
@@ -180,11 +178,11 @@ for i=0,nscripts-1 do begin
     print,scriptsdir+'/'+scripts[i],' NOT FOUND'
     return
   endif
-end
+endfor
 ; Copy the scripts to the directories
 for i=0,ndirs-1 do begin
   FILE_COPY,scriptsdir+'/'+scripts,dirs[i],/overwrite
-end
+endfor
 
 ; Getting NMULTI from setup file if not given on command line
 if n_elements(nmulti) eq 0 then begin
@@ -248,6 +246,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 successarr = intarr(nfitsbaselist)-1                ; 0-bad, 1-good
 
@@ -379,6 +378,7 @@ endfor ; directories loop
 
 
 printlog,logfile,'Making DAOPHOT/ALLSTAR option files'
+printlog,logfile,systime(0)
 
 ntomakeoptlist = n_elements(tomakeoptlist)
 printlog,logfile,strtrim(ntomakeoptlist,2),' files need OPT files'
@@ -490,7 +490,8 @@ if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
   printlog,logfile,''
   printlog,logfile,'Making CONFIRMED CELESTIAL SOURCES lists - GLOBAL METHOD'
   printlog,logfile,''
-
+  printlog,logfile,systime(0)
+  
   ; Get field and chip information for each file
   fitsfieldlist = strarr(nfitsbaselist)
   fitschiplist = strarr(nfitsbaselist)
@@ -528,7 +529,8 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   printlog,logfile,''
   printlog,logfile,'Making CONFIRMED CELESTIAL SOURCES lists - SINGLE-CHIP METHOD'
   printlog,logfile,''
-
+  printlog,logfile,systime(0)
+  
   ; Get field and chip information for each file
   fitsfieldlist = strarr(nfitsbaselist)
   fitschiplist = strarr(nfitsbaselist)
@@ -584,7 +586,6 @@ if ngd eq 0 then begin
 
   return
 endif
-
 
 ; These are the files to process
 procbaselist = FILE_BASENAME(fitsbaselist[gd],'.fits')
@@ -650,6 +651,11 @@ Endif ; some done already?
 ;----------------------
 rundaophot:
 
+printlog,logfile,''
+printlog,logfile,'Running DAOPHOT on '+strtrim(n_elements(procbaselist),2)+' files'
+printlog,logfile,''
+printlog,logfile,systime(0)
+
 ; Make commands for daophot
 if not keyword_set(fake) then begin
   cmd = './daophot.sh '+procbaselist
@@ -698,7 +704,7 @@ for i=0,nfitsbaselist-1 do begin
 
   CD,curdir
 
-end
+endfor
 
 
 

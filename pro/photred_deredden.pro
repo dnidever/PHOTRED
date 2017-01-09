@@ -1,5 +1,3 @@
-pro photred_deredden,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_DEREDDEN
@@ -16,6 +14,8 @@ pro photred_deredden,redo=redo,stp=stp
 ;
 ; By D.Nidever  Mar 2008
 ;-
+pro photred_deredden,redo=redo,stp=stp
+
 
 COMMON photred,setup
 
@@ -87,7 +87,6 @@ instrument = READPAR(setup,'INSTRUMENT')
 
 
 
-
 ;###################
 ; GETTING INPUTLIST
 ;###################
@@ -110,7 +109,6 @@ if ninputlines eq 0 then begin
 endif
 
 inputlines = lists.inputlines
-
 
 
 
@@ -410,6 +408,7 @@ printlog,logfile,''
 printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
+printlog,logfile,systime(0)
 
 ;successarr = intarr(ninputlines)-1     ; 0-bad, 1-good
 ;undefine,outputarr
@@ -429,7 +428,8 @@ FOR i=0,ninputlines-1 do begin
   printlog,logfile,'DEREDDENING ',file
   printlog,logfile,'============================='
   printlog,logfile,''
-
+  printlog,logfile,systime(0)
+  
   CD,filedir
 
   ; Make sure it exists
@@ -589,7 +589,7 @@ FOR i=0,ninputlines-1 do begin
 
     TODERED_BOMB:
 
-  end
+  endfor
 
 
   ;---------------------------------------
@@ -677,7 +677,7 @@ FOR i=0,ninputlines-1 do begin
 
     TODERED_BOMB2:
 
-  end
+  endfor
 
 
   ; WRITE new file
@@ -700,7 +700,6 @@ FOR i=0,ninputlines-1 do begin
   PUSH,successlist,longfile
 
 
-
   BOMB:
 
   CD,curdir
@@ -712,9 +711,7 @@ FOR i=0,ninputlines-1 do begin
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                       failurelist=failurelist,/silent
 
-  ;stop
-
-END
+ENDFOR
 
 
 ;#####################

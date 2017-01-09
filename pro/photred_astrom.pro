@@ -1,5 +1,3 @@
-pro photred_astrom,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_ASTROM
@@ -16,6 +14,8 @@ pro photred_astrom,redo=redo,stp=stp
 ;
 ; By D.Nidever  Mar 2008
 ;-
+
+pro photred_astrom,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -114,6 +114,7 @@ printlog,logfile,''
 printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
+printlog,logfile,systime(0)
 
 undefine,outlist,successlist,failurelist
 
@@ -364,7 +365,7 @@ FOR i=0,ninputlines-1 do begin
 
   ;stop
 
-END
+ENDFOR
 
 
 ;#####################

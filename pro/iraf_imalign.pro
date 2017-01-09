@@ -1,11 +1,3 @@
-pro iraf_imalign,input,reference,coords,output,shifts=shifts,boxsize=boxsize,$
-                bigbox=bigbox,negative=negative,background=background,$
-                lower=lower,upper=upper,niterate=niterate,tolerance=tolerance,$
-                maxshift=maxshift,shiftimages=shiftimages,interp_type=interp_type,$
-                boundary_type=boundary_type,constant=constant,trimimages=trimimages,$
-                verbose=verbose,xoff=xoff,yoff=yoff,stp=stp,error=error,trans=trans,$
-                trimsection=trimsection,irafdir=irafdir
-
 ;+
 ;
 ; IRAF_IMALIGN
@@ -170,6 +162,14 @@ pro iraf_imalign,input,reference,coords,output,shifts=shifts,boxsize=boxsize,$
 ; By D. Nidever    February 2008 
 ;-
 
+pro iraf_imalign,input,reference,coords,output,shifts=shifts,boxsize=boxsize,$
+                bigbox=bigbox,negative=negative,background=background,$
+                lower=lower,upper=upper,niterate=niterate,tolerance=tolerance,$
+                maxshift=maxshift,shiftimages=shiftimages,interp_type=interp_type,$
+                boundary_type=boundary_type,constant=constant,trimimages=trimimages,$
+                verbose=verbose,xoff=xoff,yoff=yoff,stp=stp,error=error,trans=trans,$
+                trimsection=trimsection,irafdir=irafdir
+
 undefine,error
 
 ninput = n_elements(input)
@@ -256,6 +256,7 @@ strimimages = strtrim(trimimages,2)
 sverbose = strtrim(verbose,2)
 
 ; Write IRAF script
+push,cmd,'print("")'   ; first line will be ignored
 push,cmd,'cd '+curdir
 push,cmd,'immatch'
 push,cmd,'imalign.boxsize = '+sboxsize

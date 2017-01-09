@@ -1,5 +1,3 @@
-pro photred_apcor,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_APCOR
@@ -18,6 +16,8 @@ pro photred_apcor,redo=redo,stp=stp
 ;
 ; By D.Nidever  Mar 2008
 ;-
+
+pro photred_apcor,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -146,6 +146,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 ; How many nights are there?                                                                                                                                                        
 printlog,logfile,'Getting night information'
@@ -167,8 +168,9 @@ FOR n=0,nnights-1 do begin
   if file_test(daogrowdir,/directory) eq 1 then FILE_DELETE,daogrowdir,/recursive
   FILE_MKDIR,daogrowdir
 
-  print,'--- Running DAOGROW for night = ',inight,' ---'
-
+  printlog,logfile,'--- Running DAOGROW for night = '+inight+' ---'
+  printlog,logfile,systime(0)
+  
   ; Get files for this night
   indnight = where(allnight eq nights[n],nindnight)
 
@@ -300,7 +302,8 @@ FOR n=0,nnights-1 do begin
   ; Making the DAOGROW input files
   ;--------------------------------
   printlog,logfile,'Making DAOGROW input files: daogrow-'+inight+'/daogrow.inf and daogrow-'+inight+'/daogrow.ext'
-
+  printlog,logfile,systime(0)
+  
   OPENW,infunit,/get_lun,daogrowdir+'daogrow.inf'
   OPENW,extunit,/get_lun,daogrowdir+'daogrow.ext'
 
@@ -386,7 +389,8 @@ FOR n=0,nnights-1 do begin
   FILE_COPY,scriptsdir+'/daogrow.sh','.',/overwrite
   FILE_COPY,scriptsdir+'/photo.opt','.',/overwrite
 
-  print,'RUNNING DAOGROW'
+  printlog,logfile,'RUNNING DAOGROW'
+  printlog,logfile,systime(0)
   SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout
 
 
@@ -406,6 +410,7 @@ FOR n=0,nnights-1 do begin
     printlog,logfile,''
     printlog,logfile,'RUNNING MKDEL.PRO'
     printlog,logfile,''
+    printlog,logfile,systime(0)
     MKDEL,'daogrow.inf'
 
     ;--------------------
@@ -414,6 +419,7 @@ FOR n=0,nnights-1 do begin
     printlog,logfile,''
     printlog,logfile,'RUNNING APCOR.PRO'
     printlog,logfile,''
+    printlog,logfile,systime(0)
     APCOR,'*.del','apcor.lst'
 
     ; Back to the original directory
@@ -441,7 +447,8 @@ FOR n=0,nnights-1 do begin
       printlog,logfile,''
       printlog,logfile,'FINAL Aperture Correction File = >>apcor.lst<<'
       printlog,logfile,''
-
+      printlog,logfile,systime(0)
+      
       ; Checking files in apcor.lst
       ;-----------------------------
       READCOL,daogrowdir+'apcor.lst',apcnames,apcvalue,format='A,F',/silent
@@ -525,7 +532,6 @@ endif else UNDEFINE,failurelist
 
 PHOTRED_UPDATELISTS,lists2,outlist=outlist,successlist=successlist,$
                     failurelist=failurelist
-
 
 
 printlog,logfile,'PHOTRED_APCOR Finished  ',systime(0)

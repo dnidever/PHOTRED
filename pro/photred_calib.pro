@@ -1,5 +1,3 @@
-pro photred_calib,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_CALIB
@@ -16,6 +14,8 @@ pro photred_calib,redo=redo,stp=stp
 ;
 ; By D.Nidever  Mar 2008
 ;-
+
+pro photred_calib,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -394,6 +394,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 undefine,outlist,successlist,failurelist
 
@@ -407,6 +408,7 @@ FOR i=0,ninputlines-1 do begin
   mchfile = base+'.mch'
 
   printlog,logfile,'CALIBRATING ',file
+  printlog,logfile,systime(0)
 
   CD,filedir
 
@@ -542,7 +544,7 @@ FOR i=0,ninputlines-1 do begin
       undefine,photfile
     endelse
 
-  End  ; DDO51 radial offset
+  Endif  ; DDO51 radial offset
 
 
   ; Make the input file with PHOTRED_PHOTCALIB_PREP
@@ -631,7 +633,7 @@ FOR i=0,ninputlines-1 do begin
 
   ;stop
 
-END
+ENDFOR
 
 
 

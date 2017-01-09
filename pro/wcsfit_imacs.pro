@@ -309,8 +309,10 @@ filebase = FILE_BASENAME(ifile,'.fits')
     if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' then refcatname='USNO-B1'
     print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
          '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
-
-    usno = QUERYVIZIER(refcatname,[cenra,cendec],[dist,dist],/canada,/allcolumn)
+    cfa = 1
+    userefcatname = refcatname
+    if refcatname eq '2MASS-PSC' and cfa eq 1 then userefcatname='II/246'   ; cfa issue
+    usno = QUERYVIZIER(userefcatname, [cenra,cendec], [dist,dist], cfa=cfa,/allcolumns)
     nusno = n_elements(usno)
     type = size(usno,/type)
 

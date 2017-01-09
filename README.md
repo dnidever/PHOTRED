@@ -109,13 +109,11 @@ then you might consider installing the free version of IDL, the GNU
 Data Language (http://gnudatalanguage.sourceforge.net). I have not
 tested PHOTRED on GDL, but I think GDL should have all of the
 functionality needed to run PHOTRED. However, some PHOTRED programs
-might need to be tweaked to work with GDL.  You can also download the
-IDL Virtual Machine for free and run IDL "sav"
-
-You can also download the IDL Virtual Machine for free and run IDL
-"sav" files. I have made IDL sav files for the PHOTRED pipeline so
-they can be run with the IDL Virtual Machine.  They are in the "sav/"
-directory of this repository.  To run a program type
+might need to be tweaked to work with GDL.   You can also download
+the IDL Virtual Machine for free and run IDL "sav" files. I have
+made IDL sav files for the PHOTRED pipeline so they can be run with
+the IDL Virtual Machine.  They are in the "sav/" directory of this
+repository.  To run a program type
 ```
 idl -vm=progname.sav
 ```
@@ -194,6 +192,14 @@ Start IRAF by typing "cl" in your IRAF directory and see what
 happens. Nothing should be written to the screen except "cl>" or maybe
 "ecl>". If it's still printing other things to the screen, then you'll
 need to comment out more lines from the "login.cl" file.
+
+If you have a non-standard IRAF installation and you need to specify
+an absolute path (and possibly additional optional flags), you'll
+need to make an alias for "cl" (that would be in your shell start-up file),
+e.g.
+```
+alias cl "/absolute/path/to/cl/command/cl -plusoptions"
+```
 
 # <a name="Running_Instructions"></a>Running Instructions
 

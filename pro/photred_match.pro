@@ -1,5 +1,3 @@
-pro photred_match,redo=redo,fake=fake,stp=stp
-
 ;+
 ;
 ; PHOTRED_MATCH
@@ -17,6 +15,8 @@ pro photred_match,redo=redo,fake=fake,stp=stp
 ;
 ; By D.Nidever  Feb 2008
 ;-
+
+pro photred_match,redo=redo,fake=fake,stp=stp
 
 COMMON photred,setup
 
@@ -202,10 +202,6 @@ endif
 inputlines = lists.inputlines
 
 
-
-
-
-
 alsdirlist = FILE_DIRNAME(inputlines)
 alsbaselist = FILE_BASENAME(inputlines)
 nalsbaselist = n_elements(alsbaselist)
@@ -227,6 +223,7 @@ printlog,logfile,''
 printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
+printlog,logfile,systime(0)
 
 ;successarr = intarr(ninputlines)-1            ; 0-bad, 1-good
 undefine,outlist,successlist,failurelist
@@ -816,7 +813,6 @@ FOR i=0,ndirs-1 do begin
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                       failurelist=failurelist,/silent
-
 
 
 ENDFOR  ; directoryloop

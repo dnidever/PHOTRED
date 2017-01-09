@@ -1,13 +1,3 @@
-pro iraf_imcombine,input,output,headers=headers,bpmasks=bpmasks,rejmask=rejmask,$
-              nrejmasks=nrejmasks,expmasks=expmasks,sigma=sigma,logfile=logfile,$
-              combine=combine,reject=reject,project=project,outtype=outtype,$
-              outlimits=outlimits,offsets=offsets,masktype=masktype,$
-              maskvalue=maskvalue,blank=blank,scale=scale,zero=zero,weight=weight,$
-              statsec=statsec,expname=expname,lthreshold=lthreshold,$
-              hthreshold=hthreshold,nlow=nlow,nhigh=nhigh,nkeep=nkeep,mclip=mclip,$
-              lsigma=lsigma,hsigma=hsigma,rdnoise=rdnoise,gain=gain,snoise=snoise,$
-              sigscale=sigscale,pclip=pclip,grow=grow,irafdir=irafdir,error=error
-
 ;+
 ;
 ; IRAF_IMCOMBINE
@@ -413,6 +403,16 @@ pro iraf_imcombine,input,output,headers=headers,bpmasks=bpmasks,rejmask=rejmask,
 ; By D. Nidever    February 2008 
 ;-
 
+pro iraf_imcombine,input,output,headers=headers,bpmasks=bpmasks,rejmask=rejmask,$
+              nrejmasks=nrejmasks,expmasks=expmasks,sigma=sigma,logfile=logfile,$
+              combine=combine,reject=reject,project=project,outtype=outtype,$
+              outlimits=outlimits,offsets=offsets,masktype=masktype,$
+              maskvalue=maskvalue,blank=blank,scale=scale,zero=zero,weight=weight,$
+              statsec=statsec,expname=expname,lthreshold=lthreshold,$
+              hthreshold=hthreshold,nlow=nlow,nhigh=nhigh,nkeep=nkeep,mclip=mclip,$
+              lsigma=lsigma,hsigma=hsigma,rdnoise=rdnoise,gain=gain,snoise=snoise,$
+              sigscale=sigscale,pclip=pclip,grow=grow,irafdir=irafdir,error=error
+
 undefine,error
 
 ; Not enough inputs
@@ -536,6 +536,7 @@ sgrow = strtrim(grow,2)
 
 
 ; Write IRAF script
+push,cmd,'print("")'   ; first line will be ignored
 push,cmd,'cd '+curdir
 push,cmd,'immatch'
 push,cmd,'imcombine.headers = "'+sheaders+'"'

@@ -1,5 +1,3 @@
-pro check_iraf,test,out,irafdir=irafdir,silent=silent,stp=stp
-
 ;+
 ;
 ; CHECK_IRAF
@@ -18,9 +16,13 @@ pro check_iraf,test,out,irafdir=irafdir,silent=silent,stp=stp
 ;  test       1 if the test was successful, 0 if it was not, and -1 if there was an error.
 ;  out        The IRAF output from the test
 ;
+; USAGE:
+;  IDL>check_iraf,iraftest,irafdir=irafdir
 ;
 ; By D.Nidever  Nov.2007
 ;-
+
+pro check_iraf,test,out,irafdir=irafdir,silent=silent,stp=stp
 
 test = 0         ; bad to start with
 
@@ -70,13 +72,14 @@ if n_elements(diriraf) eq 0 then begin
     return
   endif
 
-end
+endif
 
 
 CD,current=curdir
 
 
 ; Write a test IRAF script
+push,cmd,'print("")' ; adorta: FIRST LINE WILL BE IGNORED!!
 push,cmd,'print("hello world")'
 push,cmd,'logout'
 cmdfile = maketemp('temp','.cl')
@@ -110,7 +113,7 @@ if test eq 0 and not keyword_set(silent) then begin
   print,'On PLEIONE the 4 lines after'
   print,'"# Delete any old MTIO lock (magtape position) files."'
   print,'can be problematic.'
-end
+endif
 
 
 if keyword_set(stp) then stop

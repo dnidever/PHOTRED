@@ -1,5 +1,3 @@
-pro photred_save,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_SAVE
@@ -16,6 +14,8 @@ pro photred_save,redo=redo,stp=stp
 ;
 ; By D.Nidever  Mar 2008
 ;-
+
+pro photred_save,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -104,7 +104,6 @@ inputlines = lists.inputlines
 
 
 
-
 ;##################################################
 ;#  PROCESSING THE FILES
 ;##################################################
@@ -112,6 +111,7 @@ printlog,logfile,''
 printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
+printlog,logfile,systime(0)
 
 
 ; Load the "fields" file
@@ -164,7 +164,8 @@ FOR i=0,ninputlines-1 do begin
       printlog,logfile,file,'  ',ifield
       printlog,logfile,'=============================='
       printlog,logfile,''
-
+      printlog,logfile,systime(0)
+      
       ; Copy the DERED file to FINAL
       finalfile = ifield+'.final'
       printlog,logfile,'Copying ',file,' -> ',finalfile
@@ -236,9 +237,6 @@ FOR i=0,ninputlines-1 do begin
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                       failurelist=failurelist,/silent
-
-
-  ;stop
 
 ENDFOR
 

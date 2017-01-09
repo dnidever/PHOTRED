@@ -1,5 +1,3 @@
-pro photred_html,redo=redo,stp=stp
-
 ;+
 ;
 ; PHOTRED_HTML
@@ -16,6 +14,7 @@ pro photred_html,redo=redo,stp=stp
 ;
 ; By D.Nidever  June 2008
 ;-
+pro photred_html,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -155,7 +154,6 @@ namps = thisimager.namps
 
 
 
-
 ;###################
 ; GETTING INPUTLIST
 ;###################
@@ -183,13 +181,13 @@ inputlines = lists.inputlines
 
 
 
-
 ; Make the HTML directory
 if FILE_TEST('html',/directory) eq 0 then $
   FILE_MKDIR,'html'
 
 printlog,logfile,'Making SUMMARY HTML pages for ',strtrim(ninputlines,2),' Pointings/Fields'
 printlog,logfile,''
+printlog,logfile,systime(0)
 
 ; Load the "fields" file
 READCOL,'fields',shfields,fields,format='A,A',/silent
@@ -300,7 +298,6 @@ fieldinfo = REPLICATE(infostruct,ninputlines)
 undefine,outlist,successlist,failurelist,allinfo
 
 FOR i=0,ninputlines-1 do begin
-;FOR i=0,1 do begin
 
   idatfile = inputlines[i]
   ifield = FILE_BASENAME(idatfile,'.dat')
@@ -329,7 +326,8 @@ FOR i=0,ninputlines-1 do begin
   fieldinfo[i].base = base
 
   printlog,logfile,'--- MAKING HTML SUMMARY PAGE for '+base+' - '+ifield+' ---'
-
+  printlog,logfile,systime(0)
+  
 
   ; Load the DAT file
   dattest = FILE_TEST(idatfile)
@@ -1056,7 +1054,7 @@ FOR i=0,ninputlines-1 do begin
              xtit=xtit,ytit=tags[errindarr[f]],xtickformat=xform,position=[0.08,ymin,0.98,ymax],$
              noerase=noerase,yminor=2,xticklen=0.05
         xyouts,xr[0]+0.5,0.3,filters[f],charsize=charsize*1.3
-      end
+      endfor
       ps_close
       ps2gif,'html/'+namebase+'_error.ps',rot=-90
       FILE_DELETE,'html/'+namebase+'_error.ps',/allow,/quiet
@@ -1190,13 +1188,13 @@ FOR i=0,ninputlines-1 do begin
     PUSH,hlines,'<tr><td><b>Filename</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><b><a href="'+info[l].filename+'.header">'+info[l].filename+'</a></b></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Image Sise
     PUSH,hlines,'<tr><td><b>Image Size</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center>'+strtrim(info[l].nx,2)+'x'+strtrim(info[l].ny,2)+'</center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Filter
     PUSH,hlines,'<tr><td><b>Filter</b></td>'
@@ -1259,35 +1257,35 @@ FOR i=0,ninputlines-1 do begin
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><a href="'+info[l].imagefile+'"><img src="'+info[l].imagefile+$
                   '" height=250></a></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Histogram
     PUSH,hlines,'<tr><td><b>ALS Histogram</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><a href="'+info[l].histfile+'"><img src="'+info[l].histfile+$
                   '" height=250></a></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Err vs. Mag plot
     PUSH,hlines,'<tr><td><b>ALS Err vs. Mag</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><a href="'+info[l].errmagfile+'"><img src="'+info[l].errmagfile+$
                   '" height=250></a></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Chi vs. Sharp plot
     PUSH,hlines,'<tr><td><b>ALS Chi vs. Sharp</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><a href="'+info[l].chisharpfile+'"><img src="'+info[l].chisharpfile+$
                   '" height=250></a></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     ; Chi vs. Mag plot
     PUSH,hlines,'<tr><td><b>ALS Chi vs. Mag</b></td>'
     for l=0,nalsfiles-1 do begin
       PUSH,hlines,'<td><center><a href="'+info[l].chimagfile+'"><img src="'+info[l].chimagfile+$
                   '" height=250></a></center></td>'
-    end
+    endfor
     PUSH,hlines,'</tr>'
     PUSH,hlines,'</table>'
     PUSH,hlines,''
@@ -1306,9 +1304,7 @@ FOR i=0,ninputlines-1 do begin
 
     AMP_BOMB:
 
-
   Endfor ; amps loop
-
 
 
   ;----------------------------------
@@ -1637,8 +1633,6 @@ FOR i=0,ninputlines-1 do begin
     endif
     fieldinfo[i].chimagfile = chimagfile
 
-    ;stop
-
 
     ;------------------
     ; Make HTML file
@@ -1661,7 +1655,7 @@ FOR i=0,ninputlines-1 do begin
     ampline = ''
     for l=0,namps-1 do begin
       ampline = ampline+'<a href="'+fieldampinfo[l].htmlfile+'">['+strtrim(fieldampinfo[l].amp,2)+']</a>'
-    end
+    endfor
     PUSH,hlines,ampline
     PUSH,hlines,'<p>'
     PUSH,hlines,'<table border=1>'
@@ -1766,11 +1760,9 @@ FOR i=0,ninputlines-1 do begin
     fieldinfo[i].skygiantsfile = fieldampinfo[0].skygiantsfile
   Endelse
 
-  ;stop
-
   FIELD_BOMB:
 
-END
+ENDFOR
 
 
 
@@ -1892,7 +1884,7 @@ if (namps gt 1) then begin
     ;thisline = thisline+'<td><center><a href="'+baseinfo[0].chimagfile+'">Chi/Mag</a></center></td>'
     thisline = thisline+'</tr>'
     PUSH,hlines,thisline
-  end
+  endfor
 
   PUSH,hlines,'</table>'
   PUSH,hlines,''
@@ -1907,7 +1899,6 @@ if (namps gt 1) then begin
   printlog,logfile,'Writing ',htmlfile
 
 endif ; namps>1
-
 
 
 
@@ -2012,7 +2003,7 @@ for i=0,nallinfo-1 do begin
   thisline = thisline+'<td><center><a href="'+allinfo[i].chimagfile+'">Chi/Mag</a></center></td>'
   thisline = thisline+'</tr>'
   PUSH,hlines,thisline
-end
+endfor
 
 PUSH,hlines,'</table>'
 PUSH,hlines,''
@@ -2025,7 +2016,6 @@ htmlfile = 'html/logsheet.html'
 WRITELINE,htmlfile,hlines
 FILE_CHMOD,htmlfile,'755'o
 printlog,logfile,'Writing ',htmlfile
-
 
 
 
@@ -2049,7 +2039,7 @@ PUSH,hlines,'<table border=1>'
 PUSH,hlines,'<tr><td><b>Filename</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><b><a href="'+allinfo[j].filename+'.header">'+allinfo[j].filename+'</a></b></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Object
 PUSH,hlines,'<tr><td><b>Object</b></td>'
@@ -2093,7 +2083,7 @@ PUSH,hlines,'<tr><td><b>WCS</b></td>'
 for j=0,nallinfo-1 do begin
   if allinfo[j].wcs eq 0 then havewcs='NO' else havewcs='YES'
   PUSH,hlines,'<td><center>'+havewcs+'</center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; WCS type
 PUSH,hlines,'<tr><td><b>WCS-Type</b></td>'
@@ -2144,35 +2134,35 @@ PUSH,hlines,'<tr><td><b>Image</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><a href="'+allinfo[j].imagefile+'"><img src="'+allinfo[j].imagefile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Histogram
 PUSH,hlines,'<tr><td><b>ALS Histogram</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><a href="'+allinfo[j].histfile+'"><img src="'+allinfo[j].histfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Err vs. Mag plot
 PUSH,hlines,'<tr><td><b>ALS Err vs. Mag</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><a href="'+allinfo[j].errmagfile+'"><img src="'+allinfo[j].errmagfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Chi vs. Sharp plot
 PUSH,hlines,'<tr><td><b>ALS Chi vs. Sharp</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><a href="'+allinfo[j].chisharpfile+'"><img src="'+allinfo[j].chisharpfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Chi vs. Mag plot
 PUSH,hlines,'<tr><td><b>ALS Chi vs. Mag</b></td>'
 for j=0,nallinfo-1 do begin
   PUSH,hlines,'<td><center><a href="'+allinfo[j].chimagfile+'"><img src="'+allinfo[j].chimagfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 PUSH,hlines,'</table>'
 PUSH,hlines,''
@@ -2185,8 +2175,6 @@ htmlfile = 'html/logsheetplots.html'
 WRITELINE,htmlfile,hlines
 FILE_CHMOD,htmlfile,'755'o
 printlog,logfile,'Writing ',htmlfile
-
-
 
 
 
@@ -2211,7 +2199,7 @@ PUSH,hlines,'<table border=1>'
 PUSH,hlines,'<tr><td><b>Field</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><b>'+fieldinfo[j].field+'</b></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Amplifiers
 if (namps gt 1) then begin
@@ -2223,10 +2211,10 @@ if (namps gt 1) then begin
       test = FILE_TEST('html/'+htmlfile)
       if test eq 1 then line=line+'<a href="'+htmlfile+'">['+strtrim(k+1,2)+']</a>' else $
          line=line+'['+strtrim(k+1,2)+']'
-    end
+    endfor
     line = line+'</center></td>'
     PUSH,hlines,line
-  end
+  endfor
   PUSH,hlines,'</tr>'
 endif
 ; Base
@@ -2274,7 +2262,7 @@ PUSH,hlines,'<tr><td><b>CMD and 2CD</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].cmdfile+'"><img src="'+fieldinfo[j].cmdfile+$
               '" height=400></a></center></td>'
-end
+endfor
 ; Combined Image
 ; Only for single amp
 if (namps eq 1) then begin
@@ -2283,7 +2271,7 @@ if (namps eq 1) then begin
     if fieldinfo[j].imagefile ne '' then $
       PUSH,hlines,'<td><center><a href="'+fieldinfo[j].imagefile+'"><img src="'+fieldinfo[j].imagefile+$
                   '" height=400></a></center></td>'
-  end
+  endfor
   PUSH,hlines,'</tr>'
 endif
 if (namps gt 1) then begin
@@ -2292,7 +2280,7 @@ if (namps gt 1) then begin
   for j=0,ninputlines-1 do begin
     PUSH,hlines,'<td><center><a href="'+fieldinfo[j].cmdcolampfile+'"><img src="'+fieldinfo[j].cmdcolampfile+$
                 '" height=400></a></center></td>'
-  end
+  endfor
 endif
 ; CMD and 2CD with giants
 PUSH,hlines,'<tr><td><b>CMD and 2CD<br>with giants</b></td>'
@@ -2304,7 +2292,7 @@ for j=0,ninputlines-1 do begin
   endif else begin
     PUSH,hlines,'<td><center>Image NOT FOUND</center></td>'
   endelse
-end
+endfor
 ; Sky distribution with giants
 PUSH,hlines,'<tr><td><b>Sky distribution<br> with giants</b></td>'
 for j=0,ninputlines-1 do begin
@@ -2315,40 +2303,40 @@ for j=0,ninputlines-1 do begin
   endif else begin
     PUSH,hlines,'<td><center>Image NOT FOUND</center></td>'
   endelse
-end
+endfor
 ; Sky distribution
 PUSH,hlines,'<tr><td><b>Sky distribution</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].skyfile+'"><img src="'+fieldinfo[j].skyfile+$
               '" height=250></a></center></td>'
-end
+endfor
 ; Histogram
 PUSH,hlines,'<tr><td><b>Histogram</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].histfile+'"><img src="'+fieldinfo[j].histfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Err vs. Mag plot
 PUSH,hlines,'<tr><td><b>Errors</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].errorfile+'"><img src="'+fieldinfo[j].errorfile+$
               '" height=350></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Chi vs. Sharp plot
 PUSH,hlines,'<tr><td><b>Chi vs. Sharp</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].chisharpfile+'"><img src="'+fieldinfo[j].chisharpfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 ; Chi vs. Mag plot
 PUSH,hlines,'<tr><td><b>Chi vs. Mag</b></td>'
 for j=0,ninputlines-1 do begin
   PUSH,hlines,'<td><center><a href="'+fieldinfo[j].chimagfile+'"><img src="'+fieldinfo[j].chimagfile+$
               '" height=250></a></center></td>'
-end
+endfor
 PUSH,hlines,'</tr>'
 PUSH,hlines,'</table>'
 PUSH,hlines,''
@@ -2395,14 +2383,14 @@ if namps gt 1 then begin
         PUSH,hlines,'<td><center><a href="'+htmlfile+'">'+strtrim(j+1,2)+'</a></center></td>'
       if test eq 0 then $
         PUSH,hlines,'<td><center>'+strtrim(j+1,2)+'</center></td>'
-    end
-  end
-; Single AmP
+    endfor
+  endfor
+; Single Amp
 endif else begin
   PUSH,hlines,'<tr<td><b><center>Fields</center></b></td></tr>'
   for i=0,ninputlines-1 do begin
     PUSH,hlines,'<tr><td><center><a href="'+fieldinfo[i].htmlfile+'">'+fieldinfo[i].field+'</a></center></td></tr>'
-  end
+  endfor
 endelse
 PUSH,hlines,'</table>'
 PUSH,hlines,'<p>'
