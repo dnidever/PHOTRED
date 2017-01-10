@@ -65,6 +65,7 @@ if nfile eq 0 then begin
 endif
 
 nmode = n_elements(mode)
+; Loop through the files
 For i=0,nfile-1 do begin
 
   info = file_info(file)
