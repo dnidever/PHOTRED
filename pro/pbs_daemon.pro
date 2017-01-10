@@ -1,6 +1,3 @@
-pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
-               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir
-
 ;+
 ;
 ; PBS_DAEMON
@@ -35,6 +32,9 @@ pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
 ;
 ; By D.Nidever   February 2008
 ;-
+
+pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
+               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir
 
 ; How many input lines
 ninput = n_elements(input)
@@ -93,11 +93,11 @@ endif
 if keyword_set(hyperthread) then begin
   if not keyword_set(idle) and FILE_TEST('runbatch') eq 0 then begin
     undefine,lines
-    push,lines,"if test $# -eq 0'"
+    push,lines,"if test $# -eq 0"
     push,lines,"then"
     push,lines,"  echo 'Syntax - runbatch program'"
     push,lines,"else"
-    push,lines,"  echo 'Log file: '$1'.log"
+    push,lines,"  echo 'Log file: '$1'.log'"
     push,lines,"  ( nohup  $1 > $1.log 2>&1 ) &"
     push,lines,"  echo $!"
     push,lines,"fi"
@@ -106,11 +106,11 @@ if keyword_set(hyperthread) then begin
   endif
   if keyword_set(idle) and FILE_TEST('idlbatch') eq 0 then begin
     undefine,lines
-    push,lines,"if test $# -eq 0'"
+    push,lines,"if test $# -eq 0"
     push,lines,"then"
     push,lines,"  echo 'Syntax - idlbatch idl.batch'"
     push,lines,"else"
-    push,lines,"  echo 'Log file: '$1'.log"
+    push,lines,"  echo 'Log file: '$1'.log'"
     push,lines,"  ( nohup "+idlprog+" < $1 > $1.log 2>&1 ) &"
     push,lines,"  echo $!"
     push,lines,"fi"
@@ -118,7 +118,6 @@ if keyword_set(hyperthread) then begin
     FILE_CHMOD,'idlbatch','755'o
   endif
 endif
-
 
 print,'---------------------------------'
 print,' RUNNING PBS_DAEMON for ',strtrim(ninput,2),' JOB(S)'
