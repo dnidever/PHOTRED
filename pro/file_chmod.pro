@@ -129,9 +129,21 @@ For i=0,nfile-1 do begin
   ;  -keyword must be set to ZERO
   ;  -permissions were already granted and can be taken away
   ;  all three groups
-  if n_elements(a_execute) gt 0 and not keyword_set(a_execute) and (('111'o and dec_mode) eq '111'o) then dec_mode-='111'o
-  if n_elements(a_write) gt 0 and not keyword_set(a_write) and (('222'o and dec_mode) eq '222'o) then dec_mode-='222'o
-  if n_elements(a_read) gt 0 and not keyword_set(a_read) and (('444'o and dec_mode) eq '444'o) then dec_mode-='444'o
+  if n_elements(a_execute) gt 0 and not keyword_set(a_execute) then begin
+    if (('001'o and dec_mode) eq '001'o) then dec_mod-='001'o
+    if (('010'o and dec_mode) eq '010'o) then dec_mod-='010'o
+    if (('100'o and dec_mode) eq '100'o) then dec_mod-='100'o
+  endif
+  if n_elements(a_write) gt 0 and not keyword_set(a_write) then begin
+    if (('002'o and dec_mode) eq '002'o) then dec_mod-='002'o
+    if (('020'o and dec_mode) eq '020'o) then dec_mod-='020'o
+    if (('200'o and dec_mode) eq '200'o) then dec_mod-='200'o
+  endif
+  if n_elements(a_read) gt 0 and not keyword_set(a_read) then begin
+    if (('004'o and dec_mode) eq '004'o) then dec_mod-='004'o
+    if (('040'o and dec_mode) eq '040'o) then dec_mod-='040'o
+    if (('400'o and dec_mode) eq '400'o) then dec_mod-='400'o
+  endif
   ;  others
   if n_elements(o_execute) gt 0 and not keyword_set(o_execute) and (('001'o and dec_mode) eq '001'o) then dec_mode-='001'o
   if n_elements(o_write) gt 0 and not keyword_set(o_write) and (('002'o and dec_mode) eq '002'o) then dec_mode-='002'o
