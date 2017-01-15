@@ -212,7 +212,53 @@ uidirs = uidirs[sort(uidirs)]
 dirs = alsdirlist[uidirs]
 ndirs = n_elements(dirs)
 
+;;----------------------
+;; SETTING UP THE TILES
+;;======================
+if keyword_set(mchusetiles) then begin
 
+  printlog,logfile,''
+  printlog,logfile,'Making Tiling schemes'
+  printlog,logfile,''
+   
+  ;; Loop through the directories
+  For i=0,ndirs-1 do begin
+     
+    ; Getting the files in this directory
+    gdals = where(alsdirlist eq dirs[i],ngdals)
+    alsfiles = alsbaselist[gdals]
+     
+    ;; Loop over the fields in this directory
+    dum = strsplitter(alsfiles,'-',/extract)
+    allfields = reform(dum[0,*])
+    uifields = uniq(allfields,sort(allfields))
+    ufields = allfields[uifields]
+    nfields = n_elements(ufields)
+    For j=0,nfields-1 do begin
+       gdfieldals = where(allfields eq ufields[j],ngdfieldals)
+       fieldalsfiles = alsfiles[gdfieldals]
+       ;; All of the files for this field will be in THIS directory
+       ;; whether SEPFIELDDIR is set or not.  They get put in their
+       ;; appropriate directory in RENAME and it gets passed on via
+       ;; the input/output files from there.
+       
+       ;; Make tiling scheme
+       tilingfile = dirs[i]+'/'+ufields[j]+'.tiling'
+       if file_test(tilingfile) eq 0 or keyword_set(redo) then begin
+
+         ;; Run photred_maketiles
+         PHOTRED_MAKETILES,dirs[i]+'/'+ufields[j],thisimager,logfile=logfile
+         stop
+
+         
+       ;; Tiling file already exists, using it
+       endif else begin
+         printlog,logfile,'Tiling file >>'+tilingfile+'<< already exists and /redo NOT set.  Using existing file.'
+       endelse
+       
+    Endfor  ; fields loop
+  Endfor  ; directory loop
+endif  ; using tiles
 
 
 
