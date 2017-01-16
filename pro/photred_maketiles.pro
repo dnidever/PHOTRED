@@ -16,6 +16,8 @@
 ; 
 ; OUTPUTS:
 ;  The tiling scheme will be written to a file called fieldinput+".tiling".
+;  =tilehead   The header with the tiling scheme projection information.
+;  =tilestr    The structure with information on each tile.
 ;
 ; USAGE:
 ;  IDL>photred_maketiles,'F1',thisimager,logfile=logfile
@@ -23,11 +25,16 @@
 ; D.Nidever  Jan 2017
 ;-
 
-pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,logfile=logfile,stp=stp
+pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,$
+                      tilehead=tilehead,tilestr=tilestr,logfile=logfile,stp=stp
+
+undefine,tilehead
+undefine,tilestr
 
 ; Not enough inputs
 if n_elements(fieldinput) eq 0 or n_elements(thisimager) eq 0 then begin
-  print,'Syntax - photred_maketiles,fieldinput,thisimager,pixscale=pixscale,tilesize=tilesize,logfile=logfile'
+  print,'Syntax - photred_maketiles,fieldinput,thisimager,pixscale=pixscale,tilesize=tilesize,'
+  print,'                           logfile=logfile,stp=stp,tilehead=tilehead,tilestr=tilestr'
   return
 endif
 
