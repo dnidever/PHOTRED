@@ -7,6 +7,10 @@
 ; INPUTS:
 ;  fieldinput  The directory name and field name combined, e.g. "20100610/F1"
 ;  thisimager  The structure with information on the imager.
+;  =pixscale   The pixel scale to use for the projection.  The default
+;                is to use the mean pixel scale of all images rounded up to the
+;                nearest 100th of a pixel.
+;  =tilesize   The tile size (square) in pixels.  The default is 10,000 pixels.
 ;  =logfile    The name of the log file.
 ; 
 ; OUTPUTS:
@@ -18,13 +22,16 @@
 ; D.Nidever  Jan 2017
 ;-
 
-pro photred_maketiles,fieldinput,thisimager,logfile=logfile
+pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,logfile=logfile
 
 ; Not enough inputs
 if n_elements(fieldinput) eq 0 or n_elements(thisimager) eq 0 then begin
-  print,'Syntax - photred_maketiles,fieldinput,thisimager,logfile=logfile'
+  print,'Syntax - photred_maketiles,fieldinput,thisimager,pixscale=pixscale,tilesize=tilesize,logfile=logfile'
   return
 endif
+
+; Logfile
+if n_elements(logfile) eq 0 then logfile=-1
 
 ; Break "fieldinput" into directory and field name components
 dir = FILE_DIRNAME(fieldinput)
@@ -59,7 +66,7 @@ if nfieldfiles gt 0 then begin
     endelse
   endif                      ; some ones to remove
 endif else begin              ; some fieldfiles
-  printlog,logfile,'No ',field,' files found in current directory'
+  printlog,logfile,'No '+field+' files found in current directory'
   return
 endelse
 
@@ -84,11 +91,11 @@ For i=0,nfieldfiles-1 do begin
   ; What do we do if there's no WCS???
 Endfor
 
-; Set central RA/DEC, based on 
-; Deal with wraparound of RA=0
 
+; Creating the overall tiling projection and scheme
+;--------------------------------------------------
 ; this came from allframe_combine.pro
-printlog,logf,'Creating TILE projection'
+printlog,logf,'Creating TILING scheme'
 ; The default projection is a tangent plane centered
 ; at halfway between the ra/dec min/max of all of
 ; the images.  The mean pixel scale is used.
@@ -103,19 +110,117 @@ endif else begin
    rar = minmax(filestr.vertices_ra)
    cenra = mean(rar)
 endelse
+; RA/DEC ranges
 decr = minmax(filestr.vertices_dec)
 cendec = mean(decr)
-pixscale = mean(filestr.pixscale)
-                                ; Set up the tangent plane projection
+; Pixel scale
+if n_elements(inppixscale) gt 0 then begin
+  pixscale = inppixscale
+endif else begin
+  pixscale = mean(filestr.pixscale)
+  ; round up to nearest 100th
+  pixscale = ceil(pixscale*100.)/100.
+endelse
+; Set up the tangent plane projection
 step = pixscale/3600.0d0
 delta_dec = range(decr)
 delta_ra = range(rar)*cos(cendec/!radeg)
+; Make the full tiling scheme extend slightly more than
+;  full extent of the images
 nx = ceil(delta_ra*1.01/step)
 ny = ceil(delta_dec*1.01/step)
 xref = nx/2
 yref = ny/2
+; Tile size in pixels
+;  the default is 10,000 pixels
+if n_elements(inptilesize) gt 0 then tilesize=inptilesize[0] else tilesize=1e4
 
+; Make header with the WCS
+MKHDR,tilehead,fltarr(5,5)
+SXADDPAR,tilehead,'NAXIS1',nx
+SXADDPAR,tilehead,'CDELT1',step
+SXADDPAR,tilehead,'CRPIX1',xref+1L
+SXADDPAR,tilehead,'CRVAL1',cenra
+SXADDPAR,tilehead,'CTYPE1','RA---TAN'
+SXADDPAR,tilehead,'NAXIS2',ny
+SXADDPAR,tilehead,'CDELT2',step
+SXADDPAR,tilehead,'CRPIX2',yref+1L
+SXADDPAR,tilehead,'CRVAL2',cendec
+SXADDPAR,tilehead,'CTYPE2','DEC--TAN'
+EXTAST,tilehead,tileast
+tileast.equinox = 2000
 
+; Number of tiling columns and rows
+nxtile = ceil(nx/tilesize)
+nytile = ceil(ny/tilesize)
+
+; Get information for each tile
+tilestr = replicate({num:0L,name:'',x0:0L,x1:0L,nx:0L,y0:0L,y1:0L,ny:0L,nimages:0L},nxtile*nytile)
+tilecnt = 0LL
+for i=0,nxtile-1 do begin
+  x0 = i*tilesize
+  x1 = (x0+tilesize-1) < (nx-1)
+  for j=0,nytile-1 do begin
+    y0 = j*tilesize
+    y1 = (y0+tilesize-1) < (ny-1)
+    tilestr[tilecnt].num = tilecnt+1
+    tilestr[tilecnt].x0 = x0
+    tilestr[tilecnt].x1 = x1
+    tilestr[tilecnt].nx = x1-x0+1
+    tilestr[tilecnt].y0 = y0
+    tilestr[tilecnt].y1 = y1
+    tilestr[tilecnt].ny = y1-y0+1
+    tilecnt++
+  endfor
+endfor
+ntiles = n_elements(tilestr)
+
+;; Figure out which images overlap the tiles
+for i=0,nfieldfiles-1 do begin
+  HEAD_ADXY,tilehead,filestr[i].vertices_ra,filestr[i].vertices_dec,fx,fy,/deg
+  ;; Loop over the tiles
+  for j=0,ntiles-1 do begin
+    tx = [tilestr[j].x0,tilestr[j].x1,tilestr[j].x1,tilestr[j].x0]
+    ty = [tilestr[j].y0,tilestr[j].y0,tilestr[i].y1,tilestr[j].y1] 
+    overlap = DOPOLYGONSOVERLAP(fx,fy,tx,ty)
+    if overlap eq 1 then tilestr[j].nimages++
+ endfor  
+endfor
+
+; Only keep tiles that have images that overlap
+gdtiles = where(tilestr.nimages gt 0,ngdtiles)
+printlog,logfile,strtrim(ngdtiles,2),' tiles have overlapping images'
+tilestr0 = tilestr
+tilestr = tilestr[ngdtiles]
+ntiles = ngdtiles
+; Make final IDs and names
+tilestr.id = lindgen(ntiles)+1
+tilestr.name = field+'-T'+strtrim(tilestr.id,2)
+
+; Make the tiling file
+;---------------------
+undefine,lines
+; Lines with the tiling scheme first
+push,lines,'CENRA  = '+strtrim(cenra,2)
+push,lines,'NX     = '+strtrim(nx,2)
+push,lines,'XSTEP  = '+strtrim(step,2)
+push,lines,'XREF   = '+strtrim(xref+1,2)
+push,lines,'CENDEC = '+strtrim(cendec,2)
+push,lines,'NY     = '+strtrim(ny,2)
+push,lines,'YSTEP  = '+strtrim(step,2)
+push,lines,'YREF   = '+strtrim(yref+1,2)
+push,lines,'NTILES = '+strtrim(ntiles,2)
+; Then one file with info for each tile
+for i=0,ntiles-1 do begin
+  tilestr1 = tilestr[i]
+  ftm = 'I6,A10,6I8,I6'
+  line = string(format=fmt,tilestr1.id,tilestr1.name,tilestr1.x0,tilestr1.x1,tilestr1.nx,$
+                tilestr1.y0,tilestr1.y1,tilestr1.ny,tilestr1.nimages)
+  push,lines,line
+endfor
+tilingfile = dir+'/'+field+'.tiling'
+printlog,logfile,'Writing tiling information to >>'+tilefile+'<<'
+WRITELINE,tilefile,lines
 
 stop
 
