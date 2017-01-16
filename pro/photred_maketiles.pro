@@ -10,8 +10,9 @@
 ;  =pixscale   The pixel scale to use for the projection.  The default
 ;                is to use the mean pixel scale of all images rounded up to the
 ;                nearest 100th of a pixel.
-;  =tilesize   The tile size (square) in pixels.  The default is 10,000 pixels.
+;  =tilesize   The tile size (square) in pixels.  The default is 5,000 pixels.
 ;  =logfile    The name of the log file.
+;  /stp        Stop at the end of the program.
 ; 
 ; OUTPUTS:
 ;  The tiling scheme will be written to a file called fieldinput+".tiling".
@@ -22,7 +23,7 @@
 ; D.Nidever  Jan 2017
 ;-
 
-pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,logfile=logfile
+pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,logfile=logfile,stp=stp
 
 ; Not enough inputs
 if n_elements(fieldinput) eq 0 or n_elements(thisimager) eq 0 then begin
@@ -39,6 +40,8 @@ cd,current=curdir
 cd,dir
 field = FILE_BASENAME(fieldinput)
   
+printlog,logfile,'Generating TILING scheme for Field >>'+field+'<< in directory '+dir
+
 ;; Find all existing FITS files for this group
 if thisimager.namps gt 1 then $
   fieldfiles = FILE_SEARCH(dir+'/'+field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
@@ -69,8 +72,10 @@ endif else begin              ; some fieldfiles
   printlog,logfile,'No '+field+' files found in current directory'
   return
 endelse
+printlog,logfile,strtrim(nfieldfiles,2)+' FITS files found for field '+field
 
 ;; Loop through the FITS files and get their information
+printlog,logfile,'Gathering information on the files'
 filestr = replicate({field:'',file:'',nx:0L,ny:0L,filter:'',pixscale:0.0,cenra:0.0d0,cendec:0.0d0,$
                   vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfieldfiles)
 For i=0,nfieldfiles-1 do begin
@@ -80,22 +85,23 @@ For i=0,nfieldfiles-1 do begin
   filestr[i].filter = photred_getfilter(fieldfiles[i],/noupdate)
   filestr[i].nx = sxpar(head,'NAXIS1')
   filestr[i].ny = sxpar(head,'NAXIS2')
-  GETPIXSCALE,'',pixscale,head=head
+  ;GETPIXSCALE,'',pixscale,head=head
+  HEAD_XYAD,head,[0,1]+filestr[i].nx/2,[0,0]+filestr[i].ny/2,ra1,dec1,/deg  ; a little bit faster
+  pixscale = sphdist(ra1[0],dec1[0],ra1[1],dec1[1],/deg)*3600d0
   filestr[i].pixscale = pixscale
-  HEAD_XYAD,head,nx/2,ny/2,cenra,cendec
-  filestr[i].cenra = cenra
-  filestr[i].cendec = cendec
+  HEAD_XYAD,head,filestr[i].nx/2,filestr[i].ny/2,cenra1,cendec1,/degree
+  filestr[i].cenra = cenra1
+  filestr[i].cendec = cendec1
   HEAD_XYAD,head,[0,filestr[i].nx-1,filestr[i].nx-1,0],[0,0,filestr[i].ny-1,filestr[i].ny-1],vra,vdec,/degree
   filestr[i].vertices_ra = vra
   filestr[i].vertices_dec = vdec
   ; What do we do if there's no WCS???
 Endfor
 
-
 ; Creating the overall tiling projection and scheme
 ;--------------------------------------------------
 ; this came from allframe_combine.pro
-printlog,logf,'Creating TILING scheme'
+printlog,logfile,'Creating TILING scheme'
 ; The default projection is a tangent plane centered
 ; at halfway between the ra/dec min/max of all of
 ; the images.  The mean pixel scale is used.
@@ -133,7 +139,7 @@ xref = nx/2
 yref = ny/2
 ; Tile size in pixels
 ;  the default is 10,000 pixels
-if n_elements(inptilesize) gt 0 then tilesize=inptilesize[0] else tilesize=1e4
+if n_elements(inptilesize) gt 0 then tilesize=inptilesize[0] else tilesize=5000L
 
 ; Make header with the WCS
 MKHDR,tilehead,fltarr(5,5)
@@ -151,8 +157,19 @@ EXTAST,tilehead,tileast
 tileast.equinox = 2000
 
 ; Number of tiling columns and rows
-nxtile = ceil(nx/tilesize)
-nytile = ceil(ny/tilesize)
+nxtile = ceil(nx/float(tilesize))
+nytile = ceil(ny/float(tilesize))
+
+; Print out the tiling information
+printlog,logfile,'RA range = ['+strtrim(rar[0],2)+','+strtrim(rar[1],2)+'] deg'
+printlog,logfile,'DEC range = ['+strtrim(decr[0],2)+','+strtrim(decr[1],2)+'] deg'
+printlog,logfile,'Central RA = '+strtrim(cenra,2)
+printlog,logfile,'Central DEC = '+strtrim(cendec,2)
+printlog,logfile,'NX = '+strtrim(nx,2)
+printlog,logfile,'NY = '+strtrim(ny,2)
+printlog,logfile,'Tilesize = '+strtrim(tilesize,2)
+printlog,logfile,'Tiles = '+strtrim(nxtile,2)+'x'+strtrim(nytile,2)
+
 
 ; Get information for each tile
 tilestr = replicate({num:0L,name:'',x0:0L,x1:0L,nx:0L,y0:0L,y1:0L,ny:0L,nimages:0L},nxtile*nytile)
@@ -181,7 +198,7 @@ for i=0,nfieldfiles-1 do begin
   ;; Loop over the tiles
   for j=0,ntiles-1 do begin
     tx = [tilestr[j].x0,tilestr[j].x1,tilestr[j].x1,tilestr[j].x0]
-    ty = [tilestr[j].y0,tilestr[j].y0,tilestr[i].y1,tilestr[j].y1] 
+    ty = [tilestr[j].y0,tilestr[j].y0,tilestr[j].y1,tilestr[j].y1] 
     overlap = DOPOLYGONSOVERLAP(fx,fy,tx,ty)
     if overlap eq 1 then tilestr[j].nimages++
  endfor  
@@ -189,13 +206,13 @@ endfor
 
 ; Only keep tiles that have images that overlap
 gdtiles = where(tilestr.nimages gt 0,ngdtiles)
-printlog,logfile,strtrim(ngdtiles,2),' tiles have overlapping images'
+printlog,logfile,strtrim(ngdtiles,2)+' tiles have overlapping images'
 tilestr0 = tilestr
-tilestr = tilestr[ngdtiles]
+tilestr = tilestr[gdtiles]
 ntiles = ngdtiles
 ; Make final IDs and names
-tilestr.id = lindgen(ntiles)+1
-tilestr.name = field+'-T'+strtrim(tilestr.id,2)
+tilestr.num = lindgen(ntiles)+1
+tilestr.name = field+'-T'+strtrim(tilestr.num,2)
 
 ; Make the tiling file
 ;---------------------
@@ -213,15 +230,16 @@ push,lines,'NTILES = '+strtrim(ntiles,2)
 ; Then one file with info for each tile
 for i=0,ntiles-1 do begin
   tilestr1 = tilestr[i]
-  ftm = 'I6,A10,6I8,I6'
-  line = string(format=fmt,tilestr1.id,tilestr1.name,tilestr1.x0,tilestr1.x1,tilestr1.nx,$
-                tilestr1.y0,tilestr1.y1,tilestr1.ny,tilestr1.nimages)
+  fmt = '(I-6,A8,6I8,I6)'
+  ; Using IRAF indexing
+  line = string(format=fmt,tilestr1.num,tilestr1.name,tilestr1.x0+1,tilestr1.x1+1,tilestr1.nx,$
+                tilestr1.y0+1,tilestr1.y1+1,tilestr1.ny,tilestr1.nimages)
   push,lines,line
 endfor
-tilingfile = dir+'/'+field+'.tiling'
+tilefile = dir+'/'+field+'.tiling'
 printlog,logfile,'Writing tiling information to >>'+tilefile+'<<'
 WRITELINE,tilefile,lines
 
-stop
+if keyword_set(stp) then stop
 
 end
