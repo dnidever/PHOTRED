@@ -248,8 +248,6 @@ if keyword_set(mchusetiles) then begin
 
          ;; Run photred_maketiles
          PHOTRED_MAKETILES,dirs[i]+'/'+ufields[j],thisimager,logfile=logfile
-         stop
-
          
        ;; Tiling file already exists, using it
        endif else begin
@@ -278,7 +276,7 @@ undefine,outlist,successlist,failurelist
 FOR i=0,ndirs-1 do begin
 
   printlog,logfile,''
-  out = 'MATCHING FRAMES IN '+dirs[i]
+  printlog,logfile,'GROUPING FILES IN '+dirs[i]
 
   ; CD to the directory
   CD,dirs[i]
@@ -289,22 +287,15 @@ FOR i=0,ndirs-1 do begin
 
   ; Get each file's field information
   ;-----------------------------------
-  sep = '-'  ;'.'
+  sep = '-'
   dum = strsplitter(alsfiles,sep,/extract)
   fieldarr = reform(dum[0,*])
 
-  ; Now put the files into "sets" that will be matched up
-  ;-------------------------------------------------------
+  ; Unique fields
+  ;--------------
   ui = uniq(fieldarr,sort(fieldarr))
   fields = fieldarr[ui]
   nfields = n_elements(fields)
-
-  ;; What type of data is it
-  ;telescope = strupcase(READPAR(setup,'TELESCOPE'))
-  ;instrument = strupcase(READPAR(setup,'INSTRUMENT'))
-  ;filtref = strupcase(READPAR(setup,'FILTREF'))
-  ;
-  ;printlog,logfile,'This is ',telescope,'+',instrument,' data'
 
 
   ;-------------------------
@@ -316,7 +307,7 @@ FOR i=0,ndirs-1 do begin
 
     printlog,logfile,''
     printlog,logfile,'=============================='
-    printlog,logfile,'Matching frames for Field='+thisfield
+    printlog,logfile,'Grouping frames for Field='+thisfield
     printlog,logfile,'=============================='
 
     ; Get the files for this field
@@ -329,7 +320,7 @@ FOR i=0,ndirs-1 do begin
     ; If SINGLE CHIP then match all frames
 
     ; Check that there are associated FITS files
-    ;----------------------------------------------
+    ;-------------------------------------------
     foundarr = intarr(nbase)+1
     for k=0,nbase-1 do begin
       fitsfile = FILE_SEARCH(base[k]+'.fits',count=nfitsfile)
@@ -349,6 +340,222 @@ FOR i=0,ndirs-1 do begin
       goto,BOMB
     endelse    
 
+    ;;=====================
+    ;; MAKING THE GROUPS
+    ;;=====================
+    
+    ;; Grouping with tiles
+    ;;---------------------
+    If keyword_set(mchusetiles) then begin
+
+      ;; Load the tiling information
+      PHOTRED_LOADTILEFILE,tilefile,tilestr,error=loaderror
+       
+      ;; Group them into tiles 
+      PHOTRED_TILEGROUPS,files,tilestr
+      
+      ;; Pick a reference exposure
+      ;; mainly use this for the base names
+
+      ;; Loop through the tiles
+      for k=0,ntiles-1 do begin
+
+        ;; Create the tile directory
+        ;; and make the sym links if they don't exist already
+        ;; fits, als, psf
+
+        ;; Does it matter if the reference image isn't represented
+        ;; in this tile???
+        ;; Will DAOMATCH crash if some of the images don't overlap??
+        ;; maybe I need make my own MCH files based on the tiling grid
+        ;; as in allframe_combine.pro, and make my own version of the
+        ;; RAW file.
+         
+        ;; Run DAOMATCH
+         
+      endfor ; tile/group loop
+         
+       
+    ;; Grouping with chip/amp numbers
+    ;;-------------------------------
+    Endif else begin
+
+      ;; Multi-chip/amp imagers
+      ;;----------------------- 
+      if (thisimager.namps gt 1) then begin
+       
+        ; Getting all of the bases with the right extensions, e.g. _1 to _16 for Blanco+MOSAIC
+        ; also getting the array of amplifier numbers
+        ; Assuming that there are no leading 0s on the numbers, i.e. _1 and NOT _01
+        undefine,gdbase,gdbase1,amp
+        for f=1,thisimager.namps do begin
+          gdbase1 = where(stregex(base,thisimager.separator+strtrim(f,2)+'$',/boolean) eq 1,ngdbase1)
+          iamp = strtrim(f,2)
+          ; try leading 0
+          if ngdbase1 eq 0 and f lt 10 then begin
+            gdbase1 = where(stregex(base,thisimager.separator+'0'+strtrim(f,2)+'$',/boolean) eq 1,ngdbase1)
+            iamp = '0'+strtrim(f,2)
+          endif
+          if ngdbase1 gt 0 then begin
+            PUSH,gdbase,gdbase1
+            PUSH,amp,replicate(iamp,ngdbase1)
+          endif
+        endfor
+        ngdbase = n_elements(gdbase)
+        ; Some good ones
+        if (ngdbase gt 0) then begin
+          printlog,logfile,strtrim(ngdbase,2)+' of the '+strtrim(nbase,2)+' files have the correct '+$
+                           thisimager.instrument+' extension'
+
+          ; Adding the ones that didn't match to the failure list
+          if (ngdbase lt nbase) then begin
+            bad = lindgen(nbase)
+            REMOVE,gdbase,bad
+            nbad = n_elements(bad)
+            printlog,logfile,strtrim(nbad,2)+' files do not have the correct extension and will be added to the FAILURE list'
+            PUSH,failurelist,dirs[i]+'/'+base[bad]+'.als'
+          endif
+
+          ; ONLY keep the bases that have the correct extensions
+          orig_base = base
+          base = base[gdbase]
+          nbase = ngdbase
+
+        ; No good ones
+        endif else begin
+          printlog,logfile,'NO SPLIT '+thisimager.instrument+' FILES with the correct extensions.  Skipping this field'
+          PUSH,failurelist,dirs[i]+'/'+base+'.als'           ; ALL fail
+          goto,BOMB
+        endelse
+
+        ; Getting unique amplifier numbers
+        ui = uniq(amp,sort(amp))
+        amps = amp[ui]
+        si = sort(long(amps))  ; sort them
+        amps = amps[si]
+        namps = n_elements(amps)
+    
+        ; Less amps than expected
+        if (namps lt thisimager.namps) then $
+          printlog,logfile,'ONLY '+strtrim(namps,2)+' AMP(S). '+strtrim(thisimager.namps,2)+' EXPECTED.'
+
+        ; Check that we have ALL files for this GROUP
+        ;--------------------------------------------
+        ; Some previous successes to check
+        nsuccess = lists.nsuccesslines
+        if (nsuccess gt 0) then begin
+          printlog,logfile,''
+          printlog,logfile,'Some previous successes.  Making sure we have all files in this group'
+
+          ; Loop through the amps
+          for k=0,namps-1 do begin
+            printlog,logfile,'Checking amp='+amps[k]
+
+            ; Get previously successful amp files that exist
+            successbase = FILE_BASENAME(lists.successlines,'.als')
+            alstest = FILE_TEST(lists.successlines)      
+            matchind = where(stregex(successbase,'^'+thisfield+'-',/boolean) eq 1 and $
+                             stregex(successbase,thisimager.separator+amps[k]+'$',/boolean) eq 1 and $
+                             alstest eq 1,nmatchind)
+
+            ; Found some matches
+            if (nmatchind gt 0) then begin            
+
+              ; Check if these are already in the INLIST
+              undefine,ind1,ind2,num_alreadyinlist
+              MATCH,successbase[matchind],base,ind1,ind2,count=num_alreadyinlist
+              num_notinlist = nmatchind - num_alreadyinlist
+
+              ; Some not in INLIST yet
+              if (num_notinlist gt 0) then begin            
+                printlog,logfile,'Found '+strtrim(num_notinlist,2)+' previously successful file(s) for this '+$
+                                 'group NOT YET in the INLIST.  Adding.'
+                indtoadd = matchind
+                if num_alreadyinlist gt 0 then REMOVE,ind1,indtoadd
+                PUSH,base,successbase[indtoadd]
+                PUSH,amp,replicate(amps[k],num_notinlist)
+
+                ; Setting REDO=1 so the files in the success list will be redone.
+                if not keyword_set(redo) then begin
+                  printlog,logfile,'Setting REDO=1'
+                  redo = 1
+                endif
+
+              endif  ; some not in inlist yet
+            endif  ; some files from this group in success file
+          endfor ; amp loop
+
+          ; Make sure they are unique
+          ui = uniq(base,sort(base))
+          ui = ui[sort(ui)]
+          base = base[ui]
+          amp = amp[ui]
+          nbase = n_elements(base)
+
+          printlog,logfile,''
+
+        endif ; some successes
+
+        
+      ;; Single-amp imagers
+      ;;-------------------
+      endif else begin
+
+        ; Check that we have ALL files for this GROUP
+        ;--------------------------------------------
+        ; Some previous successes to check
+        nsuccess = lists.nsuccesslines
+        if (nsuccess gt 0) then begin
+          printlog,logfile,''
+          printlog,logfile,'Some previous successes.  Making sure we have all files for this field'
+
+          successbase = FILE_BASENAME(lists.successlines,'.als')
+          alstest = FILE_TEST(lists.successlines)
+          matchind = where(stregex(successbase,'^'+thisfield+'-',/boolean) eq 1 and $
+                           alstest eq 1,nmatchind)
+
+          ; Found some matches
+          if (nmatchind gt 0) then begin
+
+            ; Check if these are already in the INLIST
+            undefine,ind1,ind2,num_alreadyinlist
+            MATCH,successbase[matchind],base,ind1,ind2,count=num_alreadyinlist
+            num_notinlist = nmatchind - num_alreadyinlist
+
+            ; Some not in INLIST yet
+            if (num_notinlist gt 0) then begin      
+              printlog,logfile,'Found '+strtrim(num_notinlist,2)+' previously successful file(s) for this group NOT YET in the '+$
+                               'INLIST.  Adding.'
+              indtoadd = matchind
+              if num_alreadyinlist gt 0 then REMOVE,ind1,indtoadd
+              PUSH,base,successbase[indtoadd]
+
+              ; Setting REDO=1 so the files in the success list will be redone.
+              if not keyword_set(redo) then begin
+                printlog,logfile,'Setting REDO=1'
+                redo = 1
+              endif
+
+            endif  ; some not in inlist yet
+          endif  ; some files from this group in success file
+
+          ; Make sure they are unique
+          ui = uniq(base,sort(base))
+          ui = ui[sort(ui)]
+          base = base[ui]
+          nbase = n_elements(base)
+
+          printlog,logfile,''
+        endif ; some successes 
+
+      endelse  ; single-amp imager
+        
+    Endelse  ; chip/amp grouping
+
+
+;;;;;;;;;
+;; OLD CODE--------
+;;;;;;;;;
 
     ;#############################################
     ; MULTI-AMP IMAGERS
