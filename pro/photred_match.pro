@@ -122,6 +122,9 @@ maxshift = READPAR(setup,'MCHMAXSHIFT')
 if maxshift ne '0' and maxshift ne '' and maxshift ne '-1' then $
    maxshift=float(maxshift) else undefine,maxshift
 if n_elements(maxshift) gt 0 then if maxshift le 0. then undefine,maxshift
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
 
 
 ; Get the scripts directory from setup
@@ -219,6 +222,7 @@ if keyword_set(mchusetiles) then begin
 
   printlog,logfile,''
   printlog,logfile,'Making Tiling schemes'
+  printlog,logfile,'---------------------'
   printlog,logfile,''
    
   ;; Loop through the directories
@@ -349,20 +353,44 @@ FOR i=0,ndirs-1 do begin
     If keyword_set(mchusetiles) then begin
 
       ;; Load the tiling information
+      tilefile = dirs[i]+'/'+thisfield+'.tiling'
       PHOTRED_LOADTILEFILE,tilefile,tilestr,error=loaderror
+      if n_elements(loaderror) gt 0 then goto,BOMB
        
       ;; Group them into tiles 
-      PHOTRED_TILEGROUPS,files,tilestr
-      
+      PHOTRED_TILEGROUPS,base+'.fits',tilestr,groupstr,error=grperror
+      if n_elements(grperror) gt 0 then goto,BOmB      
+
       ;; Pick a reference exposure
       ;; mainly use this for the base names
+      ;; using chip 1 for multi-chip imagers
+      if thisimager.namps gt 1 then begin
+        amp = strarr(nbase)
+        for k=0,nbase-1 do begin
+          dum = strsplit(base[k],thisimager.separator,/extract)
+          amp[k] = first_el(dum,/last)
+        endfor
+        uiamp = uniq(amp,sort(amp))
+        amps = amp[uiamp]
+        MATCH,amp,amps[0],chip1ind,ind2,/sort
+        base1 = base[chip1ind]
+      endif else base1=base
+      PHOTRED_PICKREFERENCEFRAME,base1,filtref,thisimager,refstr,logfile=logfile,error=referror
+      if n_elements(referror) gt 0 then begin
+        printlog,logfile,'Failing field '+thisfield+' and going to the next'
+        PUSH,failurelist,dirs[i]+'/'+base+'.als'
+        goto,BOMB
+      endif
 
-      ;; Loop through the tiles
-      for k=0,ntiles-1 do begin
+      ;; Loop through the tile groups
+      ngroups = n_elements(groupstr)
+      for k=0,ngroups-1 do begin
+        groupstr1 = groupstr[k]
 
         ;; Create the tile directory
         ;; and make the sym links if they don't exist already
         ;; fits, als, psf
+        stop
 
         ;; Does it matter if the reference image isn't represented
         ;; in this tile???

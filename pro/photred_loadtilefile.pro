@@ -23,11 +23,11 @@
 
 pro photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,stp=stp
 
-undefine,tilestr
+undefine,tilestr,error
   
 ; Not enough inputs
 if n_elements(tilefile) eq 0 then begin
-  print,'Syntax - photred_loadtilefile,tilefile,tilestr,error=error'
+  print,'Syntax - photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,stp=stp'
   error = 'Not enough inputs'
   return
 endif

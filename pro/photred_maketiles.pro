@@ -83,27 +83,7 @@ printlog,logfile,strtrim(nfieldfiles,2)+' FITS files found for field '+field
 
 ;; Loop through the FITS files and get their information
 printlog,logfile,'Gathering information on the files'
-filestr = replicate({field:'',file:'',nx:0L,ny:0L,filter:'',pixscale:0.0,cenra:0.0d0,cendec:0.0d0,$
-                  vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfieldfiles)
-For i=0,nfieldfiles-1 do begin
-  head = HEADFITS(fieldfiles[i])
-  filestr[i].field = field
-  filestr[i].file = fieldfiles[i]
-  filestr[i].filter = photred_getfilter(fieldfiles[i],/noupdate)
-  filestr[i].nx = sxpar(head,'NAXIS1')
-  filestr[i].ny = sxpar(head,'NAXIS2')
-  ;GETPIXSCALE,'',pixscale,head=head
-  HEAD_XYAD,head,[0,1]+filestr[i].nx/2,[0,0]+filestr[i].ny/2,ra1,dec1,/deg  ; a little bit faster
-  pixscale = sphdist(ra1[0],dec1[0],ra1[1],dec1[1],/deg)*3600d0
-  filestr[i].pixscale = pixscale
-  HEAD_XYAD,head,filestr[i].nx/2,filestr[i].ny/2,cenra1,cendec1,/degree
-  filestr[i].cenra = cenra1
-  filestr[i].cendec = cendec1
-  HEAD_XYAD,head,[0,filestr[i].nx-1,filestr[i].nx-1,0],[0,0,filestr[i].ny-1,filestr[i].ny-1],vra,vdec,/degree
-  filestr[i].vertices_ra = vra
-  filestr[i].vertices_dec = vdec
-  ; What do we do if there's no WCS???
-Endfor
+PHOTRED_GATHERFILEINFO,fieldfiles,filestr
 
 ; Creating the overall tiling projection and scheme
 ;--------------------------------------------------

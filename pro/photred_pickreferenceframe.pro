@@ -11,6 +11,7 @@
 ;               for one chip (e.g., *_01).
 ;  filtref    The reference filter name.  Can be an array of filter
 ;               names in decreasing order of preference.
+;  thisimager The structure with information on this imager.
 ;  =logfile   The log file name.
 ;  /fake      This is running in FAKERED, artificial star tests.
 ;
@@ -24,13 +25,13 @@
 ; By D.Nidever  Jan 2017
 ;-
 
-pro photred_pickreferenceframe,base,filtref,refstr,logfile=logfile,fake=fake,error=error
+pro photred_pickreferenceframe,base,filtref,thisimager,refstr,logfile=logfile,fake=fake,error=error
 
 undefine,refimbase,error
   
 ; Not enough inputs
 if n_elements(base) eq 0 or n_elements(filtref) eq 0 then begin
-  print,'Syntax - photred_pickreferenceframe,base,filtref,refstr,logfile=logfile,fake=fake'
+  print,'Syntax - photred_pickreferenceframe,base,filtref,thisimager,refstr,logfile=logfile,fake=fake'
   error = 'Not enough inputs'
   return
 endif
@@ -38,6 +39,8 @@ endif
 ; Getting the REFERENCE Image
 ;----------------------------
   
+nbase = n_elements(base)
+nfiltref = n_elements(filtref)
 if not keyword_set(fake) then begin
   ; Get filters for first amp
   filters = PHOTRED_GETFILTER(base+'.fits')
@@ -46,8 +49,8 @@ if not keyword_set(fake) then begin
   utdate = PHOTRED_GETDATE(base+'.fits')
   uttime = PHOTRED_GETUTTIME(base+'.fits')
   dateobs = utdate+'T'+uttime
-  jd = dblarr(nind1)
-  for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
+  jd = dblarr(nbase)
+  for l=0,nbase-1 do jd[l]=DATE2JD(dateobs[l])
       
   ; Find matches to the reference filter in priority order
   ngdref=0 & refind=-1
@@ -94,8 +97,10 @@ if not keyword_set(fake) then begin
   endelse
 
   ; Getting just the base, without the extension, e.g. "_1"
+  arr = strsplit(refimbase,thisimager.separator,/extract)
+  amp = first_el(arr,/last)
   len = strlen(refimbase)
-  lenend = strlen(thisimager.separator+amps[0])
+  lenend = strlen(thisimager.separator+amp)
   refimbase = strmid(refimbase,0,len-lenend)
   refstr = {base:refimbase,filter:usefiltref,exptime:float(refexptime)}
   
