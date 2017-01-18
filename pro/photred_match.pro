@@ -352,6 +352,10 @@ FOR i=0,ndirs-1 do begin
     ;;---------------------
     If keyword_set(mchusetiles) then begin
 
+
+; MAKE SURE WE HAVE ALL OF THE FILES FOR THE GROUPS!!!
+stop
+       
       ;; Load the tiling information
       tilefile = dirs[i]+'/'+thisfield+'.tiling'
       PHOTRED_LOADTILEFILE,tilefile,tilestr,error=loaderror
