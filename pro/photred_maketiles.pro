@@ -18,6 +18,7 @@
 ;  The tiling scheme will be written to a file called fieldinput+".tiling".
 ;  =tilehead   The header with the tiling scheme projection information.
 ;  =tilestr    The structure with information on each tile.
+;  =error      The error message if one occurred.
 ;
 ; USAGE:
 ;  IDL>photred_maketiles,'F1',thisimager,logfile=logfile
@@ -26,15 +27,17 @@
 ;-
 
 pro photred_maketiles,fieldinput,thisimager,pixscale=inppixscale,tilesize=inptilesize,$
-                      tilehead=tilehead,tilestr=tilestr,logfile=logfile,stp=stp
+                      tilehead=tilehead,tilestr=tilestr,logfile=logfile,error=error,stp=stp
 
 undefine,tilehead
 undefine,tilestr
+undefine,error
 
 ; Not enough inputs
 if n_elements(fieldinput) eq 0 or n_elements(thisimager) eq 0 then begin
   print,'Syntax - photred_maketiles,fieldinput,thisimager,pixscale=pixscale,tilesize=tilesize,'
-  print,'                           logfile=logfile,stp=stp,tilehead=tilehead,tilestr=tilestr'
+  print,'                           logfile=logfile,stp=stp,tilehead=tilehead,tilestr=tilestr,error=error'
+  error = 'Not enough inputs'
   return
 endif
 
@@ -76,7 +79,8 @@ if nfieldfiles gt 0 then begin
     endelse
   endif                      ; some ones to remove
 endif else begin              ; some fieldfiles
-  printlog,logfile,'No '+field+' files found in current directory'
+  error = 'No '+field+' files found in current directory'
+  printlog,logfile,error
   return
 endelse
 printlog,logfile,strtrim(nfieldfiles,2)+' FITS files found for field '+field
@@ -84,6 +88,15 @@ printlog,logfile,strtrim(nfieldfiles,2)+' FITS files found for field '+field
 ;; Loop through the FITS files and get their information
 printlog,logfile,'Gathering information on the files'
 PHOTRED_GATHERFILEINFO,fieldfiles,filestr
+; Only want good ones
+gdfilestr = where(filestr.exists eq 1,ngdfilestr)
+if ngdfilestr eq 0 then begin
+  error = 'None of the files exist'
+  printlog,logfile,error
+  return
+endif
+filestr0 = filestr
+filestr = filestr[gdfilestr]  ; only want the ones that exist
 
 ; Creating the overall tiling projection and scheme
 ;--------------------------------------------------
