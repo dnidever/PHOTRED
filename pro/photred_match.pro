@@ -323,13 +323,19 @@ FOR i=0,ndirs-1 do begin
     ; If MEF then match each chip/amplifier
     ; If SINGLE CHIP then match all frames
 
-    ; Check that there are associated FITS files
-    ;-------------------------------------------
+    ; Check that there are associated FITS and PSF files
+    ;---------------------------------------------------
     foundarr = intarr(nbase)+1
     for k=0,nbase-1 do begin
       fitsfile = FILE_SEARCH(base[k]+'.fits',count=nfitsfile)
       if (nfitsfile eq 0) then begin
         printlog,logfile,'NO ASSOCIATED FITS FILE FOR ',base
+        PUSH,failurelist,dirs[i]+'/'+base[k]+'.als'
+        foundarr[k] = 0
+      endif
+      psffile = FILE_SEARCH(base[k]+'.psf',count=npsffile)
+      if (npsffile eq 0) then begin
+        printlog,logfile,'NO ASSOCIATED PSF FILE FOR ',base
         PUSH,failurelist,dirs[i]+'/'+base[k]+'.als'
         foundarr[k] = 0
       endif
@@ -354,32 +360,23 @@ FOR i=0,ndirs-1 do begin
 
 
 ; MAKE SURE WE HAVE ALL OF THE FILES FOR THE GROUPS!!!
-stop
+print,'MAKE SURE WE HAVE ALL OF THE FILES FOR THE GROUPS!!!'
+wait,1
+;stop
        
       ;; Load the tiling information
       tilefile = dirs[i]+'/'+thisfield+'.tiling'
-      PHOTRED_LOADTILEFILE,tilefile,tilestr,error=loaderror
+      PHOTRED_LOADTILEFILE,tilefile,tilestr,logfile=logfile,error=loaderror
       if n_elements(loaderror) gt 0 then goto,BOMB
        
-      ;; Group them into tiles 
-      PHOTRED_TILEGROUPS,base+'.fits',tilestr,groupstr,error=grperror
+      ;; Group them into tiles
+      printlog,logfile,'Gathering file information and grouping by tiles.'
+      PHOTRED_TILEGROUPS,base+'.fits',tilestr,groupstr,logfile=logfile,error=grperror
       if n_elements(grperror) gt 0 then goto,BOmB      
 
       ;; Pick a reference exposure
       ;; mainly use this for the base names
-      ;; using chip 1 for multi-chip imagers
-      if thisimager.namps gt 1 then begin
-        amp = strarr(nbase)
-        for k=0,nbase-1 do begin
-          dum = strsplit(base[k],thisimager.separator,/extract)
-          amp[k] = first_el(dum,/last)
-        endfor
-        uiamp = uniq(amp,sort(amp))
-        amps = amp[uiamp]
-        MATCH,amp,amps[0],chip1ind,ind2,/sort
-        base1 = base[chip1ind]
-      endif else base1=base
-      PHOTRED_PICKREFERENCEFRAME,base1,filtref,thisimager,refstr,logfile=logfile,error=referror
+      PHOTRED_PICKREFERENCEFRAME,base,filtref,thisimager,refstr,logfile=logfile,error=referror
       if n_elements(referror) gt 0 then begin
         printlog,logfile,'Failing field '+thisfield+' and going to the next'
         PUSH,failurelist,dirs[i]+'/'+base+'.als'
@@ -390,10 +387,23 @@ stop
       ngroups = n_elements(groupstr)
       for k=0,ngroups-1 do begin
         groupstr1 = groupstr[k]
+        groupfiles = *groupstr1.files
 
         ;; Create the tile directory
         ;; and make the sym links if they don't exist already
-        ;; fits, als, psf
+        ;; fits, als, psf files
+        tiledir = groupstr1.tilename
+        if file_test(tiledir) eq 0 then FILE_MKDIR,tiledir
+        ; Loop through the files
+        for l=0,groupstr1.nfiles-1 do begin
+          tilesuffix = 'T'+strtrim(groupstr1.tilenum,2)
+          groupbase1 = FILE_BASENAME(groupfiles[l],'.fits')
+          origfiles = groupbase1+['.fits','.psf','.als']
+          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+['.fits','.psf','.als']
+          ; Make the necessary symbolic links
+          needit = where(file_test(newfiles) eq 0,nneedit)
+          if nneedit gt 0 then FILE_LINK,'../'+origfiles[needit],newfiles[needit]
+        endfor
         stop
 
         ;; Does it matter if the reference image isn't represented
@@ -404,7 +414,9 @@ stop
         ;; RAW file.
          
         ;; Run DAOMATCH
-         
+        ;; maybe make daomatch_tile.pro to use the tile projection
+        ;; coords in the mch file.         
+
       endfor ; tile/group loop
          
        

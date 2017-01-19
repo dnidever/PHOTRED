@@ -8,6 +8,7 @@
 ; INPUTS:
 ;  files      The FITS files to group.
 ;  tilestr    The structure with information on the tiling scheme.
+;  =logfile   The name of the log file.
 ;
 ; OUTPUTS:
 ;  groupstr   The structure with information for each group.
@@ -20,16 +21,18 @@
 ; By D.Nidever  Jan 2017
 ;-
 
-pro photred_tilegroups,files,tilestr,groupstr,count=count,error=error
+pro photred_tilegroups,files,tilestr,groupstr,count=count,error=error,logfile=logfile
 
 undefine,groupstr,error,count
 
 ; Not enough inputs
 if n_elements(files) eq 0 or n_elements(tilestr) eq 0 then begin
-  print,'Syntax - photred_tilegroups,files,tilestr,groupstr,count=count,error=error'
+  print,'Syntax - photred_tilegroups,files,tilestr,groupstr,count=count,error=error,logfile=logfile'
   error = 'Not enough inputs'
   return
 endif
+
+if n_elements(logfile) eq 0 then logfile=-1
 
 ; Gather information about the files
 nfiles = n_elements(files)

@@ -25,20 +25,36 @@
 ; By D.Nidever  Jan 2017
 ;-
 
-pro photred_pickreferenceframe,base,filtref,thisimager,refstr,logfile=logfile,fake=fake,error=error
+pro photred_pickreferenceframe,base0,filtref,thisimager,refstr,logfile=logfile,fake=fake,error=error
 
 undefine,refimbase,error
   
 ; Not enough inputs
-if n_elements(base) eq 0 or n_elements(filtref) eq 0 then begin
+if n_elements(base0) eq 0 or n_elements(filtref) eq 0 then begin
   print,'Syntax - photred_pickreferenceframe,base,filtref,thisimager,refstr,logfile=logfile,fake=fake'
   error = 'Not enough inputs'
   return
 endif
+
+if n_elements(logfile) eq 0 then logfile=-1
   
 ; Getting the REFERENCE Image
 ;----------------------------
-  
+
+;; Using chip 1 for multi-chip imagers
+nbase0 = n_elements(base0)
+if thisimager.namps gt 1 then begin
+  amp = strarr(nbase0)
+  for k=0,nbase0-1 do begin
+    dum = strsplit(base0[k],thisimager.separator,/extract)
+    amp[k] = first_el(dum,/last)
+  endfor
+  uiamp = uniq(amp,sort(amp))
+  amps = amp[uiamp]
+  MATCH,amp,amps[0],chip1ind,ind2,/sort
+  base = base0[chip1ind]
+endif else base=base0
+
 nbase = n_elements(base)
 nfiltref = n_elements(filtref)
 if not keyword_set(fake) then begin
@@ -129,6 +145,6 @@ endelse
 ; Reference image information
 printlog,logfile,'REFERENCE IMAGE = '+refstr.base+' Filter='+refstr.filter+' Exptime='+strtrim(refstr.exptime,2)
 
-stop
+;stop
 
 end

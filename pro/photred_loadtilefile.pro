@@ -9,6 +9,7 @@
 ;  tilefile  The tiling file, e.g. "F2.tiling"
 ;  /silent   Don't print anything to the screen.
 ;  /stp      Stop at the end of the program.
+; =logfile   The name of the log file.
 ;
 ; OUTPUTS:
 ;  tilestr   The structure with information on the tiling
@@ -21,21 +22,23 @@
 ; By D.Nidever  Jan 2017
 ;-
 
-pro photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,stp=stp
+pro photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,logfile=logfile,stp=stp
 
 undefine,tilestr,error
   
 ; Not enough inputs
 if n_elements(tilefile) eq 0 then begin
-  print,'Syntax - photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,stp=stp'
+  print,'Syntax - photred_loadtilefile,tilefile,tilestr,error=error,silent=silent,logfile=logfile,stp=stp'
   error = 'Not enough inputs'
   return
 endif
 
+if n_elements(logfile) eq 0 then logfile=-1
+
 ; File not found
 if file_test(tilefile) eq 0 then begin
   error = tilefile+' NOT FOUND'
-  if not keyword_set(silent) then print,error
+  if not keyword_set(silent) then printlog,logfile,error
   return
 endif
 
