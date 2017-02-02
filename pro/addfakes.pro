@@ -112,7 +112,7 @@ print,'NTOT = ',strtrim(ntot,2)
 
 ; Max/min g-band magnitude
 gmin = 17.0
-gmax = 25.0
+gmax = 26.2 ;25.0
 gdsynth = where(synth.g ge gmin and synth.g le gmax,ngdsynth)
 synth1 = synth[gdsynth]
 
@@ -166,7 +166,7 @@ For i=0,nfiles-1 do begin
   ;;             + t.apcor - 2.5*alog10(t.exptime)
   magind = where(stags eq strupcase(filestr[i].filter),nmagind)
   colind = where(stags eq strupcase(filestr[i].colband),ncolind)
-  mag = fsynth.(magind[0])
+  mag = fsynth2.(magind[0])
   ; Make the color
   if filestr[i].colsign eq 1 then begin
     clr = mag - fsynth2.(colind[0])
