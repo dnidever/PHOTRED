@@ -632,6 +632,11 @@ wait,1
           refimbase = base1[gdref[0]]
           usefiltref = filters[gdref[0]]
           refexptime = exptime[gdref[0]]
+
+          ; Getting just the base, without the extension, e.g. "_1"
+          len = strlen(refimbase)
+          lenend = strlen(thisimager.separator+amps[0])
+          refimbase = strmid(refimbase,0,len-lenend)
         endelse
         
         ; Reference image information

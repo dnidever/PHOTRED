@@ -26,8 +26,8 @@
 #
 #############################################################################
 #
-daophot="/net/astro/bin/daophot"
-allstar="/net/astro/bin/allstar"
+#daophot="/net/astro/bin/daophot"
+#allstar="/net/astro/bin/allstar"
 #goodpsf="/net/halo/bin/goodpsf"
 #lstfilter="/net/halo/bin/lstfilter"
 export image=${1}
@@ -46,22 +46,63 @@ if [ ! -s ${image}.opt ]; then
    echo "ERROR: ${image}.opt required to run DAOPHOT."
    exit 1
 fi
-if [ ! -s apcor.opt ]; then
-   echo "ERROR: apcor.opt required to run DAOPHOT."
-   exit 1
-fi
 if [ ! -s ${image}.als.opt ]; then
    echo "ERROR: ${image}.als.opt required to run ALLSTAR."
    exit 1
 fi
 #
-echo "Running ALLSTAR on ${image}.fits :"
+echo "Starting photometry on ${image}.fits :"
 #
-###########################################
-###                                     ###
-### Perform PSF photometry with ALLSTAR ###
-###                                     ###
-###########################################
+#################################
+###                           ###
+### 1st step : Find Sources   ###
+###                           ###
+#################################
+#
+echo "   Finding sources ...."
+#
+#  Delete files to avoid errors in DAOPHOT.
+#
+rm ${image}.coo      >& /dev/null
+#
+echo "===============================" >> ${image}.log
+echo "== Step 1 : Find sources     ==" >> ${image}.log
+echo "===============================" >> ${image}.log
+echo "" >> ${image}.log
+#
+#  Copy the {image}.opt file to daophot.opt for safety.
+#
+#rm daophot.opt >& /dev/null
+#cp ${image}.opt daophot.opt
+#
+#  If daophot.opt does NOT exist, create it
+#
+if [ ! -s daophot.opt ]; then
+  cp ${image}.opt daophot.opt
+fi
+#
+#  Run DAOPHOT to perform FIND, PHOTOMETRY, and PICKPSF on frame.
+#  You may change the number of stars in PICKPSF.
+#
+daophot << END_DAOPHOT >> ${image}.log
+OPTIONS
+${image}.opt
+
+ATTACH ${image}.fits
+FIND
+1,1
+${image}.coo
+y
+EXIT
+END_DAOPHOT
+#
+######################################################
+###                                                ###
+### 2nd Step : Perform PSF photometry with ALLSTAR ###
+###                                                ###
+######################################################
+#
+echo "   Running allstar ...."
 #
 # If allstar.opt does NOT exist, create it
 #
@@ -83,7 +124,7 @@ echo "" >> ${image}.log
 cat ${image}.als.opt > ${image}.als.inp
 echo $image'.fits'  >> ${image}.als.inp
 echo $image'.psf'   >> ${image}.als.inp
-echo $image'.ap'    >> ${image}.als.inp
+echo $image'.coo'   >> ${image}.als.inp
 echo $image'.als'   >> ${image}.als.inp
 echo $image's.fits' >> ${image}.als.inp
 allstar < ${image}.als.inp >> ${image}.log
