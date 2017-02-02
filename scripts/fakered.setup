@@ -1,0 +1,37 @@
+##### REQUIRED #####
+scriptsdir  /idl/idllocal/photred/PHOTRED/scripts/
+irafdir     /home/smash/
+telescope   Blanco
+instrument  DECAM
+observatory CTIO
+nmulti      10
+nmulti_wcs  10
+nmulti_daophot  10
+nmulti_allframe  10
+filtref     g,i,r,z,u
+trans       nocalib.trans
+##### OPTIONAL #####
+sepfielddir  1
+keepmef      0
+redo         0
+hyperthread  1
+#mchmaxshift  50.0
+finditer      2
+#alfdetprog   sextractor
+#alfnocmbimscale 0
+#alfexclude   F1,F3
+alfusecmn     1
+ddo51radoffset  1
+keepinstr   1
+avgmag      1
+avgonlymag  0
+##### STAGES #####
+copy
+addstar
+daophot
+match
+allframe
+astrom
+calib
+combine
+complete
