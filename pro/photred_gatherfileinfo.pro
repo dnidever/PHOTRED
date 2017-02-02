@@ -31,7 +31,7 @@ endif
 
 nfiles = n_elements(files)
 ; Create structure
-filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',pixscale:0.0,cenra:0.0d0,cendec:0.0d0,$
+filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',exptime:0.0,dateobs:'',pixscale:0.0,cenra:0.0d0,cendec:0.0d0,$
                   vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfiles)
 filestr.file = files
 ; File loop
@@ -41,7 +41,10 @@ For i=0,nfiles-1 do begin
   if filestr[i].exists eq 0 then goto,BOMB
   head = HEADFITS(files[i])
   filestr[i].file = files[i]
-  filestr[i].filter = photred_getfilter(files[i],/noupdate)
+  filestr[i].filter = photred_getfilter(files[i],/noupdate,/silent,error=filterr)
+    if n_elements(filterr) gt 0 then filestr[i].filter=sxpar(head,'filter')
+  filestr[i].exptime = sxpar(head,'exptime')
+  filestr[i].dateobs = sxpar(head,'date-obs')
   filestr[i].nx = sxpar(head,'NAXIS1')
   filestr[i].ny = sxpar(head,'NAXIS2')
   ;GETPIXSCALE,'',pixscale,head=head

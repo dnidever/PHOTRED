@@ -233,7 +233,7 @@ endif
 ; COPY
 ;-------
 ; Copy the original files to the mock directories
-dorename = READPAR(setup,'COPY')
+docopy = READPAR(setup,'COPY')
 if docopy ne '0' then $
 FAKERED_COPY,redo=redo
 
@@ -274,7 +274,7 @@ PHOTRED_ALLFRAME,/fake,redo=redo
 ;--------
 ; Add coordinates
 doastrom = READPAR(setup,'ASTROM')
-if doastro ne '0' then $
+if doastrom ne '0' then $
 PHOTRED_ASTROM,redo=redo
 
 ;-------------

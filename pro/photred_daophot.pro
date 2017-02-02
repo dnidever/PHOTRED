@@ -170,7 +170,7 @@ endif
 ; Copy the scripts to the directories
 ;-------------------------------------
 ; Checking that the scripts exist
-scripts = ['photo.opt','apcor.opt','daophot.sh','lstfilter','goodpsf.pro','srcfilter.pro']
+scripts = ['photo.opt','apcor.opt','daophot.sh','daophot_fake.sh','lstfilter','goodpsf.pro','srcfilter.pro']
 nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   scriptfile = FILE_SEARCH(scriptsdir+'/'+scripts[i],count=nscriptfile)
@@ -294,6 +294,8 @@ endif
 
 ; FAKE, artificial star tests
 if keyword_set(fake) then begin
+  procbaselist = FILE_BASENAME(fitsbaselist,'.fits')
+  procdirlist = fitsdirlist
   successarr[*] = 1
   goto,rundaophot
 endif
@@ -690,15 +692,15 @@ for i=0,nfitsbaselist-1 do begin
     ; Check that this file has an ALS file
     alstest = FILE_TEST(base+'.als')
     if alstest eq 1 then alslines=FILE_LINES(base+'.als') else alslines=0
-    ; Check the A.ALS file
-    aalstest = FILE_TEST(base+'a.als')
-    if aalstest eq 1 then aalslines=FILE_LINES(base+'a.als') else aalslines=0
-
     if (alstest eq 0 or alslines lt 3) then successarr[i]=0
-    if (aalstest eq 0 or aalslines lt 3) then successarr[i]=0
-  
     if (alstest eq 0) then printlog,logfile,base+'.als NOT FOUND'
-    if (aalstest eq 0) then printlog,logfile,base+'a.als NOT FOUND'
+    ; Check the A.ALS file
+    if not keyword_set(fake) then begin
+      aalstest = FILE_TEST(base+'a.als')
+      if aalstest eq 1 then aalslines=FILE_LINES(base+'a.als') else aalslines=0
+      if (aalstest eq 0 or aalslines lt 3) then successarr[i]=0
+      if (aalstest eq 0) then printlog,logfile,base+'a.als NOT FOUND'
+    endif
 
   endif
 

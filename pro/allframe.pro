@@ -122,7 +122,7 @@ if n_elements(scriptsdir) eq 0 then begin
   return
 endif
 ; Check if the scripts exist in the current directory
-scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
+scripts = ['getpsf.sh','allstar.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
            'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 ; Loop through the scripts
@@ -348,7 +348,8 @@ if not keyword_set(fake) then begin
 
 ; FAKE, use existing comb.psf file
 endif else begin
-  printlog,logf,'Using existing '+file_basename(combfile,'.fits')+'.psf file'
+  printlog,logf,'Using existing '+file_basename(combfile,'.fits')+'.psf file and running ALLSTAR.'
+  SPAWN,'./allstar.sh '+file_basename(combfile,'.fits')
   printlog,logf,' '
 endelse
 

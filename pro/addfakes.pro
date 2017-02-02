@@ -232,16 +232,22 @@ outfakestr = dir+'fakestr.fits'
 print,'Saving FAKESTR to ',outfakestr
 MWRFITS,fakestr,outfakestr,/create
 
-; Create new MCH files
+; Create new MCH files and symlinks for the combined files
 mchfiles = file_search(dir+'F2/F2-*_??.mch',count=nmchfiles)
 for i=0,nmchfiles-1 do begin
   mchfile = mchfiles[i]
   mchdir = file_dirname(mchfile)
   mchbase = file_basename(mchfile,'.mch')
   newmchfile = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')+'.mch'
-  READLINES,mchfile,mchlines
+  READLINE,mchfile,mchlines
   mchlines2 = repstr(mchlines,"'F2-","'F2T1-")
-  WRITELINES,newmchfile,mchlines2,
+  WRITELINE,newmchfile,mchlines2,
+
+  ; Need weights, .scale, .zero, _comb.psf, _shift.mch, .mag
+  origbase = mchdir+'/'+mchbase
+  newbase = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')
+  FILE_LINK,origbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag'],$
+            newbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag']
 endfor
 
 stop
