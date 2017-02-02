@@ -1,5 +1,3 @@
-pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,fake=fake,stp=stp
-
 ;+
 ;
 ; PHOTRED_LOADSETUP
@@ -22,6 +20,8 @@ pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,fake=fake,stp=
 ;
 ; By D.Nidever  March 2008
 ;-
+
+pro photred_loadsetup,setup,count=count,std=std,setupdir=setupdir,fake=fake,stp=stp
 
 count = 0
 setup = strarr(2,2)+'-1'         ; no setup

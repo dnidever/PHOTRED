@@ -1,4 +1,4 @@
-pro fakered
+pro fakered,redo=redo
 
 
 ;FAKERED:
@@ -129,41 +129,195 @@ pro fakered
 ;SAVE
 ;-don't need this
 
-  
+
+
+COMMON photred,setup
+
+
+; Start the logfile
+;----------------
+; format is photred.DATETIME.log
+jd = systime(/julian)
+caldat,jd,month,day,year,hour,minute,second
+smonth = strtrim(month,2)
+if month lt 10 then smonth = '0'+smonth
+sday = strtrim(day,2)
+if day lt 10 then sday = '0'+sday
+syear = strmid(strtrim(year,2),2,2)
+shour = strtrim(hour,2)
+if hour lt 10 then shour='0'+shour
+sminute = strtrim(minute,2)
+if minute lt 10 then sminute='0'+sminute
+ssecond = strtrim(round(second),2)
+if second lt 10 then ssecond='0'+ssecond
+logfile = 'fakered.'+smonth+sday+syear+shour+sminute+ssecond+'.log'
+JOURNAL,logfile
+
+
+; Check that all of the required programs are available
+;------------------------------------------------------
+;  Each sub-program will do its own test.
+progs = ['photred_daophot','photred_match','photred_allframe','photred_astrom','photred_calib','photred_combine','readline',$
+         'strsplitter','readpar','check_iraf','photred_getfilter','photred_getexptime','photred_getuttime',$
+         'photred_getairmass','photred_getdate','photred_getgain','photred_getrdnoise',$
+         'readlist','printlog','photred_loadsetup','photred_mkopt','mkopt','stdred_transphot',$
+         'apcorrect','roi_cut','srcmatch','undefine','array_indices2','first_el','importascii','mad',$
+         'maketemp','maxloc','minloc','mktemp','mpfit','photred_getinput','range','scale','scale_vector',$
+         'slope','stringize','add_tag','getpixscale','head_xyad','head_adxy','loadaper',$
+         'photred_updatelists','printstr','push','touchzero','wcsfit','wcsfit_imacs','matchstars',$
+         'writecol','writeline','airmass','hdr2wcstnx','rndint','sexig2ten','signs','stress','strep',$
+         'strmult','strtrim0','combine_structs','imfwhm','loadcoo','loadinput','mk_imacsmask','printline',$
+         'randomize','rotsph','rotsphcen','wcstnx2hdr','wcstnx_rd2xy','wcstnx_xy2rd','parsetnx','badpar',$
+         'sign','wcstnxcor','rd2xieta','xieta2rd']
+test = PROG_TEST(progs)
+if min(test) eq 0 then begin
+  bd = where(test eq 0,nbd)
+  print,'SOME NECESSARY PROGRAMS MISSING'
+  print,progs[bd]
+  return
+endif
+
+; Make sure we have the right printlog.pro, not Markwardt's version
+tempprogs = strsplit(!path,':',/extract)+'/printlog.pro'
+test = file_test(tempprogs)
+ind = where(test eq 1,nind)
+bd = where(stregex(tempprogs[ind],'markwardt',/boolean) eq 1,nbd)
+if nbd gt 0 then begin
+  baddir = file_dirname(tempprogs[ind[bd]])
+  print,"There is a version of Markwardt's PRINTLOG.PRO in "+baddir
+  print,'Please rename this program (i.e. printlog.pro.orig)'
+  return
+endif
+
+; LOAD THE SETUP FILE
+;--------------------
+; This is a 2xN array.  First colume are the keywords
+; and the second column are the values.
+; Use READPAR.PRO to read it
+PHOTRED_LOADSETUP,setup,count=count,/fake
+if (count lt 1) then return
+
+; Are we redoing?
+doredo = READPAR(setup,'REDO')
+if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
+
+
+; Get the IRAF directory from the setup file
+;-------------------------------------------
+irafdir = READPAR(setup,'IRAFDIR')
+if irafdir eq '0' or irafdir eq '-1' then irafdir = '~/iraf/'
+irafdir = FILE_SEARCH(irafdir,/fully_qualify,count=nirafdir)
+if nirafdir eq 0 then begin
+   print,'NO IRAF DIRECTORY'
+   return
+endif
+
+
+; Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL
+;---------------------------------------------------------------
+CHECK_IRAF,iraftest,irafdir=irafdir
+if iraftest eq 0 then begin
+   print,'IRAF TEST FAILED.  EXITING'
+   return
+endif
+
+
+;#########################################
+;#  STARTING THE PROCESSING
+;#########################################
+
+
 ; do we need an "INIT" stage, that does the copying???
 
+;-------
+; COPY
+;-------
 ; Copy the original files to the mock directories
-FAKERED_COPY
+dorename = READPAR(setup,'COPY')
+if docopy ne '0' then $
+FAKERED_COPY,redo=redo
 
+;---------
+; ADDSTAR
+;---------
 ; Add the artificial sources
-FAKERED_ADDSTAR
+doaddstar = READPAR(setup,'ADDSTAR')
+if doaddstar ne '0' then $
+FAKERED_ADDSTAR,redo=redo
 
+;---------
+; DAOPHOT
+;---------
 ; Basically just find and allstar
-PHOTRED_DAOPHOT,/fake
+dodaophot = READPAR(setup,'DAOPHOT')
+if dodaophot ne '0' then $
+PHOTRED_DAOPHOT,/fake,redo=redo
 
+;-------
+; MATCH
+;-------
 ; Recreate raw file
-PHOTRED_MATCH,/fake
+domatch = READPAR(setup,'MATCH')
+if domatch ne '0' then $
+PHOTRED_MATCH,/fake,redo=redo
 
+;----------
+; ALLFRAME
+;----------
 ; Remake stack, detection and allframe
-PHOTRED_ALLFRAME,/fake
+doallframe = READPAR(setup,'ALLFRAME')
+if doallframe ne '0' then $
+PHOTRED_ALLFRAME,/fake,redo=redo
 
+;--------
+; ASTROM
+;--------
 ; Add coordinates
-PHOTRED_ASTROM
+doastrom = READPAR(setup,'ASTROM')
+if doastro ne '0' then $
+PHOTRED_ASTROM,redo=redo
 
+;-------------
+; CALIBRATION
+;-------------
 ; Calibrate
-PHOTRED_CALIB
+docalib = READPAR(setup,'CALIB')
+if docalib ne '0' then $
+PHOTRED_CALIB,redo=redo
 
+;---------
+; COMBINE
+;---------
 ; Combine chips
-PHOTRED_COMBINE
+docombine = READPAR(setup,'COMBINE')
+if docombine ne '0' then $
+PHOTRED_COMBINE,redo=redo
 
 ; Save, DO WE NEED THIS??
-PHOTRED_SAVE
+;PHOTRED_SAVE
 
+;----------
+; COMPLETE
+;----------
 ; Calculate completeness
-FAKERED_COMPLETE
+docomplete = READPAR(setup,'COMPLETE')
+if docomplete ne '0' then $
+FAKERED_COMPLETE,redo=redo
 
 
-stop
+print,'FAKERED FINISHED'
+
+
+; Run FAKERED_SUMMARY
+;--------------------
+FAKERED_SUMMARY
+
+
+; End logfile
+;------------
+JOURNAL
+
+if keyword_set(stp) then stop
 
 end
 
