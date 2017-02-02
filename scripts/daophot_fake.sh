@@ -50,8 +50,8 @@ if [ ! -s ${image}.als.opt ]; then
    echo "ERROR: ${image}.als.opt required to run ALLSTAR."
    exit 1
 fi
-if [ ! -s ${image}.psf1 ]; then
-   echo "ERROR: ${image}.psf1 required to run ALLSTAR."
+if [ ! -s ${image}.psf ]; then
+   echo "ERROR: ${image}.psf required to run ALLSTAR."
    exit 1
 fi
 #
