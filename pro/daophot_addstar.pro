@@ -232,7 +232,8 @@ file_delete,filebase+'.add.log',/allow
 SPAWN,[scriptfile,file_basename(filebase)],out,errout,/noshell
 
 ; Delete temporary files, absolute filenames
-FILE_DELETE,[scriptfile,tcatfile,tmpbase,tmpbase+'.log',inptmpfile],/allow
+FILE_DELETE,[scriptfile,tcatfile,tmpbase,tmpbase+'.log'],/allow
+if keyword_set(blank) then FILE_DELETE,inptmpfile,/allow
 
 ; Back to original directory
 CD,curdir
