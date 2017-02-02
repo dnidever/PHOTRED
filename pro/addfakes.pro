@@ -7,10 +7,10 @@ dir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/Field100/'
 ; Get list of artifical stars with the right bands
 synth0 = IMPORTASCII(dir+'CMD_field100',/header)
 nsynth = n_elements(synth0)
-synth = replicate({id:0L,ra:0.0d0,dec:0.0d0,lon:0.0d0,lat:0.0d0,$
+synth = replicate({id:0L,photid:0L,ra:0.0d0,dec:0.0d0,lon:0.0d0,lat:0.0d0,$
                    u:0.0,uerr:0.0,g:0.0,gerr:0.0,r:0.0,rerr:0.0,$
                    i:0.0,ierr:0.0,z:0.0,zerr:0.0},nsynth)
-synth.id = lindgen(nsynth)+1
+synth.photid = lindgen(nsynth)+1
 synth.g = synth0.magnitude
 synth.i = synth0.magnitude - synth0.colour
 
@@ -131,11 +131,13 @@ fsynth.lat = flat
 ROTSPHCEN,flon,flat,cenra,cendec,rr,dd,/reverse
 fsynth.ra = rr
 fsynth.dec = dd
-
+; Make new ID
+fsynth.id = lindgen(n_elements(fsynth))+1
 
 ; Image loop
 stags = tag_names(fsynth)
 undefine,fakestr
+undefine,allsynth
 For i=0,nfiles-1 do begin
 
   head = headfits(filestr[i].file)
@@ -201,6 +203,10 @@ For i=0,nfiles-1 do begin
   fakecat = filestr[i].dir+'/'+fname+'-'+filestr[i].expnum+'_'+string(filestr[i].chip,format='(i02)')+'_input.fits'
   MWRFITS,fsynth2,fakecat,/create
 
+  ; Make structure of all artificial stars
+  ;  deal with duplicates below
+  PUSH,allsynth,fsynth2
+
   ; Create symoblic links to the PSF and opt files
   origbase = filestr[i].dir+'/'+filestr[i].base
   newbase = filestr[i].dir+'/'+fname+'-'+filestr[i].expnum+'_'+string(filestr[i].chip,format='(i02)')
@@ -221,6 +227,13 @@ For i=0,nfiles-1 do begin
 
 Endfor 
 
+; Get unique list of artificial stars input
+ui = uniq(allsynth.id,sort(allsynth.id))
+allsynth = allsynth[ui]
+outsynthfile = dir+'F2/F2T1-input.fits'
+print,'Saving artificial star list to ',outsynthfile
+MWRFITS,allsynth,outsynthfile,/create
+
 ; Create a new "apcor.lst" list
 names = file_basename(fakestr.fake_fits,'.fits')+'a.del'
 maxlen = max(strlen(names))
@@ -228,7 +241,7 @@ fmt = '(A-'+strtrim(maxlen+3,2)+',F12.8)'
 writecol,dir+'apcor.lst',file_basename(fakestr.fake_fits,'.fits')+'a.del',fakestr.apcor,fmt=fmt
 
 ; Save the FAKESTR structure
-outfakestr = dir+'fakestr.fits'
+outfakestr = dir+'F2/F2-fakestr.fits'
 print,'Saving FAKESTR to ',outfakestr
 MWRFITS,fakestr,outfakestr,/create
 
@@ -241,7 +254,7 @@ for i=0,nmchfiles-1 do begin
   newmchfile = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')+'.mch'
   READLINE,mchfile,mchlines
   mchlines2 = repstr(mchlines,"'F2-","'F2T1-")
-  WRITELINE,newmchfile,mchlines2,
+  WRITELINE,newmchfile,mchlines2
 
   ; Need weights, .scale, .zero, _comb.psf, _shift.mch, .mag
   origbase = mchdir+'/'+mchbase
