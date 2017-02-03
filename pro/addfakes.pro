@@ -5,17 +5,28 @@ pro addfakes
 dir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/Field100/'
 
 ; Get list of artifical stars with the right bands
-synth0 = IMPORTASCII(dir+'CMD_field100',/header)
-nsynth = n_elements(synth0)
+;synth0 = IMPORTASCII(dir+'CMD_field100',/header)
+;nsynth = n_elements(synth0)
+;synth = replicate({id:0L,photid:0L,ra:0.0d0,dec:0.0d0,lon:0.0d0,lat:0.0d0,$
+;                   u:0.0,uerr:0.0,g:0.0,gerr:0.0,r:0.0,rerr:0.0,$
+;                   i:0.0,ierr:0.0,z:0.0,zerr:0.0},nsynth)
+;synth.photid = lindgen(nsynth)+1
+;synth.g = synth0.magnitude
+;synth.i = synth0.magnitude - synth0.colour
+
+; Make a "sheet" of artificial stars in CMD
+gi_range = [-1.0,3.5]
+g_range = [17.0,27.0]
+nsynth = 1e5
 synth = replicate({id:0L,photid:0L,ra:0.0d0,dec:0.0d0,lon:0.0d0,lat:0.0d0,$
                    u:0.0,uerr:0.0,g:0.0,gerr:0.0,r:0.0,rerr:0.0,$
                    i:0.0,ierr:0.0,z:0.0,zerr:0.0},nsynth)
 synth.photid = lindgen(nsynth)+1
-synth.g = synth0.magnitude
-synth.i = synth0.magnitude - synth0.colour
+synth_gi = randomu(seed,nsynth)*range(gi_range)+gi_range[0]
+synth.g = randomu(seed,nsynth)*range(g_range)+g_range[0]
+synth.i = synth.g - synth_gi
 
-; For Thomas' stars use the stellar locus to get the other
-; three bands.
+; Use the stellar locus to get the other three bands.
 restore,dir+'Field100_stellarlocus.dat'
 ; interpolate the stellar locus to get the other bands
 INTERP,tstr.gibin,tstr.ui,synth.g-synth.i,ui
@@ -102,7 +113,7 @@ lonr = minmax(vlon)
 latr = minmax(vlat)
 
 ; Create RA/DEC positions for the stars
-sep = 10.0  ; AST separation in arcsec
+sep = 7.0 ; 10.0  ; AST separation in arcsec
 nlon = floor(range(lonr)/sep*3600.0)-1
 nlat = floor(range(latr)/sep*3600.0)-1
 ntot = nlon*nlat
@@ -112,7 +123,7 @@ print,'NTOT = ',strtrim(ntot,2)
 
 ; Max/min g-band magnitude
 gmin = 17.0
-gmax = 26.2 ;25.0
+gmax = 27.0 ;26.2 ;25.0
 gdsynth = where(synth.g ge gmin and synth.g le gmax,ngdsynth)
 synth1 = synth[gdsynth]
 
