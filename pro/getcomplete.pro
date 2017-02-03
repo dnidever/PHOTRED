@@ -13,11 +13,13 @@ field = 'Field100'
 
 origfile = 'F2-00423049_01.phot'
 orig = IMPORTASCII(dir+'F2/'+origfile,/header)
+norig = n_elements(orig)
 synthfile = 'F2T1-input.fits'
 synth = MRDFITS(dir+'F2/'+synthfile,1,/silent)
+nsynth = n_elements(synth)
 finalfile = 'F2T1-00423049_01.ast'
 final = IMPORTASCII(dir+'F2/'+finalfile,/header)
-
+nfinal = n_elements(final)
 
 fakestr = MRDFITS(dir+'F2/F2-fakestr.fits',1,/silent)
 mchfile = dir+'F2/F2T1-00423049_01.mch'
@@ -78,7 +80,6 @@ fakestr[ind1].photometric = chstr[ind2].photometric
 ;trans = replicate(trans1,numobs)
 
 ; Make INSTAR
-nfinal = n_elements(final)
 ntags = n_tags(final)
 instar = dblarr(nfinal,ntags)
 for i=0,ntags-1 do instar[*,i]=final.(i)
@@ -149,17 +150,108 @@ endfor
 ; to match it up to the correct star (real or artificial)
 
 ; match obj to orig and obj to synth
-SRCMATCH,obj.ra,obj.dec,orig.ra,orig.dec,0.5,ind1a,ind2a,/sph,count=nmatch1
-SRCMATCH,obj.ra,obj.dec,synth.ra,synth.dec,0.5,ind1b,ind2b,/sph,count=nmatch2
+SRCMATCH,obj.ra,obj.dec,orig.ra,orig.dec,0.5,oind1,aind2,/sph,count=nmatch1
+SRCMATCH,obj.ra,obj.dec,synth.ra,synth.dec,0.5,aind1,aind2,/sph,count=nastmatch
 ; then deal with "duplicate" matches
 ; put everything in one structure with a FAKE column and columns for
 ; the recovered values
 
-obj2 = obj[ind1b]
-synth2 = synth[ind2b]
-
-plot,synth2.g,obj2.g-synth2.g,ps=3,xr=[14,27],yr=[-3,3]
+;obj2 = obj[aind1]
+;synth2 = synth[aind2]
+;
+;plot,synth2.g,obj2.g-synth2.g,ps=3,xr=[14,27],yr=[-3,3]
 ; Looks good
+
+; Combine everything in one structure
+schema = {id:'',ra:0.0d0,dec:0.0d0,u:0.0,uerr:0.0,ndetu:0L,$
+          g:0.0,gerr:0.0,ndetg:0L,r:0.0,rerr:0.0,ndetr:0L,$
+          i:0.0,ierr:0.0,ndeti:0L,z:0.0,zerr:0.0,ndetz:0L,$
+          chi:0.0,sharp:0.0,flag:0L,prob:0.0,$
+          ast:0,recovered:-1,ast_id:'',ast_photid:'',ast_ra:0.0d0,ast_dec:0.0d0,$
+          ast_u:0.0,ast_g:0.0,ast_r:0.0,ast_i:0.0,ast_z:0.0}
+comb = replicate(schema,nfinal)
+struct_assign,obj,comb
+comb[aind1].ast = 1
+comb[aind1].recovered = 1
+comb[aind1].ast_id = synth[aind2].id
+comb[aind1].ast_photid = synth[aind2].photid
+comb[aind1].ast_ra = synth[aind2].ra
+comb[aind1].ast_dec = synth[aind2].dec
+comb[aind1].ast_u = synth[aind2].u
+comb[aind1].ast_g = synth[aind2].g
+comb[aind1].ast_r = synth[aind2].r
+comb[aind1].ast_i = synth[aind2].i
+comb[aind1].ast_z = synth[aind2].z
+
+; Add elements for the artificial stars that were NOT recovered
+if nastmatch lt nsynth then begin
+  left = synth
+  REMOVE,aind2,left
+  nnew = nsynth-nastmatch
+  new = replicate(schema,nnew)
+  new.ast = 1
+  new.recovered = 0
+  new.ast_id = left.id
+  new.ast_photid = left.photid
+  new.ast_ra = left.ra
+  new.ast_dec = left.dec
+  new.ast_u = left.u
+  new.ast_g = left.g
+  new.ast_r = left.r
+  new.ast_i = left.i
+  new.ast_z = left.z
+  comb = [comb,new]
+endif
+
+; Write out the final file
+outcombfile = dir+field+'_complete.fits'
+print,'Writing final catalog to ',outcombfile
+MWRFITS,comb,outcombfile,/create
+spawn,['gzip',outcombfile],/noshell
+
+; Figure out the completeness
+gdall = where(comb.ast eq 1,ngdall)
+gdrecover = where(comb.ast eq 1 and comb.recovered eq 1,ngdrecover)
+dx = 0.2
+dy = 0.4
+xr = [-1,3.5]
+yr = [17.0,27.0]
+hess,comb[gdall].ast_g-comb[gdall].ast_i,comb[gdall].ast_g,dum,imall,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+hess,comb[gdrecover].ast_g-comb[gdrecover].ast_i,comb[gdrecover].ast_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+;displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness'
+
+; Make some figures
+setdisp
+;loadcol,3
+!p.font = 0
+; Input ASTS
+file = dir+'plots/'+field+'_input'
+ps_open,file,/color,thick=4,/encap
+device,/inches,xsize=8.5,ysize=10.5
+displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+field,charsize=1.3
+ps_close
+ps2png,file+'.eps',/eps
+spawn,['epstopdf',file+'.eps'],/noshell
+; Recovered
+file = dir+'plots/'+field+'_recovered'
+ps_open,file,/color,thick=4,/encap
+device,/inches,xsize=8.5,ysize=10.5
+displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+field,charsize=1.3
+ps_close
+ps2png,file+'.eps',/eps
+spawn,['epstopdf',file+'.eps'],/noshell
+; Completeness
+file = dir+'plots/'+field+'_completeness'
+ps_open,file,/color,thick=4,/encap
+device,/inches,xsize=8.5,ysize=10.5
+displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+field,charsize=1.3
+ps_close
+ps2png,file+'.eps',/eps
+spawn,['epstopdf',file+'.eps'],/noshell
+; Combine the figures
+pdffiles = dir+'/plots/'+field+'_'+['input','recovered','completeness']+'.pdf'
+spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+dir+'/plots/'+field+'_complete.pdf '+strjoin(pdffiles,' ')
+
 
 stop
 
