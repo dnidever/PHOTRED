@@ -119,7 +119,7 @@ SOLVESTAR,instar,trans,inp,outstar
 outmag = outstar[*,2*lindgen(numobs)+3]
 outerr = outstar[*,2*lindgen(numobs)+4]
 
-obj = replicate({id:'',photid:'',ra:0.0d0,dec:0.0d0,u:0.0,uerr:0.0,ndetu:0L,$
+obj = replicate({id:'',photid:'',ra:0.0d0,dec:0.0d0,ndet:0L,u:0.0,uerr:0.0,ndetu:0L,$
                  g:0.0,gerr:0.0,ndetg:0L,r:0.0,rerr:0.0,ndetr:0L,$
                  i:0.0,ierr:0.0,ndeti:0L,z:0.0,zerr:0.0,ndetz:0L,$
                  chi:0.0,sharp:0.0,flag:0L,prob:0.0},nfinal)
@@ -144,6 +144,7 @@ for i=0,nfilters-1 do begin
   obj.(magind) = avgmag
   obj.(errind) = avgerr
   obj.(detind) = total(outmag[*,ind] lt 50,2)
+  obj.ndet += obj.(detind)
 endfor
 
 ; if two stars land right on top of each other and only one is recovered then use the magnitude
@@ -163,7 +164,7 @@ SRCMATCH,obj.ra,obj.dec,synth.ra,synth.dec,0.5,aind1,aind2,/sph,count=nastmatch
 ; Looks good
 
 ; Combine everything in one structure
-schema = {id:'',ra:0.0d0,dec:0.0d0,u:0.0,uerr:0.0,ndetu:0L,$
+schema = {id:'',ra:0.0d0,dec:0.0d0,ndet:0L,u:0.0,uerr:0.0,ndetu:0L,$
           g:0.0,gerr:0.0,ndetg:0L,r:0.0,rerr:0.0,ndetr:0L,$
           i:0.0,ierr:0.0,ndeti:0L,z:0.0,zerr:0.0,ndetz:0L,$
           chi:0.0,sharp:0.0,flag:0L,prob:0.0,$
