@@ -161,7 +161,7 @@ lat2 = replicate(1,nlon)#lat1
 flat = (lat2)(*)
 fsynth.lon = flon
 fsynth.lat = flat
-ROTSPHCEN,flon,flat,cenra,cendec,rr,dd,/reverse
+ROTSPHCEN,flon,flat,cenra,cendec,rr,dd,/reverse,/gnomic
 fsynth.ra = rr
 fsynth.dec = dd
 ; Make new ID

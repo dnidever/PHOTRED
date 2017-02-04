@@ -21,9 +21,17 @@ if n_elements(dir) eq 0 then begin
   dir = dir+'/'
 endif
 
-globalfield = 'Field100'
+;globalfield = 'Field100'
 ;field = 'F2'
 fakefield = 'T1'
+
+; Load "fields" file to get "global" field name
+readcol,dir+'fields',shnames,lnames,format='A,A',/silent
+globalfield = lnames[0]
+
+print,'Getting completeness function for ',globalfield,' in ',dir+field
+print,'------------------------------------------------------------'
+
 
 ;origfile = 'F2-00423049_01.phot'
 ;orig = IMPORTASCII(dir+'F2/'+origfile,/header)
@@ -43,7 +51,8 @@ nfinal = n_elements(final)
 
 fakestr = MRDFITS(dir+field+'/'+field+'-fakestr.fits',1,/silent)
 ;fakestr = MRDFITS(dir+'F2/F2-fakestr.fits',1,/silent)
-mchfile = dir+'F2/F2T1-00423049_01.mch'
+mchfile = file_search(dir+field+'/'+field+fakefield+'-*_01.mch',count=nmchfile)
+;mchfile = dir+'F2/F2T1-00423049_01.mch'
 loadmch,mchfile,mchlines
 ; put the FAKESTR elements in the right order
 MATCH,file_basename(mchlines,'.als'),file_basename(fakestr.fake_fits,'.fits'),ind1,ind2,/sort
