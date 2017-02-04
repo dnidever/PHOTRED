@@ -1,8 +1,25 @@
-pro addfakes
+pro addfakes,field,dir=dir,fakefield=fakefield
 
 ; Add artificial stars to a set of images for a given field
 
-dir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/Field100/'
+; Not enough inputs
+if n_elements(field) eq 0 then begin
+  print,'Syntax - addfakes,field,dir=dir,fakefield=fakefield'
+  return
+endif
+
+fakedir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/'
+
+; Defaults
+if n_elements(dir) eq 0 then begin
+  cd,current=dir
+  dir = dir+'/'
+endif
+;field = 'F2'
+if n_elements(fakefield) eq 0 then fakefield = 'T1'
+
+print,'Adding artificial stars to files in ',dir
+print,'-----------------------------------------------------------'
 
 ; Get list of artifical stars with the right bands
 ;synth0 = IMPORTASCII(dir+'CMD_field100',/header)
@@ -27,7 +44,7 @@ synth.g = randomu(seed,nsynth)*range(g_range)+g_range[0]
 synth.i = synth.g - synth_gi
 
 ; Use the stellar locus to get the other three bands.
-restore,dir+'Field100_stellarlocus.dat'
+restore,fakedir+'Field100_stellarlocus.dat'
 ; interpolate the stellar locus to get the other bands
 INTERP,tstr.gibin,tstr.ui,synth.g-synth.i,ui
 synth.u = ui + synth.i
@@ -37,7 +54,12 @@ INTERP,tstr.gibin,tstr.zi,synth.g-synth.i,zi
 synth.z = zi + synth.i
 
 ; Get the images
-files = file_search(dir+'F2/F2-*_??.fits',count=nfiles)
+files = file_search(dir+field+'/'+field+'-*_??.fits',count=nfiles)
+print,'Found ',strtrim(nfiles,2),' files to add artificial stars to'
+if nfiles eq 0 then begin
+  print,'No files found'
+  return
+endif
 ; Get the info for the files
 PHOTRED_GATHERFILEINFO,files,filestr
 add_tag,filestr,'dir','',filestr
@@ -199,7 +221,8 @@ For i=0,nfiles-1 do begin
 
   ; Use daophot_addstar. pro to add artificial stars
   infile = filestr[i].dir+'/'+filestr[i].base
-  fname = filestr[i].field+'T1'
+  fname = filestr[i].field+fakefield
+  ;fname = filestr[i].field+'T1'
   outfile = filestr[i].dir+'/'+fname+'-'+filestr[i].expnum+'_'+string(filestr[i].chip,format='(i02)')+'.fits'
   print,'Adding ',strtrim(nind2,2),' artificial stars to ',file_basename(outfile)
   DAOPHOT_ADDSTAR,infile,addcat,outfile,/clobber
@@ -241,7 +264,8 @@ Endfor
 ; Get unique list of artificial stars input
 ui = uniq(allsynth.id,sort(allsynth.id))
 allsynth = allsynth[ui]
-outsynthfile = dir+'F2/F2T1-input.fits'
+outsynthfile = dir+field+'/'+field+fakefield+'-input.fits'
+;outsynthfile = dir+'F2/F2T1-input.fits'
 print,'Saving artificial star list to ',outsynthfile
 MWRFITS,allsynth,outsynthfile,/create
 
@@ -252,24 +276,29 @@ fmt = '(A-'+strtrim(maxlen+3,2)+',F12.8)'
 writecol,dir+'apcor.lst',file_basename(fakestr.fake_fits,'.fits')+'a.del',fakestr.apcor,fmt=fmt
 
 ; Save the FAKESTR structure
-outfakestr = dir+'F2/F2-fakestr.fits'
+outfakestr = dir+field+'/'+field+'-fakestr.fits'
+;outfakestr = dir+'F2/F2-fakestr.fits'
 print,'Saving FAKESTR to ',outfakestr
 MWRFITS,fakestr,outfakestr,/create
 
 ; Create new MCH files and symlinks for the combined files
-mchfiles = file_search(dir+'F2/F2-*_??.mch',count=nmchfiles)
+mchfiles = file_search(dir+field+'/'+field+'-*_??.mch',count=nmchfiles)
+;mchfiles = file_search(dir+'F2/F2-*_??.mch',count=nmchfiles)
 for i=0,nmchfiles-1 do begin
   mchfile = mchfiles[i]
   mchdir = file_dirname(mchfile)
   mchbase = file_basename(mchfile,'.mch')
-  newmchfile = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')+'.mch'
+  newmchfile = mchdir+'/'+repstr(mchbase,field+'-',field+fakefield+'-')+'.mch'
+  ;newmchfile = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')+'.mch'
   READLINE,mchfile,mchlines
-  mchlines2 = repstr(mchlines,"'F2-","'F2T1-")
+  mchlines2 = repstr(mchlines,"'"+field+"-","'"+field+fakefield+"-")
+  ;mchlines2 = repstr(mchlines,"'F2-","'F2T1-")
   WRITELINE,newmchfile,mchlines2
 
   ; Need weights, .scale, .zero, _comb.psf, _shift.mch, .mag
   origbase = mchdir+'/'+mchbase
-  newbase = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')
+  newbase = mchdir+'/'+repstr(mchbase,field+'-',field+fakefield+'-')
+  ;newbase = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')
   FILE_LINK,origbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag'],$
             newbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag']
 endfor

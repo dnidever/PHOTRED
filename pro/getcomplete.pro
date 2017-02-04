@@ -1,4 +1,4 @@
-pro getcomplete
+pro getcomplete,field,dir=dir
 
 ; Figure out completeness from artificial stars
 
@@ -8,20 +8,41 @@ pro getcomplete
 
 resolve_routine,'photcalib',/compile_full_file
 
-dir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/Field100/'
-field = 'Field100'
+fakedir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/'
 
-origfile = 'F2-00423049_01.phot'
-orig = IMPORTASCII(dir+'F2/'+origfile,/header)
+; Not enough inputs
+if n_elements(field) eq 0 then begin
+  print,'Syntax - getcomplete,field,dir=dir'
+  return
+endif
+
+if n_elements(dir) eq 0 then begin
+  cd,current=dir
+  dir = dir+'/'
+endif
+
+globalfield = 'Field100'
+;field = 'F2'
+fakefield = 'T1'
+
+;origfile = 'F2-00423049_01.phot'
+;orig = IMPORTASCII(dir+'F2/'+origfile,/header)
+origfile = file_search(dir+field+'/'+field+'-*_01.phot',count=norigfile)
+orig = IMPORTASCII(origfile,/header)
 norig = n_elements(orig)
-synthfile = 'F2T1-input.fits'
-synth = MRDFITS(dir+'F2/'+synthfile,1,/silent)
+synthfile = field+fakefield+'-input.fits'
+;synthfile = 'F2T1-input.fits'
+synth = MRDFITS(dir+field+'/'+synthfile,1,/silent)
+;synth = MRDFITS(dir+'F2/'+synthfile,1,/silent)
 nsynth = n_elements(synth)
-finalfile = 'F2T1-00423049_01.ast'
-final = IMPORTASCII(dir+'F2/'+finalfile,/header)
+;finalfile = 'F2T1-00423049_01.ast'
+;final = IMPORTASCII(dir+'F2/'+finalfile,/header)
+finalfile = file_search(dir+field+'/'+field+fakefield+'-*_01.ast',count=norigfile)
+final = IMPORTASCII(finalfile,/header)
 nfinal = n_elements(final)
 
-fakestr = MRDFITS(dir+'F2/F2-fakestr.fits',1,/silent)
+fakestr = MRDFITS(dir+field+'/'+field+'-fakestr.fits',1,/silent)
+;fakestr = MRDFITS(dir+'F2/F2-fakestr.fits',1,/silent)
 mchfile = dir+'F2/F2T1-00423049_01.mch'
 loadmch,mchfile,mchlines
 ; put the FAKESTR elements in the right order
@@ -30,7 +51,7 @@ fakestr = fakestr[ind2]
 
 ; Load the final transformation equations for this field
 reduxdir = smashred_rootdir()+'cp/red/photred/'
-chstr = mrdfits(reduxdir+'catalogs/final/v4/'+field+'_combined_chips.fits.gz',1,/silent)
+chstr = mrdfits(reduxdir+'catalogs/final/v4/'+globalfield+'_combined_chips.fits.gz',1,/silent)
 
 ; Get the information we need for our 
 add_tag,fakestr,'photometric',0B,fakestr
@@ -205,7 +226,7 @@ if nastmatch lt nsynth then begin
 endif
 
 ; Write out the final file
-outcombfile = dir+field+'_complete.fits'
+outcombfile = dir+globalfield+'_complete.fits'
 print,'Writing final catalog to ',outcombfile
 MWRFITS,comb,outcombfile,/create
 spawn,['gzip',outcombfile],/noshell
@@ -222,36 +243,37 @@ hess,comb[gdrecover].ast_g-comb[gdrecover].ast_i,comb[gdrecover].ast_g,dum,imrec
 ;displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness'
 
 ; Make some figures
+if file_test(dir+'plots/',/directory) eq 0 then file_mkdir,dir+'plots/'
 setdisp
 ;loadcol,3
 !p.font = 0
 ; Input ASTS
-file = dir+'plots/'+field+'_input'
+file = dir+'plots/'+globalfield+'_input'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+field,charsize=1.3
+displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Recovered
-file = dir+'plots/'+field+'_recovered'
+file = dir+'plots/'+globalfield+'_recovered'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+field,charsize=1.3
+displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Completeness
-file = dir+'plots/'+field+'_completeness'
+file = dir+'plots/'+globalfield+'_completeness'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+field,charsize=1.3
+displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Combine the figures
-pdffiles = dir+'/plots/'+field+'_'+['input','recovered','completeness']+'.pdf'
-spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+dir+'/plots/'+field+'_complete.pdf '+strjoin(pdffiles,' ')
+pdffiles = dir+'/plots/'+globalfield+'_'+['input','recovered','completeness']+'.pdf'
+spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+dir+'/plots/'+globalfield+'_complete.pdf '+strjoin(pdffiles,' ')
 
 
 stop
