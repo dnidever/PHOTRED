@@ -9,6 +9,7 @@ if n_elements(field) eq 0 then begin
 endif
 
 fakedir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/'
+rootdir = smashred_rootdir()+'cp/red/photred/'
 
 ; Defaults
 if n_elements(dir) eq 0 then begin
@@ -18,8 +19,13 @@ endif
 ;field = 'F2'
 if n_elements(fakefield) eq 0 then fakefield = 'T1'
 
-print,'Adding artificial stars to files in ',dir
-print,'-----------------------------------------------------------'
+; Get the "global" field name from the "fields" file
+readcol,dir+'fields',shname,lname,format='A,A',/silent
+gshname = where(shname eq field,ngshname)
+globalfield = lname[gshname[0]]
+
+print,'Adding artificial stars to ',globalfield,' files in ',dir
+print,'----------------------------------------------------------------'
 
 ; Get list of artifical stars with the right bands
 ;synth0 = IMPORTASCII(dir+'CMD_field100',/header)
@@ -87,11 +93,15 @@ endfor
 ; CAN'T I GET ALL OF THIS FROM THE FINAL PHOTRED SUMMARY FILE???
 
 ; Load the photometric transformation information
-transfile = smashred_rootdir()+'cp/red/photred/stdred/smashred_transphot_eqns.fits'
-trans_fitstr = MRDFITS(transfile,1,/silent)
-trans_chipstr = MRDFITS(transfile,2,/silent)
-trans_ntstr = MRDFITS(transfile,3,/silent)
-trans_mjdchipfilt = strtrim(trans_fitstr.mjd,2)+'-'+strtrim(trans_fitstr.chip,2)+'-'+strtrim(trans_fitstr.filter,2)
+;transfile = smashred_rootdir()+'cp/red/photred/stdred/smashred_transphot_eqns.fits'
+;trans_fitstr = MRDFITS(transfile,1,/silent)
+;trans_chipstr = MRDFITS(transfile,2,/silent)
+;trans_ntstr = MRDFITS(transfile,3,/silent)
+;trans_mjdchipfilt = strtrim(trans_fitstr.mjd,2)+'-'+strtrim(trans_fitstr.chip,2)+'-'+strtrim(trans_fitstr.filter,2)
+
+; Load the CHIPS structure with the transformation equations
+chstr = mrdfits(rootdir+'catalogs/final/v5/'+globalfield+'_combined_chips.fits.gz',1,/silent)
+chstr.base = strtrim(chstr.base,2)
 
 ; Transfer the transformation info
 add_tag,filestr,'colband','',filestr
@@ -99,15 +109,24 @@ add_tag,filestr,'colsign',0,filestr
 add_tag,filestr,'zpterm',0.0,filestr
 add_tag,filestr,'amterm',0.0,filestr
 add_tag,filestr,'colterm',0.0,filestr
-for i=0,nfiles-1 do begin
-  mjdchipfilt = strtrim(filestr[i].mjd,2)+'-'+strtrim(filestr[i].chip,2)+'-'+strtrim(filestr[i].filter,2)  
-  MATCH,trans_mjdchipfilt,mjdchipfilt,tind1,tind2,/sort,count=ntmatch
-  filestr[i].colband = trans_fitstr[tind1[0]].colband
-  filestr[i].colsign = trans_fitstr[tind1[0]].colsign
-  filestr[i].zpterm = trans_fitstr[tind1[0]].zpterm
-  filestr[i].amterm = trans_fitstr[tind1[0]].amterm
-  filestr[i].colterm = trans_fitstr[tind1[0]].colterm
-endfor
+MATCH,chstr.expnum+'_'+string(chstr.chip,format='(i02)'),filestr.expnum+'_'+string(filestr.chip,format='(i02)'),ind1,ind2,/sort,count=nmatch
+filestr[ind2].colband = chstr[ind1].colband
+filestr[ind2].colsign = chstr[ind1].colsign
+filestr[ind2].zpterm = chstr[ind1].zpterm
+filestr[ind2].amterm = chstr[ind1].amterm
+filestr[ind2].colterm = chstr[ind1].colterm
+; it's mainly ZPTERM that will be different between the
+; TRANS_FITSTR and CHSTR
+
+;for i=0,nfiles-1 do begin
+;  mjdchipfilt = strtrim(filestr[i].mjd,2)+'-'+strtrim(filestr[i].chip,2)+'-'+strtrim(filestr[i].filter,2)  
+;  MATCH,trans_mjdchipfilt,mjdchipfilt,tind1,tind2,/sort,count=ntmatch
+;  filestr[i].colband = trans_fitstr[tind1[0]].colband
+;  filestr[i].colsign = trans_fitstr[tind1[0]].colsign
+;  filestr[i].zpterm = trans_fitstr[tind1[0]].zpterm
+;  filestr[i].amterm = trans_fitstr[tind1[0]].amterm
+;  filestr[i].colterm = trans_fitstr[tind1[0]].colterm
+;endfor
 
 ; Load the aperture correction file
 apcorfile = dir+'apcor.lst.orig'

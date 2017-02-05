@@ -60,7 +60,7 @@ fakestr = fakestr[ind2]
 
 ; Load the final transformation equations for this field
 reduxdir = smashred_rootdir()+'cp/red/photred/'
-chstr = mrdfits(reduxdir+'catalogs/final/v4/'+globalfield+'_combined_chips.fits.gz',1,/silent)
+chstr = mrdfits(reduxdir+'catalogs/final/v5/'+globalfield+'_combined_chips.fits.gz',1,/silent)
 
 ; Get the information we need for our 
 add_tag,fakestr,'photometric',0B,fakestr
@@ -93,7 +93,7 @@ fakestr[ind1].photometric = chstr[ind2].photometric
 ;fakestr[ind1].amcoltermsig = chstr[ind2].amcoltermsig
 ;fakestr[ind1].colsqterm = chstr[ind2].colsqterm
 ;fakestr[ind1].colsqtermsig = chstr[ind2].colsqtermsig
-; MOST OF THESE ALREADY IN FAKESTR FROM WHEN THE CALIBRATED
+; MOST OF THESE ARE ALREADY IN FAKESTR FROM WHEN THE CALIBRATED
 ; SYNTH MAGNITUDES WERE CONVERTED TO INSTRUMENTAL ONES!!!
 
 ; Need to properly calibrate to get REAL magnitudes.

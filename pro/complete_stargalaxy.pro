@@ -22,6 +22,9 @@ gdstars = where(abs(obj.sharp) lt 1 and obj.chi lt 2 and obj.prob gt 0.2 and $
                 obj.ndet gt 5,ngdstars)
 obj = obj[gdstars]
 
+; I NEED TO INPUT THE *ACTUAL* CATALOG SO THAT IT GET'S USED TO
+; DEFINE THE CUTS!!!
+
 ;; Morphology cuts
 smashred_morphcuts,obj,ind1,nsig=3
 obj1 = obj[ind1]
@@ -33,17 +36,18 @@ obj2 = obj1[ind2]
 
 ; YEP, THAT CUT OUT ABOUT 25% OF THE STARS
 
-stop
+;stop
 
 ; Figure out the completeness                                                                                                                      
 gdall = where(comb.ast eq 1,ngdall)
-gdrecover = where(comb.ast eq 1 and comb.recovered eq 1,ngdrecover)
+;gdrecover = where(comb.ast eq 1 and comb.recovered eq 1,ngdrecover)
 dx = 0.2
 dy = 0.4
 xr = [-1,3.5]
 yr = [17.0,27.0]
 hess,comb[gdall].ast_g-comb[gdall].ast_i,comb[gdall].ast_g,dum,imall,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
-hess,comb[gdrecover].ast_g-comb[gdrecover].ast_i,comb[gdrecover].ast_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+hess,obj2.ast_g-obj2.ast_i,obj2.ast_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+;hess,comb[gdrecover].ast_g-comb[gdrecover].ast_i,comb[gdrecover].ast_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
 ;displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness'                                                           
 
 ; Make some figures                                                                                                                                
@@ -51,15 +55,15 @@ setdisp
 ;loadcol,3                                                                                                                                         
 !p.font = 0
 ; Input ASTS                                                                                                                                       
-file = dir+'plots/'+field+'_input'
-ps_open,file,/color,thick=4,/encap
-device,/inches,xsize=8.5,ysize=10.5
-displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+field,charsize=1.3
-ps_close
-ps2png,file+'.eps',/eps
-spawn,['epstopdf',file+'.eps'],/noshell
-; Recovered                                                                                                                                        
-file = dir+'plots/'+field+'_recovered'
+;file = dir+'plots/'+field+'_input'
+;ps_open,file,/color,thick=4,/encap
+;device,/inches,xsize=8.5,ysize=10.5
+;displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+field,charsize=1.3
+;ps_close
+;ps2png,file+'.eps',/eps
+;spawn,['epstopdf',file+'.eps'],/noshell
+;; Recovered                                                                                                                                        
+file = dir+'plots/'+field+'_stars_recovered'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
 displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+field,charsize=1.3
@@ -67,7 +71,7 @@ ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Completeness                                                                                                                                     
-file = dir+'plots/'+field+'_completeness'
+file = dir+'plots/'+field+'_stars_completeness'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
 displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+field,charsize=1.3
@@ -75,8 +79,8 @@ ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Combine the figures                                                                                                                              
-pdffiles = dir+'/plots/'+field+'_'+['input','recovered','completeness']+'.pdf'
-spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+dir+'/plots/'+field+'_complete.pdf '+strjoin(pdffiles,' ')
+;pdffiles = dir+'/plots/'+field+'_'+['input','recovered','completeness']+'.pdf'
+;spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+dir+'/plots/'+field+'_complete.pdf '+strjoin(pdffiles,' ')
 
 
 stop
