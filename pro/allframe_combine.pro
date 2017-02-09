@@ -178,7 +178,7 @@ nfiles = n_elements(files)
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
   ; weights, scale, zero, comb_psf, _shift.mch
-  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf']
+  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch']
   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
   if nbdfiles gt 0 then begin
     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
@@ -505,73 +505,80 @@ ENDCASE
 
 
 ; Creating new MCH file for the combined file
-print,'Deriving new transformation equations for the resampled coordinate system'
-for i=0,nfiles-1 do begin
+if not keyword_set(fake) then begin
+  print,'Deriving new transformation equations for the resampled coordinate system'
+  for i=0,nfiles-1 do begin
 
-  ; Convert X/Y of this system into the combined reference frame
-  ;  The pixel values are 1-indexed like DAOPHOT uses.
-  ngridbin = 50
-  nxgrid = filestr[i].nx / ngridbin
-  nygrid = filestr[i].ny / ngridbin
-  xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid)
-  ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1)
-  HEAD_XYAD,(*filestr[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
-  HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
-  refxgrid += 1  ; convert 0-indexed to 1-indexed
-  refygrid += 1
+    ; Convert X/Y of this system into the combined reference frame
+    ;  The pixel values are 1-indexed like DAOPHOT uses.
+    ngridbin = 50
+    nxgrid = filestr[i].nx / ngridbin
+    nygrid = filestr[i].ny / ngridbin
+    xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid)
+    ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1)
+    HEAD_XYAD,(*filestr[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
+    HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
+    refxgrid += 1  ; convert 0-indexed to 1-indexed
+    refygrid += 1
 
-  ; Now fit the transformation
-  xdiff = refxgrid-xgrid
-  ydiff = refygrid-ygrid
-  xmed = median([xdiff],/even)
-  ymed = median([ydiff],/even)
-  ; Fit rotation with linear fits if enough points
-  coef1 = robust_poly_fitq(ygrid,xdiff,1)  ; fit rotation term
-  coef1b = dln_poly_fit(ygrid,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap)
-  coef2 = robust_poly_fitq(xgrid,ydiff,1)  ; fit rotation term
-  coef2b = dln_poly_fit(xgrid,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err,/bootstrap)
-  ;theta = mean([-coef1[1],coef2[1]])
-  WMEANERR,[-coef1[1],coef2[1]],[coef1err[1],coef2err[1]],theta,thetaerr
+    ; Now fit the transformation
+    xdiff = refxgrid-xgrid
+    ydiff = refygrid-ygrid
+    xmed = median([xdiff],/even)
+    ymed = median([ydiff],/even)
+    ; Fit rotation with linear fits if enough points
+    coef1 = robust_poly_fitq(ygrid,xdiff,1)  ; fit rotation term
+    coef1b = dln_poly_fit(ygrid,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap)
+    coef2 = robust_poly_fitq(xgrid,ydiff,1)  ; fit rotation term
+    coef2b = dln_poly_fit(xgrid,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err,/bootstrap)
+    ;theta = mean([-coef1[1],coef2[1]])
+    WMEANERR,[-coef1[1],coef2[1]],[coef1err[1],coef2err[1]],theta,thetaerr
 
-  ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
-  ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-  trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
-  ; Adjust Xoff, Yoff with this transformation
-  xyout = trans_coo(xgrid,ygrid,trans)
-  trans[0] += median([refxgrid - xyout[0,*]],/even) 
-  trans[1] += median([refygrid - xyout[1,*]],/even)
+    ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
+    ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
+    trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
+    ; Adjust Xoff, Yoff with this transformation
+    xyout = trans_coo(xgrid,ygrid,trans)
+    trans[0] += median([refxgrid - xyout[0,*]],/even) 
+    trans[1] += median([refygrid - xyout[1,*]],/even)
 
-  ; Fit full six parameters if there are enough stars
-  fa = {x1:(refxgrid)(*),y1:(refygrid)(*),x2:(xgrid)(*),y2:(ygrid)(*)}
-  initpar = trans
-  fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
-               bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
-  trans = fpar
+    ; Fit full six parameters if there are enough stars
+    fa = {x1:(refxgrid)(*),y1:(refygrid)(*),x2:(xgrid)(*),y2:(ygrid)(*)}
+    initpar = trans
+    fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
+                 bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
+    trans = fpar
 
-  diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid)
-  rms = sqrt(mean(diff^2.))
-  filestr[i].resamptrans = trans
-  filestr[i].resamptransrms = rms
+    diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid)
+    rms = sqrt(mean(diff^2.))
+    filestr[i].resamptrans = trans
+    filestr[i].resamptransrms = rms
 
-  ; The output is:
-  ; filename, xshift, yshift, 4 trans, mag offset, magoff sigma
-  format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)'
-  ; In daomaster.f the translations are 10 digits with at most 4
-  ; decimal places (with a leading space), the transformation
-  ; coefficients are 12 digits with at most 9 decimal places.
-  ; Need a leading space to separate the numbers.
-  strans = ' '+[strtrim(string(trans[0:1],format='(F30.4)'),2),$
-               strtrim(string(trans[2:5],format='(F30.9)'),2)]
-  newline = STRING("'",filestr[i].catfile,"'", strans, filestr[i].magoff[0], rms, format=format)
-  PUSH,mchfinal,newline
+    ; The output is:
+    ; filename, xshift, yshift, 4 trans, mag offset, magoff sigma
+    format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)'
+    ; In daomaster.f the translations are 10 digits with at most 4
+    ; decimal places (with a leading space), the transformation
+    ; coefficients are 12 digits with at most 9 decimal places.
+    ; Need a leading space to separate the numbers.
+    strans = ' '+[strtrim(string(trans[0:1],format='(F30.4)'),2),$
+                 strtrim(string(trans[2:5],format='(F30.9)'),2)]
+    newline = STRING("'",filestr[i].catfile,"'", strans, filestr[i].magoff[0], rms, format=format)
+    PUSH,mchfinal,newline
 
-  ; Printing the transformation
-  printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms
-endfor
-; Write to the new MCH file
-combmch = mchbase+'_comb.mch'
-WRITELINE,combmch,mchfinal
+    ; Printing the transformation
+    printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms
+  endfor
+  ; Write to the new MCH file
+  combmch = mchbase+'_comb.mch'
+  WRITELINE,combmch,mchfinal
 
+; FAKE, use existing one
+endif else begin
+  combmch = mchbase+'_comb.mch'
+  ; don't need to load the information
+endelse
+  
 
 ;###########################################
 ; STEP 5: COMBINE IMAGES
