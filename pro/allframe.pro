@@ -278,7 +278,7 @@ if keyword_set(fake) then begin
   ; weights, scale, zero, comb_psf, _shift.mch
   if keyword_set(cmborig) then $
     chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch'] else $
-    chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf']
+    chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch']
   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
   if nbdfiles gt 0 then begin
     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')

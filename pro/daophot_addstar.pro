@@ -19,6 +19,7 @@
 ;  /nonoise  Don't any Poisson noise to the image, by default ADDSTAR adds Poisson noise.
 ;  /clobber  Delete the output file if it already exists.
 ;  /silent   Don't print anything to the screen.
+;  /stp      Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The artificial stars are added to an image.  By default, they are
@@ -32,14 +33,14 @@
 ; By D.Nidever  March 2016
 ;-
 
-pro daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent
+pro daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent,stp=stp
 
 undefine,error
 
 ; Do we have enough inputs
 if n_elements(filebase) eq 0 or n_elements(cat) eq 0 or n_elements(outfile) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent'
+  print,'Syntax - daophot_addstar,filebase,cat,outfile,blank=blank,nonoise=nonoise,clobber=clobber,error=error,silent=silent,stp=stp'
   return
 endif
 
@@ -256,6 +257,6 @@ if errout ne '' then begin
   return
 endif
 
-;stop
+if keyword_set(stp) then stop
 
 end

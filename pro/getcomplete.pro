@@ -167,13 +167,20 @@ filters = ['u','g','r','i','z']
 nfilters = n_elements(filters)
 for i=0,nfilters-1 do begin
   ind = where(trans.band eq filters[i],nind)
-  AVERAGEMAG,outmag[*,ind],outerr[*,ind],avgmag,avgerr,/robust
+  if nind gt 1 then begin
+    AVERAGEMAG,outmag[*,ind],outerr[*,ind],avgmag,avgerr,/robust
+    ndet = total(outmag[*,ind] lt 50,2)
+  endif else begin
+    avgmag = reform(outmag[*,ind])
+    avgerr = reform(outerr[*,ind])
+    ndet = long(avgmag lt 50)
+  endelse
   magind = where(otags eq strupcase(filters[i]),nmagind)
   errind = where(otags eq strupcase(filters[i])+'ERR',nerrind)
   detind = where(otags eq 'NDET'+strupcase(filters[i]),ndetind)
   obj.(magind) = avgmag
   obj.(errind) = avgerr
-  obj.(detind) = total(outmag[*,ind] lt 50,2)
+  obj.(detind) = ndet
   obj.ndet += obj.(detind)
 endfor
 

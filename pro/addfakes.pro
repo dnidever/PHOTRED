@@ -318,8 +318,16 @@ for i=0,nmchfiles-1 do begin
   origbase = mchdir+'/'+mchbase
   newbase = mchdir+'/'+repstr(mchbase,field+'-',field+fakefield+'-')
   ;newbase = mchdir+'/'+repstr(mchbase,'F2-','F2T1-')
-  FILE_LINK,origbase+['.weights','.scale','.zero','_comb.psf','_comb.mch','_comb.opt','_comb.als.opt','_shift.mch','.mag'],$
-            newbase+['.weights','.scale','.zero','_comb.psf','_comb.mch','_comb.opt','_comb.als.opt','_shift.mch','.mag'],/allow
+  FILE_LINK,origbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag'],$
+            newbase+['.weights','.scale','.zero','_comb.psf','_comb.opt','_comb.als.opt','_shift.mch','.mag'],/allow
+
+  ; Copy _comb.mch file (if it exists) and rename the files inside of it
+  if file_test(origbase+'_comb.mch') eq 1 then begin
+    READLINE,origbase+'_comb.mch',combmchlines
+    combmchlines2 = repstr(combmchlines,field+'-',field+fakefield+'-')
+    WRITELINE,newbase+'_comb.mch',combmchlines2
+  endif
+
 endfor
 
 ;stop
