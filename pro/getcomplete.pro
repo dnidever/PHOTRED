@@ -32,19 +32,27 @@ globalfield = lnames[0]
 print,'Getting completeness function for ',globalfield,' in ',dir+field
 print,'------------------------------------------------------------'
 
-
+; Load the ORIG file
 ;origfile = 'F2-00423049_01.phot'
 ;orig = IMPORTASCII(dir+'F2/'+origfile,/header)
 origfile = file_search(dir+field+'/'+field+'-*_01.phot',count=norigfile)
 orig = IMPORTASCII(origfile,/header,/silent)
 norig = n_elements(orig)
 print,'NORIG = ',strtrim(norig,2)
+; add magnitude columns that might be missing
+if tag_exist(orig,'UMAG') eq 0 then add_tag,orig,'UMAG',99.99,orig
+if tag_exist(orig,'GMAG') eq 0 then add_tag,orig,'GMAG',99.99,orig
+if tag_exist(orig,'RMAG') eq 0 then add_tag,orig,'RMAG',99.99,orig
+if tag_exist(orig,'IMAG') eq 0 then add_tag,orig,'IMAG',99.99,orig
+if tag_exist(orig,'ZMAG') eq 0 then add_tag,orig,'ZMAG',99.99,orig
+; LOAD the SYNTH file
 synthfile = field+fakefield+'-input.fits'
 ;synthfile = 'F2T1-input.fits'
 synth = MRDFITS(dir+field+'/'+synthfile,1,/silent)
 ;synth = MRDFITS(dir+'F2/'+synthfile,1,/silent)
 nsynth = n_elements(synth)
 print,'NSYNTH = ',strtrim(nsynth,2)
+; LOAD the FINAL file
 ;finalfile = 'F2T1-00423049_01.ast'
 ;final = IMPORTASCII(dir+'F2/'+finalfile,/header)
 finalfile = file_search(dir+field+'/'+field+fakefield+'-*_01.ast',count=norigfile)
