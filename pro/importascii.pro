@@ -435,11 +435,10 @@ IF not keyword_set(allfloat) THEN BEGIN
   ;ddd = execute(cmd)
   ;str = replicate(dum,nrow)
 
-  dum = CREATE_STRUCT(fieldnames[0],fix(0,type=typearr[0]))
+  dum = CREATE_STRUCT(fieldnames[0],fix('',type=typearr[0]))
   for i=1,ncol-1 do $
-    dum = CREATE_STRUCT(dum,fieldnames[i],fix(0,type=typearr[i]))
+    dum = CREATE_STRUCT(dum,fieldnames[i],fix('',type=typearr[i]))
   str = replicate(dum,nrow)
-
 
   ; Transferring the data
   ;STRUCT_ASSIGN does NOT work here
@@ -459,7 +458,7 @@ IF not keyword_set(allfloat) THEN BEGIN
       col = strtrim(reform(str.(i)),2)
       ;bd = where(col eq 'INDEF' or col eq "'INDEF'",nbd)
       ;if nbd gt 0 then str(bd).(i) = '999999'
-      bd = where(col eq 'INDEF' or col eq "'INDEF'" or col eq 'null',nbd)
+      bd = where(col eq 'INDEF' or col eq "'INDEF'" or col eq 'null',nbd)      
       if nbd gt 0 then str[bd].(i) = 'NAN'
       nbad = nbad + nbd
     endfor
@@ -507,16 +506,32 @@ IF not keyword_set(allfloat) THEN BEGIN
     ;ddd = execute(cmd)
     ;arr = replicate(dum,nrow)
 
-    dum = CREATE_STRUCT(fieldnames[0],fix(0,type=typearr[0]))
+    dum = CREATE_STRUCT(fieldnames[0],fix('',type=typearr[0]))
     for i=1,ncol-1 do $
-      dum = CREATE_STRUCT(dum,fieldnames[i],fix(0,type=typearr[i]))
+      dum = CREATE_STRUCT(dum,fieldnames[i],fix('',type=typearr[i]))
     arr = replicate(dum,nrow)
+
+    ; Check for missing data in floating point columns here
+    ;   harder to do that above with the INDEFs because
+    ;   we might not know the data types yet.
+    nbad2 = 0
+    for i=0,ncol-1 do begin
+      if typearr[i] eq 4 or typearr[i] eq 5 then begin
+        col = strtrim(reform(str.(i)),2)  ; STR is all strings
+        bd = where(col eq '',nbd)
+        if nbd gt 0 then str[bd].(i) = 'NAN'
+        nbad2 += nbd
+      endif
+    endfor
+    if not keyword_set(noprint) and nbad2 gt 0 then print,'Missing data converted to NAN'
 
     ; Transferring the data
     STRUCT_ASSIGN,str,arr          ; source, destination
     ;for i=0,ncol-1 do arr.(i) = str.(i)
+    ; Rename
     str = arr
- endif
+    undefine,arr
+  endif
 
 
 ; /ALLFLOAT, Using READF to read the data
