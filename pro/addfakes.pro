@@ -93,11 +93,11 @@ endfor
 ; CAN'T I GET ALL OF THIS FROM THE FINAL PHOTRED SUMMARY FILE???
 
 ; Load the photometric transformation information
-;transfile = smashred_rootdir()+'cp/red/photred/stdred/smashred_transphot_eqns.fits'
-;trans_fitstr = MRDFITS(transfile,1,/silent)
-;trans_chipstr = MRDFITS(transfile,2,/silent)
-;trans_ntstr = MRDFITS(transfile,3,/silent)
-;trans_mjdchipfilt = strtrim(trans_fitstr.mjd,2)+'-'+strtrim(trans_fitstr.chip,2)+'-'+strtrim(trans_fitstr.filter,2)
+transfile = smashred_rootdir()+'cp/red/photred/stdred/smashred_transphot_eqns.fits'
+trans_fitstr = MRDFITS(transfile,1,/silent)
+trans_chipstr = MRDFITS(transfile,2,/silent)
+trans_ntstr = MRDFITS(transfile,3,/silent)
+trans_mjdchipfilt = strtrim(trans_fitstr.mjd,2)+'-'+strtrim(trans_fitstr.chip,2)+'-'+strtrim(trans_fitstr.filter,2)
 
 ; Load the CHIPS structure with the transformation equations
 chstr = mrdfits(rootdir+'catalogs/final/v5/'+globalfield+'_combined_chips.fits.gz',1,/silent)
@@ -127,6 +127,19 @@ filestr[ind2].colterm = chstr[ind1].colterm
 ;  filestr[i].amterm = trans_fitstr[tind1[0]].amterm
 ;  filestr[i].colterm = trans_fitstr[tind1[0]].colterm
 ;endfor
+
+; For BAD exposures, just use the standard transformation equations
+bd = where(filestr.colband eq '',nbd)
+for i=0,nbd-1 do begin
+  mjdchipfilt = strtrim(filestr[bd[i]].mjd,2)+'-'+strtrim(filestr[bd[i]].chip,2)+'-'+strtrim(filestr[bd[i]].filter,2)  
+  MATCH,trans_mjdchipfilt,mjdchipfilt,tind1,tind2,/sort,count=ntmatch
+  filestr[bd[i]].colband = trans_fitstr[tind1[0]].colband
+  filestr[bd[i]].colsign = trans_fitstr[tind1[0]].colsign
+  filestr[bd[i]].zpterm = trans_fitstr[tind1[0]].zpterm
+  filestr[bd[i]].amterm = trans_fitstr[tind1[0]].amterm
+  filestr[bd[i]].colterm = trans_fitstr[tind1[0]].colterm
+endfor
+
 
 ; Load the aperture correction file
 apcorfile = dir+'apcor.lst.orig'
