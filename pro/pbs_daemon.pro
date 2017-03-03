@@ -166,8 +166,8 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
     nline = n_elements(dfout)
     ;;available = float(reform(dfarr[3,1]))
     ;available = float(reform(dfarr[2,nline-1]))
-    ;available = float(reform(dfarr[3,nline-1]))
-    available = float(reform(dfarr[2,nline-1]))
+    available = float(reform(dfarr[3,nline-1]))
+    ;available = float(reform(dfarr[2,nline-1]))
     ;available = available[0]/1000.0     ; convert to MB
     print,''
     print,strtrim(available[0],2),' MB of disk space available'
