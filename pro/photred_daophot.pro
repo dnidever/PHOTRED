@@ -120,7 +120,7 @@ if n_elements(hyperthread) eq 0 then hyperthread=0
 
 ; DAOPHOT .opt values
 daopsfva = READPAR(setup,'DAOPSFVA')
-if daopsfva eq '0' or daopsfva eq '' or daopsfva eq '-1' then undefine,daopsfva
+if daopsfva eq '' or daopsfva eq '-1' then undefine,daopsfva
 daofitradfwhm = READPAR(setup,'DAOFITRADFWHM')
 if daofitradfwhm eq '0' or daofitradfwhm eq '' or daofitradfwhm eq '-1' then undefine,daofitradfwhm
 
