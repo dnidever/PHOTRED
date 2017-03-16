@@ -56,6 +56,9 @@ endif
 
 file = reform(out[0])
 
+; Make sure it's readable, change permissions to 644
+FILE_CHMOD,file,'644'o
+
 ;stop
 
 return,file
