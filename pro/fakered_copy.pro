@@ -133,42 +133,6 @@ endif
 
 inputlines = lists.inputlines
 
-; Remove files that start with "F[1-9]" or end in _0.fits
-; *This is a final check on the entire INLIST*
-; *and is not redundant with the code above*
-bd1 = where(stregex(FILE_BASENAME(inputlines),'^F[1-9]',/boolean) eq 1,nbd1)
-if nbd1 gt 0 then begin
-  printlog,logfile,'Removed ',strtrim(nbd1,2),' files that already start with F#'
-  PUSH,bad,bd1
-end
-bd2 = where(stregex(FILE_BASENAME(inputlines),'_0.fits$',/boolean) eq 1,nbd2)
-if nbd2 gt 0 then begin
-  printlog,logfile,'Removed ',strtrim(nbd2,2),' files that end in _0.fits'
-  PUSH,bad,bd2
-endif
-nbad = n_elements(bad)
-if nbad gt 0 then begin
-  ui = uniq(bad,sort(bad))   ; want unique ones
-  ui = ui[sort(ui)]
-  bad = bad[ui]
-  nbad = n_elements(bad)
-
-  ; Update the lists
-  PUSH,failurelist,inputlines[bad]   ; add to failurelist
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
-endif
-
-nleft = ninputlines - nbad
-if (nleft gt 0) then begin
-  if nbad gt 0 then REMOVE,bad,inputlines
-  ninputlines = n_elements(inputlines)
-endif else begin
-  undefine,inputlines
-  printlog,logfile,'NO FILES TO PROCESS'
-  return
-endelse
-
 
 
 ;##########################################################
@@ -180,156 +144,6 @@ printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
 
-; Initializing arrays
-fieldarr = strarr(ninputlines)
-calibarr = intarr(ninputlines)
-stdarr = intarr(ninputlines)
-
-
-; Check that the FITS header information can be properly interpreted
-;-------------------------------------------------------------------
-printlog,logfile,'CHECKING HEADER KEYWORDS'
-headerproblem = 0
-for i=0,ninputlines-1 do begin
-
-  file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-  head = HEADFITS(file)
-  com=''
-
-  ; Checking GAIN
-  gain = PHOTRED_GETGAIN(file)
-  if gain le 0.0 then com=com+' GAIN ERROR,'
-
-  ; Checking READNOISE
-  rdnoise = PHOTRED_GETRDNOISE(file)
-  if rdnoise le 0.0 then com=com+' READNOISE ERROR,'
-
-  ; Checking UT-TIME
-  uttime = PHOTRED_GETUTTIME(file)
-  if (uttime eq '') then com=com+' UT-TIME ERROR,'
-
-  ; Checking FILTER
-  filter = SXPAR(head,'FILTER',count=nfilter,/silent)
-  if (nfilter eq 0) then com=com+' FILTER ERROR,'
-
-  ; Checking EXPTIME
-  exptime = SXPAR(head,'EXPTIME',count=nexptime,/silent)
-  if (nexptime eq 0) then com=com+' EXPTIME ERROR,'
-
-  ; Checking RA
-  ra = SXPAR(head,'RA',count=nra,/silent)
-  if nra eq 0 then ra = SXPAR(head,'CRVAL1',count=nra,/silent)
-  if (nra eq 0) then com=com+' RA ERROR,'
-
-  ; Checking DEC
-  dec = SXPAR(head,'DEC',count=ndec,/silent)
-  if ndec eq 0 then dec = SXPAR(head,'CRVAL2',count=ndec,/silent)
-  if (ndec eq 0) then com=com+' DEC ERROR,'
-
-  ; Checking DATE
-  date = PHOTRED_GETDATE(file)
-  if (date eq '') then com=com+' DATE ERROR,'
-
-  ; Checking AIRMASS
-  airmass = PHOTRED_GETAIRMASS(file,obs=observatory,/update)
-  if (airmass lt 0.9) then com=com+' AIRMASS ERROR'
-
-  ; There were header problems
-  if com ne '' then begin
-    printlog,logfile,base,com
-    if not keyword_set(continue_on_error) then PUSH,failurelist,file
-    headerproblem = 1
-    if not keyword_set(continue_on_error) then testing = 1
-  endif
-
-end
-
-; UPDATE the Lists
-PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
-
-
-; There were HEADER problems
-if (headerproblem eq 1) then begin
-  printlog,logfile,''
-  printlog,logfile,'HEADER KEYWORD problems.'
-  if not keyword_set(continue_on_error) then retall
-  ;printlog,logfile,'HEADER problems.  TESTING ONLY'
-  ;printlog,logfile,''
-endif else begin
-  printlog,logfile,'HEADER KEYWORDS OKAY'
-endelse
-
-
-; What is the "Object" for each frame
-;-------------------------------------
-FOR i=0,ninputlines-1 do begin
-
-  file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-
-  ; Load the header
-  head = HEADFITS(file)
-
-  object = SXPAR(head,'OBJECT',/silent)
-  field = first_el(strsplit(object,' ',/extract))
-  fieldarr[i] = field
-
-  ; zero in name?
-  zeroname = stregex(base,'zero',/fold_case,/boolean)
-  ; bias in name?
-  biasname = stregex(base,'bias',/fold_case,/boolean)
-  ; flat in name?
-  flatname = stregex(base,'flat',/fold_case,/boolean)
-
-  ; zero in object string
-  zeroobj = stregex(object,'zero',/fold_case,/boolean)
-  ; bias in object string
-  biasobj = stregex(object,'bias',/fold_case,/boolean)
-  ; flat in object string
-  flatobj = stregex(object,'flat',/fold_case,/boolean)
-  ; twilight
-  twiobj = stregex(object,'twil',/fold_case,/boolean)
-  ; sky
-  skyobj = stregex(object,'sky',/fold_case,/boolean)
-  ; pointing
-  pointobj = stregex(object,'pointing',/fold_case,/boolean)
-  ; focus
-  focusobj = stregex(object,'focus',/fold_case,/boolean)
-  ; test
-  testobj = stregex(object,'test',/fold_case,/boolean)
-
-
-  ; standard star fields
-  object2 = strcompress(object,/remove_all)  ; remove all whitespace
-  sa98 = stregex(object2,'sa98',/fold_case,/boolean) OR $
-         stregex(object2,'sa-98',/fold_case,/boolean)
-  sa110 = stregex(object2,'sa110',/fold_case,/boolean) OR $
-          stregex(object2,'sax-110',/fold_case,/boolean)
-  sa114 = stregex(object2,'sa114',/fold_case,/boolean) OR $
-          stregex(object2,'sa-114',/fold_case,/boolean)
-  n3680 = stregex(object2,'n3680',/fold_case,/boolean) OR $
-          stregex(object2,'ngc3680',/fold_case,/boolean)
-
-  ; Check for standards against standard file
-  stdfile=readpar(setup,'STDFILE')
-  if (FILE_TEST(stdfile) eq 1) then begin
-    ;readcol,stdfile,stdname,stdra,stdec,f='a,a,a',/silent
-    readcol,stdfile,stdname,f='a',/silent
-    stdcheck = max(stregex(stdname,object2,/fold_case,/boolean))
-  endif else stdcheck=0
-  ; This is a non-object frame
-  if (zeroname eq 1) or (biasname eq 1) or (flatname eq 1) or $
-     (zeroobj eq 1) or (biasobj eq 1) or (flatobj eq 1) or $
-     (twiobj eq 1) or (skyobj eq 1) or (pointobj eq 1) or $
-     (focusobj eq 1) or (testobj eq 1) then calibarr[i] = 1
-
-  ; Standard star field
-  if (sa98 eq 1) or (sa110 eq 1) or (sa114 eq 1) or $
-     (n3680 eq 1) or (stdcheck eq 1) then stdarr[i] = 1
-
-ENDFOR
 
 ; Making object fieldname list
 ;-------------------------------
@@ -502,7 +316,7 @@ FOR i=0,ninputlines-1 do begin
                       failurelist=failurelist,/silent
   ;stop
 
-END
+ENDFOR
 printlog,logfile,'-------------------------------------------------------------------------------------------------------------'
 
 
