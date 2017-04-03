@@ -92,37 +92,43 @@ endif
 
 ; Are we redoing?
 if n_elements(redo) eq 0 then begin
-  doredo = READPAR(setup,'REDO')
-  if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1 else redo=0
+  doredo = READPAR(setup,'REDO',count=ndoredo)
+  if ndoredo gt 0 and doredo ne '0' and doredo ne '' and doredo ne '-1' then redo=1
+  if ndoredo gt 0 and strtrim(doredo,2) eq '0' then redo=0
+  if ndoredo eq 0 then redo=0   ; don't redo by default
 endif
 
 ; Telescope, Instrument
-telescope = READPAR(setup,'TELESCOPE')
-instrument = READPAR(setup,'INSTRUMENT')
+telescope = READPAR(setup,'TELESCOPE',count=ntelescope)
+instrument = READPAR(setup,'INSTRUMENT',count=ninstrument)
 
 ; Are we running PSFSTARS?
-psfcomsrc = READPAR(setup,'PSFCOMSRC')
+psfcomsrc = READPAR(setup,'PSFCOMSRC',count=npsfcomsrc)
+if npsfcomsrc gt 0 and psfcomsrc ne '0' and psfcomsrc ne '' and psfcomsrc ne '-1' then psfcomsrc=1
+if npsfcomsrc gt 0 and strtrim(psfcomsrc,2) eq '0' then psfcomsrc=0
+if npsfcomsrc eq 0 then psfcomsrc=1  ; use by default
+
 if psfcomsrc ne '0' and psfcomsrc ne '' and psfcomsrc ne '-1' then psfcomsrc=1
 if strtrim(psfcomsrc,2) eq '0' then psfcomsrc=0
 if n_elements(psfcomsrc) eq 0 then psfcomsrc=1
 
 ; Global Common PSF stars?
-psfcomglobal = READPAR(setup,'PSFCOMGLOBAL')
-if psfcomglobal ne '0' and psfcomglobal ne '' and psfcomglobal ne '-1' then psfcomglobal=1
-if strtrim(psfcomglobal,2) eq '0' then psfcomglobal=0
-if n_elements(psfcomglobal) eq 0 then psfcomglobal=1
+psfcomglobal = READPAR(setup,'PSFCOMGLOBAL',count=npsfcomglobal)
+if npsfcomglobal gt 0 and psfcomglobal ne '0' and psfcomglobal ne '' and psfcomglobal ne '-1' then psfcomglobal=1
+if npsfcomglobal gt 0 and strtrim(psfcomglobal,2) eq '0' then psfcomglobal=0
+if npsfcomglobal eq 0 then psfcomglobal=1  ; use it by default
 
 ; Hyperthread?
-hyperthread = READPAR(setup,'hyperthread')
-if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
-if strtrim(hyperthread,2) eq '0' then hyperthread=0
-if n_elements(hyperthread) eq 0 then hyperthread=0
+hyperthread = READPAR(setup,'hyperthread',count=nhyperthread)
+if nhyperthread gt 0 and hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if nhyperthread gt 0 and strtrim(hyperthread,2) eq '0' then hyperthread=0
+if nhyperthread eq 0 then hyperthread=0  ; don't use by default
 
 ; DAOPHOT .opt values
-daopsfva = READPAR(setup,'DAOPSFVA')
-if daopsfva eq '' or daopsfva eq '-1' then undefine,daopsfva
-daofitradfwhm = READPAR(setup,'DAOFITRADFWHM')
-if daofitradfwhm eq '0' or daofitradfwhm eq '' or daofitradfwhm eq '-1' then undefine,daofitradfwhm
+daopsfva = READPAR(setup,'DAOPSFVA',count=ndaopsfva)
+if ndaopsfva eq 0 then undefine,daopsfva
+daofitradfwhm = READPAR(setup,'DAOFITRADFWHM',count=ndaofitradfwhm)
+if ndaofitradfwhm eq 0 then undefine,daofitradfwhm
 
 
 ;###################
