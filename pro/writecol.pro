@@ -43,7 +43,8 @@
 pro writecol, file, v1, v2, v3, v4, v5, v6, v7, v8, v9, $
               v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, $
               v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, $
-              v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, $
+              v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, $
+              v42, v43, v44, v45, v46, v47, v48, v49, v50, $
               FMT=fmt, FILNUM=filnum
 
 
@@ -51,7 +52,7 @@ pro writecol, file, v1, v2, v3, v4, v5, v6, v7, v8, v9, $
 
   if (N_params() LT 2) or n_elements(file) eq 0 then begin 
     print,'Syntax - ' + $
-             'writecol, file, v1, v2, [v3-v19] FMT=, FILNUM= '
+             'writecol, file, v1, v2, [v3-v50] FMT=, FILNUM= '
     return
   endif 
 
@@ -79,7 +80,56 @@ pro writecol, file, v1, v2, v3, v4, v5, v6, v7, v8, v9, $
 
   for i=0LL,n_elements(v1)-1 do begin
       case flgvn of 
-
+          50: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i],v46[i],v47[i],v48[i],v49[i],v50[i]
+          49: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i],v46[i],v47[i],v48[i],v49[i]
+          48: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i],v46[i],v47[i],v48[i]
+          47: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i],v46[i],v47[i]
+          46: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i],v46[i]
+          45: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i],v45[i]
+          44: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i],v44[i]
+          43: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i],v43[i]
+          42: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i],v42[i]
+          41: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
+            v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
+            v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
+            v30[i],v31[i],v32[i],v33[i],v34[i],v35[i],v36[i],v37[i],v38[i],v39[i],v40[i],$
+            v41[i]          
           40: printf, filnum, FORMAT=fmt, v1[i],v2[i],v3[i],v4[i],v5[i],v6[i],v7[i],$
             v8[i],v9[i],v10[i],v11[i],v12[i],v13[i],v14[i],v15[i],v16[i],v17[i],v18[i],$
             v19[i],v20[i],v21[i],v22[i],v23[i],v24[i],v25[i],v26[i],v27[i],v28[i],v29[i],$
