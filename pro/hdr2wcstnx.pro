@@ -18,9 +18,12 @@ function hdr2wcstnx, h, $
     ;for i=0,4 do s2 = s2 + ss2[i]
     tnx2 = parsetnx(s2)
     ccdsec  = fix(strsplit(sxpar(h,'CCDSEC',/silent), '[:,]',/ex))
+    if n_elements(ccdsec) eq 1 and ccdsec[0] eq 0 then $
+      ccdsec = [1,sxpar(h,'naxis1'),1,sxpar(h,'naxis2')]
     datasec = fix(strsplit(sxpar(h,'CCDSEC',/silent),'[:,]',/ex))
+    if n_elements(datasec) eq 1 and datasec[0] eq 0 then $
+      datasec = [1,sxpar(h,'naxis1'),1,sxpar(h,'naxis2')]
     ;datasec = fix(strsplit(sxpar(h,'DATASEC'),'[:,]',/ex))
-
     ;et = utc2et(sxpar(h,'DATE-OBS'))
 
     ; astcd - transforms nominal XY->xi,eta (coordinate xi,eta)
