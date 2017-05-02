@@ -24,7 +24,6 @@ function hdr2wcstnx, h, $
     if n_elements(datasec) eq 1 and datasec[0] eq 0 then $
       datasec = [1,sxpar(h,'naxis1'),1,sxpar(h,'naxis2')]
     ;datasec = fix(strsplit(sxpar(h,'DATASEC'),'[:,]',/ex))
-
     ;et = utc2et(sxpar(h,'DATE-OBS'))
 
     ; astcd - transforms nominal XY->xi,eta (coordinate xi,eta)

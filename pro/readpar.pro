@@ -1,5 +1,3 @@
-function readpar,array,keyword,stp=stp,error=error
-
 ;+
 ; 
 ; READPAR
@@ -19,6 +17,8 @@ function readpar,array,keyword,stp=stp,error=error
 ;            is output.  If none is found then '0' is returned.
 ;            If the keyword exists in array but has not value
 ;            then an empty string '' is returned.
+;  =count   The number of parameters found by READPAR.  count=0
+;            if the parameter was not found.
 ;  =error   The error message if there was one, else undefined
 ;
 ; USAGE:
@@ -26,6 +26,10 @@ function readpar,array,keyword,stp=stp,error=error
 ;
 ; By D. Nidever    Oct. 2007
 ;-
+
+function readpar,array,keyword,count=count,stp=stp,error=error
+
+count = 0  ; nothing until we find it
 
 ; Error Handling
 ;------------------
@@ -41,7 +45,6 @@ if (Error_status ne 0) then begin
    return,-1
 endif
 
-
 n = n_elements(array)
 if n eq 0 then return,'-1'                    ; must exist
 sz = size(array)
@@ -54,10 +57,11 @@ keyword2 = strlowcase(strtrim(keyword[0],2))
 keys = reform(array[0,*])
 values = reform(array[1,*])
 gd = where(strlowcase(keys) eq keyword2,ngd)
+count = ngd
 
 if keyword_set(stp) then stop
 
-if ngd eq 0 then return,'0'
+if count eq 0 then return,'0'
 value = strtrim(values[gd[0]],2)             ; returning the first value
 return,value
 
