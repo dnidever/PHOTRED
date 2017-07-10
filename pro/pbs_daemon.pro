@@ -23,18 +23,28 @@
 ;                 the same server.
 ;  =waittime  Time to wait between checking the running jobs.  Default
 ;                is 60 sec.
+;  /htcondor   Submit the jobs using HT Condor.
+;  /htc_idlvm  Use the IDL Virtual Machine with HT Condor.
+;  =pythonbin  The path to the PYTHON binary.
+;  =scriptsdir The directory that contains the IDL .sav files (when
+;                using the IDL Virtual Machine) and the HT Condor
+;                scripts.
 ;
 ; OUTPUTS:
 ;  Jobs are run.
+;  =jobs       The jobs structure with information about each job.
 ;
 ; USAGE:
 ;  IDL>pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti
 ;
 ; By D.Nidever   February 2008
+;    Antonio Dorta  April-July 2017,  added HT Condor support
 ;-
 
-pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
-               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir
+pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,  $
+               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir,   $
+               htcondor=htcondor, htc_idlvm=htcondor_idlvm,                 $
+               pythonbin=pythonbin, scriptsdir=scriptsdir
 
 ; How many input lines
 ninput = n_elements(input)
@@ -43,6 +53,9 @@ if ninput eq 0 then begin
   print,'                    hyperthread=hyperthread'
   return
 endif
+
+if not keyword_set(htcondor) then htcondor='0' $
+else if htcondor eq "" then htcondor='0'
 
 ; Current directory
 CD,current=curdir
@@ -128,207 +141,348 @@ print,'Nmulti=',strtrim(nmulti,2)
 ;--------
 ; DAEMON
 ;--------
-IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1)) then begin
+IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (htcondor ne '0')) then begin
 
-  ; Keep submitting jobs until nmulti is reached
-  ;
-  ; Check every minute or so to see how many jobs are still
-  ; running.  If it falls below nmulti and more jobs are left then
-  ; submit more jobs
-  ;
-  ; Don't return until all jobs are done.
+  ;-------------
+  ; HTCONDOR
+  ;-------------
+  if htcondor ne '0' then begin
 
-
-  ; Start the "jobs" structure
-  ; id will be the ID from Pleione
-  dum = {jobid:'',input:'',name:'',scriptname:'',submitted:0,done:0}
-  jobs = replicate(dum,ninput)
-  jobs.input = input
-  njobs = ninput
-
-  ; Loop until all jobs are done
-  ; On each loop check the pleione queue and figure out what to do
-  count = 0.
-  flag = 0
-  WHILE (flag eq 0) DO BEGIN
-
-    print,''
-    print,systime(0)
-
-    ; Check disk space
-    ;-----------------
-    ;SPAWN,'df -k '+dirs[0],dfout,dfouterr
-    ; Linux
-    ;SPAWN,'df -B 1M '+dirs[0],dfout,dfouterr
-    ; Mac OS X
-    SPAWN,'df -m '+dirs[0],dfout,dfouterr
-    dfarr = strsplitter(dfout,' ',/extract)
-    nline = n_elements(dfout)
-    ;;available = float(reform(dfarr[3,1]))
-    ;available = float(reform(dfarr[2,nline-1]))
-    available = float(reform(dfarr[3,nline-1]))
-    ;available = float(reform(dfarr[2,nline-1]))
-    ;available = available[0]/1000.0     ; convert to MB
-    print,''
-    print,strtrim(available[0],2),' MB of disk space available'
-    ; Not enough disk space available
-    if available[0] lt 100. then begin
-      print,'NOT enough disk space available'
+    ;---------------------------------------------------------------
+    ; Run CHECK_PYTHON.PRO to make sure that you can run PYTHON from IDL
+    ;---------------------------------------------------------------
+    CHECK_PYTHON,pythontest,pythonbin=pythonbin
+    if pythontest eq 0 then begin
+      print,'PYTHON TEST FAILED.  EXITING'
       return
     endif
 
-
-    ; Check for kill file
-    ;--------------------
-    kill = FILE_TEST('killpbs')
-    if (kill eq 1) then begin
-      sub = where(jobs.submitted eq 1 and jobs.done eq 0,nsub)
-
-      print,'Kill file found.  Killing all ',strtrim(nsub,2),' PBS job(s)'
-
-      for i=0,nsub-1 do begin
-        ; Killing the job
-        print,'Killing ',jobs[sub[i]].name,'  JobID=',jobs[sub[i]].jobid
-
-        if not keyword_set(hyperthread) then begin
-          SPAWN,'qdel '+jobs[sub[i]].jobid,out,errout
-        endif else begin
-          SPAWN,'kill -9 '+jobs[sub[i]].jobid,out,errout
-        endelse
-      end
-
-      ; Remove the kill file
-      print,'Deleting kill file "killpbs"'
-      FILE_DELETE,'killpbs',/allow,/quiet
-
-      ; Now exit
-      goto,BOMB
-
+    print,"Checking HTCondor..."
+    CHECK_PYHTCONDOR,pyhtcondortest,pythonbin=pythonbin
+    if pyhtcondortest eq 0 then begin
+      print,'HTCondor TEST FAILED.  EXITING'
+      return
     endif
 
+    if strlowcase(strmid(htcondor,0,7)) eq '#shared' then print,"Using shared directories (file transfer disabled!)"
+    ; Generate
 
-    ; Check the status of jobs that are running/submitted
-    ;----------------------------------------------------
-    print,'--Checking queue--'
-    sub = where(jobs.submitted eq 1 and jobs.done eq 0,nsub)
-    for i=0,nsub-1 do begin
+    basename = maketemp('htcondor-')+"-"
+    if not keyword_set(htcondor_idlvm) then htcondor_idlvm = '0'
 
-      ; Checking status
-      jobid = jobs[sub[i]].jobid
-      PBS_CHECKSTAT,statstr,jobid=jobid,hyperthread=hyperthread
+    for i=0, ninput-1 do begin
 
-      ; Done
-      ; Should probably check the output files too
-      if statstr.jobid eq '' then begin
-        print,'Input ',strtrim(sub[i]+1,2),' ',jobs[sub[i]].name,' JobID=',jobs[sub[i]].jobid,' FINISHED'
-        jobs[sub[i]].done=1
+      cmd = input[i]
+      cmdfile = basename+strtrim(i,2)+'.sh'
+
+      undefine,lines
+      push,lines,'#!/bin/bash'
+
+      commas = strpos(cmd,';')
+      if commas[0] ne -1 then begin
+        temp = strsplit(cmd,';',/extract)
+        cmd = temp
+      endif
+      if strlowcase(strmid(htcondor,0,7)) eq '#shared' then begin
+        push,lines,'cd '+dirs[i]
+      endif
+
+      for j=0,n_elements(cmd)-2 do push,lines,cmd[j]
+      last_cmd = cmd[n_elements(cmd)-1]
+      ; Last value of cmd array should have the command to execute
+      ; run it with IDL when idle is set
+      if keyword_set(idle) then begin
+        last_cmd = STRJOIN(STRSPLIT(last_cmd, "'", /EXTRACT), '"')
+        if htcondor_idlvm eq '0' then begin  
+          last_cmd = idlprog + " <<< '" + last_cmd + "'"
+          htcondor += "|;|concurrency_limits|=|idl:22" ; XXX XXX XXX FIXME!!
+        endif else begin
+          push,lines, 'ln -s ' + scriptsdir + '/fakered_allframe_wrapper.sav fakered_allframe_wrapper.sav'
+          last_cmd = htcondor_idlvm + " fakered_allframe_wrapper.sav '" + last_cmd + "' 0 1"
+        endelse
+      endif
+     
+      push,lines,last_cmd
+      WRITELINE, cmdfile, lines
+      FILE_CHMOD, cmdfile, /U_EXECUTE
+
+    endfor
+
+    executable = basename + "$(Process).sh"
+
+    htcondor_cmd = pythonbin + ' ' + scriptsdir + '/htcondor_run.py '
+    ; Running python to manage HTCondor jobs 
+
+    print,systime(0)
+    print,"SENDING JOBS TO HTCondor... Please wait!!!"
+    undefine,out,errout
+
+    
+    SPAWN, htcondor_cmd + 'condor_submit ' + strtrim(ninput,2) + "  '" + executable + "' '" + htcondor  + "'", out, errout
+
+    if n_elements(errout) gt 1 then begin
+      print,systime(0)
+      print,"There was an error when submitting jobs: " 
+      for xx=0,n_elements(errout)-1 do print,"OUTERR: ", errout[xx]
+      return
+    endif else begin
+      clusterId = out
+      print,ninput," jobs submitted to HTCondor clusterId ", clusterID
+    endelse
+   
+    count = 0
+    flag = 0
+    JOBSTATUS = ['Idle', 'Running', 'Removed', 'Completed', 'Held', 'Transferring Output', 'Suspended']
+    while (flag eq 0) do begin
+      print,systime(0)
+
+      if FILE_TEST('killhtcondor') then begin
+        print,"File killhtcondor FOUND... Killing ALL jobs process of clusterId " + clusterId
+        print,""
+        undefine,out,errout
+        SPAWN, htcondor_cmd + 'condor_rm ' + clusterId, out, errout
+      endif
+ 
+      undefine,out,errout
+      SPAWN, htcondor_cmd + 'condor_q ' + clusterId, out, errout
+      if n_elements(errout) gt 1 then begin
+      print,"There was an error when checking HTCondor queue. Retrying... " 
+      for xx=0,n_elements(errout)-1 do print,"OUTERR: ", errout[xx]
+      endif
+
+      if out ne 0 then begin
+        condor_queue = strsplit(out,';',/extract)
+        condor_info =strtrim(ninput,2) + " total HTCondor jobs. " + condor_queue[0] + " remaining -> "
+        for i=1,n_elements(condor_queue)-1 do begin
+          condor_status = strsplit(condor_queue[i],":",/extract)
+          if condor_status[0] le n_elements(JOBSTATUS) then                                 $
+            condor_info += JOBSTATUS[condor_status[0]-1] + ": " + condor_status[1] + "  "    $
+          else                                                                               $
+            condor_info += "OTHER: " + condor_status[1] + "  "
+        endfor
+        print,condor_info
+
+        ; Wait 
+        ;--------------
+        print,'Waiting '+strtrim(waittime,2)+'s'
+        print,""
+        wait,waittime
+
+      endif else begin
+        print,'All jobs are done. Continuing...'
+        flag = 1
+      endelse
+
+
+      ; Increment the counter
+      count++
+
+    endwhile
+
+  ;-------------
+  ; NON-HTCONDOR
+  ;-------------
+  Endif else begin
+
+    ; Keep submitting jobs until nmulti is reached
+    ;
+    ; Check every minute or so to see how many jobs are still
+    ; running.  If it falls below nmulti and more jobs are left then
+    ; submit more jobs
+    ;
+    ; Don't return until all jobs are done.
+
+
+    ; Start the "jobs" structure
+    ; id will be the ID from Pleione
+    dum = {jobid:'',input:'',name:'',scriptname:'',submitted:0,done:0}
+    jobs = replicate(dum,ninput)
+    jobs.input = input
+    njobs = ninput
+
+    ; Loop until all jobs are done
+    ; On each loop check the pleione queue and figure out what to do
+    count = 0.
+    flag = 0
+    WHILE (flag eq 0) DO BEGIN
+
+      print,''
+      print,systime(0)
+
+      ; Check disk space
+      ;-----------------
+      ;SPAWN,'df -k '+dirs[0],dfout,dfouterr
+      ; Linux
+      ;SPAWN,'df -B 1M '+dirs[0],dfout,dfouterr
+      ; Mac OS X
+      SPAWN,'df -m '+dirs[0],dfout,dfouterr
+      dfarr = strsplitter(dfout,' ',/extract)
+      nline = n_elements(dfout)
+      ;;available = float(reform(dfarr[3,1]))
+      ;available = float(reform(dfarr[2,nline-1]))
+      available = float(reform(dfarr[3,nline-1]))
+      ;available = float(reform(dfarr[2,nline-1]))
+      ;available = available[0]/1000.0     ; convert to MB
+      print,''
+      print,strtrim(available[0],2),' MB of disk space available'
+      ; Not enough disk space available
+      if available[0] lt 100. then begin
+        print,'NOT enough disk space available'
+        return
       endif
 
 
-      ; Check for errors as well!! and put in jobs structure
+      ; Check for kill file
+      ;--------------------
+      kill = FILE_TEST('killpbs')
+      if (kill eq 1) then begin
+        sub = where(jobs.submitted eq 1 and jobs.done eq 0,nsub)
 
-    end
+        print,'Kill file found.  Killing all ',strtrim(nsub,2),' PBS job(s)'
+
+        for i=0,nsub-1 do begin
+          ; Killing the job
+          print,'Killing ',jobs[sub[i]].name,'  JobID=',jobs[sub[i]].jobid
+
+          if not keyword_set(hyperthread) then begin
+            SPAWN,'qdel '+jobs[sub[i]].jobid,out,errout
+          endif else begin
+            SPAWN,'kill -9 '+jobs[sub[i]].jobid,out,errout
+          endelse
+        endif
+
+        ; Remove the kill file
+        print,'Deleting kill file "killpbs"'
+        FILE_DELETE,'killpbs',/allow,/quiet
+
+        ; Now exit
+        goto,BOMB
+
+      endif
 
 
-    ; How many jobs are still in the queue
-    ;-------------------------------------
-    dum = where(jobs.submitted eq 1 and jobs.done eq 0,Ninqueue)
+      ; Check the status of jobs that are running/submitted
+      ;----------------------------------------------------
+      print,'--Checking queue--'
+      sub = where(jobs.submitted eq 1 and jobs.done eq 0,nsub)
+      for i=0,nsub-1 do begin
 
-    ; How many have not been done yet
-    ;--------------------------------
-    dum = where(jobs.submitted eq 0,Nnosubmit)
+        ; Checking status
+        jobid = jobs[sub[i]].jobid
+        PBS_CHECKSTAT,statstr,jobid=jobid,hyperthread=hyperthread
 
-    ; What is the current summary
-    ;----------------------------------
-    dum = where(jobs.done eq 1,nfinished)
-    print,'--Jobs Summary--'
-    print,strtrim(ninput,2),' total, ',strtrim(nfinished,2),' finished, ',strtrim(Ninqueue,2),$
-          ' running, ',strtrim(Nnosubmit,2),' left'
+        ; Done
+        ; Should probably check the output files too
+        if statstr.jobid eq '' then begin
+          print,'Input ',strtrim(sub[i]+1,2),' ',jobs[sub[i]].name,' JobID=',jobs[sub[i]].jobid,' FINISHED'
+          jobs[sub[i]].done=1
+        endif
+
+        ; Check for errors as well!! and put in jobs structure
+      endfor
+      
+
+      ; How many jobs are still in the queue
+      ;-------------------------------------
+      dum = where(jobs.submitted eq 1 and jobs.done eq 0,Ninqueue)
+
+      ; How many have not been done yet
+      ;--------------------------------
+      dum = where(jobs.submitted eq 0,Nnosubmit)
+
+      ; What is the current summary
+      ;----------------------------------
+      dum = where(jobs.done eq 1,nfinished)
+      print,'--Jobs Summary--'
+      print,strtrim(ninput,2),' total, ',strtrim(nfinished,2),' finished, ',strtrim(Ninqueue,2),$
+            ' running, ',strtrim(Nnosubmit,2),' left'
 
 
-    ; Need to Submit more jobs
-    ;-------------------------
-    Nnew = (nmulti-ninqueue) > 0
-    Nnew = Nnew < Nnosubmit
-    If (Nnew gt 0) then begin
+      ; Need to Submit more jobs
+      ;-------------------------
+      Nnew = (nmulti-ninqueue) > 0
+      Nnew = Nnew < Nnosubmit
+      If (Nnew gt 0) then begin
 
-      ; Get the indices of new jobs to be submitted
-      nosubmit = where(jobs.submitted eq 0)
-      newind = nosubmit[0:nnew-1]
-
-      print,''
-      print,'--Updating Queue--'
-      print,strtrim(ninqueue,2),' JOB(S) running, out of ',strtrim(nmulti,2),' Maximum'
-      print,'Submitting ',strtrim(nnew,2),' more job(s)'
-
-      ; Loop through the new submits
-      For i=0,nnew-1 do begin
+        ; Get the indices of new jobs to be submitted
+        nosubmit = where(jobs.submitted eq 0)
+        newind = nosubmit[0:nnew-1]
 
         print,''
-        cmd = jobs[newind[i]].input
-        if keyword_set(idle) then cmd='IDL>'+cmd
-        print,'Input ',strtrim(newind[i]+1,2),'  Command: >>',cmd,'<<'
+        print,'--Updating Queue--'
+        print,strtrim(ninqueue,2),' JOB(S) running, out of ',strtrim(nmulti,2),' Maximum'
+        print,'Submitting ',strtrim(nnew,2),' more job(s)'
 
-        ; Make PBS script
-        undefine,name,scriptname
-        PBS_MAKESCRIPT,jobs[newind[i]].input,dir=dirs[newind[i]],name=name,scriptname=scriptname,$
-                       prefix=prefix,idle=idle,hyperthread=hyperthread
+        ; Loop through the new submits
+        For i=0,nnew-1 do begin
 
-        ; Check that the script exists
-        test = FILE_TEST(scriptname)
+          print,''
+          cmd = jobs[newind[i]].input
+          if keyword_set(idle) then cmd='IDL>'+cmd
+          print,'Input ',strtrim(newind[i]+1,2),'  Command: >>',cmd,'<<'
 
-        ; Submitting the job
-        if not keyword_set(hyperthread) then begin
-          SPAWN,'qsub '+scriptname[0],out,errout
-        endif else begin
-          if keyword_set(idle) then batchprog='idlbatch' else batchprog='runbatch'
-          if keyword_set(cdtodir) then cd,dirs[newind[i]]
-          SPAWN,batchprog+' '+scriptname[0],out,errout
-          if keyword_set(cdtodir) then cd,curdir
-        endelse
+          ; Make PBS script
+          undefine,name,scriptname
+          PBS_MAKESCRIPT,jobs[newind[i]].input,dir=dirs[newind[i]],name=name,scriptname=scriptname,$
+                         prefix=prefix,idle=idle,hyperthread=hyperthread
 
-        ; Check that there weren't any errors
-        dum = where(errout ne '',nerror)
+          ; Check that the script exists
+          test = FILE_TEST(scriptname)
 
-        ; Getting JOBID
-        jobid = reform(out)
-        if keyword_set(hyperthread) then jobid = reform(out[1])
+          ; Submitting the job
+          if not keyword_set(hyperthread) then begin
+            SPAWN,'qsub '+scriptname[0],out,errout
+          endif else begin
+            if keyword_set(idle) then batchprog='./idlbatch' else batchprog='./runbatch'
+            if keyword_set(cdtodir) then cd,dirs[newind[i]]
+            SPAWN,batchprog+' '+scriptname[0],out,errout
+            if keyword_set(cdtodir) then cd,curdir
+          endelse
 
-        ; Printing info
-        print,'Submitted ',scriptname[0],'  JobID=',jobid[0]
+          ; Check that there weren't any errors
+          dum = where(errout ne '',nerror)
 
-        ; Updating the jobs structure
-        jobs[newind[i]].submitted = 1
-        jobs[newind[i]].jobid = jobid[0]
-        jobs[newind[i]].name = name[0]
-        jobs[newind[i]].scriptname = scriptname[0]
+          if nerror gt 0 then begin
+            print,"ERRORS WHEN EXECUTING!!"
+            for xx=0,nerror-1 do print,errout[xx]
+            return
+          endif
 
-        ;stop
+          ; Getting JOBID
+          jobid = reform(out)
+          if keyword_set(hyperthread) then jobid = reform(out[1])
 
-      Endfor  ; submitting new jobs loop
+          ; Printing info
+          print,'Submitted ',scriptname[0],'  JobID=',jobid[0]
 
-    Endif  ; new jobs to submit
+          ; Updating the jobs structure
+          jobs[newind[i]].submitted = 1
+          jobs[newind[i]].jobid = jobid[0]
+          jobs[newind[i]].name = name[0]
+          jobs[newind[i]].scriptname = scriptname[0]
+
+        Endfor  ; submitting new jobs loop
+      Endif  ; new jobs to submit
 
 
-    ; Are we done?
-    ;-------------
-    dum = where(jobs.done eq 1,ndone)
-    if ndone eq njobs then flag=1
+      ; Are we done?
+      ;-------------
+      dum = where(jobs.done eq 1,ndone)
+      if ndone eq njobs then flag=1
 
 
-    ; Wait a minute
-    ;--------------
-    print,''
-    print,'Waiting '+strtrim(waittime,2)+'s'
-    if flag eq 0 then wait,waittime
+      ; Wait a minute
+      ;--------------
+      print,''
+      print,'Waiting '+strtrim(waittime,2)+'s'
+      if flag eq 0 then wait,waittime
 
-    ; Increment the counter
-    count++
+      ; Increment the counter
+      count++
 
-    ;stop
+    ENDWHILE  ; large loop until all jobs are done
 
-  ENDWHILE
-
+  ENDELSE  ; NON-HTCONDOR
 
 ;------------
 ; NON-DAEMON
