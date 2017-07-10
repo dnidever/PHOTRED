@@ -158,7 +158,7 @@ JOURNAL,logfile
 ;------------------------------------------------------
 ;  Each sub-program will do its own test.
 progs = ['photred_daophot','photred_match','photred_allframe','photred_astrom','photred_calib','photred_combine','readline',$
-         'strsplitter','readpar','check_iraf','photred_getfilter','photred_getexptime','photred_getuttime',$
+         'strsplitter','readpar','check_python','check_iraf','photred_getfilter','photred_getexptime','photred_getuttime',$
          'photred_getairmass','photred_getdate','photred_getgain','photred_getrdnoise',$
          'readlist','printlog','photred_loadsetup','photred_mkopt','mkopt','stdred_transphot',$
          'apcorrect','roi_cut','srcmatch','undefine','array_indices2','first_el','importascii','mad',$

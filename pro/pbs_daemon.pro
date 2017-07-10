@@ -33,8 +33,10 @@
 ; By D.Nidever   February 2008
 ;-
 
-pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,$
-               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir
+pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,  $
+               hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir,   $
+               htcondor=htcondor, htc_idlvm=htcondor_idlvm,                 $
+               pythonbin=pythonbin, scriptsdir=scriptsdir
 
 ; How many input lines
 ninput = n_elements(input)
@@ -43,6 +45,9 @@ if ninput eq 0 then begin
   print,'                    hyperthread=hyperthread'
   return
 endif
+
+if not keyword_set(htcondor) then htcondor='0' $
+else if htcondor eq "" then htcondor='0'
 
 ; Current directory
 CD,current=curdir
@@ -128,7 +133,176 @@ print,'Nmulti=',strtrim(nmulti,2)
 ;--------
 ; DAEMON
 ;--------
-IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1)) then begin
+
+
+IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (htcondor ne '0')) then begin
+
+
+  if htcondor ne '0' then begin
+    ;-------------
+    ; HTCONDOR
+    ;-------------
+
+    ;---------------------------------------------------------------
+    ; Run CHECK_PYTHON.PRO to make sure that you can run PYTHON from IDL
+    ;---------------------------------------------------------------
+    CHECK_PYTHON,pythontest,pythonbin=pythonbin
+    if pythontest eq 0 then begin
+      print,'PYTHON TEST FAILED.  EXITING'
+      return
+    endif
+
+    print,"Checking HTCondor..."
+    CHECK_PYHTCONDOR,pyhtcondortest,pythonbin=pythonbin
+    if pyhtcondortest eq 0 then begin
+      print,'HTCondor TEST FAILED.  EXITING'
+      return
+    endif
+
+   
+    ;---------------------------------------------------------------
+    if strcmp(htcondor, '#shared', 7, /FOLD_CASE) then print,"Using shared directories (file transfer disabled!)"
+    ; Generate
+
+    basename = maketemp('htcondor-')+"-"
+    ; Check if we are going to use the IDL Virtual Machine
+    if not keyword_set(htcondor_idlvm) then htcondor_idlvm = '0'
+
+    ; Create each job from command list (cmd)
+    ;---------------------------------------------------------------
+    for i=0, ninput-1 do begin
+
+      cmd = input[i]
+      cmdfile = basename+strtrim(i,2)+'.sh'
+
+      undefine,lines
+      push,lines,'#!/bin/bash'
+
+      ; If there are several commands per line (separated by ";"), split them in different lines
+      commas = strpos(cmd,';')
+      if commas[0] ne -1 then begin
+        temp = strsplit(cmd,';',/extract)
+        cmd = temp
+      endif
+ 
+      ; Check if we are going to transfer files or use shared directory
+      if strcmp(htcondor, '#shared', 7, /FOLD_CASE) then $
+        push,lines,'cd '+dirs[i]
+
+      ; Print each command
+      for j=0,n_elements(cmd)-2 do push,lines,cmd[j]
+      last_cmd = cmd[n_elements(cmd)-1]
+      ; Last value of cmd array should have the command to execute
+      ; run it with IDL when idle is set
+      if keyword_set(idle) then begin
+        last_cmd = STRJOIN(STRSPLIT(last_cmd, "'", /EXTRACT), '"')
+
+        if htcondor_idlvm eq '0' then begin  
+          ; No Virutal Machine, use IDL
+          last_cmd = idlprog + " <<< '" + last_cmd + "'"
+          htcondor += "|;|concurrency_limits|=|idl:22" ; XXX XXX XXX FIXME!!
+        endif else begin
+          ; Use the IDL Virtual Machine
+          push,lines, 'ln -s ' + scriptsdir + '/fakered_allframe_wrapper.sav fakered_allframe_wrapper.sav'
+          last_cmd = htcondor_idlvm + " fakered_allframe_wrapper.sav '" + last_cmd + "' 0 1"
+        endelse
+      endif
+    
+      ; Write command file and make it executable 
+      push,lines,last_cmd
+      WRITELINE, cmdfile, lines
+      FILE_CHMOD, cmdfile, /U_EXECUTE
+
+    endfor
+
+    ; Get executable (script file name)
+    executable = basename + "$(Process).sh"
+
+    htcondor_cmd = pythonbin + ' ' + scriptsdir + '/htcondor_run.py '
+    ; Running python to manage HTCondor jobs 
+
+    ;---------------------------------------------------------------
+    ; SUBMIT JOBS!! 
+    ;---------------------------------------------------------------
+    print,systime(0)
+    print,"SENDING JOBS TO HTCondor... Please wait!!!"
+    undefine,out,errout
+
+    SPAWN, htcondor_cmd + 'condor_submit ' + strtrim(ninput,2) + "  '" + executable + "' '" + htcondor  + "'", out, errout
+
+    ; Check submission
+    if n_elements(errout) gt 1 then begin
+      print,systime(0)
+      print,"There was an error when submitting jobs: " 
+      for xx=0,n_elements(errout)-1 do print,"OUTERR: ", errout[xx]
+      return
+    endif else begin
+      clusterId = out
+      print,ninput," jobs submitted to HTCondor clusterId ", clusterID
+    endelse
+  
+
+    ;---------------------------------------------------------------
+    ; Check queue, wait until completion 
+    ;---------------------------------------------------------------
+    count = 0
+    flag = 0
+    JOBSTATUS = ['Idle', 'Running', 'Removed', 'Completed', 'Held', 'Transferring Output', 'Suspended']
+    while (flag eq 0) do begin
+      print,systime(0)
+
+      if FILE_TEST('killhtcondor') then begin
+        ; If file killhtcondor is found, remove all jobs
+        print,"File killhtcondor FOUND... Killing ALL jobs process of clusterId " + clusterId
+        print,""
+        undefine,out,errout
+        SPAWN, htcondor_cmd + 'condor_rm ' + clusterId, out, errout
+      endif
+
+      ; Get info from the queue 
+      undefine,out,errout
+      SPAWN, htcondor_cmd + 'condor_q ' + clusterId, out, errout
+      if n_elements(errout) gt 1 then begin
+      print,"There was an error when checking HTCondor queue. Retrying... " 
+      for xx=0,n_elements(errout)-1 do print,"OUTERR: ", errout[xx]
+      endif
+
+      ; There are still some pending jobs. Print info from queue
+      if out ne 0 then begin
+        condor_queue = strsplit(out,';',/extract)
+        condor_info =strtrim(ninput,2) + " total HTCondor jobs. " + condor_queue[0] + " remaining -> "
+        for i=1,n_elements(condor_queue)-1 do begin
+          condor_status = strsplit(condor_queue[i],":",/extract)
+          if condor_status[0] le n_elements(JOBSTATUS) then                                 $
+            condor_info += JOBSTATUS[condor_status[0]-1] + ": " + condor_status[1] + "  "    $
+          else                                                                               $
+            condor_info += "OTHER: " + condor_status[1] + "  "
+        endfor
+        print,condor_info
+
+        ; Wait 
+        ;--------------
+        print,'Waiting '+strtrim(waittime,2)+'s'
+        print,""
+        wait,waittime
+
+      endif else begin
+        print,'All jobs are done. Continuing...'
+        flag = 1
+      endelse
+
+
+      ; Increment the counter
+      count++
+
+    endwhile
+
+
+  endif else begin
+  ;-------------
+  ; NON-HTCONDOR
+  ;-------------
+
 
   ; Keep submitting jobs until nmulti is reached
   ;
@@ -281,7 +455,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         if not keyword_set(hyperthread) then begin
           SPAWN,'qsub '+scriptname[0],out,errout
         endif else begin
-          if keyword_set(idle) then batchprog='idlbatch' else batchprog='runbatch'
+          if keyword_set(idle) then batchprog='./idlbatch' else batchprog='./runbatch'
           if keyword_set(cdtodir) then cd,dirs[newind[i]]
           SPAWN,batchprog+' '+scriptname[0],out,errout
           if keyword_set(cdtodir) then cd,curdir
@@ -289,6 +463,12 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
         ; Check that there weren't any errors
         dum = where(errout ne '',nerror)
+
+        if nerror gt 0 then begin
+          print,"ERRORS WHEN EXECUTING!!"
+          for xx=0,nerror-1 do print,errout[xx]
+          return
+        endif
 
         ; Getting JOBID
         jobid = reform(out)
@@ -329,6 +509,10 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
   ENDWHILE
 
+;-------------
+; NON-HTCONDOR
+;-------------
+ ENDELSE
 
 ;------------
 ; NON-DAEMON
