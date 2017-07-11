@@ -828,16 +828,22 @@ FOR i=0L,ninp-1 do begin
     nmatch = 0
     ; Try filename + band
     if transfileinfo eq 1 then $
-       MATCH,trans.file+'-'+trans.band,obsfile+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+       MATCH,trans.file+':'+trans.band,obsfile+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try night+chip + band
+    ;  only want to match lines with file=''
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
-       MATCH,strtrim(trans.night,2)+'-'+strtrim(trans.chip,2)+'-'+trans.band,$
-             strtrim(inp.night,2)+'-'+strtrim(inp.chip,2)+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':'+strtrim(inp.night,2)+':'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try chip + band
+    ;  only want to match lines with file='' and night=-1
     if nmatch eq 0 and transchipinfo eq 1 then $
-       MATCH,trans.chip+'-'+trans.band,inp.chip+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':-1:'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try just the band
-    if nmatch eq 0 then MATCH,trans.band,inp.band[j],ind1,ind2,/sort,count=nmatch
+    ;  only want to match lines with file='', night=-1 and chip=-1
+    if nmatch eq 0 then $
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':-1:-1:'+inp.band[j],ind1,ind2,/sort,count=nmatch
 
     ; Found the transformation for this file+band
     if (nmatch gt 0) then begin
