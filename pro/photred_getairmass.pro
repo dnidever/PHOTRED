@@ -1,4 +1,5 @@
-function photred_getairmass,file,obs=obs,update=update,silent=silent,recalculate=recalculate,stp=stp
+function photred_getairmass,file,obs=obs,update=update,silent=silent,$
+         recalculate=recalculate,stp=stp
 
 
 ;+
