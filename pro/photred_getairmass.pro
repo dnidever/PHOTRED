@@ -154,7 +154,7 @@ if nam eq 0 or float(am) lt 0.9 or keyword_set(recalculate) then begin
     if not keyword_set(silent) then print,'AIRMASS=',strtrim(am,2),' added to '+file
     undefine,errmsg
     MODFITS,file,0,head,errmsg=errmsg
-    if n_elements(errmsg) gt 0 then print,ermsg
+    if n_elements(errmsg) gt 0 then print,errmsg
   endif
 
 endif
