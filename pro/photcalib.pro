@@ -531,16 +531,26 @@ if ninptrans gt 0 then begin
   printlog,logf,'USING INPUT TRANSFORMATION EQUATIONS'
   trans = inptrans
   numbands = n_elements(trans)
-
+  if tag_exists(trans,'night') eq 0 then add_tag,trans,'night',-1,trans
+  if tag_exists(trans,'chip') eq 0 then add_tag,trans,'chip',-1,trans
+  if tag_exists(trans,'file') eq 0 then add_tag,trans,'file','',trans
+  
   printlog,logf,' TRANSFORMATION EQUATIONS'
   printlog,logf,'--------------------------------------------------------------------------------'
-  printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'  NIGHT/CHIP/FILE  BAND COLOR ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
   printlog,logf,'--------------------------------------------------------------------------------'
   for i=0,ninptrans-1 do begin
-    form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
-    printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
-                      trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-    form2 = '(A28,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1 = '(I10,I6,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1f = '(A-16,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    ; FILENAME
+    if trans[i].file ne '' then $
+      printlog,logf,format=form1f,trans[i].file,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    ; NO Filename
+    if trans[i].file eq '' then $
+      printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    form2 = '(A29,F10.4,F10.4,F10.4,F10.4,F10.4)'
     printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
                       trans[i].amcoltermsig,trans[i].colsqtermsig
   endfor
@@ -576,7 +586,12 @@ if tag_exist(trans,'CHIP') then begin
   gdtranschip = where(trans.chip ge 0,ngdtranschip)
   if ngdtranschip gt 0 then transchipinfo=1
 endif
-
+; Do we have FILE information
+transfileinfo = 0
+if tag_exist(trans,'FILE') then begin
+  gdtransfile = where(trans.file ne '',ngdtransfile)
+  if ngdtransfile gt 0 then transfileinfo=1
+endif
 
 
 ;###############################
@@ -641,7 +656,7 @@ for i=0,ninp-1 do begin
   magfile = input[i].magfile
   arr = strsplit(magfile,'.',/extract)
   narr = n_elements(arr)
-  outfile = strjoin(arr[0,narr-2],'')+'.'+ext
+  outfile = strjoin(arr[0:narr-2],'.')+'.'+ext
   input[i].outfile = outfile
 endfor
 
@@ -656,6 +671,9 @@ FOR i=0L,ninp-1 do begin
 
   inp = input[i]
   magfile = inp.magfile
+  magbase = strsplit(magfile,'.',/extract)    ; base name
+  if n_elements(magbase) gt 1 then $
+    magbase = strjoin(magbase[0:n_elements(magbase)-2],'.')
 
   ; Testing the file
   test = file_test(magfile)
@@ -784,15 +802,34 @@ FOR i=0L,ninp-1 do begin
 
   ; Associate transformation equations with each observation
   for j=0,numobs-1 do begin
-    ; ignore night and chip info if we don't have that in the trans file
-    gd = where( ( (trans.night eq inp.night[j]) or transnightinfo eq 0) and $
-                ( (trans.chip eq inp.chip[j]) or transchipinfo eq 0) and $
-                (trans.band eq inp.band[j]),ngd)
-    ; Found the transformation for this band
-    if (ngd gt 0) then begin
-      mastrans[j] = trans[gd[0]]
+    ; There are four options for matching the file:
+    ; 1) No chip/night/filename information
+    ; 2) Only chip given
+    ; 3) Night+chip given
+    ; 4) Filename given
+    ; This information can be different for each file, i.e. multiple
+    ; formats can be used in a given trans file.  Try MOST specific
+    ; (#4) to LEAST specific (#1).
+
+    nmatch = 0
+    ; Try filename + band
+    if transfileinfo eq 1 then $
+       MATCH,trans.file+'-'+trans.band,magbase+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try night+chip + band
+    if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
+       MATCH,strtrim(trans.night,2)+'-'+strtrim(trans.chip,2)+'-'+trans.band,$
+             strtrim(inp.night,2)+'-'+strtrim(inp.chip,2)+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try chip + band
+    if nmatch eq 0 and transchipinfo eq 1 then $
+       MATCH,trans.chip+'-'+trans.band,inp.chip+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try just the band
+    if nmatch eq 0 then MATCH,trans.band,inp.band[j],ind1,ind2,/sort,count=nmatch
+
+    ; Found the transformation for this file+band
+    if (nmatch gt 0) then begin
+      mastrans[j] = trans[ind1[0]]
     endif else begin
-      printlog,logf,'NO TRANSFORMATION INPUT FOR  NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
+      printlog,logf,'NO TRANSFORMATION INPUT FOR  FILE=',magbase,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
       return
     endelse
