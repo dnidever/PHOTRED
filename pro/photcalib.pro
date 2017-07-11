@@ -682,7 +682,17 @@ FOR i=0L,ninp-1 do begin
     goto,BOMB
   endif
 
-
+  ; Load the MCH file as well, need this to get the individual
+  ; exposure/observation file names
+  mchfile = magbase+'.mch'
+  if file_test(mchfile) eq 0 then begin
+    printlog,logf,'MCH FILE ',mchfile,' DOES NOT EXIST'
+    goto,BOMB
+  endif
+  LOADMCH,mchfile,mfiles
+  ; they should be in the same order as the magnitude columns
+  ; in the mag file
+  
   ; Stars in this file
   numstar = file_lines(magfile)-3L
 
@@ -802,6 +812,10 @@ FOR i=0L,ninp-1 do begin
 
   ; Associate transformation equations with each observation
   for j=0,numobs-1 do begin
+
+    ; Get the filename of each observation, get from mch file
+    obsfile = file_basename(mfiles[j],'.als')
+     
     ; There are four options for matching the file:
     ; 1) No chip/night/filename information
     ; 2) Only chip given
@@ -814,7 +828,7 @@ FOR i=0L,ninp-1 do begin
     nmatch = 0
     ; Try filename + band
     if transfileinfo eq 1 then $
-       MATCH,trans.file+'-'+trans.band,magbase+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
+       MATCH,trans.file+'-'+trans.band,obsfile+'-'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try night+chip + band
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
        MATCH,strtrim(trans.night,2)+'-'+strtrim(trans.chip,2)+'-'+trans.band,$
@@ -829,7 +843,7 @@ FOR i=0L,ninp-1 do begin
     if (nmatch gt 0) then begin
       mastrans[j] = trans[ind1[0]]
     endif else begin
-      printlog,logf,'NO TRANSFORMATION INPUT FOR  FILE=',magbase,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
+      printlog,logf,'NO TRANSFORMATION INPUT FOR  REFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
       return
     endelse
