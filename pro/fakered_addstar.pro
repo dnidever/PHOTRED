@@ -1,29 +1,3 @@
-; *************************************************
-function getparam, var, name, setup, default, logfile, bool=bool
-
-  if n_elements(var) ne 0 then begin 
-    out = var
-  endif else begin
-    data = READPAR(setup,name)
-    if data eq '0' or data eq '-1' or data eq '' then begin 
-      out = default
-    endif else begin
-      out = data
-    endelse
-  endelse
-
-  if keyword_set(bool) then if out eq '0' then out = 0 else out = 1
-    
-  if n_elements(logfile) ne 0 then printlog,logfile,"PARAM "+name+": "+strcompress(out)
-
-  return,out
-
-end
-; *************************************************
-
-
-pro fakered_addstar,redo=redo,stp=stp
-
 ;+
 ;
 ; FAKERED_ADDSTAR
@@ -38,7 +12,10 @@ pro fakered_addstar,redo=redo,stp=stp
 ;  The artificial stars are added to the mock images.
 ;
 ; By D.Nidever  March 2017
+;   Antonio Dorta,  major update   June/July 2017
 ;-
+
+pro fakered_addstar,redo=redo,stp=stp
 
 COMMON photred,setup
 
