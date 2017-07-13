@@ -73,6 +73,8 @@ if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 ; PHOTRED parameters
 ;                       VARIABLE       NAME IN SETUP    SETUP  DEFAULT VALUE   LOGFILE       
 redo            = getparam(redo            , 'redo'            , setup, 0             , logfile, /bool)
+telescope       = getparam(telescope       , 'telescope'       , setup, '0'           , logfile)
+instrument      = getparam(instrument      , 'instrument'      , setup, '0'           , logfile)
 hyperthread     = getparam(hyperthread     , 'hyperthread'     , setup, '0'           , logfile, /bool)
 nmulti          = getparam(nmulti          , 'nmulti'          , setup, '1'           , logfile)
 scriptsdir      = getparam(scriptsdir      , 'scriptsdir'      , setup, ''            , logfile)
@@ -118,8 +120,24 @@ if starscols eq '' then begin
   return
 endif
 
+; Telescope must be set
+if telescope eq '0' then begin
+  error = 'TELESCOPE not found in setup file'
+  printlog,logfile,error
+  return
+endif
+; Instrument must be set
+if instrument eq '0' then begin
+  error = 'INSTRUMENT not found in setup file'
+  printlog,logfile,error
+  return
+endif
+
 ; Check whether datatransfer is one of the valid methods
 if datatransfer ne 'skip' and datatransfer ne 'copy' and datatransfer ne 'move' and datatransfer ne 'link' then datatransfer='skip'
+
+; The main directory
+CD,current=maindir
 
 ; LOAD THE "imagers" FILE
 ;----------------------------
@@ -146,7 +164,7 @@ endif
 
 ; What IMAGER are we using??
 ;---------------------------
-ind_imager = where(imagers.telescope eq telescope and imagers.instrument eq instrument,nind_imager)
+ind_imager = where(imagers.telescope eq strupcase(telescope) and imagers.instrument eq strupcase(instrument),nind_imager)
 if nind_imager eq 0 then begin
   printlog,logfile,'TELESCOPE='+telescope+' INSTRUMENT='+instrument+' NOT FOUND in >>imagers<< file'
   return
@@ -241,8 +259,8 @@ For i=0,nfields-1 do begin
   printlog,logfile,strtrim(i+1,2)+'/'+strtrim(nfields,2)+' '+ufields[i]+' - '+strtrim(nind,2)+' phot files'
   printlog,logfile,'----------------' 
   printlog,logfile,''
-
-  COMPLETENESS,ffiles,starsfile,imager=thisimager,logfile=logfile
+stop
+  COMPLETENESS,ffiles,starsfile,imager=thisimager,maindir=maindir,logfile=logfile
 Endfor
 
 

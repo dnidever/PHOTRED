@@ -67,7 +67,8 @@ endif
 thisprog = strupcase(thisprog)
 stages = ['RENAME','WCS','SPLIT','DAOPHOT','MATCH','ALLFRAME','APCOR',$
           'CALIB','ASTROM','COMBINE','DEREDDEN','SAVE','HTML',$
-          'APERPHOT','DAOGROW','MATCHCAT','COMBINECAT','FITDATA']   ; STDRED stages
+          'APERPHOT','DAOGROW','MATCHCAT','COMBINECAT','FITDATA',$   ; STDRED stages
+          'COMPLETE']   ; FAKERED stages
 ; NOT a valid stage
 stageind = where(stages eq thisprog,nstageind)
 if (nstageind eq 0) then begin

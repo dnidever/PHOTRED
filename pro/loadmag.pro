@@ -72,7 +72,10 @@ free_lun,unit
 ; Stars in this file
 numstar = (FILE_LINES(file)-3L )/nstarline
 
-nextra = ncol - 2*numobs    ; nextra includes, ID, X, Y, CHI, SHARP, etc.
+; Number of observations
+nextra = 7
+numobs = (ncol-nextra)/2
+;nextra = ncol - 2*numobs    ; nextra includes, ID, X, Y, CHI, SHARP, etc.
 
 ; mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
 mastable = fltarr(numstar,2*numobs+nextra)
