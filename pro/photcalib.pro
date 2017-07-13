@@ -402,9 +402,9 @@ if ninptrans gt 0 then begin
   printlog,logf,'USING INPUT TRANSFORMATION EQUATIONS'
   trans = inptrans
   numbands = n_elements(trans)
-  if tag_exists(trans,'night') eq 0 then add_tag,trans,'night',-1,trans
-  if tag_exists(trans,'chip') eq 0 then add_tag,trans,'chip',-1,trans
-  if tag_exists(trans,'file') eq 0 then add_tag,trans,'file','',trans
+  if tag_exist(trans,'night') eq 0 then add_tag,trans,'night',-1,trans
+  if tag_exist(trans,'chip') eq 0 then add_tag,trans,'chip',-1,trans
+  if tag_exist(trans,'file') eq 0 then add_tag,trans,'file','',trans
   
   printlog,logf,' TRANSFORMATION EQUATIONS'
   printlog,logf,'--------------------------------------------------------------------------------'
