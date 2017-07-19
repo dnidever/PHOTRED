@@ -85,7 +85,7 @@ datadir         = getparam(datadir         , 'datadir'         , setup, '.'     
 datatransfer    = getparam(datatransfer    , 'datatransfer'    , setup, 'skip'        , logfile)
 chipsfile       = getparam(chipsfile       , 'chipssfile'      , setup, '*chips.fits' , logfile)
 maxccdsize      = getparam(maxccdsize      , 'maxccdsize'      , setup, '2048,4096'   , logfile)
-magext          = getparam(magext          , 'magext'          , setup, '0'           , logfile)
+magext          = getparam(magext          , 'magext'          , setup, ''            , logfile)
 radcent         = getparam(radcent         , 'radcent'         , setup, '*'           , logfile)
 dimfield        = getparam(dimfield        , 'dimfield'        , setup, '*'           , logfile)
 distance        = getparam(distance        , 'distance'        , setup, '0'           , logfile)
@@ -287,10 +287,15 @@ if htcondor ne '0' then begin
     htcondor_cmd += "|;|Initialdir|=|$CHOICE(Process"+workdir+")" 
     htcondor_cmd += "|;|transfer_input_files|=|"+scriptsdir+"/"+"fakered_addstar.py" +","+ fn_chipsfile +",./"
   endif
-endif
 
-PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=15,    $
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=15,    $
            htcondor=htcondor_cmd, scriptsdir=scriptsdir, pythonbin=pythonbin
+
+endif else $
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=15,    $
+           htcondor=htcondor_cmd, scriptsdir=scriptsdir, pythonbin=pythonbin,/cdtodir
+
+
 
 ; UPDATE the Lists
 ;PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
@@ -311,6 +316,47 @@ if exitcode ne 0 then begin
   printlog,logfile,'' 
   return
 endif
+
+
+
+; Make a copy of old apcor.lst and create a new file with all info from partial files
+; that were created by Python script
+cmd = 'mv -f apcor.lst apcor.lst.bak' 
+print,cmd
+SPAWN,cmd,out,errout,EXIT_STATUS=exitcode
+cmd = 'find . -type f -name "*partial_apcor*.lst" -exec cat {} >> apcor.lst \;'
+print,cmd
+SPAWN,cmd,out,errout,EXIT_STATUS=exitcode
+if exitcode ne 0 then begin
+  ; Check errors (exitcode is NOT 0) 
+  printlog,logfile,'' 
+  printlog,logfile,"#############"
+  printlog,logfile,"# WARNING!!   #"
+  printlog,logfile,"#############"
+  printlog,logfile,"There was an error when executing script", cmd
+  printlog,logfile,"Error was:", errout
+  printlog,logfile,"Info about Aperture Correction needed in CALIB stage might NOT be valid!!"
+  printlog,logfile,'' 
+endif
+
+cmd = 'mv -f calib.trans calib.trans.bak' 
+print,cmd
+SPAWN,cmd,out,errout,EXIT_STATUS=exitcode
+cmd = 'find . -type f -name "*partial_calib*.trans" -exec cat {} >> calib.trans \;'
+print,cmd
+SPAWN,cmd,out,errout,EXIT_STATUS=exitcode
+if exitcode ne 0 then begin
+  ; Check errors (exitcode is NOT 0) 
+  printlog,logfile,'' 
+  printlog,logfile,"#############"
+  printlog,logfile,"# WARNING!!   #"
+  printlog,logfile,"#############"
+  printlog,logfile,"There was an error when executing script", cmd
+  printlog,logfile,"Error was:", errout
+  printlog,logfile,"Info about Transformation Equations needed in CALIB stage might NOT be valid!!"
+  printlog,logfile,'' 
+endif
+
 
 printlog,logfile,'FAKERED_ADDSTAR Finished  ',systime(0)
 
