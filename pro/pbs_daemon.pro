@@ -49,6 +49,9 @@ endif
 if not keyword_set(htcondor) then htcondor='0' $
 else if htcondor eq "" then htcondor='0'
 
+
+if not keyword_set(scriptsdir) then scriptsdir='.' 
+
 ; Current directory
 CD,current=curdir
 
@@ -455,7 +458,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         if not keyword_set(hyperthread) then begin
           SPAWN,'qsub '+scriptname[0],out,errout
         endif else begin
-          if keyword_set(idle) then batchprog='./idlbatch' else batchprog='./runbatch'
+          if keyword_set(idle) then batchprog=scriptsdir+'/idlbatch' else batchprog=scriptsdir+'/runbatch'
           if keyword_set(cdtodir) then cd,dirs[newind[i]]
           SPAWN,batchprog+' '+scriptname[0],out,errout
           if keyword_set(cdtodir) then cd,curdir

@@ -27,7 +27,7 @@
 # New extension for MCH with .alf 
 ext=".alf.mch"
 # Files to be copied
-EXT_TO_COPY=(.fits .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .weights .scale .zero _comb.psf _comb.opt _comb.als.opt _shift.mch)
+EXT_TO_COPY=(.fits .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .weights .scale .zero _comb.psf _comb.opt _comb.als.opt _shift.mch .phot)
 #EXT_TO_COPY=(alf)
 FILES_TO_COPY=(apcor.lst extinction fields nocalib.trans)
 
@@ -284,6 +284,7 @@ do
 done
 
 # Transfer CHIPS info file
+echo "$starsCmd $orig/${chipsFile} ."
 $starsCmd $orig/${chipsFile} .
 
 # Transfer some other needed files
