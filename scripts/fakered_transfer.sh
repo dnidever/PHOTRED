@@ -29,7 +29,7 @@ ext=".alf.mch"
 # Files to be copied
 EXT_TO_COPY=(.fits .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .weights .scale .zero _comb.psf _comb.opt _comb.als.opt _shift.mch .phot)
 #EXT_TO_COPY=(alf)
-FILES_TO_COPY=(apcor.lst extinction fields nocalib.trans)
+FILES_TO_COPY=(apcor.lst extinction fields)
 
 FILE_FIELDS=addstar_fields
 FILE_CHIPS=addstar_chips
@@ -273,7 +273,7 @@ do
     # Link to common files
     for file in ${FILES_TO_COPY[@]}
     do
-      ln -s $relDir/${file} .
+      ln -s $relDir/$file .
     done
 
 
@@ -288,9 +288,10 @@ echo "$starsCmd $orig/${chipsFile} ."
 $starsCmd $orig/${chipsFile} .
 
 # Transfer some other needed files
-$starsCmd $orig/apcor.lst .
-$starsCmd $orig/extinction .
-$starsCmd $orig/fields .
+for file in ${FILES_TO_COPY[@]}
+do
+  $starsCmd $orig/$file .
+done
 
 # Return to initial directory
 popd 
