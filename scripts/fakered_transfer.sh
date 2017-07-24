@@ -31,35 +31,34 @@ EXT_TO_COPY=(.fits .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .we
 #EXT_TO_COPY=(alf)
 FILES_TO_COPY=(apcor.lst extinction fields)
 
-FILE_FIELDS=addstar_fields
-FILE_CHIPS=addstar_chips
+mkdir -p logs
+INLIST=logs/ADDSTAR.inlist
+
+#FILE_FIELDS=addstar_fields
+#FILE_CHIPS=addstar_chips
 starsDir=STARS
 starsFn=input_stars
 
 ARGS=( \
-"1: whether link/copy/move data files from source to destination" \
+"1: whether link/copy/move data files from source to destination (or 'inlist' to only create input list)" \
 "2: path to data files" \
 "3: create (1) or not (anything else) a directory per field" \
 "4: create (1) or not (anything else) a directory per chip" \
 "5: path to input stars file" \
 "6: split (1) or not (anything else) the input stars file among all chips" \
 "7: file with info of chips" \
-"8 (Optional): path to add as prefix if needed when creating links (only if arg6 is 'link'" \
+"8 (Optional): path to add as prefix if needed when creating links (only if arg6 is 'link')" \
 )
 # "8 (Optional): destination (current directory if none). It will be created if it does NOT exist" \
 
-# Check that all needed arguments were specified
-transferMethod=$1
-orig=$2
-sepFields=$3
-sepChips=$4
-starsOrig=$5
-starsSplit=$6
-chipsFile=$7
-dest="."
- 
 
-if [[ $# -eq 8 ]] 
+if [[ $# -eq 1 ]] && [[ $1 == 'inlist' ]]
+then 
+  # If there is only one argument and it is "inlist", only the list will be created
+  find `pwd` -regextype sed -regex ".*F[0-9]*-[0-9]*_[0-9]*\.mch" | sort > $INLIST
+  echo "Input list for ADDSTAR stage has been created in $INLIST"
+  exit
+elif [[ $# -eq 8 ]] 
 then
   prefix=$7
 elif [[ $# -eq 7 ]] 
@@ -85,6 +84,17 @@ else
   >&2 echo "Syntax error when calling $0"	
   exit 1
 fi
+
+# Check that all needed arguments were specified
+transferMethod=$1
+orig=$2
+sepFields=$3
+sepChips=$4
+starsOrig=$5
+starsSplit=$6
+chipsFile=$7
+dest="."
+ 
 
 # Determine whether copy|move|link the data files
 case $transferMethod in
@@ -182,17 +192,17 @@ pushd .
 cd $dest
 
 # Create file with fields and chips
-rm -f $FILE_FIELDS
-for fld in ${FIELDS[@]}
-do
-	echo "F$fld" >> $FILE_FIELDS
-done
+#rm -f $FILE_FIELDS
+#for fld in ${FIELDS[@]}
+#do
+#	echo "F$fld" >> $FILE_FIELDS
+#done
 
-rm -f $FILE_CHIPS
-for chp in ${CHIPS[@]}
-do
-	echo $chp >> $FILE_CHIPS
-done
+#rm -f $FILE_CHIPS
+#for chp in ${CHIPS[@]}
+#do
+#	echo $chp >> $FILE_CHIPS
+#done
 
 
 # Create MCH with .alf files instead of .als
@@ -276,9 +286,8 @@ do
       ln -s $relDir/$file .
     done
 
-
+    # Go back to base directory
     cd $relDir
-
       
   done
 done
@@ -292,6 +301,11 @@ for file in ${FILES_TO_COPY[@]}
 do
   $starsCmd $orig/$file .
 done
+
+# Create the INLIST file with all FX-NNNNNNN_YY.mch files
+find `pwd` -regextype sed -regex ".*F[0-9]*-[0-9]*_[0-9]*\.mch" | sort > $INLIST
+echo "Input list for ADDSTAR stage has been created in $INLIST"
+ 
 
 # Return to initial directory
 popd 

@@ -1189,8 +1189,9 @@ def process_argv(args, mch_ext):
         * distance:      value of distance
     """
     argc           = 1
-    ARG_FIELD      = argc; argc+=1
-    ARG_CHIP       = argc; argc+=1
+    #ARG_FIELD      = argc; argc+=1
+    #ARG_CHIP       = argc; argc+=1
+    ARG_MCHFILE    = argc; argc+=1
     ARG_CHIPSFILE  = argc; argc+=1
     ARG_STARSCOLS  = argc; argc+=1
     ARG_MAGEXT     = argc; argc+=1
@@ -1211,12 +1212,14 @@ def process_argv(args, mch_ext):
         exit_error_msg("Syntax: %s <1:field> <2:chip> <3:chip_file> <4:starscols> <5:magext> <6:maxccdsize> <7:dimfield> <8:radcent> <9:distance>" % args[0], True)
 
 
-    field = args[ARG_FIELD].strip()
-    chip  = args[ARG_CHIP].strip()
-
-    mch_args   = field + "_*_"     + chip + mch_ext
-    stars_file = field + "-stars_" + chip + ".txt"
-
+    try:
+        # MCH filename has format FX-NNNNNN_YY.mch) -> Get FIELD (FX) and CHIP (YY) from it!
+        mch_fn = os.path.basename(args[ARG_MCHFILE])         # Remove path, get only FILENAME
+        field  = mch_fn.split("-")[0].strip()                # Field (FX) goes BEFORE "-"
+        chip   = mch_fn.split("_")[1].split(".")[0].strip()  # Chip  (YY) goes BETWEEN "_" and "." 
+        print_info ("Processing Field " + field + " and Chip " + chip)
+    except:
+        error_msg = " * Field and chip data\n"
 
 
     # Process config file and read each field
@@ -1224,6 +1227,8 @@ def process_argv(args, mch_ext):
 
     try:
         # Main MCH file: string
+        # Filename format is FX_NNNNNN_YY.alf.mch -> replace FX-NNNNNN_YY.mch to get new format
+        mch_args   = mch_fn.replace("-", "_").replace(".mch", ".alf.mch")
         main_mch_file = get_filename(mch_args, "Main MCH", True)
     except:
         error_msg += " * Main MCH file\n"
@@ -1237,6 +1242,7 @@ def process_argv(args, mch_ext):
     
     try:
         # Input file: string
+        stars_file = field + "-stars_" + chip + ".txt"
         input_file    = get_filename(stars_file, "Input stars", True)
     except:
         error_msg += " * Input file\n"

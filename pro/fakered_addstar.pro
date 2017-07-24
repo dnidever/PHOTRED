@@ -14,6 +14,25 @@
 ;   Antonio Dorta,  major update   June/July 2017
 ;-
 
+function getField, fn, remove_path=remove_path
+  ; Given a file, returns the FIELD. Filename is expected with
+  ; format FX-NNNNNNN_YY.ext (FX will be returned)
+  if keyword_set(remove_path) then fn = file_basename(fn)
+  tmp = strsplit(fn, '-', /EXTRACT)   ; Field located in the beginning before "-"
+  return, tmp[0]
+end
+
+function getChip, fn, remove_path=remove_path
+  ; Given a file, returns the CHIP. Filename is expected with
+  ; format FX-NNNNNNN_YY.ext (YY will be returned)
+  if keyword_set(remove_path) then fn = file_basename(fn)
+  tmp = strsplit(fn, '_', /EXTRACT)   ; Chip located between "_" and extension
+  if n_elements(tmp) ne 2 then return,''
+  tmp = strsplit(tmp[1], '.', /EXTRACT)   ; Remove extension
+  return, tmp[0]
+end
+
+
 pro fakered_addstar,redo=redo,stp=stp,waittime=waittime
 
 COMMON photred,setup
@@ -180,10 +199,6 @@ if datatransfer ne 'skip' then begin
   if runshellcmd(cmd+params,msg=msg,/printcmd,/printout) ne 0 then return
 endif
 
-; READ FIELDS AND CHIPS
-readline, 'addstar_fields', fields, count=nfields
-readline, 'addstar_chips' , chips,  count=nchips
-
 
 
 ;----------------------------
@@ -197,11 +212,9 @@ undefine,inlist,outlist,successlist,failurelist
 ; Add all mch files with format FX-NNNNN-YY.mch to the INLIST
 ;cmd='find `pwd` -regextype sed -regex ".*F[0-9]*-[0-9]*_[0-9]*\.mch"' 
 ;ec=runshellcmd(cmd,output=inlist,/quiet)
-inlist=""
-for i=0,nfields-1 do begin
-  inlist += file_search("", fields[i]+"-[0-9]*_[0-9][0-9].mch",/fully)
-endfor
 
+READLIST,'logs'+PATH_SEP()+thisprog+'.inlist',mchinputlines,/exist,/unique,/fully,count=nmchinputlines,logfile=logfile
+if n_elements(mchinputlines) eq 0 then mchinputlines = []
 
 ;--------------------------------
 
@@ -216,84 +229,36 @@ printlog,logfile,'------------------------'
 printlog,logfile,''
 
 
+CD,current= curdir
 undefine,cmd,cmddir
 htcondor_cmd = ""
 reldir      = ""
-base_chip   = ""
-base_script = ""
-base_dir    = "."  
-workdir     = ""
-CD,current= curdir
-
+base_chipsfile  = curdir+PATH_SEP()+string(chipsfile)
+base_script     = scriptsdir + PATH_SEP()+"fakered_addstar.py"
 ; Check if we have extra directories (for fields and/or chips)
 if sepfielddir eq 1 then reldir += ".." + PATH_SEP()
 if sepchipdir  eq 1 then reldir += ".." + PATH_SEP()
 
-for fld=0,nfields-1 do begin
-  for chp=0,nchips-1 do begin
-   
-    ; Build workdir according to extra directories 
-    workdir_tmp = ""
-    if sepfielddir eq 1 then workdir_tmp += PATH_SEP() + fields[fld]
-    if sepchipdir  eq 1 then workdir_tmp += PATH_SEP() + "chip"+chips[chp]
-
-    if htcondor eq '0' or htcondor ne 'transfer_files' then begin
-    	; Using NO HTCondor OR shared directory: change directory to workdir
-      base_dir = curdir+workdir_tmp
-      base_chip = reldir
-      base_script = scriptsdir + PATH_SEP()
-   endif else begin
-  		; Get and store working dir needed by HTCondor when transferring files
-      workdir += "," + workdir_tmp
-    endelse
- 
-    ; Make commands for addstar python program
-    cmd1  = pythonbin +  " "  + base_script + "fakered_addstar.py '"  $
-          + string(fields[fld])      + "' '" + string(chips[chp])      + "' '"       $
-          + base_chip                        + string(chipsfile)       + "' '"       $
-          + strcompress(starscols)   + "' '" + strcompress(magext)     + "' '"       $
-          + strcompress(maxccdsize)  + "' '" + strcompress(radcent)    + "' '"       $
-          + strcompress(dimfield)    + "' '" + strcompress(distance)   + "'"
-
+printlog,logfile,"Processing " + strcompress(nmchinputlines) + " files from INPUT list"
+for i=0,nmchinputlines-1 do begin
+  base_dir = file_dirname(mchinputlines[i])
+  ; Make commands for addstar python program
+  cmd1  = pythonbin                + " "   + base_script           + " '"    $
+        + mchinputlines[i]         + "' '" + base_chipsfile        + "' '"   $
+        + strcompress(starscols)   + "' '" + strcompress(magext)   + "' '"   $
+        + strcompress(maxccdsize)  + "' '" + strcompress(radcent)  + "' '"   $
+        + strcompress(dimfield)    + "' '" + strcompress(distance) + "'"
     ; Add commands and directories
-    PUSH,cmd,cmd1
-    PUSH,cmddir,base_dir
-
-  endfor
+  PUSH,cmd,cmd1
+  PUSH,cmddir,base_dir
 endfor
 
 
 if htcondor ne '0' then begin
   ; HTCondor is ENABLED!!
 
-  ; Check whether we are going to use shared directory or transfer files
-  if htcondor eq 'transfer_files' then htcondor_cmd = "#transfer_files" $
-  else htcondor_cmd = "#shared"
-
-  ; Add common commands: Rank (choose first the fastest machines) and 
-  ; Set basic environment variables
-  ;htcondor_cmd += "|;|Rank|=|Kflops"
-  htcondor_cmd += "|;|environment|=|PATH="+getenv('PATH')+";LD_LIBRARY_PATH="+ $
+  htcondor_cmd = "#shared|;|environment|=|PATH="+getenv('PATH')+";LD_LIBRARY_PATH="+ $
                   getenv('LD_LIBRARY_PATH')+";HOME="+getenv('HOME')
-
-
-  if htcondor eq "transfer_files" then begin
-    ; Only when transferring files, we need to specify which those files are:
-
-    ; Locate chips file, since given name could include wildcards (use full path)
-    chips_files = file_search(chipsfile,/FULLY_QUALIFY_PATH)
-    if n_elements(chips_files) ge 1 then fn_chipsfile = chips_files[0] $
-    else begin
-      print,"ERROR: No chips file were found!!"
-      return
-    endelse
-    if n_elements(chips_files) gt 1 then print,"WARNING!! More than 1 chip file was found. Using first one!!"
-    ; Add request disk (at least 5GB), initial workdir and which 
-    ; files to transfer: python script, chips files and ALL files in workdir (./)
-    htcondor_cmd += "|;|Request_disk|=|5GB"
-    htcondor_cmd += "|;|Initialdir|=|$CHOICE(Process"+workdir+")" 
-    htcondor_cmd += "|;|transfer_input_files|=|"+scriptsdir+PATH_SEP()+"fakered_addstar.py" +","+ fn_chipsfile +",."+PATH_SEP()
-  endif
 
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=waittime,    $
            htcondor=htcondor_cmd, scriptsdir=scriptsdir, pythonbin=pythonbin
@@ -312,28 +277,21 @@ successlist=[]
 failurelist=[]
 ; We will process the inlist to see which input files have produced outputs (.fits files)
 ; and then move it to SUCCESS or failed and then move to FAILURE
-for i=0,n_elements(inlist)-1 do begin
+for i=0,nmchinputlines-1 do begin
   ; For each file in inlist, separate dirname(path) and basename(filename:fn)
-  path    = file_dirname(inlist[i])
-  fn_mch  = file_basename(inlist[i])
+  path    = file_dirname(mchinputlines[i])
+  fn_mch  = file_basename(mchinputlines[i])
   ; ------------------------
   ; From basename get ONLY FIELD and CHIP (bear in mind that if sepfielddir and sepchipdir are false,
   ; all files will be together, so we need to get field and chip from each input file
-  tmp = strsplit(fn_mch, '-', /EXTRACT)   ; Field located in the beginning before "-"
-  field = tmp[0]
-  tmp = strsplit(fn_mch, '_', /EXTRACT)   ; Chip located between "_" and extension
-  if n_elements(tmp) ne 2 then begin
-    push, failurelist, inlist[i]          ; If there is no chip info, it is a failure
-    continue
-  endif
-  tmp = strsplit(tmp[1], '.', /EXTRACT)   ; Remove extension
-  chip = tmp[0]
+  field = getField(fn_mch)
+  chip  = getChip(fn_mch)
   ; ------------------------
   ; Get ALL .add files for all Mocks of that field and chip in that path
   fn_adds = path + PATH_SEP() + field + 'M*-*_'+ chip + '.add'
   check_adds = file_search(fn_adds, /FULLY)
   if n_elements(check_adds) lt 1 then begin
-    push, failurelist, inlist[i]          ; If there are no .add files, it is a failure
+    push, failurelist, mchinputlines[i]          ; If there are no .add files, it is a failure
     continue
   endif
 
@@ -343,12 +301,12 @@ for i=0,n_elements(inlist)-1 do begin
     fn_fits = file_basename(check_adds[j], "add") + "fits"   ; change .add to .fits
     check_fits = path + PATH_SEP() + fn_fits
     if not file_test(check_fits) then begin
-      push, failurelist, inlist[i]                           ; a fits file is missinge, FAILURE!
+      push, failurelist, mchinputlines[i]                           ; a fits file is missinge, FAILURE!
       check_ok = 0
       break
     endif
   endfor
-  if check_ok eq 1 then push, successlist, inlist[i]         ; ALL fits files are there, SUCCESS!
+  if check_ok eq 1 then push, successlist, mchinputlines[i]         ; ALL fits files are there, SUCCESS!
 endfor
 
 ; OUTLIST is all new .mch files for all mocks
