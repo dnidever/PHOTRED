@@ -234,7 +234,6 @@ printlog,logfile,''
 
 CD,current= curdir
 undefine,cmd,cmddir
-htcondor_cmd = ""
 reldir      = ""
 base_chipsfile  = curdir+PATH_SEP()+string(chipsfile)
 base_script     = scriptsdir + PATH_SEP()+"fakered_addstar.py"
@@ -246,6 +245,8 @@ printlog,logfile,"Processing " + strcompress(nmchinputlines) + " files from INPU
 for i=0,nmchinputlines-1 do begin
   base_dir = file_dirname(mchinputlines[i])
   ; Make commands for addstar python program
+  ; Syntax: python python_script.py  <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> 
+  ;                                  <6:magext>   <7:maxccdsize> <8:dimfield> <9:radcent>   <10:distance>
   cmd1  = pythonbin                 + " "   + base_script            + " '"    $
         + mchinputlines[i]          + "' '" + base_chipsfile         + "' '"   $
         + strcompress(maxmocks)     + "' '" + strcompress(starscols) + "' '"   $
@@ -261,7 +262,9 @@ endfor
 if htcondor ne '0' then begin
   ; HTCondor is ENABLED!!
 
-  htcondor_cmd = "#shared|;|environment|=|PATH="+getenv('PATH')+";LD_LIBRARY_PATH="+ $
+  ; Build the HTCondor submit commands (Use |=| for assignations and |;| to separate commands
+  ; Add user's HTCondor commands and needed environment variables (PATH, LD_LIBRARY_PATH and HOME)
+  htcondor_cmd = "#shared|;|" + htcondor_cmd + "|;|environment|=|PATH="+getenv('PATH')+";LD_LIBRARY_PATH="+ $
                   getenv('LD_LIBRARY_PATH')+";HOME="+getenv('HOME')
 
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=waittime,    $

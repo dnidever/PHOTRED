@@ -147,7 +147,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
     ;-------------
 
     ;---------------------------------------------------------------
-    ; Run CHECK_PYTHON.PRO to make sure that you can run PYTHON from IDL
+    ; Run CHECK_PYTHON.PRO and CHECK_PYHTCONDOR to make sure that you can run PYTHON/HTCondor from IDL
     ;---------------------------------------------------------------
     CHECK_PYTHON,pythontest,pythonbin=pythonbin
     if pythontest eq 0 then begin
@@ -162,15 +162,18 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
       return
     endif
 
-   
+    ; HTCondor files will begin with prefix htcondor-...
+    basename = maketemp('htcondor-')+"-"
+
+    ; Check if the htcondor command begins with "shared" to use shared directories 
     ;---------------------------------------------------------------
     if strcmp(htcondor, '#shared', 7, /FOLD_CASE) then print,"Using shared directories (file transfer disabled!)"
     ; Generate
 
-    basename = maketemp('htcondor-')+"-"
     ; Check if we are going to use the IDL Virtual Machine
     if not keyword_set(htcondor_idlvm) then htcondor_idlvm = '0'
 
+    ;---------------------------------------------------------------
     ; Create each job from command list (cmd)
     ;---------------------------------------------------------------
     for i=0, ninput-1 do begin
@@ -178,9 +181,9 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
       cmd = input[i]
       cmdfile = basename+strtrim(i,2)+'.sh'
 
+      ; Write bash script file with all commands
       undefine,lines
       push,lines,'#!/bin/bash'
-
       ; If there are several commands per line (separated by ";"), split them in different lines
       commas = strpos(cmd,';')
       if commas[0] ne -1 then begin
@@ -200,10 +203,10 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
       if keyword_set(idle) then begin
         last_cmd = STRJOIN(STRSPLIT(last_cmd, "'", /EXTRACT), '"')
 
+        ; Are we going to use IDL VM??
         if htcondor_idlvm eq '0' then begin  
           ; No Virutal Machine, use IDL
           last_cmd = idlprog + " <<< '" + last_cmd + "'"
-          htcondor += "|;|concurrency_limits|=|idl:22" ; XXX XXX XXX FIXME!!
         endif else begin
           ; Use the IDL Virtual Machine
           push,lines, 'ln -s ' + scriptsdir + '/fakered_allframe_wrapper.sav fakered_allframe_wrapper.sav'
@@ -218,11 +221,12 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
     endfor
 
-    ; Get executable (script file name)
+    ; Get executable (script filename)
     executable = basename + "$(Process).sh"
 
-    htcondor_cmd = pythonbin + ' ' + scriptsdir + '/htcondor_run.py '
+    ; Get HTCondor script that manages the submissions and queue
     ; Running python to manage HTCondor jobs 
+    htcondor_cmd = pythonbin + ' ' + scriptsdir + '/htcondor_run.py '
 
     ;---------------------------------------------------------------
     ; SUBMIT JOBS!! 
@@ -233,16 +237,38 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
     SPAWN, htcondor_cmd + 'condor_submit ' + strtrim(ninput,2) + "  '" + executable + "' '" + htcondor  + "'", out, errout
 
+    ; -----------------------------------
     ; Check submission
-    if n_elements(errout) gt 1 then begin
+    ; -----------------------------------
+    if out eq '0' then begin   ; ClusterID is 0, there was an error
+      print,''
       print,systime(0)
-      print,"There was an error when submitting jobs: " 
+      print,"THERE WAS AN ERROR WHEN SUBMITTING JOBS."
+      print,"If you have used htcondor_cmd in fakered.setup to specify"
+      print,"HTCondor submit commands, please, check they are correct." 
+      print,"Also check the syntax is valid:"
+      print," - use |=| to assign values to commands"
+      print," - use |;| to separate commands"
+      print," - and do NOT use extra blanks or other separators."
+      print,"EXAMPLE (fakered.setup):"
+      print,"htcondor         1"
+      print,"htcondor_cmd     request_memory|=|5GB|;|request_disk|=|200GB"
+      print,''
+      print,'You can still write .c to continue the execution'
+      stop
+    endif
+    if n_elements(errout) gt 1 then begin   ; There were errors when submitting
+      print,''
+      print,systime(0)
+      print,"THERE WAS AN ERROR WHEN SUBMITTING JOBS."
       for xx=0,n_elements(errout)-1 do print,"OUTERR: ", errout[xx]
-      return
-    endif else begin
-      clusterId = out
-      print,ninput," jobs submitted to HTCondor clusterId ", clusterID
-    endelse
+      print,''
+      print,'You can still write .c to continue the execution'
+      stop
+    endif
+
+    clusterId = out
+    print,ninput," jobs submitted to HTCondor clusterId ", clusterID
   
 
     ;---------------------------------------------------------------
@@ -254,6 +280,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
     while (flag eq 0) do begin
       print,systime(0)
 
+      ; Check if file 'killhtcondor' exists. If so, REMIOVE all jobs of this cluster
       if FILE_TEST('killhtcondor') then begin
         ; If file killhtcondor is found, remove all jobs
         print,"File killhtcondor FOUND... Killing ALL jobs process of clusterId " + clusterId
@@ -276,7 +303,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         condor_info =strtrim(ninput,2) + " total HTCondor jobs. " + condor_queue[0] + " remaining -> "
         for i=1,n_elements(condor_queue)-1 do begin
           condor_status = strsplit(condor_queue[i],":",/extract)
-          if condor_status[0] le n_elements(JOBSTATUS) then                                 $
+          if condor_status[0] le n_elements(JOBSTATUS) then                                  $
             condor_info += JOBSTATUS[condor_status[0]-1] + ": " + condor_status[1] + "  "    $
           else                                                                               $
             condor_info += "OTHER: " + condor_status[1] + "  "
@@ -293,7 +320,6 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         print,'All jobs are done. Continuing...'
         flag = 1
       endelse
-
 
       ; Increment the counter
       count++
