@@ -288,7 +288,7 @@ def get_mch(fn_mch_in, field, chip):
 
 ########################################################################################
 
-def get_input_stars(fn_stars, cols_order):
+def get_input_stars(fn_stars, cols_order, stars_shuffle):
     """ Read input stars from file and store it in a dictionary using columns order
     
     fn_stars -- file containing stars magnitudes
@@ -303,7 +303,15 @@ def get_input_stars(fn_stars, cols_order):
 
     try:
         # Get output filename and read RAW input file (skip first lines of file header)
-        stars_raw = np.loadtxt(fn_stars, unpack=True, ndmin=2)
+        if not stars_shuffle:
+            stars_raw = np.loadtxt(fn_stars, unpack=True, ndmin=2) # No shuffling, direct read (Unpack)
+        else:
+            stars_raw = np.loadtxt(fn_stars, ndmin=2) # We will shuffle stars. np.shuffle() only works in the 
+            print("Shuffling " + str(len(stars_raw)) + " stars.")   # first dimension, so we will NOT unpack 
+            np.random.shuffle(stars_raw)              # Shuffle rows (each col is a filter)
+            stars_raw = np.transpose(stars_raw)       # Transpose (equivalent to Unpack, now each row is a filter)
+            print("Shuffling done!")
+     
         pos = 0
         stars = {}
         for col in cols_order:
@@ -383,7 +391,9 @@ def get_mode(ncols, fname, main_mode, ALLOWED_MODES):
  
 ########################################################################################
 
-def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip_info, radcent, dimfield, distance, corners, MAX_COEF, numcaj, numstar, offset, shift):
+def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, mtrans, 
+                     chip_info, radcent, dimfield, distance, corners, MAX_COEF, numcaj, 
+                     numstar, offset, shift):
     """
     Apply the transformations and generate the .add files with results
     Make .add files (one per line in file.mch) to be used with add task in DAOPHOT.
@@ -515,7 +525,7 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     print("Mode: %s, nimages: %s, xsize: %s, ysize: %s" % (mode, nimages, xsize, ysize))
 
     # SEPARATION between lines (distribute artificial stars in triangles, NOT squares)
-    XSEP = sqrt(1/2)
+    XSEP = sqrt(0.5)
  
     # Get number of stars
     cn = len(caja[STAR_ID]);
@@ -532,6 +542,9 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     if cnmax > arin:
         print ('Too much artificial stars for a single file')
         print ('It will be used ' + str(addmax) + ' files to complete the total number of artificial stars')
+    if max_iters > 0 and max_iters < addmax:
+        print_warning("Limiting number of Mocks to " + str(max_iters))
+        addmax = max_iters
     max_files = int(round(999/nimages)-1)
     if addmax > max_files:
        exit_error_msg('Too many open files\nMaximun number is: ' + str(max_files) + "\nDecrease the total number of artificial stars", False)
@@ -761,6 +774,10 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
 
         # Check if CCD is FULL (xaux >= xsize) and there are still some stars to process (cn > 0)
         if (xaux >= xsize) and (cn > 0):
+
+            # Check if we have reached the limit of iters (Mocks). If so, quit loop!
+            if numcaj >= addmax: break        
+
             # CCD IS FULL, write in new files
             xaux = 0
             yaux = 0
@@ -781,8 +798,8 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
             f_mag = open(fn_mag, "w+")
             f_mag.write(mag_header)
  
-
             print ('Writing set of files %s...' % numcaj)
+
 
 #-----------------------------------------------------------------------------
 
@@ -821,13 +838,13 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     
 #-----------------------------------------------------------------------------
 
+    # Show final stats about number of included and discarded stars
     print ("All files written:")
     for i in xrange(nimages):
         print ("  Image %2d (%s). Total stars written (inside rectangle): %s of %s (discarded: %s)" % 
                   (i+1, filenames[i], stars_in[i], stars_out[i] + stars_in[i], stars_out[i]))
 
     return addmax
-
 
 #-----------------------------------------------------------------------------
 
@@ -1193,7 +1210,9 @@ def process_argv(args, mch_ext):
     #ARG_CHIP       = argc; argc+=1
     ARG_MCHFILE    = argc; argc+=1
     ARG_CHIPSFILE  = argc; argc+=1
+    ARG_MAXMOCKS   = argc; argc+=1
     ARG_STARSCOLS  = argc; argc+=1
+    ARG_STARSSHUF  = argc; argc+=1
     ARG_MAGEXT     = argc; argc+=1
     ARG_MAXCCDSIZE = argc; argc+=1
     ARG_DIMFIELD   = argc; argc+=1
@@ -1209,7 +1228,8 @@ def process_argv(args, mch_ext):
 
     if len(args) != NUM_ARGS:
         # Wrong number of parameters
-        exit_error_msg("Syntax: %s <1:field> <2:chip> <3:chip_file> <4:starscols> <5:magext> <6:maxccdsize> <7:dimfield> <8:radcent> <9:distance>" % args[0], True)
+        exit_error_msg("Syntax: %s <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> " 
+                       "<6:magext> <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance>" % args[0], True)
 
 
     try:
@@ -1239,6 +1259,19 @@ def process_argv(args, mch_ext):
     except:
         #print ("Unexpected error:", str(sys.exc_info()))
         error_msg += " * Chips data file\n"
+
+    try:
+        # max_iters: int (limit in the number of mocks)
+        max_iters = int(args[ARG_MAXMOCKS])
+    except:
+        error_msg += " * Max Number of Mocks\n"
+
+    try:
+        # starsShuffle: bool
+        stars_shuffle = (args[ARG_STARSSHUF] != '0') and (args[ARG_STARSSHUF] != '')
+    except:
+        error_msg += " * Stars Shuffle\n"
+ 
     
     try:
         # Input file: string
@@ -1379,14 +1412,19 @@ def process_argv(args, mch_ext):
         print_subtitle(" Chips data file: " + chips_file)       
         print_subtitle("      Input file: " + input_file)
         print_subtitle("    Column order: " + str(cols_order))
-        print_subtitle("  Magnitude Ext.: " + str(magext))
         print_subtitle("         Corners: " + str(corners))
         print_subtitle("         Radcent: " + str(radcent))
         print_subtitle("        Dimfield: " + str(dimfield))  
         print_subtitle("           Field: " + field)  
-        print_subtitle("            Chip: " + chip)  
+        print_subtitle("            Chip: " + chip) 
+        print_subtitle(" Mag. Extinction: " + str(magext))
+        print_subtitle("        Distance: " + str(distance))
+        if max_iters > 0: print_subtitle("     Limit Mocks: " + str(max_iters)) 
+        if stars_shuffle: print_subtitle("   Shuffle stars: YES") 
+        else: print_subtitle("   Shuffle stars: NO") 
 
-        return [main_mch_file, chips_file, input_file, cols_order, magext, corners, radcent, dimfield, distance, field, chip]
+
+        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, dimfield, distance, field, chip, max_iters]
 
 ########################################################################################
 
@@ -1405,7 +1443,6 @@ def get_mag(data, calmag, colsub, star_filt, distance, magext):
 
     absorption = magext[star_filt] * data['EBV']
     calmag += absorption + distance
-    #instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] + data['COLTERM'] * color + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] + data['COLTERM'] * colsub + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     return instmag
  
@@ -1701,6 +1738,7 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
 [orig_mch_file,   \
  chips_file,      \
  stars_file,      \
+ stars_shuffle,   \
  cols_order,      \
  magext,          \
  corners,         \
@@ -1708,7 +1746,8 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
  dimfield,        \
  distance,        \
  field,           \
- chip]            \
+ chip,            \
+ max_iters]       \
  = process_argv(sys.argv, MCH_FILE_EXT)
 
 
@@ -1716,7 +1755,7 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
 mch_file = get_mch(orig_mch_file, field, chip)
 
 # Get and store stars magnitude input file
-stars = get_input_stars(stars_file, cols_order)
+stars = get_input_stars(stars_file, cols_order, stars_shuffle)
 
 star_init = number_stars = 0
 # Get data from MAIN MCH and INPUT files
@@ -1746,7 +1785,7 @@ shift   = 0
 ###########################################################
 # PROCESS TRANSFORMATIONS
 ###########################################################
-numiters = crowdingmultipro(field, chip, mode, mch_fnames, mch_data, data_in, mmtrans, 
+numiters = crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, data_in, mmtrans, 
                             chip_info, radcent, dimfield, distance, corners, MAX_COEF, 
                             None, star_init, offset, shift)
 

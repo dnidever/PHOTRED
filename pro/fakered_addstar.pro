@@ -105,6 +105,9 @@ dimfield        = getparam(dimfield        , 'dimfield'        , setup, '*'     
 distance        = getparam(distance        , 'distance'        , setup, '0'           , logfile)
 pythonbin       = getparam(pythonbin       , 'pythonbin'       , setup, 'python'      , logfile)
 htcondor        = getparam(htcondor        , 'htcondor'        , setup, '0'           , logfile)
+htcondor_cmd    = getparam(htcondor_cmd    , 'htcondor_cmd'    , setup, ''            , logfile)
+starsshuffle    = getparam(starsshuffle    , 'starsshuffle'    , setup, '0'           , logfile, /bool)
+maxmocks        = getparam(maxmocks        , 'maxmocks'        , setup, '0'           , logfile)
 
 ; SOME EXTRA VALIDATIONS
 
@@ -243,11 +246,12 @@ printlog,logfile,"Processing " + strcompress(nmchinputlines) + " files from INPU
 for i=0,nmchinputlines-1 do begin
   base_dir = file_dirname(mchinputlines[i])
   ; Make commands for addstar python program
-  cmd1  = pythonbin                + " "   + base_script           + " '"    $
-        + mchinputlines[i]         + "' '" + base_chipsfile        + "' '"   $
-        + strcompress(starscols)   + "' '" + strcompress(magext)   + "' '"   $
-        + strcompress(maxccdsize)  + "' '" + strcompress(radcent)  + "' '"   $
-        + strcompress(dimfield)    + "' '" + strcompress(distance) + "'"
+  cmd1  = pythonbin                 + " "   + base_script            + " '"    $
+        + mchinputlines[i]          + "' '" + base_chipsfile         + "' '"   $
+        + strcompress(maxmocks)     + "' '" + strcompress(starscols) + "' '"   $
+        + strcompress(starsshuffle) + "' '" + strcompress(magext)    + "' '"   $
+        + strcompress(maxccdsize)   + "' '" + strcompress(radcent)   + "' '"   $
+        + strcompress(dimfield)     + "' '" + strcompress(distance)  + "'"
     ; Add commands and directories
   PUSH,cmd,cmd1
   PUSH,cmddir,base_dir
