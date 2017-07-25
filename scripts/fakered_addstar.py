@@ -11,7 +11,7 @@ __copyright__  = "Copyright 2016, The Local Group in Multi-Dimensions | SIEie@IA
 __credits__    = [""] 
 __license__    = ""
 __date__       = "2017-03-02"
-__version__    = "0.1.1"
+__version__    = "0.1.3"
 __maintainer__ = "Antonio Dorta"
 __email__      = "adorta@iac.es"
 __status__     = "Developtment"
@@ -210,6 +210,10 @@ def get_filename(fname_in, desc, oblig=True):
         If several files match the given name, then the first of them will be chosen
         and a message will be showed. If there are no files matching the given name
         an error will be showed (execution will be halted if oblig == True)
+
+    fname_in -- input filename (it can include wildcards: * ?
+        desc -- description (only to show in warning or error messages)
+       oblig -- if True, exit if there are no files matching fname_in 
     """
     # Get MCH file of the directory:
     fname_list = glob.glob(fname_in)
@@ -237,6 +241,7 @@ def get_mch(fn_mch_in, field, chip):
          'daomaster' does NOT accept char '-' in filenames, we will 
          use soft links with char '_' that were created in preprocess.
 
+     fn_mch_in -- MCH file with list of input files
          field -- field identificator (used to generate proper filenames for new files)
           chip --  chip identificator (used to generate proper filenames for new files)
 
@@ -263,7 +268,7 @@ def get_mch(fn_mch_in, field, chip):
 
             # daomaster input file
             f_writeln(f, fn_mch_in)          # File with list of input files (MCH)
-            f_writeln(f, "2 0 99")            # Minimum number, minimum fraction, enough frames:       
+            f_writeln(f, "2 0 99")           # Minimum number, minimum fraction, enough frames:       
             f_writeln(f, "1")                # Maximum sigma
             f_writeln(f, "20")               # 20: Cubic transformation
             f_writeln(f, radius)             # Critical match-up radius
@@ -293,6 +298,7 @@ def get_input_stars(fn_stars, cols_order, stars_shuffle):
     
     fn_stars -- file containing stars magnitudes
     cols_order -- array with the order of the filters
+    stars_shuffle -- if True, then stars from input file will be shuffled before using them
 
     RETURNS:
       * stars: Dictionary with stars ID (@) and magnitudes per filter 
@@ -400,8 +406,17 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
     Developed by adorta starting from a MATLAB code Version 2.7 05-Jul-2010  
      - Code changed to perform several transformation in cascade
      - Code changed to transform also magnitudes
-  
-         mode -- mode of the main MCH file (used in DAOMASTER: 2, 4, 6, 12, 20)
+     - Code changed to write also magnitude file (.mag) per mock
+     - Code changed to allow the limit of Mocks (iters) that will be generated
+
+       
+   max_iters -- if > 0, it will limit the number of iters (mocks generated)
+   
+       field -- field we are processing (usually FX: F1, F2, etc.)
+ 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
+        mode -- mode of the main MCH file (used in DAOMASTER: 2, 4, 6, 12, 20)
 
   mch_fnames -- List of filenames that appears in the MCH file 
                 provided by DAOMASTER task used to obtain the photometry.
@@ -496,6 +511,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 # PROCESS MCH FILE
 
     """
+    #DISABLED!!!
     mode = 0
     mch_fnames = []
     mch_data = []
@@ -971,12 +987,19 @@ def get_radcent_from_psf():
 
 def get_radcent_from_opt(field, chip):
     """ Returns value of radcent calculated from OPT data stored in .dat files in the CWD
+     radcent is the distance in pixel between the centroids of the stars
+     The centroids of two adjacent stars will be separated this quantity
 
         PSF Format:
            Line 1:...Header...
            Line 2:_11111111111112222222222222...nnnnnnnnnnnnn
            Line 3:...
+
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
     """
+
     print_title ("\n\nCALCULATE VALUE OF RADCENT USING FI AND PS INFO OF OPT FILES:")
     print_title ("============================================================================")
 
@@ -1003,8 +1026,12 @@ def get_dimfield_from_file(fname, corners, radcent):
     
          fname -- filename of MCH file
        corners -- original dims [x0,y0, x1,y1]
+       radcent -- distance in pixel between the centroids of the stars. The centroids of two adjacent stars will be separated this quantity
 
+       RETURNS:
+         dimfield
     """ 
+
     COL_X = 1     # Position of column X in MCH file (first col is 0)
     COL_Y = 2     # Position of column Y in MCH file (first col is 0)
     xmin = xmax = ymin = ymax = None
@@ -1121,6 +1148,13 @@ def process_mch(mch_file, input_data, cols_order, star_ini, number_stars, ALLOWE
 ########################################################################################
 
 def process_daophot(field, chip, numiters):
+    """ 
+       FITS files will be created from .add files using daophot.
+
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (mocks)
+    """
     DAO_EXT  = ".opt"
     DAO_GAIN = "GA"
     DAO_SEP  = "="
@@ -1193,7 +1227,8 @@ def process_argv(args, mch_ext):
     """
     Check and process command-line arguments
 
-    args -- array of arguments (sys.argv)
+      args -- array of arguments (sys.argv)
+   mch_ext -- Extension of MCH files
 
         RETURNS: 
         * main_mch_file: filename of the main MCH file
@@ -1203,7 +1238,7 @@ def process_argv(args, mch_ext):
         * corners:       array with opposite corners of CCD: [x0,y0, x1,y1]
         * radcent:       value of radcent
         * dimfield:      array: [xmin, xmax, ymin, ymax]
-        * distance:      value of distance
+        * distance:      value of distance used to calculate the calibrated magnitudes
     """
     argc           = 1
     #ARG_FIELD      = argc; argc+=1
@@ -1433,9 +1468,12 @@ def get_mag(data, calmag, colsub, star_filt, distance, magext):
         color = colsub  * 3.07 * EBV
         instmag = calmag + zpterm + amterm*X + colterm*COLOR + apcorr - 2.5*alog10(exptime)  [X = airmass]
 
-    data   -- chip values for the current image
-    calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
-    colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
+       data   -- chip values for the current image
+       calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
+       colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
+    star_filt -- filter used in this image
+     distance -- used to calculate the calibrated magnitude
+       magext -- magnitude extinctions
 
     RETURNS:
      * calculated magnitude according to the given equation
@@ -1493,6 +1531,16 @@ def get_iter_filename(orig_fn, field, chip, iteration, new_ext=None, sep=None):
     Get the filename INCLUDING the Mock number (iteration) using orig_fn as basename
     For instance, FX-001234_YY.eee will be FXM1-001234_YY.eee for the first Mock (iter=1)
     It will also change extension if a new extension (new_ext) is given
+
+     orig_fn -- Original filename
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+   iteration -- current iteration (mock number)
+     nex_ext -- new extension (if present, old extension will be replaced by the new one)
+        sep  -- separator between field and mock number (iteration)
+
+     RETURNS:
+        new_fn: New filename after applying the modifications
     """
 
     if sep is None:
@@ -1514,7 +1562,14 @@ def get_iter_filename(orig_fn, field, chip, iteration, new_ext=None, sep=None):
 def get_mch_addstar_fn(field, chip):
     """ 
     Get the filename of the MCH file according to field and chip
+
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
+    RETURNS:
+       New filename of MCH file according to current field and chip
     """
+
     return field + "-" + MCH_ADDSTAR + "_" + chip + ".mch"
 
 ########################################################################################
@@ -1530,7 +1585,14 @@ def create_mch(main_mch, field, chip, numiters, dest_mch):
     but this file is the same for all iterations, so we need to do: 
     XMi-001234_YY.psf -> FX-001234_YY.psf for each iteration from 1..N
     We need to that for ALL extension in SYMLINKS_EXT.
+
+    main_mch -- Filename of the main MCH file
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (number of Mocks)
+    dest_mch -- Original name of the MCH file that will be trasnformed 
     """
+
     OLD_EXT = ".alf"
     NEW_EXT = ".als"
     SYMLINKS_EXT = [".als", ".raw", ".opt", ".psf", ".als.opt", ".ap" , ".mag", ".log",
@@ -1597,6 +1659,11 @@ def update_apcor(field, chip, mch_fnames, numiters):
     New file:
     FX-......-NNa.del    0.0000000
     FXMY-......-NNa.del    0.0000000
+
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+  mch_fnames -- List of filenames of all MCH files
+    numiters -- Number of iterations (number of Mocks)
     """
 
     # Filenames (original one and partial one)
@@ -1661,6 +1728,11 @@ def create_trans_eq_calib(field, chip, numiters, chip_info):
     Example:
     F5-00517150_43  g  g-r  -0.4089    0.1713   -0.1193   0.0000   0.0000
                              0.0040   -0.0000    0.0001   0.0000   0.0000
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (number of Mocks)
+   chip_info -- Info about each image (filters, coefficients, etc.)
+
 
     """
 
