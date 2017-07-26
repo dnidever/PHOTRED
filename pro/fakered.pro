@@ -168,7 +168,7 @@ progs = ['photred_daophot','photred_match','photred_allframe','photred_astrom','
          'writecol','writeline','airmass','hdr2wcstnx','rndint','sexig2ten','signs','stress','strep',$
          'strmult','strtrim0','combine_structs','imfwhm','loadcoo','loadinput','mk_imacsmask','printline',$
          'randomize','rotsph','rotsphcen','wcstnx2hdr','wcstnx_rd2xy','wcstnx_xy2rd','parsetnx','badpar',$
-         'sign','wcstnxcor','rd2xieta','xieta2rd']
+         'sign','wcstnxcor','rd2xieta','xieta2rd', 'runshellcmd']
 test = PROG_TEST(progs)
 if min(test) eq 0 then begin
   bd = where(test eq 0,nbd)
@@ -265,6 +265,11 @@ PHOTRED_MATCH,/fake,redo=redo
 ; ALLFRAME
 ;----------
 ; Remake stack, detection and allframe
+; Check if input list for ALLFRAME is coming from ADDSTAR 
+; (when DAOPHOT and DAOMATH are NOT run)
+; If so, copy ADDSTAR.outlist to ALLFRAME.inlist
+if doaddstar ne '0' and dodaophot eq '0' and domatch eq '0' then $
+  file_copy,'logs/ADDSTAR.outlist','logs/ALLFRAME.inlist',/OVERWRITE
 doallframe = READPAR(setup,'ALLFRAME')
 if doallframe ne '0' then $
 PHOTRED_ALLFRAME,/fake,redo=redo

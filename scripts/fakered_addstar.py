@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import division
+from __future__ import print_function
 
 """ 
     Generate MCH, MAG and RAW files from IMG (.als and .head) files
@@ -10,7 +11,7 @@ __copyright__  = "Copyright 2016, The Local Group in Multi-Dimensions | SIEie@IA
 __credits__    = [""] 
 __license__    = ""
 __date__       = "2017-03-02"
-__version__    = "0.0.20"
+__version__    = "0.1.3"
 __maintainer__ = "Antonio Dorta"
 __email__      = "adorta@iac.es"
 __status__     = "Developtment"
@@ -24,7 +25,6 @@ import time
 import copy
 from subprocess import Popen, PIPE
 from astropy.io.fits import getdata
-
 from math import ceil, log10, sqrt
 from numpy.linalg import inv
 import random
@@ -49,7 +49,14 @@ class bcolors:
 
 ########################################################################################
 
-def exit_error_msg (error_msg, oblig=True):
+def print_stderr(*args, **kwargs):
+    # print in stderr
+    print(*args, file=sys.stderr, **kwargs)
+
+
+########################################################################################
+
+def exit_error_msg (error_msg, exit=True):
     """Print an error message and exit
 
      error_msg -- message to print
@@ -58,10 +65,14 @@ def exit_error_msg (error_msg, oblig=True):
 
     # Print text with a special format (Error in red)
     print (bcolors.ERROR + "\n\n\tERROR!!! "+ error_msg + bcolors.ENDC + "\n")
-    # XXX XXX XXX
     print (sys.exc_info())
 
-    if oblig:
+    # Print also in STDERR
+    print_stderr ("\n\n\tERROR!!! " + error_msg + "\n")
+    print_stderr (sys.exc_info())
+
+    # Check if force exit
+    if exit:
         sys.exit(-1)
 
 
@@ -186,6 +197,7 @@ def exec_cmd_stdin(cmd, fn_input, log=True):
                 print ("LOGs for this command were created in files " + fn_input+".out and " + fn_input+".err")
             except:
                 print_warning ("There were problems when creating logs for command '" + cmd + " < " + fn_input + "'")
+                print (sys.exc_info())
                     
     except:
         exit_error_msg ("There were errors when calling  " + cmd + " with " + fn_input)
@@ -198,6 +210,10 @@ def get_filename(fname_in, desc, oblig=True):
         If several files match the given name, then the first of them will be chosen
         and a message will be showed. If there are no files matching the given name
         an error will be showed (execution will be halted if oblig == True)
+
+    fname_in -- input filename (it can include wildcards: * ?
+        desc -- description (only to show in warning or error messages)
+       oblig -- if True, exit if there are no files matching fname_in 
     """
     # Get MCH file of the directory:
     fname_list = glob.glob(fname_in)
@@ -225,6 +241,7 @@ def get_mch(fn_mch_in, field, chip):
          'daomaster' does NOT accept char '-' in filenames, we will 
          use soft links with char '_' that were created in preprocess.
 
+     fn_mch_in -- MCH file with list of input files
          field -- field identificator (used to generate proper filenames for new files)
           chip --  chip identificator (used to generate proper filenames for new files)
 
@@ -236,7 +253,7 @@ def get_mch(fn_mch_in, field, chip):
     print_title ("============================================================================")
 
 
-    # Get filenames for current filter. Delete older files to avoid overwriting question when using daomatch
+    # Get filenames for current filter. Delete older files to avoid overwriting question when using daomaster
     fn_input   = field + "-daomaster_" + chip + ".input"
 
     #  Generate daomaster input file 
@@ -251,7 +268,7 @@ def get_mch(fn_mch_in, field, chip):
 
             # daomaster input file
             f_writeln(f, fn_mch_in)          # File with list of input files (MCH)
-            f_writeln(f, "2 0 99")            # Minimum number, minimum fraction, enough frames:       
+            f_writeln(f, "2 0 99")           # Minimum number, minimum fraction, enough frames:       
             f_writeln(f, "1")                # Maximum sigma
             f_writeln(f, "20")               # 20: Cubic transformation
             f_writeln(f, radius)             # Critical match-up radius
@@ -276,11 +293,12 @@ def get_mch(fn_mch_in, field, chip):
 
 ########################################################################################
 
-def get_input_stars(fn_stars, cols_order):
+def get_input_stars(fn_stars, cols_order, stars_shuffle):
     """ Read input stars from file and store it in a dictionary using columns order
     
     fn_stars -- file containing stars magnitudes
     cols_order -- array with the order of the filters
+    stars_shuffle -- if True, then stars from input file will be shuffled before using them
 
     RETURNS:
       * stars: Dictionary with stars ID (@) and magnitudes per filter 
@@ -291,7 +309,15 @@ def get_input_stars(fn_stars, cols_order):
 
     try:
         # Get output filename and read RAW input file (skip first lines of file header)
-        stars_raw = np.loadtxt(fn_stars, unpack=True, ndmin=2)
+        if not stars_shuffle:
+            stars_raw = np.loadtxt(fn_stars, unpack=True, ndmin=2) # No shuffling, direct read (Unpack)
+        else:
+            stars_raw = np.loadtxt(fn_stars, ndmin=2) # We will shuffle stars. np.shuffle() only works in the 
+            print("Shuffling " + str(len(stars_raw)) + " stars.")   # first dimension, so we will NOT unpack 
+            np.random.shuffle(stars_raw)              # Shuffle rows (each col is a filter)
+            stars_raw = np.transpose(stars_raw)       # Transpose (equivalent to Unpack, now each row is a filter)
+            print("Shuffling done!")
+     
         pos = 0
         stars = {}
         for col in cols_order:
@@ -371,15 +397,26 @@ def get_mode(ncols, fname, main_mode, ALLOWED_MODES):
  
 ########################################################################################
 
-def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip_info, radcent, dimfield, distance, corners, MAX_COEF, numcaj, numstar, offset, shift):
+def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, mtrans, 
+                     chip_info, radcent, dimfield, distance, corners, MAX_COEF, numcaj, 
+                     numstar, offset, shift):
     """
     Apply the transformations and generate the .add files with results
     Make .add files (one per line in file.mch) to be used with add task in DAOPHOT.
     Developed by adorta starting from a MATLAB code Version 2.7 05-Jul-2010  
      - Code changed to perform several transformation in cascade
      - Code changed to transform also magnitudes
-  
-         mode -- mode of the main MCH file (used in DAOMASTER: 2, 4, 6, 12, 20)
+     - Code changed to write also magnitude file (.mag) per mock
+     - Code changed to allow the limit of Mocks (iters) that will be generated
+
+       
+   max_iters -- if > 0, it will limit the number of iters (mocks generated)
+   
+       field -- field we are processing (usually FX: F1, F2, etc.)
+ 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
+        mode -- mode of the main MCH file (used in DAOMASTER: 2, 4, 6, 12, 20)
 
   mch_fnames -- List of filenames that appears in the MCH file 
                 provided by DAOMASTER task used to obtain the photometry.
@@ -436,6 +473,9 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
 
     """
 
+    print_title ("\n\nPROCESSING TRANSFORMATIONS AND CREATING ADD FILES...")
+    print_title ("============================================================================")
+
     # -----------------------------------------
     # SET DEFAULT VALUES (if empty)
     # -----------------------------------------
@@ -471,6 +511,7 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
 # PROCESS MCH FILE
 
     """
+    #DISABLED!!!
     mode = 0
     mch_fnames = []
     mch_data = []
@@ -492,7 +533,7 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
         return None
     """
 
-# Get number of images (number of lines in MCH files)
+    # Get number of images (number of lines in MCH files)
     nimages = len(mch_data)
     xsize   = int(((xmax - xmin + 1) / (radcent * 2)))
     ysize   = int(((ymax - ymin + 1) / (radcent * 2)))
@@ -500,9 +541,9 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     print("Mode: %s, nimages: %s, xsize: %s, ysize: %s" % (mode, nimages, xsize, ysize))
 
     # SEPARATION between lines (distribute artificial stars in triangles, NOT squares)
-    XSEP = sqrt(1/2)
+    XSEP = sqrt(0.5)
  
-# Get number of stars
+    # Get number of stars
     cn = len(caja[STAR_ID]);
     print ('Total number of artificial stars: ' + str(cn))
     print ('Maximun number of artificial stars in each frame: ' + str(int(arin)))
@@ -512,20 +553,23 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
         ########### sys.exit(-1)
 
 
-# Get max number of stars per output file
+    # Get max number of stars per output file
     addmax = int(ceil(float(cnmax)/arin))
     if cnmax > arin:
         print ('Too much artificial stars for a single file')
         print ('It will be used ' + str(addmax) + ' files to complete the total number of artificial stars')
+    if max_iters > 0 and max_iters < addmax:
+        print_warning("Limiting number of Mocks to " + str(max_iters))
+        addmax = max_iters
     max_files = int(round(999/nimages)-1)
     if addmax > max_files:
        exit_error_msg('Too many open files\nMaximun number is: ' + str(max_files) + "\nDecrease the total number of artificial stars", False)
 
 
-#-----------------------------------------------------------------------------
+    #-----------------------------------------------------------------------------
 
-# Now the matrix will be built, depending on MODE
-# Build also the filename array
+    # Now the matrix will be built, depending on MODE
+    # Build also the filename array
     mchdat = np.empty((0,MAX_COEF), float)
     filenames = [] 
 
@@ -538,52 +582,51 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
             filenames.append(fname)
             
 
-###########################################
-###### T R A N S F O R M A T I O N S ######
-###########################################
-
-# Asignamos coeficientes  para la transformacion de coordenadas 
-#
-# 'imagen 1' C(1,1) C(1,2) C(1,3) C(1,4) C(1,5) C(1,6) DMAG(1) SMAG(1) C(1,7) C(1,8) ... C(1,20)
-# ...
-# 'imagen n' C(n,1) C(n,2) C(n,3) C(n,4) C(n,5) C(n,6) DMAG(n) SMAG(n) C(n,7) C(n,8) ... C(n,20)
-#
-# tal que resuelven el sistema:
-#
-# Modo 2
-# X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn
-# Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn
-#                              
-# con C(n,3)=C(n,6)=1  y  C(n,5)=C(n,4)=0
-#
-# Modo 4:
-# X = C(n,1) + C(n,3)*Xn - Sign(cros)*C(n,4)*Yn
-# Y = C(n,2) + C(n,4)*Xn + Sign(cros)*C(n,3)*Yn
-#                              
-# Modo 6:
-# X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn
-# Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn
-#
-# Modo 12
-# X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn + C(n,7)*XDOS + C(n, 9)*XY  + C(n,11)*YDOS
-# Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn + C(n,8)*XDOS + C(n,10)*XY  + C(n,12)*YDOS
-#
-# Modo 20
-# X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn + C(n,7)*XDOS + C(n, 9)*XY  + C(n,11)*YDOS + C(n,13)*XS*XDOS + C(n,15)*YS*XDOS + C(n,17)*XS*YDOS + C(n,19)*YS*YDOS
-# Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn + C(n,8)*XDOS + C(n,10)*XY  + C(n,12)*YDOS + C(n,14)*XS*XDOS + C(n,16)*YS*XDOS + C(n,18)*XS*YDOS + C(n,20)*YS*YDOS
-#
-# Donde:
-# Sign(cros) es el signo de (C(n,3)*C(n,6) - C(n,4)*C(n,5))
-# XS = 2*(Xn-1)/(NCOL-1) - 1
-# YS = 2*(Yn-1)/(NROW-1) - 1
-# XY = XS*YS
-# XDOS = 1.5*XS^2 - 0.5
-# YDOS = 1.5*YS^2 - 0.5
-# DMAG = magnitud media pesada imagen-a-imagen respecto de la primera
-# SMAG = varianza de DMAG imagen-a-imagen
-
+    ###########################################
+    ###### T R A N S F O R M A T I O N S ######
+    ###########################################
+    """
+    we assign coeficients in order to transform the coordinates:
+    'image 1' C(1,1) C(1,2) C(1,3) C(1,4) C(1,5) C(1,6) DMAG(1) SMAG(1) C(1,7) C(1,8) ... C(1,20)
+    ...
+    'image n' C(n,1) C(n,2) C(n,3) C(n,4) C(n,5) C(n,6) DMAG(n) SMAG(n) C(n,7) C(n,8) ... C(n,20)
+   
+    to solve the system:
+   
+    Mode 2
+    X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn
+    Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn
+                                 
+    where C(n,3) = C(n,6) = 1 and  C(n,5) = C(n,4) = 0
+   
+    Mode 4:
+    X = C(n,1) + C(n,3)*Xn - Sign(cros)*C(n,4)*Yn
+    Y = C(n,2) + C(n,4)*Xn + Sign(cros)*C(n,3)*Yn
+                                 
+    Mode 6:
+    X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn
+    Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn
+   
+    Mode 12
+    X =  C(n,1) + C(n,3)*Xn + C(n,5)*Yn + C(n,7)*XDOS + C(n, 9)*XY  + C(n,11)*YDOS
+    Y =  C(n,2) + C(n,4)*Xn + C(n,6)*Yn + C(n,8)*XDOS + C(n,10)*XY  + C(n,12)*YDOS
+   
+    Mode 20
+    X = C(n,1) + C(n,3)*Xn + C(n,5)*Yn + C(n,7)*XDOS + C(n, 9)*XY + C(n,11)*YDOS + C(n,13)*XS*XDOS + C(n,15)*YS*XDOS + C(n,17)*XS*YDOS + C(n,19)*YS*YDOS
+    Y = C(n,2) + C(n,4)*Xn + C(n,6)*Yn + C(n,8)*XDOS + C(n,10)*XY + C(n,12)*YDOS + C(n,14)*XS*XDOS + C(n,16)*YS*XDOS + C(n,18)*XS*YDOS + C(n,20)*YS*YDOS
+   
+    where:
+    Sign(cros) -> sign of (C(n,3)*C(n,6) - C(n,4)*C(n,5))
+    XS = 2*(Xn-1)/(NCOL-1) - 1
+    YS = 2*(Yn-1)/(NROW-1) - 1
+    XY = XS*YS
+    XDOS = 1.5*XS^2 - 0.5
+    YDOS = 1.5*YS^2 - 0.5
+    DMAG = magnitud media pesada imagen-a-imagen respecto de la primera
+    SMAG = varianza de DMAG imagen-a-imagen
+    """
     
-    # FIRST TRANSFORMATION, data from MAIN MCH file
+    # FIRST TRANSFORMATION, data from MAIN MCH file (NOT NEEDED HERE!)
     ###mtrans_all = [main_mtrans, None]
     #mtrans_all = [mtrans]
  
@@ -600,6 +643,21 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     # Open output files for writing
     for k in xrange(nimages):
         fidimag.append(open(filenames[k], "w"))
+
+    # Create the MAG file with stars to be added
+    fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
+    f_mag = open(fn_mag, "w+")
+    # Copy HEADER from ref. image .als (3 first lines)
+    mag_header = ""
+    with open(mch_fnames[0]+".als", "r") as f_als:
+        n_line = 0
+        for als_line in f_als:
+            mag_header += als_line
+            n_line += 1
+            if n_line >= 3:
+                break
+    f_mag.write(mag_header)
+
 
     # Init arrays of stars inside/outside rectangle (just to print some stats)
     stars_in  = [0] * nimages
@@ -621,7 +679,21 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
         xpos_init = xmin + (2 * (xaux + 1) - 1) * radcent + offx
         ypos_init = ymin + (2 * (yaux + 1) - 1) * radcent + offy
 
-        # Transform all images
+        # Write line in file .mag for the current star. Format:
+        # ID  XREF YREF   F1 F1ERR  F2 F2ERR ... FN FNERR  CHI  SHARP  FLAG  PROB
+        # ALL ERRORS ARE 0.0000, CHI: 1.0000 SHARP=0.0000 FLAG:0 PROB:1.00
+        # Number of decimals and spaces are STRICT!!!
+        # Each line can only have 12 cols (first line could have 3 extra cols)
+        # Second and consecutive lines has 27 spaces before first data
+        MAX_COLS = 12
+        num_cols = 0
+        mag_line = "%9d %8.3f %8.3f" % (star_id, xpos_init, ypos_init)
+       
+        # -------------------------------------------------------------------------
+
+        #############################################
+        # TRANSFORM ALL IMAGES
+        #############################################
         for nimg in range(nimages):
 
             # Second transformation, data from current image
@@ -632,15 +704,7 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
             xpos = xpos_init
             ypos = ypos_init
 
-            try:
-                # Get calibrated color: colsign * (band - colband)
-                chip_img = chip_info[nimg]
-                color = chip_img['COLSIGN'] * (data_in[chip_img['BAND']][star_pos] - data_in[chip_img['COLBAND']][star_pos]) 
-                calmag = get_mag(chip_img, data_in[chip_img['FILTER']][star_pos], color, chip_img['FILTER'], distance, magext)
-
-            except:
-                exit_error_msg("There was a problem when processing magnitude for image " + mch_fnames[nimg])
-            
+           
             # BEGIN TRANSFORMATIONS
             # This code has been prepared in order to work with several consecutive transformations,
             # that's why we use lists of transformations instead of the variable
@@ -671,17 +735,45 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
             
             # After transformations, SAVE TO FILE (xpos, ypos) ONLY if it is inside rectangle given by corners
             if in_rectangle (corners, [xpos, ypos]):
+                # This star is INSIDE the limits, transform the MAGNITUDE and write it to ADD
+                try:
+                    # Get calibrated color: colsign * (band - colband)
+                    chip_img = chip_info[nimg]
+                    color = chip_img['COLSIGN'] * (data_in[chip_img['BAND']][star_pos] - data_in[chip_img['COLBAND']][star_pos]) 
+                    # PERFORM MAGNITUDE TRANSFORMATION
+                    calmag = get_mag(chip_img, data_in[chip_img['FILTER']][star_pos], color, chip_img['FILTER'], distance, magext)
+                except:
+                    exit_error_msg("There was a problem when processing magnitude for image " + mch_fnames[nimg])
+
+                # Write it to ADD file 
                 fidimag[nimg + (numcaj - numcajorg) * nimages].write('%6i %8.3f %8.3f %8.3f\n' % 
                                 (star_id, xpos, ypos, calmag))
+                mag_line += "%9.4f   0.0000" % calmag
                 stars_in[nimg]  += 1
             else:
-                # This point is outside corners, just add it to stats
+                # This point is outside corners, just ignore it
+                mag_line += "%9.4f   9.9999" % 99.9999
                 stars_out[nimg] += 1
+
+            # Check if we have to go to a new line in MAG file (every 12 cols we need to add new line)
+            num_cols += 2
+            if num_cols % MAX_COLS == 0: mag_line += "\n%27s" % ''
+ 
+
+#-----------------------------------------------------------------------------
+        # END MAG file with fixed fields: CHI SHARP FLAG PROB
+
+        num_cols += 2
+        mag_line += "   1.0000   0.0000"
+        if num_cols % MAX_COLS == 0: mag_line += "\n%23s" % ''
+        mag_line += "    0   1.00\n"
+        #mag_line += "   1.0000   0.0000    0   1.00\n"
+        f_mag.write(mag_line)
 
 
 #-----------------------------------------------------------------------------
 
-        # UPDATE COUNTERS: Get ready for next iteration over the star loop 
+        # UPDATE COUNTERS: Get ready for next iteration over the stars loop 
         # (Go to next star and next col of CCD)
         cn -= 1
         yaux += 1
@@ -698,6 +790,10 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
 
         # Check if CCD is FULL (xaux >= xsize) and there are still some stars to process (cn > 0)
         if (xaux >= xsize) and (cn > 0):
+
+            # Check if we have reached the limit of iters (Mocks). If so, quit loop!
+            if numcaj >= addmax: break        
+
             # CCD IS FULL, write in new files
             xaux = 0
             yaux = 0
@@ -712,7 +808,14 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
             for k in xrange(nimages):
                 fidimag.append(open(filenames[nfopen * nimages + k], 'w'))
 
+            # Close previous MAG file and create new one for current iteration
+            f_mag.close()
+            fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
+            f_mag = open(fn_mag, "w+")
+            f_mag.write(mag_header)
+ 
             print ('Writing set of files %s...' % numcaj)
+
 
 #-----------------------------------------------------------------------------
 
@@ -721,66 +824,45 @@ def crowdingmultipro(field, chip, mode, mch_fnames, mch_data, caja, mtrans, chip
     for f in fidimag:
         if not f.closed:
             f.close()
+    f_mag.close()
 
+
+#-----------------------------------------------------------------------------
+
+    # It could happen that due to the discards one (or more) of the mocks 
+    # has 0 stars. Then .add files will be empty and the creation of .fits
+    # files will fail. If that happens (any of the mocks is empty), then
+    # we will totally REMOVE that mock.
+
+    last_add_list = glob.glob(field+FILE_ITER_SEP+str(addmax)+"-*_"+chip+"."+FILE_ITER_EXT)
+    for fn_add in last_add_list:
+        f_info = os.stat(fn_add)
+        #print(fn_add + " -> " + str(f_info.st_size))
+        if f_info.st_size == 0:
+            # One of the add files is empty... Delete all files related to this mock!!!
+            print_warning(fn_add + " file is empty!! Removing all files of iter #" + str(addmax))
+            all_last_mock = glob.glob(field+FILE_ITER_SEP+str(addmax)+"-*")
+            for fn_rm in all_last_mock:
+                #print("Removing file: " + fn_rm)
+                os.remove(fn_rm)
+
+            # Update the max number of mocks
+            addmax -= 1
+            break
+      
+
+    
+#-----------------------------------------------------------------------------
+
+    # Show final stats about number of included and discarded stars
     print ("All files written:")
     for i in xrange(nimages):
-       print ("  Image %2d (%s). Total stars written (inside rectangle): %s of %s (discarded: %s)" % 
+        print ("  Image %2d (%s). Total stars written (inside rectangle): %s of %s (discarded: %s)" % 
                   (i+1, filenames[i], stars_in[i], stars_out[i] + stars_in[i], stars_out[i]))
 
-#-----------------------------------------------------------------------------
-
-    # After creating the new filenames for each mock, we have to update the Aperture Correction (ApCor)
-    # Info about ApCor is located in file with name apcor.lst that has been transfer to the main
-    # directory and also to each field/chip if they were separated
-    # We will create a new partial ApCor file just with the info of the current images, we need to
-    # replicate the info of each image:
-    # Original file:
-    # FX-......-NNa.del    0.0000000
-    # New file:
-    # FX-......-NNa.del    0.0000000
-    # FXMY-......-NNa.del    0.0000000
-
-    FNAME2RM = "a.del"       # In ApCor filenames have extra text to be removed         
-    # Filenames (original one and partial one)
-    APCOR_FILENAME = "apcor.lst"
-    partial_filename = field+"-partial_apcor_"+chip+".lst"
-   
-    # Use the original names of the images (FXX-......-NN)
-    fnames_apcor = copy.copy(mch_fnames)
-    try:
-        with open(APCOR_FILENAME, "r") as f_old:
-            with open(partial_filename, "w+") as f_new:
-                for line in f_old:
-                    if not line.strip().startswith('#'):   # Ignore comments
-                        line_data = line.strip().split()   # Separate filename (first col) and values (second col)
-                        fname = line_data[0].replace(FNAME2RM, "")  # Remove extra chars
-
-                        # Check if current line has 2 columns and this filename is in our list
-                        if len(line_data) == 2 and fname in fnames_apcor:  
-                            # Valid image!! Write the original data
-                            f_new.write(line)
-                            # Add mocks with same value
-                            for iadd in xrange(addmax):
-                                fname_new = get_iter_filename(fname, field, chip, iadd+numcajorg, FNAME2RM)
-                                f_new.write(fname_new + "   " + line_data[1]+"\n")
-                            # Remove current image from the pending list
-                            fnames_apcor.remove(fname)
-
-                        if len(fnames_apcor) == 0:
-                            break   # If there are no more images to be processed, break!!
-
-        # List of pending images should be empty... If not, print warning!!
-        if len(fnames_apcor) != 0:
-            print_warning("Not all images were added to apcor.lst!! Missing images: " + str(fnames_apcor))
-
-    except:
-        print_warning("There was an error when processing apcor.lst file. " 
-                     +"Aperture Correction info may not be properly updated, CALIB stage could fail!")
-    
-
-#-----------------------------------------------------------------------------
     return addmax
 
+#-----------------------------------------------------------------------------
 
 
 ########################################################################################
@@ -835,12 +917,15 @@ def clean_comments(f):
 
 ########################################################################################
 
-# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 def get_radcent_from_psf():
-    """ Returns value of radcent calculated from PSF files in the CWD
+    """ THIS FUNCTION IS NOT USED ANYMORE SINCE radcent IS CALCULATED 
+        FROM PS AND FI INFO IN OPT FILES!!
+        Returns value of radcent calculated from PSF files in the CWD
         Data from PSF files are obtained always from the first two
         columns of the second line of each PSF file. There is ONE blank
         space before first col and then each col has a fixed size of 13 chars.
+        
+      
 
         PSF Format:
            Line 1:...Header...
@@ -902,12 +987,19 @@ def get_radcent_from_psf():
 
 def get_radcent_from_opt(field, chip):
     """ Returns value of radcent calculated from OPT data stored in .dat files in the CWD
+     radcent is the distance in pixel between the centroids of the stars
+     The centroids of two adjacent stars will be separated this quantity
 
         PSF Format:
            Line 1:...Header...
            Line 2:_11111111111112222222222222...nnnnnnnnnnnnn
            Line 3:...
+
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
     """
+
     print_title ("\n\nCALCULATE VALUE OF RADCENT USING FI AND PS INFO OF OPT FILES:")
     print_title ("============================================================================")
 
@@ -934,8 +1026,12 @@ def get_dimfield_from_file(fname, corners, radcent):
     
          fname -- filename of MCH file
        corners -- original dims [x0,y0, x1,y1]
+       radcent -- distance in pixel between the centroids of the stars. The centroids of two adjacent stars will be separated this quantity
 
+       RETURNS:
+         dimfield
     """ 
+
     COL_X = 1     # Position of column X in MCH file (first col is 0)
     COL_Y = 2     # Position of column Y in MCH file (first col is 0)
     xmin = xmax = ymin = ymax = None
@@ -1052,6 +1148,13 @@ def process_mch(mch_file, input_data, cols_order, star_ini, number_stars, ALLOWE
 ########################################################################################
 
 def process_daophot(field, chip, numiters):
+    """ 
+       FITS files will be created from .add files using daophot.
+
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (mocks)
+    """
     DAO_EXT  = ".opt"
     DAO_GAIN = "GA"
     DAO_SEP  = "="
@@ -1082,7 +1185,7 @@ def process_daophot(field, chip, numiters):
         if gain == "":
             exit_error_msg ("There were errors when getting GAIN value from file: " + fn_img + DAO_EXT)
 
-        # Get filenames for current filter. Delete older files to avoid overwriting question when using daomatch
+        # Get filenames for current filter. Delete older files to avoid overwriting question when using daophot
         fn_input = fn_img + "-daophot.input"
 
         # Get base image filename
@@ -1105,7 +1208,7 @@ def process_daophot(field, chip, numiters):
                 f_writeln(f, gain)                  #    
 
                 for itr in xrange(1,numiters+1):
-                    f_writeln(f, get_iter_filename(fn_img, field, chip, itr, ".add"))    #        
+                    f_writeln(f, get_iter_filename(fn_img, field, chip, itr, "."+FILE_ITER_EXT))    #        
                     f_writeln(f, "")                       #    
 
                 f_writeln(f, "EXIT")                   #    
@@ -1124,7 +1227,8 @@ def process_argv(args, mch_ext):
     """
     Check and process command-line arguments
 
-    args -- array of arguments (sys.argv)
+      args -- array of arguments (sys.argv)
+   mch_ext -- Extension of MCH files
 
         RETURNS: 
         * main_mch_file: filename of the main MCH file
@@ -1134,13 +1238,16 @@ def process_argv(args, mch_ext):
         * corners:       array with opposite corners of CCD: [x0,y0, x1,y1]
         * radcent:       value of radcent
         * dimfield:      array: [xmin, xmax, ymin, ymax]
-        * distance:      value of distance
+        * distance:      value of distance used to calculate the calibrated magnitudes
     """
     argc           = 1
-    ARG_FIELD      = argc; argc+=1
-    ARG_CHIP       = argc; argc+=1
+    #ARG_FIELD      = argc; argc+=1
+    #ARG_CHIP       = argc; argc+=1
+    ARG_MCHFILE    = argc; argc+=1
     ARG_CHIPSFILE  = argc; argc+=1
+    ARG_MAXMOCKS   = argc; argc+=1
     ARG_STARSCOLS  = argc; argc+=1
+    ARG_STARSSHUF  = argc; argc+=1
     ARG_MAGEXT     = argc; argc+=1
     ARG_MAXCCDSIZE = argc; argc+=1
     ARG_DIMFIELD   = argc; argc+=1
@@ -1156,15 +1263,18 @@ def process_argv(args, mch_ext):
 
     if len(args) != NUM_ARGS:
         # Wrong number of parameters
-        exit_error_msg("Syntax: %s <1:field> <2:chip> <3:chip_file> <4:starscols> <5:magext> <6:maxccdsize> <7:dimfield> <8:radcent> <9:distance>" % args[0], True)
+        exit_error_msg("Syntax: %s <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> " 
+                       "<6:magext> <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance>" % args[0], True)
 
 
-    field = args[ARG_FIELD].strip()
-    chip  = args[ARG_CHIP].strip()
-
-    mch_args   = field + "_*_"     + chip + mch_ext
-    stars_file = field + "-stars_" + chip + ".txt"
-
+    try:
+        # MCH filename has format FX-NNNNNN_YY.mch) -> Get FIELD (FX) and CHIP (YY) from it!
+        mch_fn = os.path.basename(args[ARG_MCHFILE])         # Remove path, get only FILENAME
+        field  = mch_fn.split("-")[0].strip()                # Field (FX) goes BEFORE "-"
+        chip   = mch_fn.split("_")[1].split(".")[0].strip()  # Chip  (YY) goes BETWEEN "_" and "." 
+        print_info ("Processing Field " + field + " and Chip " + chip)
+    except:
+        error_msg = " * Field and chip data\n"
 
 
     # Process config file and read each field
@@ -1172,6 +1282,8 @@ def process_argv(args, mch_ext):
 
     try:
         # Main MCH file: string
+        # Filename format is FX_NNNNNN_YY.alf.mch -> replace FX-NNNNNN_YY.mch to get new format
+        mch_args   = mch_fn.replace("-", "_").replace(".mch", ".alf.mch")
         main_mch_file = get_filename(mch_args, "Main MCH", True)
     except:
         error_msg += " * Main MCH file\n"
@@ -1182,9 +1294,23 @@ def process_argv(args, mch_ext):
     except:
         #print ("Unexpected error:", str(sys.exc_info()))
         error_msg += " * Chips data file\n"
+
+    try:
+        # max_iters: int (limit in the number of mocks)
+        max_iters = int(args[ARG_MAXMOCKS])
+    except:
+        error_msg += " * Max Number of Mocks\n"
+
+    try:
+        # starsShuffle: bool
+        stars_shuffle = (args[ARG_STARSSHUF] != '0') and (args[ARG_STARSSHUF] != '')
+    except:
+        error_msg += " * Stars Shuffle\n"
+ 
     
     try:
         # Input file: string
+        stars_file = field + "-stars_" + chip + ".txt"
         input_file    = get_filename(stars_file, "Input stars", True)
     except:
         error_msg += " * Input file\n"
@@ -1316,19 +1442,24 @@ def process_argv(args, mch_ext):
     else:
         # No errors: print and return values 
         print_title ("\n\nPROCESSING INPUT DATA:")   
-        print_title ("======================")
+        print_title ("============================================================================")
         print_subtitle("   Main MCH file: " + main_mch_file)       
         print_subtitle(" Chips data file: " + chips_file)       
         print_subtitle("      Input file: " + input_file)
         print_subtitle("    Column order: " + str(cols_order))
-        print_subtitle("  Magnitude Ext.: " + str(magext))
         print_subtitle("         Corners: " + str(corners))
         print_subtitle("         Radcent: " + str(radcent))
         print_subtitle("        Dimfield: " + str(dimfield))  
         print_subtitle("           Field: " + field)  
-        print_subtitle("            Chip: " + chip)  
+        print_subtitle("            Chip: " + chip) 
+        print_subtitle(" Mag. Extinction: " + str(magext))
+        print_subtitle("        Distance: " + str(distance))
+        if max_iters > 0: print_subtitle("     Limit Mocks: " + str(max_iters)) 
+        if stars_shuffle: print_subtitle("   Shuffle stars: YES") 
+        else: print_subtitle("   Shuffle stars: NO") 
 
-        return [main_mch_file, chips_file, input_file, cols_order, magext, corners, radcent, dimfield, distance, field, chip]
+
+        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, dimfield, distance, field, chip, max_iters]
 
 ########################################################################################
 
@@ -1337,9 +1468,12 @@ def get_mag(data, calmag, colsub, star_filt, distance, magext):
         color = colsub  * 3.07 * EBV
         instmag = calmag + zpterm + amterm*X + colterm*COLOR + apcorr - 2.5*alog10(exptime)  [X = airmass]
 
-    data   -- chip values for the current image
-    calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
-    colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
+       data   -- chip values for the current image
+       calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
+       colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
+    star_filt -- filter used in this image
+     distance -- used to calculate the calibrated magnitude
+       magext -- magnitude extinctions
 
     RETURNS:
      * calculated magnitude according to the given equation
@@ -1347,7 +1481,6 @@ def get_mag(data, calmag, colsub, star_filt, distance, magext):
 
     absorption = magext[star_filt] * data['EBV']
     calmag += absorption + distance
-    #instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] + data['COLTERM'] * color + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] + data['COLTERM'] * colsub + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     return instmag
  
@@ -1394,7 +1527,21 @@ def get_chip_info(fn_chips, fnames_img):
 ########################################################################################
 
 def get_iter_filename(orig_fn, field, chip, iteration, new_ext=None, sep=None):
-    # Get the new filename
+    """ 
+    Get the filename INCLUDING the Mock number (iteration) using orig_fn as basename
+    For instance, FX-001234_YY.eee will be FXM1-001234_YY.eee for the first Mock (iter=1)
+    It will also change extension if a new extension (new_ext) is given
+
+     orig_fn -- Original filename
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+   iteration -- current iteration (mock number)
+     nex_ext -- new extension (if present, old extension will be replaced by the new one)
+        sep  -- separator between field and mock number (iteration)
+
+     RETURNS:
+        new_fn: New filename after applying the modifications
+    """
 
     if sep is None:
         sep = FILE_ITER_SEP
@@ -1413,11 +1560,39 @@ def get_iter_filename(orig_fn, field, chip, iteration, new_ext=None, sep=None):
 ########################################################################################
 
 def get_mch_addstar_fn(field, chip):
+    """ 
+    Get the filename of the MCH file according to field and chip
+
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+
+    RETURNS:
+       New filename of MCH file according to current field and chip
+    """
+
     return field + "-" + MCH_ADDSTAR + "_" + chip + ".mch"
 
 ########################################################################################
 
 def create_mch(main_mch, field, chip, numiters, dest_mch):
+    """
+    Create the new MCH files (replacing .alf with .als) and adding the Mock 
+    number (iteration). Since we are introducing new filenames, we need some 
+    related files (.psf, .mag, etc.)
+    Those files are the same as the original ones, we only need to copy them, 
+    but it's better to just make a symbolic link (symlink). 
+    For example, when creating FXMN-001234_YY.alf, we also need the FXMN-001234_YY.psf, 
+    but this file is the same for all iterations, so we need to do: 
+    XMi-001234_YY.psf -> FX-001234_YY.psf for each iteration from 1..N
+    We need to that for ALL extension in SYMLINKS_EXT.
+
+    main_mch -- Filename of the main MCH file
+       field -- field we are processing (usually FX: F1, F2, etc.)
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (number of Mocks)
+    dest_mch -- Original name of the MCH file that will be trasnformed 
+    """
+
     OLD_EXT = ".alf"
     NEW_EXT = ".als"
     SYMLINKS_EXT = [".als", ".raw", ".opt", ".psf", ".als.opt", ".ap" , ".mag", ".log",
@@ -1434,33 +1609,166 @@ def create_mch(main_mch, field, chip, numiters, dest_mch):
     try:
         mch_f = [None] * numiters
         for i in xrange(numiters):
+            # Build all new MCH files (one per Mock)
             dest_fn = get_iter_filename(dest_mch, field, chip, i+1)
             mch_f[i] = open(dest_fn, "w")
             print("Creating MCH file: " + dest_fn)
         
+        # Process old MCH file (original one, we will use it like a template)
         with open(get_mch_addstar_fn(field, chip), "r") as f:
             for line in f:
                 line = line.strip()
                 if line:
                     for i in xrange(numiters):
+                        # Get OLD filename (Original one from MCH. 
+                        # Then remove everything to get ONLY the basename (remove extension, etc.)
                         old_fn = line.split(" ")[0].replace("'","").replace(OLD_EXT,"")
+                        # Build the new names that includes different extension and MOCK number
                         new_fn = get_iter_filename(old_fn, field, chip, i+1) 
+                        # Replace old names with new ones
                         xline = line.replace(old_fn+OLD_EXT, new_fn+NEW_EXT)
                         f_writeln(mch_f[i], xline)
                           
                         # Create SYMLINKS
+                        # We need symlinks from new files with Mock number to the old original files
+                        # for the given extension (SYMLINKS_EXT)
                         for ext in SYMLINKS_EXT:
                             if os.path.isfile(old_fn+ext):
                                 try:
                                     os.symlink(old_fn+ext, new_fn+ext)
                                 except:
                                     continue
-
+        # Close all open files
         for i in xrange(numiters):
             mch_f[i].close() 
  
     except:
         exit_error_msg ("Error when creating MCH files!")
+
+########################################################################################
+
+def update_apcor(field, chip, mch_fnames, numiters):
+    """
+    After creating the new filenames for each mock, we have to update the Aperture Correction (ApCor)
+    Info about ApCor is located in file with name apcor.lst that has been transfer to the main
+    directory and also to each field/chip if they were separated
+    We will create a new partial ApCor file just with the info of the current images, we need to
+    replicate the info of each image:
+    Original file:
+    FX-......-NNa.del    0.0000000
+    New file:
+    FX-......-NNa.del    0.0000000
+    FXMY-......-NNa.del    0.0000000
+
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+  mch_fnames -- List of filenames of all MCH files
+    numiters -- Number of iterations (number of Mocks)
+    """
+
+    # Filenames (original one and partial one)
+    APCOR_FILENAME = "apcor.lst"
+    FNAME2RM = "a.del"       # In ApCor filenames have extra text to be removed         
+
+    print_title ("\n\nUPDATING ApCor INFORMATION FOR THIS CHIP...")
+    print_title ("============================================================================")
+
+
+    partial_filename = field+"-partial_apcor_"+chip+".lst"
+    # Use the original names of the images (FXX-......-NN)
+    fnames_apcor = copy.copy(mch_fnames)
+    try:
+        with open(APCOR_FILENAME, "r") as f_old:
+            with open(partial_filename, "w+") as f_new:
+                for line in f_old:
+                    if not line.strip().startswith('#'):   # Ignore comments
+                        line_data = line.strip().split()   # Separate filename (first col) and values (second col)
+                        fname = line_data[0].replace(FNAME2RM, "")  # Remove extra chars
+
+                        # Check if current line has 2 columns and this filename is in our list
+                        if len(line_data) == 2 and fname in fnames_apcor:  
+                            # Valid image!! Write the original data
+                            f_new.write(line)
+                            # Add mocks with same value (1..N)
+                            for iadd in xrange(1,numiters+1):
+                                fname_new = get_iter_filename(fname, field, chip, iadd, FNAME2RM)
+                                f_new.write(fname_new + "   " + line_data[1]+"\n")
+                            # Remove current image from the pending list
+                            fnames_apcor.remove(fname)
+
+                        if len(fnames_apcor) == 0:
+                            break   # If there are no more images to be processed, break!!
+
+        # List of pending images should be empty... If not, print warning!!
+        if len(fnames_apcor) != 0:
+            print_warning("Not all images were added to apcor.lst!! Missing images: " + str(fnames_apcor))
+        print_info("Update done! Partial ApCor data for field " + field + " and chip " + chip + " is stored in file " + partial_filename)
+
+    except:
+        print_warning("There was an error when processing apcor.lst file. " 
+                     +"Aperture Correction info may not be properly updated, CALIB stage could fail!")
+        print (sys.exc_info())
+
+
+ 
+###################################################################################
+
+def create_trans_eq_calib(field, chip, numiters, chip_info):
+    """
+    Create the Transforamtion Equations that will be used in CALIB stage
+    All data are extracted from Chips info File. Output has 3 lines per image and mock:
+
+    1) First line: filename,  band name,      color name, zero-point, airmass, color,   airmass*color, color^2
+       Fields:     BASE,      FILTER or BAND  note1       ZPTERM,     AMTERM   COLTERM, AMCOLTERM,     COLSQTERM
+    2) Second line:  errors (note2)
+    3) Third line: empty
+
+    note1: COLSIGN indicates how to construct the color (COLSIGN=1 means color=BAND-COLBAND. COLSIGN=-1 means color=COLBAND-BAND)
+    note2: XXXXSIG are the error terms that go on the second line (example: ZPTERMSIG, AMTERMSING, etc.)
+    Example:
+    F5-00517150_43  g  g-r  -0.4089    0.1713   -0.1193   0.0000   0.0000
+                             0.0040   -0.0000    0.0001   0.0000   0.0000
+       field -- field we are processing (usually FX: F1, F2, etc.) 
+        chip -- chip we are processing (usually YY: 01, 02 ... 62)
+    numiters -- Number of iterations (number of Mocks)
+   chip_info -- Info about each image (filters, coefficients, etc.)
+
+
+    """
+
+    print_title ("\n\nCREATING TRANSFORMATION EQUATIONS FOR THIS CHIP:")   
+    print_title ("============================================================================")
+
+    try:
+        line_format = "%18s  %s  %s  %8.4f %8.4f %8.4f %8.4f %8.4f\n"
+        partial_filename = field+"-partial_calib_"+chip+".trans"
+        with open(partial_filename, "w+") as f:
+            for info in chip_info:
+                for iadd in xrange(1, numiters+1):
+                    # Add Mock number to base name
+                    fname = info['BASE'].replace("-", "M"+str(iadd)+"-")
+                   
+                    # Get color name based on COLSIGN (see note1)
+                    if info['COLSIGN'] == 1: color = info['BAND'] + "-" + info['COLBAND']
+                    else:                    color = info['COLBAND'] + "-" + info['BAND']
+
+                    line  = line_format % (fname, info['FILTER'], color,
+                            info['ZPTERM'],    info['AMTERM'],    info['COLTERM'],    info['AMCOLTERM'],    info['COLSQTERM'])
+
+                    line += line_format % ('', ' ', '   ',
+                            info['ZPTERMSIG'], info['AMTERMSIG'], info['COLTERMSIG'], info['AMCOLTERMSIG'], info['COLSQTERMSIG'])
+                    
+                    line += "\n"
+                    f.write(line)
+
+        print_info("Done! Partial Transf. Eq. for field " + field + " and chip " + chip + " are stored in file " + partial_filename)
+
+    except:
+        print_warning("There was an error when generating Transformation Equations for this chip. " 
+                     +"Info may not be properly created and CALIB stage could fail!")
+        print (sys.exc_info())
+
+
     
 
 ###################################################################################
@@ -1502,6 +1810,7 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
 [orig_mch_file,   \
  chips_file,      \
  stars_file,      \
+ stars_shuffle,   \
  cols_order,      \
  magext,          \
  corners,         \
@@ -1509,7 +1818,8 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
  dimfield,        \
  distance,        \
  field,           \
- chip]            \
+ chip,            \
+ max_iters]       \
  = process_argv(sys.argv, MCH_FILE_EXT)
 
 
@@ -1517,7 +1827,7 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
 mch_file = get_mch(orig_mch_file, field, chip)
 
 # Get and store stars magnitude input file
-stars = get_input_stars(stars_file, cols_order)
+stars = get_input_stars(stars_file, cols_order, stars_shuffle)
 
 star_init = number_stars = 0
 # Get data from MAIN MCH and INPUT files
@@ -1547,10 +1857,9 @@ shift   = 0
 ###########################################################
 # PROCESS TRANSFORMATIONS
 ###########################################################
-print_title ("\n\nPROCESSING TRANSFORMATION ACCORDING TO MCH %s..."  % mch_file)
-print_title ("============================================================================")
-
-numiters = crowdingmultipro(field, chip, mode, mch_fnames, mch_data, data_in, mmtrans, chip_info, radcent, dimfield, distance, corners, MAX_COEF,  None, star_init, offset, shift)
+numiters = crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, data_in, mmtrans, 
+                            chip_info, radcent, dimfield, distance, corners, MAX_COEF, 
+                            None, star_init, offset, shift)
 
 ###########################################################
 # DAOPHOT: Process each Iteration
@@ -1559,6 +1868,17 @@ numiters = crowdingmultipro(field, chip, mode, mch_fnames, mch_data, data_in, mm
 process_daophot(field, chip, numiters)
 create_mch(mch_file, field, chip, numiters, orig_mch_file)
 
+##########################################################
+# AUXILIAR OPERATIONS: Update apcor (APerture CORrection) 
+# and create Transformation Equation for CALIB stage
+# (partial data only for this chip, later all partial
+# data will be gathered and joined in one single file)
+##########################################################
+update_apcor(field, chip, mch_fnames, numiters)
+create_trans_eq_calib(field, chip, numiters, chip_info)
 
+##########################################################
 print ("\nEND TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
 print ("Final elapsed time (in seconds): " + str(time.time() - init_time))
+
+

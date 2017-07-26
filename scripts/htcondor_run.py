@@ -59,15 +59,16 @@ if oper == 'condor_submit':
   
 
   # Submit!!
-  clusterId = 0
-  with schedd.transaction() as txn:  # txn will now represent the transaction.
-    clusterId = sub.queue(txn, N)
+  try:
+    with schedd.transaction() as txn:  # txn will now represent the transaction.
+      clusterId = sub.queue(txn, N)
+  except:
+    clusterId = 0
 
+  print (clusterId)
   # Check submission
-  if clusterId:
-    print (clusterId)
-  else:
-    err_msg_exit("There was an error submitting jobs")
+  #if not clusterId:
+  #  err_msg_exit("There was an error submitting jobs")
 
 
 #########################
