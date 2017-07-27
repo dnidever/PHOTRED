@@ -439,7 +439,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
     dimfield -- Field size covered by all the images in file.mch and offset in X and Y
                 to be applied: [xmin ymin xmax ymax]
     
-    distance -- Distance to calculate calibrated magnitude
+    distance -- Distance Modulus to calculate calibrated magnitude
 
      corners -- Coordinates of the corners of the images
                 [x0, y0, x1, y1]  x0 <= x1, y0 <= y1
@@ -880,7 +880,7 @@ def print_config_file_help():
     print ("\tLine 5: Max CCD size [format]: xmax ymax")
     print ("\tLine 6: radcent (set a float value OR use * to calculate radcent using .opt files)")
     print ("\tLine 7: Field size covered by all the images (dimfield). You can specify a MCH file to calculate values OR set them: xmin xmax ymin ymax")
-    print ("\tLine 8: Distance used to calculate calibrated magnitude that will be added to absorption")
+    print ("\tLine 8: Distance Modulus used to calculate calibrated magnitude (it will be added to absorption)")
     print ("\t# Empty lines or those beginning with '#' will be ignored\n")
     print_title("\nEXAMPLE OF CONFIG FILE:\n")
     print ("\t# Main MCH file\n\tF*_*_*.alf.mch\n")
@@ -1238,7 +1238,7 @@ def process_argv(args, mch_ext):
         * corners:       array with opposite corners of CCD: [x0,y0, x1,y1]
         * radcent:       value of radcent
         * dimfield:      array: [xmin, xmax, ymin, ymax]
-        * distance:      value of distance used to calculate the calibrated magnitudes
+        * distance:      value of Distance Modulus used to calculate the calibrated magnitudes
     """
     argc           = 1
     #ARG_FIELD      = argc; argc+=1
@@ -1443,20 +1443,20 @@ def process_argv(args, mch_ext):
         # No errors: print and return values 
         print_title ("\n\nPROCESSING INPUT DATA:")   
         print_title ("============================================================================")
-        print_subtitle("   Main MCH file: " + main_mch_file)       
-        print_subtitle(" Chips data file: " + chips_file)       
-        print_subtitle("      Input file: " + input_file)
-        print_subtitle("    Column order: " + str(cols_order))
-        print_subtitle("         Corners: " + str(corners))
-        print_subtitle("         Radcent: " + str(radcent))
-        print_subtitle("        Dimfield: " + str(dimfield))  
-        print_subtitle("           Field: " + field)  
-        print_subtitle("            Chip: " + chip) 
-        print_subtitle(" Mag. Extinction: " + str(magext))
-        print_subtitle("        Distance: " + str(distance))
-        if max_iters > 0: print_subtitle("     Limit Mocks: " + str(max_iters)) 
-        if stars_shuffle: print_subtitle("   Shuffle stars: YES") 
-        else: print_subtitle("   Shuffle stars: NO") 
+        print_subtitle("    Main MCH file: " + main_mch_file)       
+        print_subtitle("  Chips data file: " + chips_file)       
+        print_subtitle("       Input file: " + input_file)
+        print_subtitle("     Column order: " + str(cols_order))
+        print_subtitle("          Corners: " + str(corners))
+        print_subtitle("          Radcent: " + str(radcent))
+        print_subtitle("         Dimfield: " + str(dimfield))  
+        print_subtitle("            Field: " + field)  
+        print_subtitle("             Chip: " + chip) 
+        print_subtitle("  Mag. Extinction: " + str(magext))
+        print_subtitle(" Distance Modulus: " + str(distance))
+        if max_iters > 0: print_subtitle("      Limit Mocks: " + str(max_iters)) 
+        if stars_shuffle: print_subtitle("    Shuffle stars: YES") 
+        else: print_subtitle("    Shuffle stars: NO") 
 
 
         return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, dimfield, distance, field, chip, max_iters]
@@ -1472,7 +1472,7 @@ def get_mag(data, calmag, colsub, star_filt, distance, magext):
        calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
        colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
     star_filt -- filter used in this image
-     distance -- used to calculate the calibrated magnitude
+     distance -- Distance Modulus used to calculate the calibrated magnitude
        magext -- magnitude extinctions
 
     RETURNS:
