@@ -136,7 +136,14 @@ if starscols eq '' then begin
 endif
 
 ; Check whether datatransfer is one of the valid methods
-if datatransfer ne 'skip' and datatransfer ne 'copy' and datatransfer ne 'move' and datatransfer ne 'link' then datatransfer='skip'
+datatransfer_valid = ['skip', 'copy', 'move', 'link', 'inlist']
+if where(datatransfer_valid eq datatransfer) eq -1 then begin 
+  printlog,logfile,''
+  printlog,logfile,'WARNING!! "' + datatransfer + '" is not a valid transfer option'
+  printlog,logfile,'Please, check your setup file. Skipping file transferring...'
+  printlog,logfile,''
+  datatransfer = 'skip'
+endif
 
 ; Check if the scripts exist in the current directory
 scripts = ['fakered_transfer.sh']
@@ -325,9 +332,9 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,  $
                     failurelist=failurelist,/silent
 
 
-;---------------------------------------
-; GATHER AND MERGE PARTIAL FILES
-;---------------------------------------
+; ---------------------------------------
+;  GATHER AND MERGE PARTIAL FILES
+; ---------------------------------------
 
 ; Some information like Aperture Correction (apcor) and Transformation Equations 
 ; are created partially for each chip and stored in partial files. 
@@ -339,7 +346,7 @@ partial_files = [{fn_full:'apcor.lst',   fn_part:'*partial_apcor*.lst'}, $
 for i=0,n_elements(partial_files)-1 do begin
   ; If the destination file exists, save a BAK
   if file_test(partial_files[i].fn_full) then $    
-    file_move, partial_files[i].fn_full, partial_files[i].fn_full+".bak", /OVERWRITE
+    file_move, partial_files[i].fn_full, partial_files[i].fn_full+'.bak', /OVERWRITE
 
   ; Search for all partial files, read them and write all content in a single file
   partial_fn = file_search("", partial_files[i].fn_part, /FULLY)
@@ -349,8 +356,71 @@ for i=0,n_elements(partial_files)-1 do begin
   endfor
 endfor
 
+; ---------------------------------------
+;  BUILD THE NEW fields FILE
+; ---------------------------------------
+; We will add the new "fake" fields (fieldmock: FXM1, FXM2, ... FXMN) 
+; to the fields file, since it is required by later stages (like COMBINE)
+; The long field name of the new fieldmocks will be the same as the old field
+; Example (with 2 mocks per field):
+;    OLD fields file                NEW field file
+;      F1    Field10                  F1    Field10
+;      F2    Field43                  F1M1  Field10
+;                                     F1M2  Field10
+;                                     F2    Field43
+;                                     F2M1  Field43
+;                                     F2M2  Field43
+FIELDS_FILE='fields'
+if file_test(FIELDS_FILE) then begin      
+  newshortfields = []
+  newfields = []
+  ; Read old field file
+  READCOL,FIELDS_FILE,oldshortfields,oldfields,format='A,A',/silent
+  ; Backup old file (-> fields.bak)
+  file_move, FIELDS_FILE, FIELDS_FILE+".bak", /OVERWRITE
+  ; Process the outlist to get the new shortfields (they include mocks)
+  for i=0,n_elements(outlist)-1 do begin
+    fn = file_basename(outlist[i])
+    ; Get the fieldmock (FXMN) and the field (FN) of each outlist file
+    prefix = strsplit(fn, "-", /EXTRACT)
+    fieldmock = prefix[0]
+    prefix = strsplit(fieldmock, 'M', /EXTRACT)
+    field = prefix[0]
+   
+    ; Check if the field (FX) is already included in the new fields 
+    newidx = where(newshortfields eq field)
+    if newidx lt 0 then begin
+      ; It is not inclueded, add it!!
+      oldidx = where(oldshortfields eq field)
+      if oldidx ge 0 then begin
+        ; Add both shortfield and field
+        PUSH,newshortfields,field
+        PUSH,newfields,oldfields[oldidx]
+      endif else printlog,logfile,"WARNING: NO field " + field + " found in original field file!!"
+    endif
+       
+    ; Check if the fieldmock (FXMN) is already included in the new fields 
+    newidx = where(newshortfields eq fieldmock)
+    if newidx lt 0 then begin
+      ; It is not inclueded, add it!!
+      oldidx = where(oldshortfields eq field)
+      if oldidx ge 0 then begin
+        ; Add both shortfield and field
+        PUSH,newshortfields,fieldmock
+        PUSH,newfields,oldfields[oldidx]
+      endif
+    endif
+  endfor
+
+  ; Write to file...
+  out = newshortfields+'   '+newfields
+  WRITELINE,FIELDS_FILE,out
+endif else printlog,logfile,"WARNING: NO fields field found!!"
+  
+  
+
 ; --------------------------------------
-; OLD CODE (using shell scripts) 
+; OLD CODE TO GENERATE LIST (using shell scripts) 
 ; --------------------------------------
 ; Update the list with all NEW mch files create for each mock (F*M*....mch)
 ;cmd = 'find `pwd` -name "F*M*-*_??.mch" > logs/ALLFRAME.inlist'

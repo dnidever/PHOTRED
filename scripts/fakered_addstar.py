@@ -878,7 +878,7 @@ def print_config_file_help():
     print ("\tLine 4: Order of input file columns (separated by space, it MUST contain stars ID marked with " 
                 + STAR_ID + ". Ignore cols using: " + IGNORE_COL + ")")
     print ("\tLine 5: Max CCD size [format]: xmax ymax")
-    print ("\tLine 6: radcent (set a float value OR use * to calculate radcent using all PSF files in the current directory)")
+    print ("\tLine 6: radcent (set a float value OR use * to calculate radcent using .opt files)")
     print ("\tLine 7: Field size covered by all the images (dimfield). You can specify a MCH file to calculate values OR set them: xmin xmax ymin ymax")
     print ("\tLine 8: Distance used to calculate calibrated magnitude that will be added to absorption")
     print ("\t# Empty lines or those beginning with '#' will be ignored\n")

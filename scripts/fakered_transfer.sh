@@ -52,11 +52,12 @@ ARGS=( \
 # "8 (Optional): destination (current directory if none). It will be created if it does NOT exist" \
 
 
-if [[ $# -eq 1 ]] && [[ $1 == 'inlist' ]]
+if [[ $# -ge 1 ]] && [[ $1 == 'inlist' ]]
 then 
   # If there is only one argument and it is "inlist", only the list will be created
   find `pwd` -regextype sed -regex ".*F[0-9]*-[0-9]*_[0-9]*\.mch" | sort > $INLIST
-  echo "Input list for ADDSTAR stage has been created in $INLIST"
+  echo "Input list for ADDSTAR stage has been created in $INLIST. Skipping file transferring..."
+  echo ""
   exit
 elif [[ $# -eq 8 ]] 
 then
