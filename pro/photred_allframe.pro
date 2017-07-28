@@ -555,9 +555,9 @@ hyades = stregex(host,'hyades',/boolean,/fold_case)
 
 
 ; Running on multiple machines
-if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread) or (htcondor ne '0'))  then begin
+if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread) or (htcondor ne 0))  then begin
 
-  if htcondor ne '0' then begin
+  if htcondor ne 0 then begin
     ; Get SETUP to see if we are using IDL VM and/or we have some submit commands
     htcondor_cmd   = getparam(htcondor_cmd, 'htcondor_cmd',   setup, '', logfile)
     htcondor_idlvm = getparam(htcondor_cmd, 'htcondor_idlvm', setup, '', logfile)

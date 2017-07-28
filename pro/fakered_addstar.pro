@@ -108,6 +108,7 @@ htcondor        = getparam(htcondor        , 'htcondor'        , setup, '0'     
 htcondor_cmd    = getparam(htcondor_cmd    , 'htcondor_cmd'    , setup, ''            , logfile)
 starsshuffle    = getparam(starsshuffle    , 'starsshuffle'    , setup, '0'           , logfile, /bool)
 maxmocks        = getparam(maxmocks        , 'maxmocks'        , setup, '0'           , logfile)
+refinemch       = getparam(refinemch       , 'refinemch'       , setup, '0'           , logfile)
 
 ; SOME EXTRA VALIDATIONS
 
@@ -177,12 +178,14 @@ if (ndaophotfile eq 0) then begin
   return
 endif
 
-; Check that the DAOMSATER programs exist
-SPAWN,'which daomaster',out,errout
-daomasterfile = FILE_SEARCH(out,count=ndaomasterfile)
-if (ndaomasterfile eq 0) then begin
-  print,'DAOMASTER PROGRAM NOT AVAILABLE'
-  return
+if refinemch gt 0 then begin
+  ; Check that the DAOMSATER programs exist
+  SPAWN,'which daomaster',out,errout
+  daomasterfile = FILE_SEARCH(out,count=ndaomasterfile)
+  if (ndaomasterfile eq 0) then begin
+    print,'DAOMASTER PROGRAM NOT AVAILABLE'
+    return
+  endif
 endif
 
 
@@ -253,20 +256,21 @@ for i=0,nmchinputlines-1 do begin
   base_dir = file_dirname(mchinputlines[i])
   ; Make commands for addstar python program
   ; Syntax: python python_script.py  <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> 
-  ;                                  <6:magext>   <7:maxccdsize> <8:dimfield> <9:radcent>   <10:distance>
+  ;                                  <6:magext>   <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance> <11:refinemch>
   cmd1  = pythonbin                 + " "   + base_script            + " '"    $
         + mchinputlines[i]          + "' '" + base_chipsfile         + "' '"   $
         + strcompress(maxmocks)     + "' '" + strcompress(starscols) + "' '"   $
         + strcompress(starsshuffle) + "' '" + strcompress(magext)    + "' '"   $
         + strcompress(maxccdsize)   + "' '" + strcompress(radcent)   + "' '"   $
-        + strcompress(dimfield)     + "' '" + strcompress(distance)  + "'"
+        + strcompress(dimfield)     + "' '" + strcompress(distance)  + "' '"   $
+        + strcompress(refinemch)    + "'"
     ; Add commands and directories
   PUSH,cmd,cmd1
   PUSH,cmddir,base_dir
 endfor
 
 
-if htcondor ne '0' then begin
+if htcondor ne 0 then begin
   ; HTCondor is ENABLED!!
 
   ; Build the HTCondor submit commands (Use |=| for assignations and |;| to separate commands
@@ -277,9 +281,9 @@ if htcondor ne '0' then begin
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=waittime,    $
            htcondor=htcondor_cmd, scriptsdir=scriptsdir, pythonbin=pythonbin
 
-endif else $
+endif else  $
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='py',hyperthread=hyperthread,waittime=waittime,    $
-           htcondor=htcondor_cmd, scriptsdir=scriptsdir, pythonbin=pythonbin,/cdtodir
+           htcondor='', scriptsdir=scriptsdir, pythonbin=pythonbin,/cdtodir
 
 
 

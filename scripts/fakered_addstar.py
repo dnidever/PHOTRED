@@ -233,7 +233,7 @@ def get_filename(fname_in, desc, oblig=True):
 
 ########################################################################################
 
-def get_mch(fn_mch_in, field, chip):
+def get_mch(fn_mch_in, refine_mch, field, chip):
     """  Use information of filters to generate the MCH file 
          Use external command 'daomaster' to to get final MCH file
          'daomaster' only accept stdin arguments, so will
@@ -242,6 +242,7 @@ def get_mch(fn_mch_in, field, chip):
          use soft links with char '_' that were created in preprocess.
 
      fn_mch_in -- MCH file with list of input files
+    refine_mch -- Mode (number of coefficients). It should be 0 (no change) or 6, 12, 20
          field -- field identificator (used to generate proper filenames for new files)
           chip --  chip identificator (used to generate proper filenames for new files)
 
@@ -249,9 +250,27 @@ def get_mch(fn_mch_in, field, chip):
         fn_mch: filename of output MCH file 
     """
 
-    print_title ("\n\nUSING 'daomaster' TO GENERATE MCH FILE (from .alf files)")
-    print_title ("============================================================================")
+    # Get output MCH filename (delete file, just in case it exists)
+    fn_mch = get_mch_addstar_fn(field, chip)
+    delfile(fn_mch)   
+ 
+    if refine_mch == 0 or not refine_mch in ALLOWED_MODES:
+        # If refine_mch is 0 (or is NOT a valid mode), then MCH file will NOT be changed,
+        # just a symlink between old and new filenames will be created
+        if refine_mch != 0:
+            print_warning("Mode " + str(refine_mch) + " is NOT ALLOWED. MCH file will be NOT refined")
 
+        try:
+            os.symlink(fn_mch_in, fn_mch)
+        except:
+            # If link fails, most probably it already exists 
+            # (or error will be found later: full disk, permissions, etc.)
+            pass
+        # RETURN since we will NOT run daomaster
+        return fn_mch
+
+    print_title ("\n\nUSING 'daomaster' TO GENERATE MCH FILE (from .alf files) WITH MODE " + str(refine_mch))
+    print_title ("============================================================================")
 
     # Get filenames for current filter. Delete older files to avoid overwriting question when using daomaster
     fn_input   = field + "-daomaster_" + chip + ".input"
@@ -262,15 +281,13 @@ def get_mch(fn_mch_in, field, chip):
    
     try:
         with open(fn_input, "w") as f:
-            fn_mch = get_mch_addstar_fn(field, chip)
-            delfile(fn_mch)    # Remove MCH output file if it exists
             print_info ("Next files will be created in this stage: " + fn_mch)
 
             # daomaster input file
             f_writeln(f, fn_mch_in)          # File with list of input files (MCH)
             f_writeln(f, "2 0 99")           # Minimum number, minimum fraction, enough frames:       
             f_writeln(f, "1")                # Maximum sigma
-            f_writeln(f, "20")               # 20: Cubic transformation
+            f_writeln(f, str(refine_mch))    # Mode: See ALLOWED_MODES
             f_writeln(f, radius)             # Critical match-up radius
             f_writeln(f, "n")                # NO:  Assign new star IDs? 
             f_writeln(f, "n")                # NO:  A file with mean magnitudes and scatter? 
@@ -377,7 +394,7 @@ def get_mode(ncols, fname, main_mode, ALLOWED_MODES):
               ncols -- number of columns in MCH file
               fname -- name of the MCH file (to display it in case of error)
           main_mode -- mode of the main MCH file, in order to compare it is the same (default None)
-      ALLOWED_MODES -- allowed models in DAOMASTER: 2, 4, 6, 12, 20 (default None)
+      ALLOWED_MODES -- allowed models in DAOMASTER
 
     RETURNS:
       * "mode" of the MCH file
@@ -416,7 +433,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
  
         chip -- chip we are processing (usually YY: 01, 02 ... 62)
 
-        mode -- mode of the main MCH file (used in DAOMASTER: 2, 4, 6, 12, 20)
+        mode -- mode of the main MCH file (used in DAOMASTER. See ALLOWE_MODES)
 
   mch_fnames -- List of filenames that appears in the MCH file 
                 provided by DAOMASTER task used to obtain the photometry.
@@ -1253,6 +1270,7 @@ def process_argv(args, mch_ext):
     ARG_DIMFIELD   = argc; argc+=1
     ARG_RADCENT    = argc; argc+=1
     ARG_DISTANCE   = argc; argc+=1
+    ARG_REFINEMCH  = argc; argc+=1
     NUM_ARGS       = argc
 
     error_msg = ""
@@ -1264,7 +1282,7 @@ def process_argv(args, mch_ext):
     if len(args) != NUM_ARGS:
         # Wrong number of parameters
         exit_error_msg("Syntax: %s <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> " 
-                       "<6:magext> <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance>" % args[0], True)
+                       "<6:magext> <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance> <11:refine_mch>" % args[0], True)
 
 
     try:
@@ -1367,8 +1385,12 @@ def process_argv(args, mch_ext):
                 magext_file = args[ARG_MAGEXT]
             elif os.path.isfile(MAGEXT_FILE_DEFAULT):
                 magext_file = MAGEXT_FILE_DEFAULT
-            else:  
-                error_msg += " * MagExt is not a valid file or an array of values\n"
+            else: 
+                # There is no file, use 0 instead 
+                for flt in cols_order:
+                    if flt != STAR_ID and flt != IGNORE_COL:
+                        magext[flt] = 0             # One common value
+                #error_msg += " * MagExt is not a valid file or an array of values\n"
          
             # Process file 
             if magext_file != "": 
@@ -1410,6 +1432,8 @@ def process_argv(args, mch_ext):
         else:
             # Get float value from config file
             radcent = float(args[ARG_RADCENT])
+            if radcent <= 0:
+                error_msg += " * Radcent should be > 0 (" + str(radcent) + " was set)\n"
     except:
         error_msg += " * Radcent\n"
 
@@ -1430,7 +1454,15 @@ def process_argv(args, mch_ext):
         # distance: float value
         distance = float(args[ARG_DISTANCE])
     except:
-        error_msg += " * distance\n"
+        error_msg += " * Distance modulus\n"
+
+    try:
+        # refine_mch: int value
+        refine_mch = int(args[ARG_REFINEMCH])
+    except:
+        error_msg += " * Refine MCH\n"
+
+
 
     # Chech whether there were some errors
     if error_msg:
@@ -1454,12 +1486,14 @@ def process_argv(args, mch_ext):
         print_subtitle("             Chip: " + chip) 
         print_subtitle("  Mag. Extinction: " + str(magext))
         print_subtitle(" Distance Modulus: " + str(distance))
+        print_subtitle("       Refine MCH: " + str(refine_mch))
         if max_iters > 0: print_subtitle("      Limit Mocks: " + str(max_iters)) 
         if stars_shuffle: print_subtitle("    Shuffle stars: YES") 
         else: print_subtitle("    Shuffle stars: NO") 
 
 
-        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, dimfield, distance, field, chip, max_iters]
+        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, 
+                dimfield, distance, field, chip, max_iters, refine_mch]
 
 ########################################################################################
 
@@ -1784,7 +1818,8 @@ def create_trans_eq_calib(field, chip, numiters, chip_info):
 ###################################################################################
 
 DEF_CCD_SIZE  = [0, 0, 4096, 2048]      # Default values of CCD size
-ALLOWED_MODES = [2, 4, 6, 12, 20]  # Allowe modes in DAOMASTER
+#ALLOWED_MODES = [2, 4, 6, 12, 20]  # Allowed modes in DAOMASTER
+ALLOWED_MODES = [6, 12, 20]  # Allowed modes in DAOMASTER (Transformations of mode 2 and 4 NOT implemented!!)
 MAX_COEF      = 22                      # Max. number of coefficients in MCH files (with NO filename)
 STAR_ID       = "@"
 IGNORE_COL    = "*"
@@ -1819,12 +1854,13 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
  distance,        \
  field,           \
  chip,            \
- max_iters]       \
+ max_iters,       \
+ refine_mch]      \
  = process_argv(sys.argv, MCH_FILE_EXT)
 
 
 # Get and process mch_file of MCH 
-mch_file = get_mch(orig_mch_file, field, chip)
+mch_file = get_mch(orig_mch_file, refine_mch, field, chip)
 
 # Get and store stars magnitude input file
 stars = get_input_stars(stars_file, cols_order, stars_shuffle)
