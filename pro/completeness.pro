@@ -2,11 +2,11 @@
 ;
 ; COMPLETENESS
 ;
-; Figure out completeness from artificial stars
+; Figure out completeness from artificial starsn for a single PHOTRED "field".
 ;
 ; Put together list of original detected source + input artificial
 ; stars. Then match those up with the final list of real sources
-; and artificial stars.
+; and artificial stars.  The data from all chips and all mocks are combined.
 ;
 ; INPUTS:
 ;  photfiles     List of AST phot files.
@@ -22,7 +22,7 @@
 ;  =error     The error message if there was one.
 ;
 ; USAGE:
-;  IDL>completeness,photfiles
+;  IDL>completeness,photfiles,bigsynthfile,imager=imager,maindir=maindir
 ; 
 ; By D.Nidever  based on getcomplete.pro   July 2017
 ;-
@@ -97,7 +97,8 @@ For i=0,nchips-1 do begin
   chipind = where(allchips eq ichip,nmocks)
   printlog,logfile,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mocks'
 
-  ; Loop over the mocks
+  ; Loop over the mocks for this chip
+  ;----------------------------------
   undefine,chipast
   For j=0,nmocks-1 do begin
     mockphotfile = photfiles[chipind[j]]
@@ -122,6 +123,7 @@ For i=0,nchips-1 do begin
     nphot = n_elements(phot)
     
     ; -- Add average magnitudes to PHOT file --
+    ; We need average magnitues per band for reach object
     phottags = tag_names(phot)
     photavgmag = where(stregex(phottags,'MAG$',/boolean) eq 1,nphotavgmag)
     if nphotavgmag eq 0 then begin
@@ -173,8 +175,9 @@ For i=0,nchips-1 do begin
 
     
     ; Load the final, recovered photometry file, but use the mag/raw
-    ;  instrumental photometry
-    ;  .raw or .mag file depending if allframe was used
+    ;  instrumental photometry.  Use this to match up recovered to
+    ;  original objects.
+    ;  Use .raw or .mag file depending if allframe was used.
     if allframe eq 1 then magext='.mag' else magext='.raw'
     finalfile = repstr(mockphotfile,'.phot','.mag')
     if (file_info(finalfile)).exists eq 0 then begin
@@ -186,6 +189,7 @@ For i=0,nchips-1 do begin
     printlog,logfile,'  NFINAL='+strtrim(nfinal,2)
     
     ; Load the original "real" star data file
+    ;  Use .raw or .mag file depending if allframe was used.
     origfile = mockphotdir+'/'+shfield+'-'+refname+imager.separator+string(ichip,format='(i02)')+magext
     if (file_info(origfile)).exists eq 0 then begin
       printlog,logfile,origfile+' NOT FOUND'
@@ -212,95 +216,98 @@ For i=0,nchips-1 do begin
     ; to match it up to the correct star (real or artificial)
     ; We don't want to think we recovered an artificial star when it's
     ; actually a real star (likely bright one).
+    ; We are using the instrumental photomery (.mag/.raw) to do this matching.
+    COMPLETENESS_CROSSMATCH,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=xmatcherror
+    if n_elements(xmatcherror) gt 0 then goto,BOMB1
     
-    ; Crossmatch final to orig and final to synth
-    SRCMATCH,final.x,final.y,orig.x,orig.y,2,oind1,oind2,count=nomatch
-    SRCMATCH,final.x,final.y,synth.x,synth.y,2,aind1,aind2,count=nastmatch
-
-    ; Deal with duplicates
-    ;  all we care about is real objects falsely
-    ;  identified as ASTs, so bad matches in AIND
-    finaldblind = doubles([oind1,aind1],count=nfinaldbl)
-    if nfinaldbl gt 0 then begin
-      printlog,logfile,'  Resolving '+strtrim(nfinaldbl,2)+' duplicates'
-      finaldbl = ([oind1,aind1])(finaldblind)
-      flag = lonarr(nfinaldbl)  ; 0-real, 1-ast
-      origdbl = lonarr(nfinaldbl)
-      synthdbl = lonarr(nfinaldbl)
-      ; Get magnitude column indices for the three structures
-      finaltags = tag_names(final)
-      finalmagind = where(stregex(finaltags,'^MAG',/boolean) eq 1,nfinalmagind)
-      origtags = tag_names(orig)
-      origmagind = where(stregex(origtags,'^MAG',/boolean) eq 1,norigmagind)
-      synthtags = tag_names(synth)
-      synthmagind = where(stregex(synthtags,'^MAG',/boolean) eq 1,nsynthmagind)
-      if nfinalmagind ne norigmagind or nfinalmagind ne nsynthmagind then begin
-        printlog,logfile,'  FINAL/ORIG/SYNTH photometry files have different magnitude columns'
-        goto,BOMB1
-      endif
-      ; Loop over duplicates
-      for k=0,nfinaldbl-1 do begin
-        finaldbl1 = finaldbl[k]  ; the FINAL index
-        final1 = final[finaldbl1]
-        finalmag = fltarr(nfinalmagind)
-        for l=0,nfinalmagind-1 do finalmag[l]=final1.(finalmagind[l])
-
-        ; ORIG
-        MATCH,oind1,finaldbl1,ind1,/sort
-        origdbl[k] = ind1  ; index into OIND1/2
-        orig1 = orig[oind2[ind1]]
-        odist = sqrt( (final1.x-orig1.x)^2 + (final1.y-orig1.y)^2 )
-        origmag = fltarr(norigmagind)
-        for l=0,norigmagind-1 do origmag[l]=orig1.(origmagind[l])
-        gdorig = where(finalmag lt 50 and origmag lt 50,ngdorig)
-        if ngdorig gt 0 then omagdiff = mean(abs(origmag[gdorig]-finalmag[gdorig])) else omagdiff=99.99
-        ofinaldiff = sqrt(odist^2 + omagdiff^2)
-
-        ; SYNTH
-        MATCH,aind1,finaldbl1,ind2,/sort
-        synthdbl[k] = ind2  ; index into AIND1/2
-        synth1 = synth[aind2[ind2]]
-        adist = sqrt( (final1.x-synth1.x)^2 + (final1.y-synth1.y)^2 )
-        synthmag = fltarr(nsynthmagind)
-        for l=0,nsynthmagind-1 do synthmag[l]=synth1.(synthmagind[l])
-        gdsynth = where(finalmag lt 50 and synthmag lt 50,ngdsynth)
-        if ngdsynth gt 0 then amagdiff = mean(abs(synthmag[gdsynth]-finalmag[gdsynth])) else amagdiff=99.99
-        afinaldiff = sqrt(adist^2 + amagdiff^2)
-
-        ; Which one is the match
-        if ofinaldiff lt afinaldiff then begin
-          com='  REAL'
-          flag[k] = 0
-        endif else begin
-          com='  AST'
-          flag[k] = 1
-        endelse
-        if keyword_set(verbose) then $
-          printlog,logfile,'  '+strtrim(i+1,2),odist,omagdiff,ofinaldiff,' ',adist,amagdiff,afinaldiff,com
-        ;if amagdiff lt omagdiff and adist gt odist then stop
-      endfor  ; duplicates loop
-
-      ; Remove ASTs from the "ORIG" list
-      bdomatch = where(flag eq 1,nbdomatch,ncomp=ngdomatch)  
-      print,strtrim(nbdomatch,2),' are ASTs and ',strtrim(ngdomatch,2),' are REAL sources'
-      if nbdomatch gt 0 then begin
-        if nbdomatch lt nomatch then begin
-          bdorigdbl = origdbl[bdomatch]
-          REMOVE,bdorigdbl,oind1,oind2
-          nomatch = n_elements(oind1)
-        endif else begin
-          undefine,oind1,oind2
-          nomatch = 0
-        endelse
-      endif
-    endif ; duplicates
-
-    ; "Prune" the real sources from the list of recovered sources
-    left = phot  ; use the calibrated photometry, same sources/order as FINAL
-    if nomatch gt 0 then remove,oind1,left
-    ; Now rematch SYNTH to the leftover sources
-    SRCMATCH,left.x,left.y,synth.x,synth.y,2,aind1,aind2,count=nastmatch
-    print,strtrim(nastmatch,2),' ASTs recovered'
+    ;; Crossmatch final to orig and final to synth
+    ;SRCMATCH,final.x,final.y,orig.x,orig.y,2,oind1,oind2,count=nomatch
+    ;SRCMATCH,final.x,final.y,synth.x,synth.y,2,aind1,aind2,count=nastmatch
+    ;
+    ;; Deal with duplicates
+    ;;  all we care about is real objects falsely
+    ;;  identified as ASTs, so bad matches in AIND
+    ;finaldblind = doubles([oind1,aind1],count=nfinaldbl)
+    ;if nfinaldbl gt 0 then begin
+    ;  printlog,logfile,'  Resolving '+strtrim(nfinaldbl,2)+' duplicates'
+    ;  finaldbl = ([oind1,aind1])(finaldblind)
+    ;  flag = lonarr(nfinaldbl)  ; 0-real, 1-ast
+    ;  origdbl = lonarr(nfinaldbl)
+    ;  synthdbl = lonarr(nfinaldbl)
+    ;  ; Get magnitude column indices for the three structures
+    ;  finaltags = tag_names(final)
+    ;  finalmagind = where(stregex(finaltags,'^MAG',/boolean) eq 1,nfinalmagind)
+    ;  origtags = tag_names(orig)
+    ;  origmagind = where(stregex(origtags,'^MAG',/boolean) eq 1,norigmagind)
+    ;  synthtags = tag_names(synth)
+    ;  synthmagind = where(stregex(synthtags,'^MAG',/boolean) eq 1,nsynthmagind)
+    ;  if nfinalmagind ne norigmagind or nfinalmagind ne nsynthmagind then begin
+    ;    printlog,logfile,'  FINAL/ORIG/SYNTH photometry files have different magnitude columns'
+    ;    goto,BOMB1
+    ;  endif
+    ;  ; Loop over duplicates
+    ;  for k=0,nfinaldbl-1 do begin
+    ;    finaldbl1 = finaldbl[k]  ; the FINAL index
+    ;    final1 = final[finaldbl1]
+    ;    finalmag = fltarr(nfinalmagind)
+    ;    for l=0,nfinalmagind-1 do finalmag[l]=final1.(finalmagind[l])
+    ;
+    ;    ; ORIG
+    ;    MATCH,oind1,finaldbl1,ind1,/sort
+    ;    origdbl[k] = ind1  ; index into OIND1/2
+    ;    orig1 = orig[oind2[ind1]]
+    ;    odist = sqrt( (final1.x-orig1.x)^2 + (final1.y-orig1.y)^2 )
+    ;    origmag = fltarr(norigmagind)
+    ;    for l=0,norigmagind-1 do origmag[l]=orig1.(origmagind[l])
+    ;    gdorig = where(finalmag lt 50 and origmag lt 50,ngdorig)
+    ;    if ngdorig gt 0 then omagdiff = mean(abs(origmag[gdorig]-finalmag[gdorig])) else omagdiff=99.99
+    ;    ofinaldiff = sqrt(odist^2 + omagdiff^2)
+    ;
+    ;    ; SYNTH
+    ;    MATCH,aind1,finaldbl1,ind2,/sort
+    ;    synthdbl[k] = ind2  ; index into AIND1/2
+    ;    synth1 = synth[aind2[ind2]]
+    ;    adist = sqrt( (final1.x-synth1.x)^2 + (final1.y-synth1.y)^2 )
+    ;    synthmag = fltarr(nsynthmagind)
+    ;    for l=0,nsynthmagind-1 do synthmag[l]=synth1.(synthmagind[l])
+    ;    gdsynth = where(finalmag lt 50 and synthmag lt 50,ngdsynth)
+    ;    if ngdsynth gt 0 then amagdiff = mean(abs(synthmag[gdsynth]-finalmag[gdsynth])) else amagdiff=99.99
+    ;    afinaldiff = sqrt(adist^2 + amagdiff^2)
+    ;
+    ;    ; Which one is the match
+    ;    if ofinaldiff lt afinaldiff then begin
+    ;      com='  REAL'
+    ;      flag[k] = 0
+    ;    endif else begin
+    ;      com='  AST'
+    ;      flag[k] = 1
+    ;    endelse
+    ;    if keyword_set(verbose) then $
+    ;      printlog,logfile,'  '+strtrim(i+1,2),odist,omagdiff,ofinaldiff,' ',adist,amagdiff,afinaldiff,com
+    ;    ;if amagdiff lt omagdiff and adist gt odist then stop
+    ;  endfor  ; duplicates loop
+    ;
+    ;  ; Remove ASTs from the "ORIG" list
+    ;  bdomatch = where(flag eq 1,nbdomatch,ncomp=ngdomatch)  
+    ;  print,strtrim(nbdomatch,2),' are ASTs and ',strtrim(ngdomatch,2),' are REAL sources'
+    ;  if nbdomatch gt 0 then begin
+    ;    if nbdomatch lt nomatch then begin
+    ;      bdorigdbl = origdbl[bdomatch]
+    ;      REMOVE,bdorigdbl,oind1,oind2
+    ;      nomatch = n_elements(oind1)
+    ;    endif else begin
+    ;      undefine,oind1,oind2
+    ;      nomatch = 0
+    ;    endelse
+    ;  endif
+    ;endif ; duplicates
+    ;
+    ;; "Prune" the real sources from the list of recovered sources
+    ;left = phot  ; use the calibrated photometry, same sources/order as FINAL
+    ;if nomatch gt 0 then remove,oind1,left
+    ;; Now rematch SYNTH to the leftover sources
+    ;SRCMATCH,left.x,left.y,synth.x,synth.y,2,aind1,aind2,count=nastmatch
+    ;print,strtrim(nastmatch,2),' ASTs recovered'
 
     
     ; Put all AST information into one structure
@@ -331,7 +338,7 @@ For i=0,nchips-1 do begin
     uiphotmags = uniq(allphotmags,sort(allphotmags))
     uphotmags = allphotmags[uiphotmags]
     nphotmags = n_elements(photmags)
-    ;  add three columns for each filter: magnitude, error, Ndetections
+    ;  Add three columns for each filter: magnitude, error, Ndetections
     for k=0,nphotmags-1 do $
        astschema=CREATE_STRUCT(astschema,photmags[k],0.0,photmags[k]+'ERR',0.0,'NDET'+photmags[k],0L)
     ; Add final morphology columns
@@ -350,11 +357,11 @@ For i=0,nchips-1 do begin
     ast.inp_x = synth.x
     ast.inp_y = synth.y
     ; Get the calibrated photometry from BIGSYNTHSTR
-    ;  match2 deals with duplicates better
-    ;  The IDs in the add.mag (SYNTH) and BIGSYNTHSTR should match
+    ;  match2.pro deals with duplicates better
+    ;  The IDs in the add.mag file (SYNTH) and BIGSYNTHSTR should match
     MATCH2,bigsynthstr.id,synth.id,ind1,ind2
-    dum = where(ind2 gt -1,nmatch)
-    if nbigmatch ne nmatch then begin
+    dum = where(ind2 gt -1,nbigmatch)
+    if nbigmatch ne nsynth then begin
       printlog,logfile,'Not all synth elements found matches in bigsynthstr'
       goto,BOMB1
     endif
@@ -366,11 +373,15 @@ For i=0,nchips-1 do begin
     endfor
     ; Copy over the recovered values using STRUCT_ASSIGN
     ;  LEFT was created from the PHOT structure
-    temp = ast[aind2]
-    STRUCT_ASSIGN,left[aind1],temp,/nozero
-    ast[aind2] = temp
-    ast[aind2].recovered = 1
-
+    ;temp = ast[aind2]
+    ;STRUCT_ASSIGN,left[aind1],temp,/nozero
+    ;ast[aind2] = temp
+    ;ast[aind2].recovered = 1
+    temp = ast[sind]
+    STRUCT_ASSIGN,phot[find],temp,/nozero
+    ast[sind] = temp
+    ast[sind].recovered = 1
+    
     ; Write out the ast file for this mock
     outmockfile = mockphotdir+'/'+mockphotbase+'_complete.fits'
     print,'  Writing AST catalog for this Field/Chip/Mock to ',outmockfile
