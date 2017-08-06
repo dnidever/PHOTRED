@@ -57,7 +57,7 @@ progs = ['allframe','allfprep','readline','readlist','readpar','photred_getinput
          'iraf_imalign','iraf_imcombine','mkopt','randomize','touchzero','writecol','writeline','maketemp',$
          'stress','combine_structs','getpixscale','imfwhm','loadals','loadinput','printline','writeals',$
          'mad','rndint','strep','head_xyad','hdr2wcstnx','wcstnx_xy2rd','parsetnx','wcstnxcor','xieta2rd',$
-         'fiximages','iraf_run','check_iraf','ia_trim']
+         'fiximages','iraf_run','check_iraf','ia_trim', 'getparam']
 test = PROG_TEST(progs)
 if min(test) eq 0 then begin
   bd = where(test eq 0,nbd)
@@ -273,6 +273,9 @@ if scriptsdir eq '' then begin
   printlog,logfile,'NO SCRIPTS DIRECTORY'
   return
 endif
+pythonbin = READPAR(setup,'pythonbin')
+htcondor = READPAR(setup,'htcondor')
+
 
 
 ; Copy the scripts to the directories
@@ -532,6 +535,7 @@ if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
 if keyword_set(alfusecmn) then cmd+=",/usecmn"
 if keyword_set(fake) then cmd+=",/fake"
 
+
 ; Getting NMULTI from setup file if not input
 if n_elements(nmulti) eq 0 then begin
   nmulti = READPAR(setup,'NMULTI')
@@ -543,6 +547,7 @@ if n_elements(nmulti) eq 0 then begin
   nmulti = nmulti > 1  ; must be >=1
 endif
 
+
 ; What host
 host = getenv('HOST')
 pleione = stregex(host,'pleione',/boolean,/fold_case)
@@ -550,10 +555,31 @@ hyades = stregex(host,'hyades',/boolean,/fold_case)
 
 
 ; Running on multiple machines
-if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread))  then begin
+if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread) or (htcondor ne '0'))  then begin
+
+  if htcondor ne '0' then begin
+    ; Get SETUP to see if we are using IDL VM and/or we have some submit commands
+    htcondor_cmd   = getparam(htcondor_cmd, 'htcondor_cmd',   setup, '', logfile)
+    htcondor_idlvm = getparam(htcondor_cmd, 'htcondor_idlvm', setup, '', logfile)
+
+    ; Build the HTCondor submit commands (Use |=| for assignations and |;| to separate commands
+    ; Add user's HTCondor commands and needed environment variables (PATH, LD_LIBRARY_PATH and HOME, and those needed by IRAF)
+    htcondor_cmd  = "#shared|;|" + htcondor_cmd
+    htcondor_cmd += "|;|environment|=|PATH=" + getenv('PATH')            $
+                 +       ";LD_LIBRARY_PATH=" + getenv('LD_LIBRARY_PATH') $
+                 +                  ";iraf=" + getenv('iraf')            $
+                 +              ";IRAFARCH=" + getenv('IRAFARCH')        $
+                 +                 ";SHELL=" + getenv('SHELL')           $
+                 +                  ";HOME=" + getenv('HOME')            $
+                 +           ";IDL_STARTUP=" + getenv('IDL_STARTUP')
+  endif else begin
+    htcondor_cmd   = '0' 
+    htcondor_idlvm = '0' 
+  endelse
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,procdirlist,/idle,nmulti=nmulti,prefix='alf',hyperthread=hyperthread,waittime=1,/cdtodir
+  PBS_DAEMON,cmd,procdirlist,/idle,nmulti=nmulti,prefix='alf',hyperthread=hyperthread, $
+             pythonbin=pythonbin,scriptsdir=scriptsdir,htcondor=htcondor_cmd,htc_idlvm=htcondor_idlvm,waittime=15,/cdtodir
 
 
 ; Normal, single jobs

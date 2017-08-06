@@ -45,6 +45,23 @@
 ; 
 ;  55975  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
 ;                     0.0039   -0.0000    0.0001   0.0000   0.0000
+;
+;      The transformation information can also be input for
+;      individual file:
+;  F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+;                           0.0040   -0.0000    0.0001   0.0000   0.0000
+;
+;  F5-00517150_44  G  G-R  -0.4284    0.1767   -0.1261   0.0000   0.0000
+;                           0.0030    0.0020    0.0001   0.0000   0.0000
+;
+;  F5-00517150_45  G  G-R  -0.5082    0.1801   -0.1215   0.0000   0.0000
+;                           0.0025    0.0023    0.0001   0.0000   0.0000
+;
+;  Each pair of lines can use a different format, i.e. the four format
+;  types can be mixed in a file.  But this is not recommended since
+;  it might be confusing what transformation to use for a given file
+;  since there could be multiple "matches".
+;
 ;  /silent    Don't print anything to the screen.
 ;  =logfile   The name of a logfile to write messages to.
 ;  /stp       Stop at the end of the program.
@@ -57,6 +74,8 @@
 ;  IDL>read_trans,'n1.trans',trans
 ;
 ; By D.Nidever  Feb.2013
+;    Added Night+chip format March 2015
+;    Added filename format  July 2017
 ;-
 
 pro read_trans,transfile,trans,silent=silent,logfile=logfile,error=error,stp=stp
@@ -94,18 +113,45 @@ if keyword_set(logfile) then logf=logfile else logf=-1
 ; 
 ;  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
 ;              0.0039   -0.0000    0.0001   0.0000   0.0000
+;
+; If the file has night and chip information then the lines will be
+; First line: night, chip,  band name, color name, trans eqns.
+; second line:  errors
+;  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+;                     0.0040   -0.0000    0.0001   0.0000   0.0000
+; 
+;  55975  2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000
+;                     0.0039   -0.0000    0.0001   0.0000   0.0000
+; 
+;  55975  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000
+;                     0.0039   -0.0000    0.0001   0.0000   0.0000
+;
+; If the file has information on individual files then the lines will be
+; First line: filename,  band name, color name, trans eqns.
+; second line:  errors
+;  F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+;                           0.0040   -0.0000    0.0001   0.0000   0.0000
+;
+;  F5-00517150_44  G  G-R  -0.4284    0.1767   -0.1261   0.0000   0.0000
+;                           0.0030    0.0020    0.0001   0.0000   0.0000
+;
+;  F5-00517150_45  G  G-R  -0.5082    0.1801   -0.1215   0.0000   0.0000
+;                           0.0025    0.0023    0.0001   0.0000   0.0000
+;
 
 ; What options?
 ; 1 - single night, single chip (no NIGHT or CHIP information)
 ; 2 - single night, multiple chips (no NIGHT but CHIP information)
 ; 3 - multiple nights, multiple chips (NIGHT and CHIP information)
+; 4 - individual files
 optcase = -1
+; I DON'T THINK "optcase" IS ACTUALLY USED FOR ANYTHING ANYMORE
 
 openr,unit,/get_lun,transfile
 
 while (~EOF(unit)) do begin
 
-  trans1 = {night:-1L,chip:-1,band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
+  trans1 = {night:-1L,chip:-1,file:'',band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,$
             amcolterm:0.0d,colsqterm:0.0d,zptermsig:0.0d,amtermsig:0.0d,coltermsig:0.0d,$
             amcoltermsig:0.0d,colsqtermsig:0.0d}
 
@@ -123,7 +169,11 @@ while (~EOF(unit)) do begin
     ;  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
     ;                     0.0040   -0.0000    0.0001   0.0000   0.0000
     ; NIGHT and CHIP are optional.
+    ; For specific files it looks like this:
+    ;  F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000
+    ;                           0.0040   -0.0000    0.0001   0.0000   0.0000
 
+    
     ; Are NIGHT and CHIP supplied?
     case narr of
        ; ---NIGHT and CHIP---
@@ -143,21 +193,21 @@ while (~EOF(unit)) do begin
          optcase = 3 > optcase
 
        end
-       ; ---CHIP---
+       ; ---CHIP or FILENAME---
        8: begin
 
-         ; Make sure CHIP is a  number
+         ; CHIP, first value is a number
          if valid_num(arr[0],chip) then begin
            trans1.chip = long(chip)
            arr = arr[1:*]
-         ; Parsing error
+           optcase = 2 > optcase
+         ; FILENAME, first value is NOT a number
          endif else begin
-           error = 'CHIP must be a numbers'
-           if not keyword_set(silent) then printlog,logf,error
-           return
+           trans1.file = strtrim(arr[0],2)
+           arr = arr[1:*]
+           optcase = 4 > optcase
          endelse
-         optcase = 2 > optcase
-         
+
        end
        ; ---Neither---
        7: begin
@@ -266,13 +316,20 @@ endfor
 if not keyword_set(silent) then begin
   printlog,logf,' TRANSFORMATION EQUATIONS'
   printlog,logf,'--------------------------------------------------------------------------------'
-  printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'  NIGHT/CHIP/FILE  BAND COLOR ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
   printlog,logf,'--------------------------------------------------------------------------------'
   for i=0,ntrans-1 do begin
-    form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
-    printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
-                      trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-    form2 = '(A28,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1 = '(I10,I6,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1f = '(A-16,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    ; FILENAME
+    if trans[i].file ne '' then $
+      printlog,logf,format=form1f,trans[i].file,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    ; NO Filename
+    if trans[i].file eq '' then $
+      printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    form2 = '(A29,F10.4,F10.4,F10.4,F10.4,F10.4)'
     printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
                       trans[i].amcoltermsig,trans[i].colsqtermsig
   endfor

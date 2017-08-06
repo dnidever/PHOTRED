@@ -572,7 +572,7 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   endfor
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=30,/cdtodir
+  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
 endif
 
 
@@ -672,8 +672,7 @@ endif else begin
 endelse
   
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=30,/cdtodir
-
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5,/cdtodir
 
 ; IT WOULD BE BETTER TO UPDATE THE LISTS
 ; AFTER EACH FILE IS PROCESSED!!!!!

@@ -421,7 +421,8 @@ wait,1
          
         ;; Run DAOMATCH
         ;; maybe make daomatch_tile.pro to use the tile projection
-        ;; coords in the mch file.         
+        ;; coords in the mch file. 
+        ;; I started daomatch_tile.pro.        
 
       endfor ; tile/group loop
          

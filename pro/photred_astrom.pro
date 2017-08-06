@@ -283,7 +283,7 @@ FOR i=0,ninputlines-1 do begin
   dum = {id:0L,x:0.0,y:0.0}
   for m=0,numobs-1 do begin
     dum = CREATE_STRUCT(dum,'MAG'+strtrim(m+1,2),0.0,'MAG'+strtrim(m+1,2)+'ERR',0.0)
-  end
+  endfor
   dum = CREATE_STRUCT(dum,'CHI',0.0,'SHARP',0.0)
   if ending eq 'mag' then dum = CREATE_STRUCT(dum,'FLAG',0L,'PROB',0.0)
   dum = CREATE_STRUCT(dum,'RA',0.0d0,'DEC',0.0d0)
