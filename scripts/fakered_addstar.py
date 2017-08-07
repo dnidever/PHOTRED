@@ -702,7 +702,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
         # Number of decimals and spaces are STRICT!!!
         # Each line can only have 12 cols (first line could have 3 extra cols)
         # Second and consecutive lines has 27 spaces before first data
-        MAX_COLS = 12
+        MAX_MAG_COLS = 12
         num_cols = 0
         mag_line = "%9d %8.3f %8.3f" % (star_id, xpos_init, ypos_init)
        
@@ -774,7 +774,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
             # Check if we have to go to a new line in MAG file (every 12 cols we need to add new line)
             num_cols += 2
-            if num_cols % MAX_COLS == 0: mag_line += "\n%27s" % ''
+            if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%27s" % ''
  
 
 #-----------------------------------------------------------------------------
@@ -782,7 +782,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
         num_cols += 2
         mag_line += "   1.0000   0.0000"
-        if num_cols % MAX_COLS == 0: mag_line += "\n%23s" % ''
+        if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%23s" % ''
         mag_line += "    0   1.00\n"
         #mag_line += "   1.0000   0.0000    0   1.00\n"
         f_mag.write(mag_line)
@@ -1172,6 +1172,8 @@ def process_daophot(field, chip, numiters):
         chip -- chip we are processing (usually YY: 01, 02 ... 62)
     numiters -- Number of iterations (mocks)
     """
+    IMG_EXT  = ".fits"
+    PSF_EXT  = ".psf"
     DAO_EXT  = ".opt"
     DAO_GAIN = "GA"
     DAO_SEP  = "="
@@ -1179,13 +1181,15 @@ def process_daophot(field, chip, numiters):
     print_title ("\n\nUSING 'daophot' TO GENERATE FITS FILES (from .add files)")
     print_title ("============================================================================")
 
-    # Get all images names:
-
-    images = glob.glob(field+"-*_"+chip+".fits")
+    # Get all images names (.fits files):
+    images = glob.glob(field+"-*_"+chip+IMG_EXT)
+    if len(images) == 0:
+        exit_error_msg ("There are no " + IMG_EXT + " images!!")
+    print_info("Processing " + str(len(images)) + " " + IMG_EXT + " images")
 
     for img in images:
-
-        fn_img = img.replace(".fits", "")
+        # Get basename removing extension
+        fn_img = img.replace(IMG_EXT, "")
 
         # Get GAIN value from .opt
         gain = ""
@@ -1220,7 +1224,7 @@ def process_daophot(field, chip, numiters):
                 f_writeln(f, "")                    #    
                 f_writeln(f, "ATTACH " + fn_img)    #    
                 f_writeln(f, "ADDSTAR")             #    
-                f_writeln(f, fn_img+".psf")         #        
+                f_writeln(f, fn_img+PSF_EXT)        #        
                 f_writeln(f, "1")                   #    
                 f_writeln(f, gain)                  #    
 
