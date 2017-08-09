@@ -318,13 +318,14 @@ for i=0,nmchinputlines-1 do begin
   for j=0,n_elements(check_adds)-1 do begin
     fn_fits = file_basename(check_adds[j], "add") + "fits"   ; change .add to .fits
     check_fits = path + PATH_SEP() + fn_fits
-    if not file_test(check_fits) then begin
-      push, failurelist, mchinputlines[i]                           ; a fits file is missinge, FAILURE!
+    info = file_info(check_fits)                             ; get info about file
+    if info.exists eq 0 or info.size eq 0 then begin
+      push, failurelist, mchinputlines[i]                    ; a fits file is missing or it has size=0, FAILURE!
       check_ok = 0
       break
     endif
   endfor
-  if check_ok eq 1 then push, successlist, mchinputlines[i]         ; ALL fits files are there, SUCCESS!
+  if check_ok eq 1 then push, successlist, mchinputlines[i]  ; ALL fits files are there, SUCCESS!
 endfor
 
 ; OUTLIST is all new .mch files for all mocks

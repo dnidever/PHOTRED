@@ -440,7 +440,8 @@ endif else begin
 
   ;# #####################################################
   ;# READ THE TRANSFORMATION FILE
-  READ_TRANS,transfile,trans,logfile=logf,silent=silent
+  ;READ_TRANS,transfile,trans,logfile=logf,silent=silent
+  READ_TRANS,transfile,trans,logfile=logf,/silent
   numbands = n_elements(trans)
 
 endelse
