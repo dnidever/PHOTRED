@@ -108,14 +108,15 @@ case $transferMethod in
 *) cmd='cp -f'
   ;;
 esac
-if [[ $transferMethod == "move" ]]
-then
+
+# Stars will not be moved, just copied!
+if [[ $transferMethod == "move" ]] ; then
   starsCmd='cp -f'
 else
   starsCmd=$cmd
 fi
 
-# Check that star file exists
+# Check that stars file exists
 if [ ! -f $starsOrig ]; then
   >&2 echo "File $starsOrig NOT found"
   exit 2
@@ -227,12 +228,15 @@ then
   relDir="${relDir}/.."
 fi
 
-# Transfer common files
+# Transfer common needed files (if they exist)
 for file in ${FILES_TO_COPY[@]}
 do
-  $cmd $orig/${file} .
+  if [ -f "$orig/$file" ] ; then
+    $cmd $orig/$file .
+  else
+    echo "Warning! File $orig/$file does NOT exist!"
+  fi
 done
-
 
  
 # Create a directory per EACH cheap and transfer related files to it
@@ -284,7 +288,9 @@ do
     # Link to common files
     for file in ${FILES_TO_COPY[@]}
     do
-      ln -s $relDir/$file .
+      if [ -f "$relDir/$file" ] ; then
+        ln -s $relDir/$file .
+      fi 
     done
 
     # Go back to base directory
@@ -294,14 +300,8 @@ do
 done
 
 # Transfer CHIPS info file
-echo "$starsCmd $orig/${chipsFile} ."
-$starsCmd $orig/${chipsFile} .
-
-# Transfer some other needed files
-for file in ${FILES_TO_COPY[@]}
-do
-  $starsCmd $orig/$file .
-done
+echo "$cmd $orig/${chipsFile} ."
+$cmd $orig/${chipsFile} .
 
 # Create the INLIST file with all FX-NNNNNNN_YY.mch files
 find `pwd` -regextype sed -regex ".*F[0-9]*-[0-9]*_[0-9]*\.mch" | sort > $INLIST
