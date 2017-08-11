@@ -398,7 +398,7 @@ FOR n=0,nnights-1 do begin
   ;----------------------
   ; Read in the log file
   READLINE,'daogrow.log',lines
-  ind = first_el(where(stregex(lines,'Converged',/boolean) eq 1,nind),/last)
+  ind = first_el(where(stregex(lines,'converged',/boolean,/fold_case) eq 1,nind),/last)
   if nind gt 0 then begin
 
     printlog,logfile,lines[ind[0]:*]
