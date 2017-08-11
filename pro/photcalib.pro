@@ -89,135 +89,6 @@
 ;           Mar 2008:   Renamed photcalib.pro
 ;-
 
-PRO averagemag,mag,err,newmag,newerr,robust=robust
-
-; Average magnitudes
-; /robust  Outlier rejection
-
-sz = size(mag)
-numstar = sz[1]
-numobs = sz[2]
-
-; Starting arrays
-finalflux = fltarr(numstar)+99.9999
-newmag = fltarr(numstar)+99.9999
-newerr = fltarr(numstar)+9.9999
-
-tmag = mag
-terr = err
-tflux = 2.5118864d0^tmag
-twt = 1.0/(terr^2.0)
-bd = where(tmag gt 50,nbd)
-if nbd gt 0 then begin
-  tmag[bd] = !values.f_nan
-  terr[bd] = !values.f_nan
-  tflux[bd] = !values.f_nan
-  twt[bd] = !values.f_nan
-endif
-
-; Outlier rejection
-if numobs gt 2 and keyword_set(robust) then begin
-
-  ; Number of detections per star
-  ngood = total(finite(tmag),2)
-  ngood2 = ngood#replicate(1,numobs)
-
-  ; Get average sigma value and median difference
-  medmag = median(tmag,dim=2)  ; no /even, want an actual value
-  diffmag = tmag-medmag#replicate(1,numobs)
-  sigmag = mad(diffmag,dim=2,/zero)
-  gdsig = where(finite(sigmag) eq 1,ngdsig,comp=bdsig,ncomp=nbdsig)
-  if ngdsig gt 1 then maxsig=max(sigmag[gdsig]) else maxsig=0.5
-  if nbdsig gt 0 then sigmag[bdsig]=maxsig
-
-  ; Get average error
-  avgerr = total(terr,2,/nan)/(ngood>1)
-  gderr = where(finite(avgerr) eq 1,ngderr,comp=bderr,ncomp=nbderr)
-  if ngderr gt 1 then maxerr=max(avgerr[gderr]) else maxerr=0.5
-  if nbderr gt 0 then avgerr[bderr]=maxerr
-
-  ; Need to set threshold on a star-by-star basis since the scatter
-  ; will vary with magnitude
-  
-  ; Old method
-  ;gdsig = where(finite(sigmag) eq 1 and sigmag gt 0.0,ngdsig,comp=bdsig,ncomp=nbdsig)
-  ;if ngdsig gt 0 then avgsig=median([sigmag[gdsig]]) else avgsig=0.2  ; average sigma value
-
-  ; Rejected "bad" values, only for stars detection in 3 or more frames
-  ;bdval = where(abs(diffmag) gt 3*(0.2>avgsig) or finite(tmag) eq 0 and ngood2 ge 3,nbdval)
-  threshold = 5.0 * (sigmag > avgerr > 0.05)
-  threshold2 = threshold#replicate(1,numobs)
-  bdval = where(abs(diffmag) gt threshold2 or finite(tmag) eq 0 and ngood2 ge 3,nbdval)
-  if nbdval gt 0 then begin
-    tflux[bdval] = !values.f_nan
-    twt[bdval] = !values.f_nan
-  endif
-
-endif ; outlier rejection
-
-; Now do flux-weighted average for the leftover "good" values
-totalwt = total(twt,2,/nan)
-totalfluxwt = total(twt*tflux,2,/nan)
-bdwt = where(finite(totalwt) eq 0,nbdwt)
-if nbdwt gt 0 then totwt[bdwt]=0.0
-
-; Calculate final mags and errors
-fgd = where(totalwt gt 0.0,nfgd)  ; stars with at least one good mag
-if (nfgd gt 0) then begin
-  finalflux[fgd] = totalfluxwt[fgd]/totalwt[fgd]
-  newmag[fgd] = 2.50*alog10(finalflux[fgd])
-  newerr[fgd] = sqrt(1.0/totalwt[fgd])
-endif
-
-; OLD METHOD
-
-; ; Starting arrays
-; colmag = fltarr(numstar)+99.9999
-; colerr = fltarr(numstar)+9.9999
-; totalwt = fltarr(numstar)
-; totalfluxwt = fltarr(numstar)
-; finalflux = fltarr(numstar)
-;
-; ; The equations are:
-; ; wt = 1.0/(err^2.0)
-; ; totalwt = (wt1 + wt2 + ...)
-; ; finalflux = (flux1*wt1 + flux2*wt2 + ...)/totalwt
-; ; finalmag = 2.50*alog10(finalflux)
-; ; finalerr = sqrt(1.0/totalwt)
-; ;
-; ; Add totalwt and (flux1*wt1 + ...) as you go only for good mags
-; ; Then calculate finalmag and finalerr at the end
-;
-; ; Looping through the multiple exposures
-; for k=0,nind-1 do begin
-;
-;   mag = tempmag[*,ind[k]]
-;   ;err = temperr[*,ind[k]]
-;   err = inerr[*,ind[k]]            ; use the instrumental errors
-;   gd = where(mag lt 50.0,ngd)
-;
-;   flux = mag*0.0
-;   wt = mag*0.0
-;   if (ngd gt 0) then begin
-;     flux[gd] = 2.511864^mag[gd]
-;     wt[gd] = 1.0/(err[gd]^2.0)
-;     totalwt[gd] = totalwt[gd] + wt[gd]
-;     totalfluxwt[gd] = totalfluxwt[gd] + flux[gd]*wt[gd]
-;   endif
-; end ; multiple bands loop
-;
-; ; Calculate final mags and errors
-; fgd = where(totalwt gt 0.0,nfgd)  ; stars with at least one good mag
-; if (nfgd gt 0) then begin
-;   finalflux[fgd] = totalfluxwt[fgd]/totalwt[fgd]
-;   colmag[fgd] = 2.50*alog10(finalflux[fgd])
-;   colerr[fgd] = sqrt(1.0/totalwt[fgd])
-; endif
-
-end
-
-;------------------------------------------------------------
-
 FUNCTION simplerr,inerr,am,cl,cler,t
 ;=====================================================================
 ;
@@ -531,16 +402,26 @@ if ninptrans gt 0 then begin
   printlog,logf,'USING INPUT TRANSFORMATION EQUATIONS'
   trans = inptrans
   numbands = n_elements(trans)
-
+  if tag_exist(trans,'night') eq 0 then add_tag,trans,'night',-1,trans
+  if tag_exist(trans,'chip') eq 0 then add_tag,trans,'chip',-1,trans
+  if tag_exist(trans,'file') eq 0 then add_tag,trans,'file','',trans
+  
   printlog,logf,' TRANSFORMATION EQUATIONS'
   printlog,logf,'--------------------------------------------------------------------------------'
-  printlog,logf,'  NIGHT  CHIP   BAND   COLOR  ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
+  printlog,logf,'  NIGHT/CHIP/FILE  BAND COLOR ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR^2 '
   printlog,logf,'--------------------------------------------------------------------------------'
   for i=0,ninptrans-1 do begin
-    form1 = '(I7,I4,A7,A10,F10.4,F10.4,F10.4,F10.4,F10.4)'
-    printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
-                      trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
-    form2 = '(A28,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1 = '(I10,I6,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    form1f = '(A-16,A6,A7,F10.4,F10.4,F10.4,F10.4,F10.4)'
+    ; FILENAME
+    if trans[i].file ne '' then $
+      printlog,logf,format=form1f,trans[i].file,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    ; NO Filename
+    if trans[i].file eq '' then $
+      printlog,logf,format=form1,trans[i].night,trans[i].chip,'  '+trans[i].band,trans[i].color,trans[i].zpterm,$
+                        trans[i].amterm,trans[i].colterm,trans[i].amcolterm,trans[i].colsqterm
+    form2 = '(A29,F10.4,F10.4,F10.4,F10.4,F10.4)'
     printlog,logf,format=form2,'',trans[i].zptermsig,trans[i].amtermsig,trans[i].coltermsig,$
                       trans[i].amcoltermsig,trans[i].colsqtermsig
   endfor
@@ -576,7 +457,12 @@ if tag_exist(trans,'CHIP') then begin
   gdtranschip = where(trans.chip ge 0,ngdtranschip)
   if ngdtranschip gt 0 then transchipinfo=1
 endif
-
+; Do we have FILE information
+transfileinfo = 0
+if tag_exist(trans,'FILE') then begin
+  gdtransfile = where(trans.file ne '',ngdtransfile)
+  if ngdtransfile gt 0 then transfileinfo=1
+endif
 
 
 ;###############################
@@ -641,7 +527,7 @@ for i=0,ninp-1 do begin
   magfile = input[i].magfile
   arr = strsplit(magfile,'.',/extract)
   narr = n_elements(arr)
-  outfile = strjoin(arr[0,narr-2],'')+'.'+ext
+  outfile = strjoin(arr[0:narr-2],'.')+'.'+ext
   input[i].outfile = outfile
 endfor
 
@@ -656,6 +542,9 @@ FOR i=0L,ninp-1 do begin
 
   inp = input[i]
   magfile = inp.magfile
+  magbase = strsplit(magfile,'.',/extract)    ; base name
+  if n_elements(magbase) gt 1 then $
+    magbase = strjoin(magbase[0:n_elements(magbase)-2],'.')
 
   ; Testing the file
   test = file_test(magfile)
@@ -664,7 +553,17 @@ FOR i=0L,ninp-1 do begin
     goto,BOMB
   endif
 
-
+  ; Load the MCH file as well, need this to get the individual
+  ; exposure/observation file names
+  mchfile = magbase+'.mch'
+  if file_test(mchfile) eq 0 then begin
+    printlog,logf,'MCH FILE ',mchfile,' DOES NOT EXIST'
+    goto,BOMB
+  endif
+  LOADMCH,mchfile,mfiles
+  ; they should be in the same order as the magnitude columns
+  ; in the mag file
+  
   ; Stars in this file
   numstar = file_lines(magfile)-3L
 
@@ -784,15 +683,44 @@ FOR i=0L,ninp-1 do begin
 
   ; Associate transformation equations with each observation
   for j=0,numobs-1 do begin
-    ; ignore night and chip info if we don't have that in the trans file
-    gd = where( ( (trans.night eq inp.night[j]) or transnightinfo eq 0) and $
-                ( (trans.chip eq inp.chip[j]) or transchipinfo eq 0) and $
-                (trans.band eq inp.band[j]),ngd)
-    ; Found the transformation for this band
-    if (ngd gt 0) then begin
-      mastrans[j] = trans[gd[0]]
+
+    ; Get the filename of each observation, get from mch file
+    obsfile = file_basename(mfiles[j],'.als')
+     
+    ; There are four options for matching the file:
+    ; 1) No chip/night/filename information
+    ; 2) Only chip given
+    ; 3) Night+chip given
+    ; 4) Filename given
+    ; This information can be different for each file, i.e. multiple
+    ; formats can be used in a given trans file.  Try MOST specific
+    ; (#4) to LEAST specific (#1).
+
+    nmatch = 0
+    ; Try filename + band
+    if transfileinfo eq 1 then $
+       MATCH,trans.file+':'+trans.band,obsfile+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try night+chip + band
+    ;  only want to match lines with file=''
+    if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':'+strtrim(inp.night,2)+':'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try chip + band
+    ;  only want to match lines with file='' and night=-1
+    if nmatch eq 0 and transchipinfo eq 1 then $
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':-1:'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ; Try just the band
+    ;  only want to match lines with file='', night=-1 and chip=-1
+    if nmatch eq 0 then $
+       MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+             ':-1:-1:'+inp.band[j],ind1,ind2,/sort,count=nmatch
+
+    ; Found the transformation for this file+band
+    if (nmatch gt 0) then begin
+      mastrans[j] = trans[ind1[0]]
     endif else begin
-      printlog,logf,'NO TRANSFORMATION INPUT FOR  NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
+      printlog,logf,'NO TRANSFORMATION INPUT FOR  REFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
       return
     endelse

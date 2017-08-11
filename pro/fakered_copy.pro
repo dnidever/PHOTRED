@@ -75,7 +75,7 @@ doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 
 ; Separate field directories
-spefielddir = READPAR(setup,'SEPFIELDDIR')
+sepfielddir = READPAR(setup,'SEPFIELDDIR')
 if sepfielddir eq '0' or sepfielddir eq '-1' or sepfielddir eq '' then undefine,sepfielddir else sepfielddir=1
 
 ; Number of separate mocks
