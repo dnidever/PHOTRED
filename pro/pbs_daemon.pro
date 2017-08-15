@@ -49,11 +49,10 @@ endif
 if not keyword_set(htcondor) then htcondor='0' $
 else if htcondor eq "" then htcondor='0'
 
-
-if not keyword_set(scriptsdir) then scriptsdir='.' 
-
 ; Current directory
 CD,current=curdir
+
+if not keyword_set(scriptsdir) then scriptsdir=curdir  ; use absolute path
 
 ndirs = n_elements(dirs)
 if ndirs eq 0 then dirs = replicate(curdir,ninput)
