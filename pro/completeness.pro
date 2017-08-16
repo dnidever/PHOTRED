@@ -366,9 +366,9 @@ For i=0,nchips-1 do begin
       goto,BOMB1
     endif
     ; loop over bigsynth columns and copy
-    for k=0,nbigsynthcolind-1 do begin
+    for k=0,nbigsynthphotcolind-1 do begin
       asttagind = where(asttags eq 'INP_'+bigsynthphotcols[k],nasttagind)
-      bigsynttagind = where(bigsynthtags eq bigsynthcphotcols[k],nbigsynthtagind)
+      bigsynttagind = where(bigsynthtags eq bigsynthphotcols[k],nbigsynthtagind)
       ast.(asttagind) = bigsynthstr[ind1].(bigsynthtagind)
     endfor
     ; Copy over the recovered values using STRUCT_ASSIGN
