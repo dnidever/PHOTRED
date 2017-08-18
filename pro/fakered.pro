@@ -294,9 +294,9 @@ PHOTRED_CALIB,redo=redo
 ; COMBINE
 ;---------
 ; Combine chips
-docombine = READPAR(setup,'COMBINE')
-if docombine ne '0' then $
-PHOTRED_COMBINE,redo=redo
+;docombine = READPAR(setup,'COMBINE')
+;if docombine ne '0' then $
+;PHOTRED_COMBINE,redo=redo
 
 ; Save, DO WE NEED THIS??
 ;PHOTRED_SAVE
