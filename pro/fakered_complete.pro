@@ -259,7 +259,7 @@ For i=0,nfields-1 do begin
   printlog,logfile,strtrim(i+1,2)+'/'+strtrim(nfields,2)+' '+ufields[i]+' - '+strtrim(nind,2)+' phot files'
   printlog,logfile,'----------------' 
   printlog,logfile,''
-stop
+
   COMPLETENESS,ffiles,starsfile,imager=thisimager,maindir=maindir,logfile=logfile
 Endfor
 
