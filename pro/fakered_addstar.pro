@@ -189,7 +189,6 @@ if refinemch gt 0 then begin
 endif
 
 
-
 ;##########################################################
 ;#  TRANSFERRING INPUT FILES (if needed)
 ;##########################################################
@@ -336,7 +335,6 @@ lists = photred_getinput(thisprog)
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,  $
                     failurelist=failurelist,/silent
 
-
 ; ---------------------------------------
 ;  GATHER AND MERGE PARTIAL FILES
 ; ---------------------------------------
@@ -349,9 +347,11 @@ partial_files = [{fn_full:'apcor.lst',   fn_part:'*partial_apcor*.lst'}, $
                  {fn_full:'calib.trans', fn_part:'*partial_calib*.trans'}]
 
 for i=0,n_elements(partial_files)-1 do begin
-  ; If the destination file exists, save a BAK
-  if file_test(partial_files[i].fn_full) then $    
-    file_move, partial_files[i].fn_full, partial_files[i].fn_full+'.bak', /OVERWRITE
+  ; If the destination file exists, save a BAK (if there is NOT already another bak)
+  bak_file = partial_files[i].fn_full+'.bak'  
+  if file_test(partial_files[i].fn_full) and (not file_test(bak_file)) then $
+    file_move, partial_files[i].fn_full, bak_file, /OVERWRITE, /ALLOW_SAME
+  file_delete,partial_files[i].fn_full, /ALLOW_NONEXISTENT, /QUIET
 
   ; Search for all partial files, read them and write all content in a single file
   partial_fn = file_search("", partial_files[i].fn_part, /FULLY)
@@ -381,8 +381,6 @@ if file_test(FIELDS_FILE) then begin
   newfields = []
   ; Read old field file
   READCOL,FIELDS_FILE,oldshortfields,oldfields,format='A,A',/silent
-  ; Backup old file (-> fields.bak)
-  file_move, FIELDS_FILE, FIELDS_FILE+".bak", /OVERWRITE
   ; Process the outlist to get the new shortfields (they include mocks)
   for i=0,n_elements(outlist)-1 do begin
     fn = file_basename(outlist[i])
@@ -418,8 +416,19 @@ if file_test(FIELDS_FILE) then begin
   endfor
 
   ; Write to file...
-  out = newshortfields+'   '+newfields
-  WRITELINE,FIELDS_FILE,out
+  if n_elements(newshortfields) gt 0 then begin
+    ; Backup old file (fields -> fields.bak)
+    bak_file = FIELDS_FILE+'.bak'  
+    if not file_test(bak_file) then $
+      file_move, FIELDS_FILE, bak_file, /OVERWRITE, /ALLOW_SAME
+    file_delete, FIELDS_FILE, /ALLOW_NONEXISTENT, /QUIET
+    ; Write new fields for mocks!
+    out = newshortfields+'   '+newfields
+    WRITELINE,FIELDS_FILE,out
+  endif else begin
+    print,"WARNING: There are no new fields for mocks!"
+  end
+  
 endif else printlog,logfile,"WARNING: NO fields field found!!"
   
   
