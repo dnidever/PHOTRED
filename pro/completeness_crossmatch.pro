@@ -68,7 +68,7 @@ if nfinaldbl gt 0 then begin
   synthtags = tag_names(synth)
   synthmagind = where(stregex(synthtags,'^MAG',/boolean) eq 1,nsynthmagind)
   if nfinalmagind ne norigmagind or nfinalmagind ne nsynthmagind then begin
-    printlog,logfile,'  FINAL/ORIG/SYNTH photometry files have different magnitude columns'
+    printlog,logf,'  FINAL/ORIG/SYNTH photometry files have different magnitude columns'
     error = 'FINAL/ORIG/SYNTH photometry files have different magnitude columns'
     nmatch = 0
     return
@@ -111,13 +111,13 @@ if nfinaldbl gt 0 then begin
       flag[k] = 1
     endelse
     if keyword_set(verbose) then $
-      printlog,logfile,'  '+strtrim(i+1,2),odist,omagdiff,ofinaldiff,' ',adist,amagdiff,afinaldiff,com
+      printlog,logf,'  '+strtrim(k+1,2),odist,omagdiff,ofinaldiff,' ',adist,amagdiff,afinaldiff,com
     ;if amagdiff lt omagdiff and adist gt odist then stop
   endfor  ; duplicates loop
 
   ; Remove ASTs from the "ORIG" list
   bdomatch = where(flag eq 1,nbdomatch,ncomp=ngdomatch)  
-  print,strtrim(nbdomatch,2),' are ASTs and ',strtrim(ngdomatch,2),' are REAL sources'
+  printlog,logf,'  '+strtrim(nbdomatch,2),' duplicates are ASTs and ',strtrim(ngdomatch,2),' are REAL sources'
   if nbdomatch gt 0 then begin
     if nbdomatch lt nomatch then begin
       bdorigdbl = origdbl[bdomatch]
@@ -128,7 +128,8 @@ if nfinaldbl gt 0 then begin
       nomatch = 0
     endelse
   endif
-endif ; duplicates
+
+endif                           ; duplicates
 
 ; "Prune" the real sources from the list of recovered sources
 left = final
@@ -136,13 +137,11 @@ leftind = lindgen(n_elements(final))
 if nomatch gt 0 then remove,oind1,left,leftind
 ; Now rematch SYNTH to the leftover sources
 SRCMATCH,left.x,left.y,synth.x,synth.y,2,aind1,aind2,count=nastmatch
-print,strtrim(nastmatch,2),' ASTs recovered'
+printlog,logf,'  '+strtrim(nastmatch,2),' ASTs recovered'
 
 ; Final indices
 find = leftind[aind1]
 sind = aind2
 nmatch = nastmatch
-
-stop
 
 end
