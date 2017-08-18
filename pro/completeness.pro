@@ -392,17 +392,17 @@ dx = 0.2
 dy = 0.4
 xr = [-1,3.5]
 yr = [17.0,27.0]
+; GENERALIZE THE RANGES AND MAYBE MAGNITUDES/COLORS BETTER
 hess,bigast.inp_g-bigast.inp_i,bigast.inp_g,dum,imall,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
 hess,bigast[gdrecover].inp_g-bigast[gdrecover].inp_i,bigast[gdrecover].inp_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
 
-
 ; Make some figures
-if file_test(maindir+'plots/',/directory) eq 0 then file_mkdir,maindir+'plots/'
+if file_test(maindir+'plots/',/directory) eq 0 then file_mkdir,maindir+'/plots/'
 setdisp
 ;loadcol,3
 !p.font = 0
 ; Input ASTS
-file = maindir+'plots/'+globalfield+'_input'
+file = maindir+'/plots/'+globalfield+'_input'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
 displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+globalfield,charsize=1.3
@@ -410,7 +410,7 @@ ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Recovered
-file = maindir+'plots/'+globalfield+'_recovered'
+file = maindir+'/plots/'+globalfield+'_recovered'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
 displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+globalfield,charsize=1.3
@@ -418,7 +418,7 @@ ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Completeness
-file = maindir+'plots/'+globalfield+'_completeness'
+file = maindir+'/plots/'+globalfield+'_completeness'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
 displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+globalfield,charsize=1.3
@@ -429,6 +429,6 @@ spawn,['epstopdf',file+'.eps'],/noshell
 pdffiles = maindir+'/plots/'+globalfield+'_'+['input','recovered','completeness']+'.pdf'
 spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+maindir+'/plots/'+globalfield+'_complete.pdf '+strjoin(pdffiles,' ')
 
-stop
+;stop
 
 end
