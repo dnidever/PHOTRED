@@ -132,6 +132,7 @@ if (coolines lt 4 or aplines lt 4 or keyword_set(clobber)) then begin
   push,lines,'${image}.cmn.coo'
   push,lines,'${image}.cmn.ap'
   push,lines,'EXIT'
+  push,lines,'EXIT'
   push,lines,'END_DAOPHOT'
   ;tempfile = maketemp('dao','.sh')
   tempfile = MKTEMP('dao')    ; absolute path
@@ -139,13 +140,14 @@ if (coolines lt 4 or aplines lt 4 or keyword_set(clobber)) then begin
   FILE_CHMOD,tempfile,'755'o
 
   ; If this is a fpack-compressed file then temporarily uncompress it
-  if fpack eq 1 then spawn,['funpack',ifile],/no_shell
+  if fpack eq 1 then spawn,['funpack',file],/noshell
 
   ; Run the program
+  FILE_DELETE,[base+'.cmn.coo',base+'.cmn.ap'],/allow   ; make sure these don't exist
   SPAWN,[tempfile,base],out,errout,/noshell
 
   ; Delete funpacked file
-  if fpack eq 1 then FILE_DELETE,ibase+'.fits',/allow
+  if fpack eq 1 then FILE_DELETE,base+'.fits',/allow
 
   ; Test the coo and ap files
   cootest = FILE_TEST(base+'.cmn.coo')

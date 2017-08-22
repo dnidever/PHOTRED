@@ -435,6 +435,7 @@ For i=0,nfieldfiles-1 do begin
     push,lines,'${image}.cmn.coo'
     push,lines,'${image}.cmn.ap'
     push,lines,'EXIT'
+    push,lines,'EXIT'
     push,lines,'END_DAOPHOT'
     ;tempfile = maketemp('dao','.sh')
     tempfile = MKTEMP('dao')    ; absolute path
@@ -445,6 +446,7 @@ For i=0,nfieldfiles-1 do begin
     if fpack eq 1 then spawn,['funpack',ifile],/no_shell
 
     ; Run the program
+    FILE_DELETE,[ibase+'.cmn.coo',ibase+'.cmn.ap'],/allow  ; make sure these don't exist
     SPAWN,tempfile+' '+ibase,out,errout
     ;FILE_DELETE,tempfile    ; delete the temporary script
  
