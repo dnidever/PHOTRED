@@ -421,9 +421,9 @@ if ntomakeoptlist gt 0 then begin
   if n_elements(daofitradfwhm) gt 0 then cmd+=',fitradius_fwhm='+strtrim(daofitradfwhm,2)
   ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,$
+             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
-
 
 ; Check all OPT files
 ;---------------------
@@ -594,7 +594,8 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   endfor
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,$
+             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
 
 
@@ -680,7 +681,6 @@ If not keyword_set(redo) then begin
 
 Endif ; some done already?
 
-;stop
 
 ;----------------------
 ; RUNNING THE COMMANDS
@@ -700,7 +700,8 @@ endif else begin
 endelse
   
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5,/cdtodir
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$
+           waittime=5,/cdtodir,scriptsdir=scriptsdir
 
 ; IT WOULD BE BETTER TO UPDATE THE LISTS
 ; AFTER EACH FILE IS PROCESSED!!!!!
@@ -756,7 +757,7 @@ if nind gt 0 then successlist = inputlines[ind] else UNDEFINE,successlist
 ; Output List
 ; Creating the new output array, ALS files
 if (nind gt 0) then begin
-  bases = strarr(n_elements(nind)
+  bases = strarr(nind)
   for i=0,nind-1 do begin
     if strmid(fitsbaselist[ind[i]],6,7,/reverse_offset) eq 'fits.fz' then $
       bases[i]=FILE_BASENAME(fitsbaselist[ind[i]],'.fits.fz') else $

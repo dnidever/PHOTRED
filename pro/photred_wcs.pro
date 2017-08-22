@@ -143,6 +143,12 @@ nmultiwcs = READPAR(setup,'NMULTI_WCS')
 if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
 nmulti = nmulti > 1  ; must be >=1
 
+; Get the scripts directory from setup
+scriptsdir = READPAR(setup,'SCRIPTSDIR')
+if scriptsdir eq '' then begin
+  printlog,logfile,'NO SCRIPTS DIRECTORY'
+  return
+endif
 
 ;###################
 ; GETTING INPUTLIST
@@ -456,7 +462,7 @@ printlog,logfile,strtrim(ncmd,2),' files to run WCSFIT on'
 if ncmd gt 0 then begin
   cmd = "cd,'"+cmddir+"' & "+cmd  ; go to the directory
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=1  ;2, 5
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='wfit',hyperthread=hyperthread,/idle,waittime=1,scriptsdir=scriptsdir
 endif
 
 ; Check for success/failures

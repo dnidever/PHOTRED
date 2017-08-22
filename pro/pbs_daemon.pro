@@ -13,16 +13,17 @@
 ; PBS jobs will be killed.
 ;
 ; INPUTS:
-;  input     A string array with the IDL commands (i.e. jobs) to be run.
-;  dirs      The directories in which the commands are to be run.
-;  /idle     This is an IDL command, otherwise a SHELL command.
-;  =prefix   The prefix for the PBS script names
-;  =nmulti   How many nodes to run these jobs on.  Default is 8.
-;  /hyperthread  Not on a PBS server but one that has multiple processors
+;  input        A string array with the IDL commands (i.e. jobs) to be run.
+;  dirs         The directories in which the commands are to be run.
+;  /idle        This is an IDL command, otherwise a SHELL command.
+;  =prefix      The prefix for the PBS script names
+;  =nmulti      How many nodes to run these jobs on.  Default is 8.
+;  /hyperthread Not on a PBS server but one that has multiple processors
 ;                 hyperthreaded.  Run multiple jobs at the same time on
 ;                 the same server.
-;  =waittime  Time to wait between checking the running jobs.  Default
-;                is 60 sec.
+;  =scriptsdir  The directory that contains the PHOTRED scripts.
+;  =waittime    Time to wait between checking the running jobs.  Default
+;                 is 60 sec.
 ;
 ; OUTPUTS:
 ;  Jobs are run.
