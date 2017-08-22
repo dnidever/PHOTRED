@@ -1,7 +1,27 @@
+;+
+;
+; PHOTRED_COMMONSOURCES_DAOFINDPHOT
+;
+; Find sources and get simple aperture photometry using DAOPHOT.
+;
+; INPUTS:
+;  file      The FITS file name.
+;  /clobber  Overwrite any existing output files.
+;
+; OUTPUTS:
+;  The DAOPHOT "find" .cmn.coo and "photometry" .cmn.ap files
+;   are created.
+;  =error    The error message if one occurred.
+;
+; USAGE:
+;  IDL>photred_commonsources_daofindphot,'F1-00126342_10.fits',/clobber
+;
+; By D.Nidever  May 2015
+;-
+
 pro photred_commonsources_daofindphot,file,clobber=clobber,error=error
 
-; Find sources and get simple aperture photometry
-
+; Not enough inputs
 if n_elements(file) eq 0 then begin
   print,'syntax - photred_commonsources_daofindphot,file,clobber=clobber,error=error'
   error = 'Not enough inputs'
@@ -9,8 +29,7 @@ if n_elements(file) eq 0 then begin
 endif
 
 ; Is this a FITS file
-len = strlen(file)
-if (strmid(strtrim(file,2),len-5,5) ne '.fits') then begin
+if (strmid(file,3,4,/reverse_offset) ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz') then begin
   print,file,' is NOT a FITS file'
   error = file+' is NOT a FITS file'
   return
@@ -23,7 +42,13 @@ if FILE_TEST(file) eq 0 then begin
   return
 endif
 
-base = FILE_BASENAME(file[0],'.fits')
+if strmid(file[0],6,7,/reverse_offset) eq 'fits.fz' then begin
+  fpack = 1
+  base = FILE_BASENAME(file[0],'.fits.fz')
+endif else begin
+  fpack = 0
+  base = FILE_BASENAME(file[0],'.fits')
+endelse
 dir = FILE_DIRNAME(file[0])
 
 cd,current=curdir
@@ -113,8 +138,14 @@ if (coolines lt 4 or aplines lt 4 or keyword_set(clobber)) then begin
   WRITELINE,tempfile,lines
   FILE_CHMOD,tempfile,'755'o
 
+  ; If this is a fpack-compressed file then temporarily uncompress it
+  if fpack eq 1 then spawn,['funpack',ifile],/no_shell
+
   ; Run the program
   SPAWN,[tempfile,base],out,errout,/noshell
+
+  ; Delete funpacked file
+  if fpack eq 1 then FILE_DELETE,ibase+'.fits',/allow
 
   ; Test the coo and ap files
   cootest = FILE_TEST(base+'.cmn.coo')

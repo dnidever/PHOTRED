@@ -448,7 +448,7 @@ For i=0,nfieldfiles-1 do begin
     SPAWN,tempfile+' '+ibase,out,errout
     ;FILE_DELETE,tempfile    ; delete the temporary script
  
-    ; Delete unpacked file
+    ; Delete funpacked file
     if fpack eq 1 then FILE_DELETE,ibase+'.fits',/allow
 
     ; Test the coo and ap file
