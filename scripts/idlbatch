@@ -4,6 +4,7 @@ then
 else
   echo 'Log file: '$1'.log'
  # ( nohup /common/rsi/idl/bin/idl < $1 > $1.log 2>&1 ) &
-  ( nohup /Applications/exelis/idl/bin/idl < $1 > $1.log 2>&1 ) &
+ # ( nohup /Applications/exelis/idl/bin/idl < $1 > $1.log 2>&1 ) &
+  ( nohup idl < $1 > $1.log 2>&1 ) &
   echo $!
 fi
