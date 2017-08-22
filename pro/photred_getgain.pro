@@ -1,6 +1,3 @@
-function photred_getgain,file,keyword=keyword,stp=stp
-
-
 ;+
 ;
 ; PHOTRED_GETGAIN
@@ -23,6 +20,8 @@ function photred_getgain,file,keyword=keyword,stp=stp
 ; By D.Nidever  May 2008
 ;-
 
+function photred_getgain,file,keyword=keyword,stp=stp
+
 COMMON photred,setup
 
 undefine,gain,keyword
@@ -41,7 +40,7 @@ if nfile gt 1 then begin
   for i=0,nfile-1 do begin
     gain[i] = photred_getgain(file[i],keyword=ikeyword)
     keyword[i] = ikeyword
-  end
+  endfor
   return,gain
 endif
 
@@ -51,7 +50,8 @@ if test eq 0 then begin
   return,-1.0
 endif
 
-head = HEADFITS(file)
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+  head = HEADFITS(file)
 gain = SXPAR(head,'GAIN',count=ngain,/silent)
 egain = SXPAR(head,'EGAIN',count=negain,/silent)          ; imacs
 
