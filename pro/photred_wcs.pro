@@ -462,7 +462,8 @@ endif
 ; Check for success/failures
 for i=0,ncmd-1 do begin
   ; Successful
-  head = HEADFITS(cmdlongfile[i])
+  if strmid(cmdlongfile[i],6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(cmdlongfile[i],exten=1) else $
+     head = HEADFITS(cmdlongfile[i],exten=0)
   ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1,/silent),2)
   dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
   if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then begin
