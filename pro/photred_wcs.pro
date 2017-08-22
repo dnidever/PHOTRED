@@ -147,23 +147,16 @@ nmulti = nmulti > 1  ; must be >=1
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files
-; OUTLIST        FITS files
-; SUCCESSLIST    FITS files
+; INLIST         FITS or FITS.FZ files
+; OUTLIST        FITS or FITS.FZ files
+; SUCCESSLIST    FITS or FITS.FZ files
 
 
 ; Get input
 ;-----------
-;precursor = ['SPLIT','RENAME']
 precursor = 'SPLIT'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
+lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext=['fits','fits.fz'])
 ninputlines = lists.ninputlines
-
-;if (ninputlines eq 0) then begin
-;  precursor = 'RENAME'
-;  lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
-;  ninputlines = lists.ninputlines
-;endif
 
 ; No files to process
 ;---------------------
@@ -215,7 +208,9 @@ FOR i=0,ninputlines-1 do begin
   longfile = inputlines[i]
   file = FILE_BASENAME(longfile)
   filedir = FILE_DIRNAME(longfile)
-  base = FILE_BASENAME(file,'.fits')
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
+  if fpack eq 1 then base=FILE_BASENAME(file,'.fits.fz') else $
+    base = FILE_BASENAME(file,'.fits')
   printlog,logfile,strtrim(i+1,2),' ',longfile
 
   ; Check that the file exists
@@ -250,7 +245,7 @@ FOR i=0,ninputlines-1 do begin
   ; Make sure that |BITPIX| > 16
   ; Only works for single chip images
   bitpix = long(SXPAR(head,'BITPIX',/silent))
-  if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) then begin
+  if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) and (fpack eq 0) then begin
     printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
     ; Read in the image

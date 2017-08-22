@@ -1398,6 +1398,16 @@ if test eq 0 then begin
   return
 endif
 
+; Fpack-compressed FITS file
+if strmid(filename,6,7,/reverse_offset) eq 'fits.fz' then begin
+  fpack = 1
+  filebase = FILE_BASENAME(filename,'.fits.fz')
+; Normal FITS file
+endif else begin
+  fpack = 0
+  filebase = FILE_BASENAME(filename,'.fits')
+endelse
+
 ; Defaults
 if n_elements(noupdate) eq 0 then noupdate=0       ; updating the header?
 if n_elements(rmslim) eq 0 then rmslim=1.0         ; maximum RMS to allow in arcsec
@@ -1416,8 +1426,8 @@ if message ne '' then begin
   print,error
   return    
 endif
+if fpack eq 1 then head=headfits(filename,exten=1)  ; fits_read will modify the header improperly
 im = float(im)
-;head = HEADFITS(filename)
 
 ; Information structure
 info = {up:'', left:'', cenra:0.0d0, cendec:0.0d0, nx:0L, ny:0L,$
@@ -1714,7 +1724,7 @@ endif
 if n_elements(cat) eq 0 and not keyword_set(redo) then begin
   
   ; Check if there is already a DAOPHOT/FIND file for this file
-  catfile = file_basename(filename,'.fits')+'_cat.dat'
+  catfile = filebase+'_cat.dat'
   test = FILE_TEST(catfile)
   
   ; There IS a CAT file
@@ -1909,7 +1919,7 @@ if n_elements(cat) eq 0 then begin
   cat.y = cat.y - 1.0
 
   ; SAVING THE CATALOG FILE
-  catfile = file_basename(filename,'.fits')+'_cat.dat'
+  catfile = filebase+'_cat.dat'
   print,'Saving catalog file to FILE=',catfile
   SAVE,cat,file=catfile
 
@@ -1975,7 +1985,7 @@ endif
 if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
       
   ; Check if there is already a reference file for this file
-  refcatfile = file_basename(filename,'.fits')+'_refcat.dat'
+  refcatfile = filebase+'_refcat.dat'
   test = file_test(refcatfile)
 
   ; There IS a reference file
@@ -2106,7 +2116,7 @@ if n_elements(refcat) eq 0 then begin
   print,'Nstars = ',strtrim(nrefcat,2)
 
   ; SAVING THE REFERENCE CATALOG FILE
-  refcatfile = file_basename(filename,'.fits')+'_refcat.dat'
+  refcatfile = filebase+'_refcat.dat'
   print,'Saving reference catalog file to FILE=',refcatfile
   SAVE,refcat,file=refcatfile
 
@@ -2623,8 +2633,17 @@ if not keyword_set(noupdate) then begin
   if (rms le rmslim) then begin
 
     print,'Updating WCS in ',filename
-    MWRFITS,im,filename,head,/create
-    ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
+    if fpack eq 0 then begin
+      MWRFITS,im,filename,head,/create
+      ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
+    endif else begin
+      ; Create temporary symbolic link to make modfits.pro think
+      ; this is an ordinary FITS file
+      tempfile = MAKETEMP('temp')
+      FILE_LINK,filename,tempfile+'.fits'
+      MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
+      FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files
+    endelse
 
   ; RMS too high
   endif else begin
@@ -2637,7 +2656,6 @@ endif else begin
 endelse
 
 ;MODFITS,filename,0,head,errmsg=errmsg  ; this can give problems with CHECKSUM
-
 
 
 dt = systime(1)-t0
