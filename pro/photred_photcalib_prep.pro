@@ -72,6 +72,7 @@ for j=0,nfiles-1 do begin
   if narr ge 2 then filebase = strjoin(arr[0,narr-2]) else filebase = file
 
   fitsfile = filebase+'.fits'
+  if file_test(fitsfile) eq 0 then fitsfile=filebase+'.fits.fz'
 
   ; Get the chip/amp number
   chipnum = PHOTRED_GETCHIPNUM(fitsfile,imager,error=errorchipnum)
@@ -83,7 +84,8 @@ for j=0,nfiles-1 do begin
   
   ; Reading header of FITS file
   undefine,errmsg
-  head = HEADFITS(fitsfile,errmsg=errmsg)
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(fitsfile,exten=1,errmsg=errmsg) else $
+    head = HEADFITS(fitsfile,errmsg=errmsg)
   if (errmsg ne '') then begin
     print,'ERROR in getting header'
     error = errmsg
