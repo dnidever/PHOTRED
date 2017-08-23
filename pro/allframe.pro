@@ -227,7 +227,7 @@ for i=0,nfiles-1 do begin
   ; Uncompress FPACK FITS files if necessary, temporarily
   if file_test(base+'.fits') eq 0 and file_test(base+'.fits.fz') eq 1 then begin
     fpack[i] = 1
-    printlog,logf,'Temporarily uncomporessing '+base+'.fits.fz'
+    printlog,logf,'Temporarily uncompressing '+base+'.fits.fz'
     spawn,['funpack',base+'.fits.fz'],/noshell
   endif
 
@@ -464,7 +464,8 @@ magfile = mchbase+'.makemag'
 ; combmch = FILEBASE.mch        ORIG
 ; combmch = FILEBASE_comb.mch   NEW
 ; The tfr file will have the same name but with .tfr
-MAKEMAG,file_basename(combmch,'.mch')+'.tfr',magfile
+MAKEMAG,file_basename(combmch,'.mch')+'.tfr',magfile,error=magerror
+if n_elements(magerror) gt 0 then goto,BOMB
 
 ; Prepend the ALF header to the makemag file
 line1='' & line2='' & line3=''
@@ -544,11 +545,11 @@ endelse
 printlog,logf,'FINAL ALLFRAME file = ',finalfile
 printlog,logf,systime(0)
 
+BOMB:
+
 ; Delete temporarily funpacked files
 bdfpack = where(fpack eq 1,nbdfpack)
-if nbdfpack gt 0 then FILE_DELETE,base[bdfpack]+'.fits',/allow
-
-BOMB:
+if nbdfpack gt 0 then FILE_DELETE,file_basename(files[bdfpack],'.als')+'.fits',/allow
 
 if keyword_set(stp) then stop
 
