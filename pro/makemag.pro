@@ -1,17 +1,21 @@
-pro makemag,tfrfile,outfile,stp=stp
+pro makemag,tfrfile,outfile,stp=stp,error=error
 
 ; This combines the ALLFRAME alf photometry output files
+
+undefine,error
 
 ntfrfile = n_elements(tfrfile)
 noutfile = n_elements(outfile)
 if ntfrfile eq 0 or noutfile eq 0 then begin
+  error = 'Not enough inputs'
   print,'Syntax - makemag,tfrfile,outfile'
   return
 endif
 
 test = file_test(tfrfile)
 if test eq 0 then begin
-  print,tfrfile,' NOT FOUND'
+  error = tfrfile+' NOT FOUND'
+  print,error
   return
 endif
 
@@ -34,7 +38,8 @@ nfiles = nfiles-1
 
 ; No files
 if nfiles lt 1 then begin
-  print,'No files in ',tfrfile
+  error = 'No files in '+tfrfile
+  print,error
   return
 endif
 
@@ -125,6 +130,12 @@ countarr = lonarr(nstars)        ; how many good mags for this stars
 ; Loop through the ALF files
 ;---------------------------
 for i=0,nfiles-1 do begin
+
+  if file_test(files[i]) eq 0 then begin
+    error = files[i]+' NOT FOUND'
+    print,error
+    return
+  endif
 
   ; Load the ALF file
   LOADALS,files[i],alf,alfhead

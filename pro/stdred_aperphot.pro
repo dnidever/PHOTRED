@@ -336,7 +336,8 @@ if ntomakeoptlist gt 0 then begin
   cmd = "PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,$
+             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
 
 
@@ -464,7 +465,7 @@ nprocbaselist = n_elements(procbaselist)
 cmd = './aperphot.sh '+procbaselist
 
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5,scriptsdir=scriptsdir
 
 
 ;-------------------

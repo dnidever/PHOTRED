@@ -1,6 +1,3 @@
-function photred_getinput,thisprog,precursor,redo=redo,stp=stp,error=error,$
-                          extension=extension,noempty=noempty
-
 ;+
 ;
 ; PHOTRED_GETINPUT
@@ -21,7 +18,8 @@ function photred_getinput,thisprog,precursor,redo=redo,stp=stp,error=error,$
 ;  /redo        Redo files already processed
 ;  /stp         Stop at the end of the program
 ;  =extension   Only accept inputs with this extension (i.e. 'als').  Do
-;                 not include the dot.
+;                 not include the dot.  This can be an array for accepting
+;                 multiple extensions.
 ;
 ; OUTPUTS:
 ;  lists        An IDL structure that includes all of the list information: precursor, prestage,
@@ -34,6 +32,9 @@ function photred_getinput,thisprog,precursor,redo=redo,stp=stp,error=error,$
 ;
 ; By D.Nidever  March 2008
 ;-
+
+function photred_getinput,thisprog,precursor,redo=redo,stp=stp,error=error,$
+                          extension=extension,noempty=noempty
 
 COMMON photred,setup
 
@@ -270,9 +271,12 @@ endif
 ;-------------------------
 if (n_elements(extension) gt 0 and ninputlines gt 0) then begin
 
-  extarr = strarr(ninputlines)
-  for i=0,ninputlines-1 do extarr[i]=first_el(strsplit(inputlines[i],'.',/extract),/last)
-  gdinp = where(extarr eq extension,ngdinp)
+  extmask = bytarr(ninputlines)
+  for i=0,n_elements(extension)-1 do begin
+    extlen = strlen(extension[i])
+    extmask = extmask OR (strmid(inputlines,extlen-1,extlen,/reverse_offset) eq extension[i])
+  endfor
+  gdinp = where(extmask eq 1,ngdinp)
 
   ; Some endings matched
   if (ngdinp gt 0) then begin
@@ -286,9 +290,9 @@ if (n_elements(extension) gt 0 and ninputlines gt 0) then begin
   endelse
 
   ndiff = ninputlines-ngdinp
-  if ndiff gt 0 then printlog,logfile,strtrim(ndiff,2),' DO NOT HAVE THE REQUIRED >>',extension,'<< EXTENSION'
+  if ndiff gt 0 then printlog,logfile,strtrim(ndiff,2),' DO NOT HAVE THE REQUIRED >>',strjoin(extension,' '),'<< EXTENSION'
 
-end
+endif
 
 
 ; Writing INLIST
@@ -310,20 +314,6 @@ endelse
 
 ; Making LIST structure
 ;------------------------
-;cmd = 'lists = {thisprog:thisprog'
-;if nprecursor gt 0 then cmd=cmd+', precursor:precursor'
-;if n_elements(prestage) gt 0 then cmd=cmd+', prestage:prestage'
-;if n_elements(prefile) gt 0 then cmd=cmd+', prefile:prefile'
-;if ninputlines gt 0 then cmd=cmd+', inputlines:inputlines'
-;cmd = cmd+', ninputlines:ninputlines'
-;if noutputlines gt 0 then cmd=cmd+', outputlines:outputlines'
-;cmd = cmd+', noutputlines:noutputlines'
-;if nsuccesslines gt 0 then cmd=cmd+', successlines:successlines'
-;cmd = cmd+', nsuccesslines:nsuccesslines'
-;if nfailurelines gt 0 then cmd=cmd+', failurelines:failurelines'
-;cmd = cmd+', nfailurelines:nfailurelines}'
-;dum = EXECUTE(cmd)
-
 lists = {thisprog:thisprog}
 if nprecursor gt 0 then lists = CREATE_STRUCT(lists,'precursor',precursor)
 if n_elements(prestage) gt 0 then lists = CREATE_STRUCT(lists,'prestage',prestage)

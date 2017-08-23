@@ -165,6 +165,7 @@ FOR i=0,ninputlines-1 do begin
     mchfile = file
     rawfile = base+'.raw'
     fitsfile = base+'.fits'
+    if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
     photfile = rawfile
   Endif
 
@@ -296,7 +297,8 @@ FOR i=0,ninputlines-1 do begin
 
 
   ; Load the FITS header
-  head = HEADFITS(fitsfile)
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(fitsfile,exten=1) else $
+    head = HEADFITS(fitsfile)
 
   ; Checking that the header has a WCS
   EXTAST,head,astr

@@ -1,6 +1,3 @@
-function photred_getuttime,file,head=head,stp=stp
-
-
 ;+
 ;
 ; PHOTRED_GETUTTIME
@@ -20,6 +17,8 @@ function photred_getuttime,file,head=head,stp=stp
 ;
 ; By D.Nidever  February 2008
 ;-
+
+function photred_getuttime,file,head=head,stp=stp
 
 COMMON photred,setup
 
@@ -43,7 +42,8 @@ if test eq 0 then begin
   return,''
 endif
 
-head = HEADFITS(file)
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+  head = HEADFITS(file)
 
 ; Getting UT TIME
 ;----------------

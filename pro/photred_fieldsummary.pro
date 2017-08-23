@@ -1,5 +1,3 @@
-pro photred_fieldsummary,field,setupdir=setupdir,redo=redo
-
 ;+
 ;
 ; PHOTRED_FIELDSUMMARY
@@ -19,6 +17,8 @@ pro photred_fieldsummary,field,setupdir=setupdir,redo=redo
 ;
 ; By D.Nidever  May 2015
 ;-
+
+pro photred_fieldsummary,field,setupdir=setupdir,redo=redo
   
 COMMON photred,setup
 
@@ -121,14 +121,20 @@ if thisimager.namps gt 1 then begin
   chstring = '' ; make regular expression for the chip number
   ndig = ceil(alog10(thisimager.namps))
   for l=0,ndig-1 do chstring+='[0-9]'
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+'.fits',count=nfieldfiles)
+  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+'.fits*',count=nfieldfiles)
 endif else begin
-  fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
+  fieldfiles = FILE_SEARCH(field+'-*.fits*',count=nfieldfiles)
 endelse
 
 ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
 if nfieldfiles gt 0 then begin
-  fbases = FILE_BASENAME(fieldfiles,'.fits')
+  ; Get base names
+  fbases = strarr(nfieldfiles)
+  for i=0,nfieldfiles-1 do begin
+    if strmid(fieldfiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+  endfor
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
               stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 header file from splitting 
@@ -210,7 +216,9 @@ For i=0,nfieldfiles-1 do begin
   undefine,chilines,chilinesarr,chiarr,psfan,minpsftype,maxpsftype,psfchi
   
   fitsfile = fieldfiles[i]
-  base = file_basename(fitsfile,'.fits')   
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
+  if fpack eq 1 then base=file_basename(fitsfile,'.fits.fz') else $
+    base = file_basename(fitsfile,'.fits')   
   shfield = first_el(strsplit(base,'-',/extract))
   if thisimager.namps gt 1 then begin
     tmp = first_el(strsplit(base,'-',/extract),/last)
@@ -244,7 +252,8 @@ For i=0,nfieldfiles-1 do begin
 
   ; From FITS header
   ;  nx, ny, ctype, scale, ra, dec
-  head = headfits(fitsfile)
+  if fpack eq 1 then head=headfits(fitsfile,exten=1) else $
+    head = headfits(fitsfile)
   nx = sxpar(head,'NAXIS1',count=n_nx)
   if n_nx gt 0 then chipstr[i].nx = nx
   ny = sxpar(head,'NAXIS2',count=n_ny)
@@ -590,7 +599,8 @@ For i=0,nchips-1 do begin
     if fitstest eq 1 and (alstest eq 1 or cootest eq 1) then begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
         LOADCOO,coofile,cat
-      head = headfits(fitsfile)
+      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=headfits(fitsfile,exten=1) else $
+        head = headfits(fitsfile)
       HEAD_XYAD,head,cat.x-1,cat.y-1,ra,dec,/deg
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch
       if nmatch gt 0 then begin

@@ -11,8 +11,8 @@
 ;  input    The FITS file(s) for which to find confirmed celestial
 ;             sources.  It should have the field information
 ;             appended, i.e. F6-ccd1001.fits. 
-;             Three formats can be used (1) Name of file
-;             with a list of input filenames.  Must start with an '@';
+;             Three formats can be used:
+;             (1) Name of file with a list of input filenames.  Must start with an '@';
 ;             (2) A name with wildcard characters, such as '*';
 ;             (3) An array of filenames.
 ;  =minsources  The number of minimum sources required.  The default
@@ -75,8 +75,7 @@ endif
 
 
 ; Is this a FITS file
-len = strlen(file)
-if (strmid(strtrim(file,2),len-5,5) ne '.fits') then begin
+if (strmid(file,3,4,/reverse_offset) ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz') then begin
   print,file,' is NOT a FITS file'
   error = file+' is NOT a FITS file'
   return
@@ -162,7 +161,8 @@ thisimager = imagers[ind_imager[0]]
 
 
 ; Get the field information
-base = FILE_BASENAME(file,'.fits')
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(file,'.fits.fz') else $
+  base = FILE_BASENAME(file,'.fits')
 basarr = strsplit(base,'-',/extract)
 dash = strpos(base,'-')
 if (strmid(base,0,1) ne 'F' or dash[0] eq -1) then begin
@@ -212,12 +212,18 @@ endif
 ; If less than 2 files found
 if (nfieldfiles lt 2) then begin
   if thisimager.namps gt 1 then $
-    fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
+    fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits*',count=nfieldfiles) else $
     fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
 
   ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
   if nfieldfiles gt 0 then begin
-    fbases = FILE_BASENAME(fieldfiles,'.fits')
+    ; Get base name
+    fbases = strarr(nfieldfiles)
+    for i=0,nfieldfiles-1 do begin
+      if strmid(fieldiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
+        fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+        fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+    endfor
     bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
                 stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
                 stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 head file from split 
@@ -252,6 +258,12 @@ if thisimager.namps gt 1 then begin
 
   amp = first_el(strsplit(base,thisimager.separator,/extract),/last)
   fbases = FIlE_BASENAME(fieldfiles,'.fits')
+  ; Get base name
+  for i=0,nfieldfiles-1 do begin
+    if strmid(fieldiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+  endfor
   gdbase = where(stregex(fbases,thisimager.separator+amp+'$',/boolean) eq 1,ngdbase)
 
   if (ngdbase gt 0) then begin
@@ -330,7 +342,13 @@ endif
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
-  ibase = FILE_BASENAME(ifile,'.fits')
+  if strmid(ifile,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fpack = 1
+    ibase = FILE_BASENAME(ifile,'.fits.fz')
+  endif else begin
+    fpack = 0
+    ibase = FILE_BASENAME(ifile,'.fits')
+  endelse
 
   ; Do the CMN.COO and CMN.AP files already exist?
   coofile = ibase+'.cmn.coo'
@@ -417,16 +435,24 @@ For i=0,nfieldfiles-1 do begin
     push,lines,'${image}.cmn.coo'
     push,lines,'${image}.cmn.ap'
     push,lines,'EXIT'
+    push,lines,'EXIT'
     push,lines,'END_DAOPHOT'
     ;tempfile = maketemp('dao','.sh')
     tempfile = MKTEMP('dao')    ; absolute path
     WRITELINE,tempfile,lines
     FILE_CHMOD,tempfile,'755'o
 
+    ; If this is a fpack-compressed file then temporarily uncompress it
+    if fpack eq 1 then spawn,['funpack',ifile],/no_shell
+
     ; Run the program
+    FILE_DELETE,[ibase+'.cmn.coo',ibase+'.cmn.ap'],/allow  ; make sure these don't exist
     SPAWN,tempfile+' '+ibase,out,errout
     ;FILE_DELETE,tempfile    ; delete the temporary script
  
+    ; Delete funpacked file
+    if fpack eq 1 then FILE_DELETE,ibase+'.fits',/allow
+
     ; Test the coo and ap file
     cootest = FILE_TEST(ibase+'.cmn.coo')
     if cootest eq 1 then coolines=FILE_LINES(ibase+'.cmn.coo') else coolines=0
@@ -467,8 +493,13 @@ if aptest eq 1 then aplines=FILE_LINES(apfile) else aplines=0
 if (coolines ge 4 and aplines ge 4) then begin
 
   ; Get the header
-  fitsfile = base+'.fits'
-  head = headfits(fitsfile)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fitsfile = base+'.fits.fz'
+    head = headfits(fitsfile,exten=1)
+  endif else begin  
+    fitsfile = base+'.fits'
+    head = headfits(fitsfile)
+  endelse
 
   ; Load the coordinates file
   LOADCOO,coofile,coo,coohead1
@@ -525,7 +556,13 @@ ndetected = lonarr(ncat)  ; The number of detections in other frames
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
-  ibase = FILE_BASENAME(ifile,'.fits')
+  if strmid(ifile,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fpack = 1
+    ibase = FILE_BASENAME(ifile,'.fits.fz')
+  endif else begin
+    fpack = 0
+    ibase = FILE_BASENAME(ifile,'.fits')
+  endelse
 
   if ibase eq base then goto,BOMB  ; Skip the current file
 
@@ -542,8 +579,13 @@ For i=0,nfieldfiles-1 do begin
     undefine,coo,aper
 
     ; Get the header
-    fitsfile = ibase+'.fits'
-    head1 = headfits(fitsfile)
+    if fpack eq 1 then begin
+      fitsfile = ibase+'.fits.fz'
+      head1 = headfits(fitsfile,exten=1)
+    endif else begin
+      fitsfile = ibase+'.fits'
+      head1 = headfits(fitsfile)
+    endelse
 
     ; Load the coordinates file
     LOADCOO,coofile,coo,coohead
