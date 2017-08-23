@@ -10,6 +10,13 @@ rm ${image}a.ap      >& /dev/null
 if [ ! -s daophot.opt ]; then
   cp ${image}.opt daophot.opt
 fi
+# Using fpack compressed file
+export fpackfile=0
+if [ ! -s ${image}.fits ] && [ -s ${image}.fits.fz ]; then
+   echo "Temporarily uncompressing ${image}.fits.fz"
+   funpack ${image}.fits.fz
+   export fpackfile=1
+fi
 #
 daophot << END_DAOPHOT >> ${image}.log
 OPTIONS
@@ -48,3 +55,8 @@ ${image}a.coo
 ${image}a.ap
 EXIT
 END_DAOPHOT
+# Delete temporarily uncompressed fits file
+if [ ${fpackfile} == 1 ]; then
+   echo "Removing temporarily uncompressed ${image}.fits file"
+   rm ${image}.fits >& /dev/null
+fi
