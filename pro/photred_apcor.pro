@@ -108,9 +108,9 @@ endif
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files
-; OUTLIST        FITS files
-; SUCCESSLIST    FITS files
+; INLIST         FITS or FITS.FZ files
+; OUTLIST        FITS or FITS.FZ files
+; SUCCESSLIST    FITS or FITS.FZ files
 
 ; Takes all of the FITS files from DAOPHOT.success(!!) (because the files in DAOPHOT.outlist will already
 ; have been moved by MATCH)and COPIES them into APCOR.inlist.
@@ -123,7 +123,7 @@ endif
 ; Get input
 ;-----------
 precursor = 'DAOPHOT.success'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
+lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext=['fits','fits.fz'])
 ninputlines = lists.ninputlines
 
 
@@ -201,15 +201,16 @@ FOR n=0,nnights-1 do begin
     ;-----------------------------------------
     len = strlen(file)
     ending = strmid(file,len-4,4)
-    if (ending ne 'fits') then begin
+    if (strmid(file,3,4,/reverse_offset) ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz') then begin
       successarr[i] = 0
-      printlog,logfile,file,' DOES NOT END IN >>fits<<'
+      printlog,logfile,file,' DOES NOT END IN "fits" or "fits.fz"'
       goto,BOMB
     endif
 
     ; Check that the A.ALS and A.AP files exist
     ;------------------------------------------
-    base = FILE_BASENAME(file,'.fits')
+    if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(file,'.fits.fz') else $
+      base = FILE_BASENAME(file,'.fits')
     alsfile = base+'a.als'
     apfile = base+'a.ap'
     alstest = FILE_TEST(alsfile)
@@ -316,10 +317,13 @@ FOR n=0,nnights-1 do begin
       filedir = FILE_DIRNAME(inputlines[indnight[i]])
       ;fitsfile = FILE_BASENAME(inputlines[i])
       fitsfile = inputlines[indnight[i]]
-      base = FILE_BASENAME(fitsfile,'.fits')
-
-      ; Getting information from header
-      head = HEADFITS(fitsfile)
+      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
+        base = FILE_BASENAME(fitsfile,'.fits.fz')
+        head = HEADFITS(fitsfile,exten=1)  ; get the header
+      endif else begin
+        base = FILE_BASENAME(fitsfile,'.fits')
+        head = HEADFITS(fitsfile)  ; get the header
+      endelse
 
       ; Getting FILTER
       filt = PHOTRED_GETFILTER(fitsfile,/numeric)
@@ -461,7 +465,8 @@ FOR n=0,nnights-1 do begin
         if (successarr[indnight[i]] eq 1) then begin
 
           fil = FILE_BASENAME(inputlines[indnight[i]])
-          base = FILE_BASENAME(fil,'.fits')
+          if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(fil,'.fits.fz') else $
+            base = FILE_BASENAME(fil,'.fits')
           delfile = base+'a.del'
 
           ; Check if the del file is in the apcor list
