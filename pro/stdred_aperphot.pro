@@ -1,5 +1,3 @@
-pro stdred_aperphot,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_APERPHOT
@@ -15,6 +13,8 @@ pro stdred_aperphot,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_aperphot,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -125,7 +125,7 @@ if n_elements(hyperthread) eq 0 then hyperthread=0
 ; Get input
 ;-----------
 precursor = 'WCS'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
+lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext=['fits','fits.fz'])
 ninputlines = lists.ninputlines
 
 
@@ -205,8 +205,13 @@ headerproblem = 0
 for i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
   com=''
 
   ; Checking GAIN
@@ -267,15 +272,22 @@ for i=0,ndirs-1 do begin
 
       ind = gd[j]
       fil = fitsbaselist[ind]
-      base = FILE_BASENAME(fil,'.fits')
+      if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then begin
+        fpack = 1
+        base = FILE_BASENAME(fil,'.fits.fz')
+        head = HEADFITS(fil,exten=1)
+      endif else begin
+        fpack = 0
+        base = FILE_BASENAME(fil,'.fits')
+        head = HEADFITS(fil)
+      endelse
       printlog,logfile,fil
 
       ; Make sure that the FITS files are FLOAT
       ;----------------------------------------
       ; Make sure that |BITPIX| > 16
-      head = HEADFITS(fil)
       bitpix = long(SXPAR(head,'BITPIX',/silent))
-      if (bitpix eq 8 or bitpix eq 16) then begin
+      if (bitpix eq 8 or bitpix eq 16) and (fpack eq 0) then begin
         printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
         ; Read in the image
@@ -347,7 +359,9 @@ for i=0,nfitsbaselist-1 do begin
 
   CD,fitsdirlist[i]
 
-  base = file_basename(fitsbaselist[i],'.fits')
+  if strmid(fitsbaselist[i],6,7,/reverse_offset) eq 'fits.fz' then $
+    base = file_basename(fitsbaselist[i],'.fits.fz') else $
+    base = file_basename(fitsbaselist[i],'.fits')
 
   ; Check OPT file
   ;----------------
@@ -450,7 +464,13 @@ printlog,logfile,'--------------------------'
 printlog,logfile,''
 
 ; These are the files to process
-procbaselist = FILE_BASENAME(fitsbaselist[gd],'.fits')
+procbaselist = strarr(ngd)
+procextlist = strarr(ngd)
+for i=0,ngd-1 do begin
+  if strmid(fitsbaselist[gd[i]],6,7,/reverse_offset) eq 'fits.fz' then $
+    procextlist[i]='.fits.fz' else procextlist[i]='.fits'
+  procbaselist[i] = FILE_BASENAME(fitsbaselist[gd[i]],procextlist[i])
+endfor
 procdirlist = fitsdirlist[gd]
 nprocbaselist = n_elements(procbaselist)
 
@@ -478,7 +498,7 @@ For i=0,nprocbaselist-1 do begin
   ; CD to the appropriate directory
   CD,procdirlist[i]
 
-  longfile = procdirlist[i]+'/'+procbaselist[i]+'.fits'
+  longfile = procdirlist[i]+'/'+procbaselist[i]+procextlist[i]
   base = procbaselist[i]
 
   ; Check the outputs

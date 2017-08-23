@@ -1,5 +1,3 @@
-pro stdred_matchcat,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_MATCHCAT
@@ -18,6 +16,8 @@ pro stdred_matchcat,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_matchcat,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -264,6 +264,7 @@ FOR i=0,ninputlines-1 do begin
   base = FILE_BASENAME(file,'.ast')
   filedir = FILE_DIRNAME(longfile)
   fitsfile = base+'.fits'
+  if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
 
   printlog,logfile,''
   printlog,logfile,'================================================='
