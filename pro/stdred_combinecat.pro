@@ -1,5 +1,3 @@
-pro stdred_combinecat,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_COMBINECAT
@@ -20,6 +18,8 @@ pro stdred_combinecat,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_combinecat,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -433,6 +433,7 @@ FOR i=0,nfilters-1 do begin
       base = FILE_BASENAME(file,'.cat')
       filedir = FILE_DIRNAME(longfile)
       fitsfile = base+'.fits'
+      if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
 
       iframe = framearr[filtnightind[j]]
       ichip = long( (strsplit(base,'_',/extract))[1] )

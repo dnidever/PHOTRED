@@ -18,6 +18,7 @@
 ;
 ; By D.Nidever  January 2016
 ;-
+
 function photred_getchipnum,file,imager,stp=stp,error=error
   
 COMMON photred,setup
@@ -45,7 +46,8 @@ if tag_exist(imager,'separator') eq 0 or tag_exist(imager,'namps') eq 0 then beg
 endif
 
 ; Parse the filename
-base = file_basename(file,'.fits')   
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then base=file_basename(file,'.fits.fz') else $
+  base = file_basename(file,'.fits')   
 shfield = first_el(strsplit(base,'-',/extract))
 
 ; --- Multi AMP imager ---

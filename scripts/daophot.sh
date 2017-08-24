@@ -34,7 +34,7 @@ export image=${1}
 #
 #  If required files do not exist, don't run this script.
 #
-if [ ! -s ${image}.fits ]; then
+if [ ! -s ${image}.fits ] && [ ! -s ${image}.fits.fz ]; then
    echo "ERROR: input image [ ${image}.fits ] not found."
    exit 1
 fi
@@ -62,8 +62,17 @@ if [ ! -s lstfilter ]; then
    echo "ERROR: LSTFILTER program required to filter bad PSF stars."
    exit 1
 fi
+# Using fpack compressed file
+export fpackfile=0
+export fullfile=${image}.fits
+if [ ! -s ${image}.fits ] && [ -s ${image}.fits.fz ]; then
+   echo "Temporarily uncompressing ${image}.fits.fz"
+   funpack ${image}.fits.fz
+   export fpackfile=1
+   export fullfile=${image}.fits.fz
+fi
 #
-echo "Starting photometry on ${image}.fits :"
+echo "Starting photometry on ${fullfile} :"
 #
 ###############################################################
 ###                                                         ###
@@ -492,5 +501,10 @@ echo exit  >> ${image}a.als.inp
 allstar < ${image}a.als.inp >> ${image}a.log
 #rm allstar.inp
 rm ${image}as.fits >& /dev/null
+# Delete temporarily uncompressed fits file
+if [ ${fpackfile} == 1 ]; then
+   echo "Removing temporarily uncompressed ${image}.fits file"
+   rm ${image}.fits >& /dev/null
+fi
 echo ""
 

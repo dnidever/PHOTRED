@@ -191,11 +191,13 @@ endif
 if keyword_set(usewcs) then begin
   ; Checking WCS of first file
   fitsfile1 = file_basename(files[0],'.als')+'.fits'
+  if file_test(fitsfile1) eq 0 then fitsfile1=file_basename(files[0],'.als')+'.fits.fz'
   if file_test(fitsfile1) eq 0 then begin
     print,fitsfile1,' NOT FOUND. Cannot use WCS for matching'
   endif else begin
-    head1 = headfits(fitsfile1)
-    extast,head1,astr1,noparams1
+    if strmid(fitsfile1,6,7,/reverse_offset) eq 'fits.fz' then head1=headfits(fitsfile1,exten=1) else $
+      head1 = headfits(fitsfile1)
+    EXTAST,head1,astr1,noparams1
     if noparams1 lt 1 then print,fitsfile1,' has NO WCS.  Cannot use WCS for matching'
   endelse
 endif
@@ -282,12 +284,14 @@ for i=1,nfiles-1 do begin
   if keyword_set(usewcs) and noparams1 ge 1 then begin
     ; Checking WCS of second file
     fitsfile2 = file_basename(files[i],'.als')+'.fits'
+    if file_test(fitsfile2) eq 0 then fitsfile2 = file_basename(files[i],'.als')+'.fits.fz'
     if file_test(fitsfile2) eq 0 then begin
       printlog,logf,fitsfile2+' NOT FOUND. Cannot use WCS for matching'
       goto,BOMB1
     endif
-    head2 = headfits(fitsfile2)
-    extast,head2,astr2,noparams2
+    if strmid(fitsfile2,6,7,/reverse_offset) eq 'fits.fz' then head2=headfits(fitsfile2,exten=1) else $
+      head2 = headfits(fitsfile2)
+    EXTAST,head2,astr2,noparams2
     if noparams2 lt 1 then begin
       printlog,logf,fitsfile2+' has NO WCS.  Cannot use WCS for matching'
       goto,BOMB1

@@ -1,6 +1,3 @@
-function photred_getdate,file,head=head,stp=stp
-
-
 ;+
 ;
 ; PHOTRED_GETDATE
@@ -21,6 +18,8 @@ function photred_getdate,file,head=head,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+function photred_getdate,file,head=head,stp=stp
 
 COMMON photred,setup
 
@@ -44,7 +43,8 @@ if test eq 0 then begin
   return,''
 endif
 
-head = HEADFITS(file)
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+  head = HEADFITS(file)
 
 ; Getting UT DATE
 ;----------------

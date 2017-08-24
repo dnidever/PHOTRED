@@ -1,7 +1,3 @@
-function photred_getairmass,file,obs=obs,update=update,silent=silent,$
-         recalculate=recalculate,stp=stp
-
-
 ;+
 ;
 ; PHOTRED_GETAIRMASS
@@ -26,6 +22,9 @@ function photred_getairmass,file,obs=obs,update=update,silent=silent,$
 ;
 ; By D.Nidever  February 2008
 ;-
+
+function photred_getairmass,file,obs=obs,update=update,silent=silent,$
+         recalculate=recalculate,stp=stp
 
 COMMON photred,setup
 
@@ -54,7 +53,8 @@ endif
 
 if n_elements(obs) eq 0 then obs=''
 
-head = HEADFITS(file)
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+  head = HEADFITS(file)
 
 ; Get AIRMASS from header
 am = SXPAR(head,'AIRMASS',count=nam,/silent)
@@ -153,7 +153,19 @@ if nam eq 0 or float(am) lt 0.9 or keyword_set(recalculate) then begin
     SXADDPAR,head,'AIRMASS',am,' Added on '+systime()
     if not keyword_set(silent) then print,'AIRMASS=',strtrim(am,2),' added to '+file
     undefine,errmsg
-    MODFITS,file,0,head,errmsg=errmsg
+    ; Fpack compressed FITS file
+    if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+      ; Create temporary symbolic link to make modfits.pro
+      ; think this is an ordinary FITS file
+      tempfile = MAKETEMP('temp')
+      FILE_LINK,file,tempfile+'.fits'
+      MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
+      FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files  
+
+    ; Normal FITS
+    endif else begin
+      MODFITS,file,0,head,errmsg=errmsg
+    endelse
     if n_elements(errmsg) gt 0 then print,errmsg
   endif
 

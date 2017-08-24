@@ -140,12 +140,18 @@ printlog,logfile
 
 ; Search for files in the directory.
 if thisimager.namps gt 1 then $
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
+  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits*',count=nfieldfiles) else $
   fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
 
 ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
 if nfieldfiles gt 0 then begin
-  fbases = FILE_BASENAME(fieldfiles,'.fits')
+  ; Get base name
+  fbases = strarr(nfieldfiles)
+  for i=0,nfieldfiles-1 do begin
+    if strmid(fieldfiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+  endfor
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
               stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 head file from split
@@ -176,7 +182,9 @@ printlog,logfile,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
-  ibase = FILE_BASENAME(ifile,'.fits')
+  if strmid(ifile,6,7,/reverse_offset) eq 'fits.fz' then $
+    ibase = FILE_BASENAME(ifile,'.fits.fz') else $
+    ibase = FILE_BASENAME(ifile,'.fits')
   idir = FILE_DIRNAME(ifile)
 
   ; Do the CMN.COO and CMN.AP files already exist?
@@ -198,7 +206,7 @@ printlog,logfile,'Creating cmn.coo and cmn.ap for ',strtrim(nfieldfiles,2),' fil
 
 ; Now run PBS_DAEMON.PRO
 if n_elements(cmd) gt 0 then $
-  PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5
+  PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5,scriptsdir=scriptsdir
 
 ; Now concatenate and merge all of the catalogs
 ;----------------------------------------------
@@ -216,7 +224,13 @@ if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo)
   For i=0,nfieldfiles-1 do begin
 
     ifile = fieldfiles[i]
-    ibase = FILE_BASENAME(ifile,'.fits')
+    if strmid(ifile,6,7,/reverse_offset) eq 'fits.fz' then begin
+      fpack = 1
+      ibase = FILE_BASENAME(ifile,'.fits.fz')
+    endif else begin
+      fpack = 0
+      ibase = FILE_BASENAME(ifile,'.fits')    
+    endelse
     idir = FILE_DIRNAME(ifile)
 
     if thisimager.namps gt 1 then begin 
@@ -241,7 +255,8 @@ if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo)
     if (coolines ge 4 and aplines ge 4) then begin
    
       ; Get the header
-      head = headfits(ifile)
+      if fpack eq 1 then head=headfits(ifile,exten=1) else $
+        head = headfits(ifile)
 
       ; Load the coordinates file
       LOADCOO,coofile,coo,coohead1
@@ -343,7 +358,13 @@ printlog,logfile,'Creating individual .cmn.lst files'
 For i=0,nfieldfiles-1 do begin
 
   ifile = fieldfiles[i]
-  ibase = FILE_BASENAME(ifile,'.fits')
+  if strmid(ifile,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fpack = 1
+    ibase = FILE_BASENAME(ifile,'.fits.fz')
+  endif else begin
+    fpack = 0
+    ibase = FILE_BASENAME(ifile,'.fits')
+  endelse
   idir = FILE_DIRNAME(ifile)
 
   printlog,logfile,strtrim(i+1,2),' ',ibase
@@ -363,7 +384,8 @@ For i=0,nfieldfiles-1 do begin
     undefine,coo,aper
 
     ; Get the header
-    head1 = headfits(ifile)
+    if fpack eq 1 then head1=headfits(ifile,exten=1) else $
+      head1 = headfits(ifile)
 
     ; Load the coordinates file
     LOADCOO,coofile,coo,coohead

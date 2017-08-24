@@ -1,5 +1,3 @@
-pro stdred_daogrow,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_DAOGROW
@@ -16,6 +14,8 @@ pro stdred_daogrow,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_daogrow,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -108,9 +108,9 @@ endif
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files
-; OUTLIST        FITS files
-; SUCCESSLIST    FITS files
+; INLIST         AP files
+; OUTLIST        TOT files
+; SUCCESSLIST    AP files
 
 ; Takes all of the FITS files from DAOPHOT.success(!!) (because the files in DAOPHOT.outlist will already
 ; have been moved by MATCH)and COPIES them into APCOR.inlist.
@@ -216,6 +216,7 @@ FOR i=0,nnights-1 do begin
     filedir = FILE_DIRNAME(longfile)
     base = FILE_BASENAME(longfile,'.ap')
     fitsfile = base+'.fits'
+    if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
     apfile = file
     aapfile = base+'a.ap'
 
@@ -335,10 +336,13 @@ FOR i=0,nnights-1 do begin
       filedir = FILE_DIRNAME(longfile)
       base = FILE_BASENAME(longfile,'.ap')
       fitsfile = base+'.fits'
+      if file_test(fitsfile) eq 1 then begin
+        head = HEADFITS(fitsfile)   ; load the header
+      endif else begin
+        fitsfile = base+'.fits.fz'
+        head = HEADFITS(fitsfile,exten=1)  ; load the header
+      endelse
       apfile = file
-
-        ; Getting information from header
-      head = HEADFITS(fitsfile)
 
       ; Getting FILTER
       filt = PHOTRED_GETFILTER(fitsfile,/numeric)
@@ -471,6 +475,7 @@ FOR i=0,nnights-1 do begin
         filedir = FILE_DIRNAME(longfile)
         base = FILE_BASENAME(longfile,'.ap')
         fitsfile = base+'.fits'
+        if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
         apfile = file
         totfile = filedir+'/'+base+'.tot'
         totafile = base+'a.tot'

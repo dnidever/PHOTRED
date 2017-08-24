@@ -1,6 +1,3 @@
-function photred_getrdnoise,file,keyword=keyword,stp=stp
-
-
 ;+
 ;
 ; PHOTRED_GETRDNOISE
@@ -22,6 +19,8 @@ function photred_getrdnoise,file,keyword=keyword,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+function photred_getrdnoise,file,keyword=keyword,stp=stp
 
 COMMON photred,setup
 
@@ -51,7 +50,8 @@ if test eq 0 then begin
   return,-1.0
 endif
 
-head = HEADFITS(file)
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+  head = HEADFITS(file)
 rdnoise = SXPAR(head,'RDNOISE',count=nrdnoise,/silent)
 readnois = SXPAR(head,'READNOIS',count=nreadnois,/silent)  ; Swope
 enoise = SXPAR(head,'ENOISE',count=nenoise,/silent)        ; IMACS

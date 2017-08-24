@@ -23,6 +23,7 @@
 ; By D.Nidever  January 2016
 ;  much of it copied from APOGEE getmjd5.pro
 ;-
+
 function photred_getmjd,file,obs,dateobs=dateobs,stp=stp,error=error
 
 undefine,error
@@ -65,7 +66,10 @@ if test eq 0 and ndateobs eq 0 then begin
 endif
 
 ; Load file
-if ndateobs eq 0 then head = HEADFITS(file)
+if ndateobs eq 0 then begin
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+    head = HEADFITS(file)
+endif
 
 ; --- Get the DATE ---
 if ndateobs eq 0 then begin

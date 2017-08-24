@@ -438,6 +438,7 @@ FOR i=0,ninputlines-1 do begin
     ialsfile = alsfiles[j]
     ibase = FILE_BASENAME(ialsfile,'.als')
     ifitsfile = ibase+'.fits'
+    if file_test(ifitsfile) eq 0 then ifitsfile=ibase+'.fits.fz'
 
     ifitstest = FILE_TEST(ifitsfile)
     igd = where(apcor.name eq ibase,nigd)
@@ -458,6 +459,8 @@ FOR i=0,ninputlines-1 do begin
     ; Check that we have DDO51
     alsbases = FILE_BASENAME(alsfiles,'.als')
     alsfitsfiles = alsbases+'.fits'
+    bdfits = where(file_test(alsfitsfiles) eq 0,nbdfits)
+    if nbdfits gt 0 then alsfitsfiles[bdfits]=alsbases[bdfits]+'.fits.fz'
     filters = PHOTRED_GETFILTER(alsfitsfiles)
 
     ; We have a DDO51 filter
