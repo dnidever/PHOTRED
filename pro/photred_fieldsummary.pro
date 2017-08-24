@@ -252,12 +252,19 @@ For i=0,nfieldfiles-1 do begin
 
   ; From FITS header
   ;  nx, ny, ctype, scale, ra, dec
-  if fpack eq 1 then head=headfits(fitsfile,exten=1) else $
+  if fpack eq 1 then begin
+    head = headfits(fitsfile,exten=1)
+    nx = sxpar(head,'ZNAXIS1',count=n_nx)
+    if n_nx gt 0 then chipstr[i].nx = nx
+    ny = sxpar(head,'ZNAXIS2',count=n_ny)
+    if n_ny gt 0 then chipstr[i].ny = ny
+  endif else begin
     head = headfits(fitsfile)
-  nx = sxpar(head,'NAXIS1',count=n_nx)
-  if n_nx gt 0 then chipstr[i].nx = nx
-  ny = sxpar(head,'NAXIS2',count=n_ny)
-  if n_ny gt 0 then chipstr[i].ny = ny
+    nx = sxpar(head,'NAXIS1',count=n_nx)
+    if n_nx gt 0 then chipstr[i].nx = nx
+    ny = sxpar(head,'NAXIS2',count=n_ny)
+    if n_ny gt 0 then chipstr[i].ny = ny
+  endelse
   ctype1 = sxpar(head,'CTYPE1',count=n_ctype1)
   if n_ctype1 gt 0 then begin
     WCS_CHECK_CTYPE,ctype1,wcstype

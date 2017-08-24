@@ -1478,8 +1478,13 @@ if nastr gt 0 then begin
   projhead = strtrim(projhead,2)
 
   ; Getting central RA/DEC
-  nx = SXPAR(head,'NAXIS1',/silent)
-  ny = SXPAR(head,'NAXIS2',/silent)
+  if fpack eq 0 then begin
+    nx = SXPAR(head,'NAXIS1',/silent)
+    ny = SXPAR(head,'NAXIS2',/silent)
+  endif else begin
+    nx = SXPAR(head,'ZNAXIS1',/silent)
+    ny = SXPAR(head,'ZNAXIS2',/silent)
+  endelse
   HEAD_XYAD,head,0.5*nx,0.5*ny,cenra0,cendec0,/degree
 
 endif
