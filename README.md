@@ -327,7 +327,7 @@ skipwcs | Set this if your images already have correct WCS in their headers and 
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
 wcsleft | What cardinal direction (i.e. N, S, E or W) is "left" in the image? This is only used for non-standard setups.
 pixscale | The plate scale in arcseconds/pixel. This is ONLY used for non-"standard" imagers (i.e. not MOSAIC, IMACS, LBC or Swope) where the pixel scale cannot be determined from the image headers.
-wcsrefname | The name of the WCS reference catalog to use. The options are 'GAIA/GAIA', 'USNO-B1' or '2MASS-PSC'. Gaia is the default. The astromery of Gaia is very good and goes to V~20.5 or so.  The astrometric accuracy of the 2MASS catalog is better (~0.170 arcsec) than USNO-B1 (~0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20).
+wcsrefname | The name of the WCS reference catalog to use. The options are 'GAIA/GAIA', 'USNO-B1' or '2MASS-PSC'. Gaia is the default. The astromery of Gaia is very good and goes to V~20.5 or so.  The astrometric accuracy of the 2MASS catalog is better (0.170 arcsec) than USNO-B1 (0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20).
 searchdist | This sets the search distance (in arcmin) for WCS fitting (PHOTRED_WCS). Normally this is not needed. The default is 2*image size > 60 arcmin (i.e. whichever is greater). This is normally sufficient. If the WCS isn't fitting correctly then try setting "searchdist" to a larger value.
 wcsrmslim | This is the maximum RMS (in arcseconds) allowed for an acceptable WCS fit. The default is 1.0 arcseconds. Normally the RMS values are ~0.2-0.3 arcseconds.
 hyperthread | This allows multiple jobs to be running (daophot and allframe only) on a computer (such as halo or stream) that has multiple processors. It's similar to running it on a cluster.
@@ -341,6 +341,7 @@ mchmaxshift | This sets a maximum constraint on the X/Y shifts found in the MATC
 finditer | The number of times to iteratively find sources in ALLFRAME (allfprep). The default is 2.
 alfdetprog | The program to use for source detection in the ALLFRAME stage (allfprep). The options are "sextractor" and "daophot". The default is "sextractor". SExtractor is generally better at finding faint sources and returns a stellaricity probability value which is very useful. HOWEVER, SExtractor fails in VERY crowded regions. It's best to use DAOPHOT for very crowded images.
 alfnocmbimscale | Do not "scale" the combined images in the ALLFRAME prep stage.
+alftrimcmb  |  Trim off "extra" parts of the combined/stacked image that aren't shared by other images.
 alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from ALLFRAME processing.
 alfusecmn  |  Use the reference image common sources file to pick PSF stars for the combined image.
 alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
