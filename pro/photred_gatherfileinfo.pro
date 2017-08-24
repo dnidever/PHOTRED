@@ -39,7 +39,8 @@ For i=0,nfiles-1 do begin
   info = FILE_INFO(files[i])
   filestr[i].exists = info.exists
   if filestr[i].exists eq 0 then goto,BOMB
-  head = HEADFITS(files[i])
+  if strmid(files[i],6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(files[i],exten=1) else $
+    head = HEADFITS(files[i])
   filestr[i].file = files[i]
   filestr[i].filter = photred_getfilter(files[i],/noupdate,/silent,error=filterr)
     if n_elements(filterr) gt 0 then filestr[i].filter=sxpar(head,'filter')

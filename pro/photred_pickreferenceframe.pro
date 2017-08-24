@@ -57,13 +57,20 @@ endif else base=base0
 
 nbase = n_elements(base)
 nfiltref = n_elements(filtref)
+
+; Get the FITS filenames
+basefits = base+'.fits'
+bdbasefits = where(file_test(basefits) eq 0,nbdbasefits)
+if nbdbasefits gt 0 then basefits[bdbasefits]+='.fz'
+
 if not keyword_set(fake) then begin
+
   ; Get filters for first amp
-  filters = PHOTRED_GETFILTER(base+'.fits')
-  exptime = PHOTRED_GETEXPTIME(base+'.fits')
+  filters = PHOTRED_GETFILTER(basefits)
+  exptime = PHOTRED_GETEXPTIME(basefits)
   rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
-  utdate = PHOTRED_GETDATE(base+'.fits')
-  uttime = PHOTRED_GETUTTIME(base+'.fits')
+  utdate = PHOTRED_GETDATE(basefits)
+  uttime = PHOTRED_GETUTTIME(basefits)
   dateobs = utdate+'T'+uttime
   jd = dblarr(nbase)
   for l=0,nbase-1 do jd[l]=DATE2JD(dateobs[l])
@@ -123,8 +130,8 @@ if not keyword_set(fake) then begin
 ; FAKE, pick reference image of existing MCH file
 ;  This ensures that we use exactly the same reference frame.
 endif else begin
-  filters = PHOTRED_GETFILTER(base+'.fits')
-  exptime = PHOTRED_GETEXPTIME(base+'.fits')
+  filters = PHOTRED_GETFILTER(basefits)
+  exptime = PHOTRED_GETEXPTIME(basefits)
   gdref = where(file_test(base+'.mch') eq 1,ngdref)
   if ngdref eq 0 then begin
     error = '/FAKE, no existing MCH file.'
