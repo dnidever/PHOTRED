@@ -329,9 +329,8 @@ FOR i=0,ndirs-1 do begin
     ;---------------------------------------------------
     foundarr = intarr(nbase)+1
     for k=0,nbase-1 do begin
-      fitsfile = FILE_SEARCH(base[k]+'.fits',count=nfitsfile)
-      fzfile = FILE_SEARCH(base[k]+'.fits.fz',count=nfzfile)
-      if (nfitsfile eq 0 and nfzfile eq 0) then begin
+      fitsfile = FILE_SEARCH(base[k]+['.fits','.fits.fz'],count=nfitsfile)
+      if (nfitsfile eq 0) then begin
         printlog,logfile,'NO ASSOCIATED FITS FILE FOR ',base
         PUSH,failurelist,dirs[i]+'/'+base[k]+'.als'
         foundarr[k] = 0
@@ -371,6 +370,11 @@ wait,1
 ; use photred_gatherfileinfo.pro to get information on all
 ; the files in INPUTLIST and in SUCCESSLIST
 
+      ;; Get the FITS file names
+      basefits = base+'.fits'
+      bdbasefits = where(file_test(basefits) eq 0,nbdbasefits)
+      if nbdbasefits gt 0 then basefits[bdbasefits]+='.fz'
+
       ;; Load the tiling information
       tilefile = dirs[i]+'/'+thisfield+'.tiling'
       PHOTRED_LOADTILEFILE,tilefile,tilestr,logfile=logfile,error=loaderror
@@ -378,8 +382,7 @@ wait,1
        
       ;; Group them into tiles
       printlog,logfile,'Gathering file information and grouping by tiles.'
-  ; MAKE THIS SO IT WILL WORK WITH FITS.FZ FILES AS WELL!!!
-      PHOTRED_TILEGROUPS,base+'.fits',tilestr,groupstr,logfile=logfile,error=grperror
+      PHOTRED_TILEGROUPS,basefits,tilestr,groupstr,logfile=logfile,error=grperror
       if n_elements(grperror) gt 0 then goto,BOMB
 
       ;; Pick a reference exposure
