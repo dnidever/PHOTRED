@@ -316,6 +316,7 @@ telescope | The name of the telescope (e.g. Blanco, Swope)
 instrument | The name of the instrument (e.g. MOSAIC)
 observatory | (OPTIONAL) The name of the observatory. This is needed if the header does not contain the AIRMASS and it needs to be calculated from the date, ra/dec and observatory location.
 nmulti |  The number of processors PHOTRED should use for the DAOPHOT and ALLFRAME stages (only relevant if on the Pleione cluster).
+nmulti_STAGE  |  The number of processors PHOTRED should use for STAGE.  Currently this is supported for WCS, DAOPHOT and ALLFRAME.
 filtref |  The shortname of the filter (specified in the "filters" file) to be used as the reference frame (e.g. the M frame). This can be a comma-delimited priority-ordered list of filters (e.g. g,i,r,z,u). If there are multiple observations in this filter then the longest exposure in this filter will be used.
 trans | The name of the file that contains the photometric transformation equations.
 **OPTIONAL**  |  **OPTIONAL**
@@ -326,7 +327,7 @@ skipwcs | Set this if your images already have correct WCS in their headers and 
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
 wcsleft | What cardinal direction (i.e. N, S, E or W) is "left" in the image? This is only used for non-standard setups.
 pixscale | The plate scale in arcseconds/pixel. This is ONLY used for non-"standard" imagers (i.e. not MOSAIC, IMACS, LBC or Swope) where the pixel scale cannot be determined from the image headers.
-wcsrefname | The name of the WCS reference catalog to use. The two options are 'USNO-B1' and '2MASS-PSC'. USNO-B1 is the default. The astrometric accuracy of the 2MASS catalog is better (~0.170 arcsec) than USNO-B1 (~0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20). So if you have deep images then definitely use USNO-B1, but if you have moderately deep images then 2MASS-PSC is probably better (and faster).
+wcsrefname | The name of the WCS reference catalog to use. The options are 'GAIA/GAIA', 'USNO-B1' or '2MASS-PSC'. Gaia is the default. The astromery of Gaia is very good and goes to V~20.5 or so.  The astrometric accuracy of the 2MASS catalog is better (~0.170 arcsec) than USNO-B1 (~0.270 arcsec), but it does not go as deep (R~18) as USNO-B1 (R~20).
 searchdist | This sets the search distance (in arcmin) for WCS fitting (PHOTRED_WCS). Normally this is not needed. The default is 2*image size > 60 arcmin (i.e. whichever is greater). This is normally sufficient. If the WCS isn't fitting correctly then try setting "searchdist" to a larger value.
 wcsrmslim | This is the maximum RMS (in arcseconds) allowed for an acceptable WCS fit. The default is 1.0 arcseconds. Normally the RMS values are ~0.2-0.3 arcseconds.
 hyperthread | This allows multiple jobs to be running (daophot and allframe only) on a computer (such as halo or stream) that has multiple processors. It's similar to running it on a cluster.
