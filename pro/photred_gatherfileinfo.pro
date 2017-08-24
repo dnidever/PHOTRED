@@ -39,15 +39,21 @@ For i=0,nfiles-1 do begin
   info = FILE_INFO(files[i])
   filestr[i].exists = info.exists
   if filestr[i].exists eq 0 then goto,BOMB
-  if strmid(files[i],6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(files[i],exten=1) else $
+  if strmid(files[i],6,7,/reverse_offset) eq 'fits.fz' then begin
+    head = HEADFITS(files[i],exten=1)
+    ; Fix the NAXIS1/NAXIS2 in the header
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  endif else begin
     head = HEADFITS(files[i])
+  endelse
+  filestr[i].nx = sxpar(head,'NAXIS1')
+  filestr[i].ny = sxpar(head,'NAXIS2')
   filestr[i].file = files[i]
   filestr[i].filter = photred_getfilter(files[i],/noupdate,/silent,error=filterr)
     if n_elements(filterr) gt 0 then filestr[i].filter=sxpar(head,'filter')
   filestr[i].exptime = sxpar(head,'exptime')
   filestr[i].dateobs = sxpar(head,'date-obs')
-  filestr[i].nx = sxpar(head,'NAXIS1')
-  filestr[i].ny = sxpar(head,'NAXIS2')
   ;GETPIXSCALE,'',pixscale,head=head
   HEAD_XYAD,head,[0,1]+filestr[i].nx/2,[0,0]+filestr[i].ny/2,ra1,dec1,/deg  ; a little bit faster  
   pixscale = sphdist(ra1[0],dec1[0],ra1[1],dec1[1],/deg)*3600d0

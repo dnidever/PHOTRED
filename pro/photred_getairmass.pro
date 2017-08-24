@@ -53,8 +53,14 @@ endif
 
 if n_elements(obs) eq 0 then obs=''
 
-if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+  head = HEADFITS(file,exten=1)
+  ; Fix the NAXIS1/NAXIS2 in the header
+  sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+  sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+endif else begin
   head = HEADFITS(file)
+endelse
 
 ; Get AIRMASS from header
 am = SXPAR(head,'AIRMASS',count=nam,/silent)

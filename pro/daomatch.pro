@@ -195,8 +195,14 @@ if keyword_set(usewcs) then begin
   if file_test(fitsfile1) eq 0 then begin
     print,fitsfile1,' NOT FOUND. Cannot use WCS for matching'
   endif else begin
-    if strmid(fitsfile1,6,7,/reverse_offset) eq 'fits.fz' then head1=headfits(fitsfile1,exten=1) else $
+    if strmid(fitsfile1,6,7,/reverse_offset) eq 'fits.fz' then begin
+      head1 = headfits(fitsfile1,exten=1)
+      ; Fix the NAXIS1/2 in the header
+      sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
+      sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
+    endif else begin
       head1 = headfits(fitsfile1)
+    endelse
     EXTAST,head1,astr1,noparams1
     if noparams1 lt 1 then print,fitsfile1,' has NO WCS.  Cannot use WCS for matching'
   endelse

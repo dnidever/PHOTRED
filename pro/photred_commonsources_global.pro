@@ -255,8 +255,14 @@ if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo)
     if (coolines ge 4 and aplines ge 4) then begin
    
       ; Get the header
-      if fpack eq 1 then head=headfits(ifile,exten=1) else $
+      if fpack eq 1 then begin
+        head = headfits(ifile,exten=1)
+        ; Fix the NAXIS1/2 in the header
+        sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+        sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+      endif else begin
         head = headfits(ifile)
+      endelse
 
       ; Load the coordinates file
       LOADCOO,coofile,coo,coohead1
@@ -384,8 +390,14 @@ For i=0,nfieldfiles-1 do begin
     undefine,coo,aper
 
     ; Get the header
-    if fpack eq 1 then head1=headfits(ifile,exten=1) else $
+    if fpack eq 1 then begin
+      head1 = headfits(ifile,exten=1)
+      ; Fix the NAXIS1/2 in the header
+      sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
+      sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
+    endif else begin
       head1 = headfits(ifile)
+    endelse
 
     ; Load the coordinates file
     LOADCOO,coofile,coo,coohead

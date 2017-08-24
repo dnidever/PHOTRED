@@ -254,17 +254,16 @@ For i=0,nfieldfiles-1 do begin
   ;  nx, ny, ctype, scale, ra, dec
   if fpack eq 1 then begin
     head = headfits(fitsfile,exten=1)
-    nx = sxpar(head,'ZNAXIS1',count=n_nx)
-    if n_nx gt 0 then chipstr[i].nx = nx
-    ny = sxpar(head,'ZNAXIS2',count=n_ny)
-    if n_ny gt 0 then chipstr[i].ny = ny
+    ; Fix the NAXIS1/NAXIS2 in the header
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin
     head = headfits(fitsfile)
-    nx = sxpar(head,'NAXIS1',count=n_nx)
-    if n_nx gt 0 then chipstr[i].nx = nx
-    ny = sxpar(head,'NAXIS2',count=n_ny)
-    if n_ny gt 0 then chipstr[i].ny = ny
   endelse
+  nx = sxpar(head,'NAXIS1',count=n_nx)
+  if n_nx gt 0 then chipstr[i].nx = nx
+  ny = sxpar(head,'NAXIS2',count=n_ny)
+  if n_ny gt 0 then chipstr[i].ny = ny
   ctype1 = sxpar(head,'CTYPE1',count=n_ctype1)
   if n_ctype1 gt 0 then begin
     WCS_CHECK_CTYPE,ctype1,wcstype
@@ -606,8 +605,14 @@ For i=0,nchips-1 do begin
     if fitstest eq 1 and (alstest eq 1 or cootest eq 1) then begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
         LOADCOO,coofile,cat
-      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=headfits(fitsfile,exten=1) else $
+      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
+        head = headfits(fitsfile,exten=1)
+        ; Fix the NAXIS1/NAXIS2 in the header
+        sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+        sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+      endif else begin
         head = headfits(fitsfile)
+      endelse
       HEAD_XYAD,head,cat.x-1,cat.y-1,ra,dec,/deg
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch
       if nmatch gt 0 then begin
