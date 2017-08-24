@@ -100,7 +100,7 @@ if sepfielddir eq '0' or sepfielddir eq '-1' or sepfielddir eq '' then undefine,
 undefine,outlist,successlist,failurelist
 
 ; Add all fits files to the INLIST
-fitsfiles = FILE_SEARCH('*.fits',count=nfitsfiles,/fully)
+fitsfiles = FILE_SEARCH(['*.fits','*.fits.fz'],count=nfitsfiles,/fully)
 
 ; Remove files that start with "F[1-9]"
 ; since they were probably renamed already
@@ -189,8 +189,13 @@ headerproblem = 0
 for i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
   com=''
 
   ; Checking GAIN
@@ -263,10 +268,13 @@ endelse
 FOR i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-
-  ; Load the header
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
 
   object = SXPAR(head,'OBJECT',/silent)
   field = first_el(strsplit(object,' ',/extract))
@@ -406,10 +414,14 @@ FOR i=0,ninputlines-1 do begin
   longfile = inputlines[i]
   file = FILE_BASENAME(longfile)
   filedir = FILE_DIRNAME(longfile)
-  base = FILE_BASENAME(file,'.fits')
 
-  ; Load the header
-  head = HEADFITS(longfile)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
 
   object = SXPAR(head,'OBJECT',/silent)
   exptime = PHOTRED_GETEXPTIME(longfile)

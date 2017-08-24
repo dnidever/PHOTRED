@@ -212,8 +212,8 @@ endif
 ; If less than 2 files found
 if (nfieldfiles lt 2) then begin
   if thisimager.namps gt 1 then $
-    fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+'*.fits*',count=nfieldfiles) else $
-    fieldfiles = FILE_SEARCH(field+'-*.fits',count=nfieldfiles)
+    fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+['*.fits','*.fits.fz'],count=nfieldfiles) else $
+    fieldfiles = FILE_SEARCH(field+'-*'+['.fits','.fits.fz'],count=nfieldfiles)
 
   ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
   if nfieldfiles gt 0 then begin

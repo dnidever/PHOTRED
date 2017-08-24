@@ -109,7 +109,7 @@ undefine,outlist,successlist,failurelist
 
 ; Add all fits files to the INLIST
 ; This APPENDS files to the input file
-fitsfiles = FILE_SEARCH('*.fits*',count=nfitsfiles,/fully)
+fitsfiles = FILE_SEARCH(['*.fits','*.fits.fz'],count=nfitsfiles,/fully)
 WRITELINE,inputfile,fitsfiles,/append
 
 ; Get input
