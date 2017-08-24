@@ -318,10 +318,9 @@ observatory | (OPTIONAL) The name of the observatory. This is needed if the head
 nmulti |  The number of processors PHOTRED should use for the DAOPHOT and ALLFRAME stages (only relevant if on the Pleione cluster).
 filtref |  The shortname of the filter (specified in the "filters" file) to be used as the reference frame (e.g. the M frame). This can be a comma-delimited priority-ordered list of filters (e.g. g,i,r,z,u). If there are multiple observations in this filter then the longest exposure in this filter will be used.
 trans | The name of the file that contains the photometric transformation equations.
-keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
 **OPTIONAL**  |  **OPTIONAL**
 sepfielddir |  Put each field in a separate directory (this is now the default option), otherwise everything will go in the main directory and can slow down processing because a very large (~100,000) number of fileds.
-keepmef  |  Keep the original multi-exension files (MEF).
+keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
 redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
 skipwcs | Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
@@ -345,6 +344,7 @@ alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from
 alfusecmn  |  Use the reference image common sources file to pick PSF stars for the combined image.
 alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
 ddo51radoffset  |  There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
+cmbforce  |  Force COMBINE to combine the files even though not all expected amps/chips are there
 keepinstr | CALIB should keep the instrumental magnitudes in the final output file.
 avgmag | CALIB should calculate average magnitudes in filters that were observed multiple times. The individual magnitudes are also kept.
 avgonlymag | Same as "avgmag" but only keeps the average magnitudes.
