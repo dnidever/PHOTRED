@@ -10,6 +10,7 @@
 ;  files     Array of ALS files,  The first file will be used
 ;            as the reference.  If /fake set then the first ALS file
 ;            in "files" should already have an associated MCH file.
+;  tilestr   The tiling scheme structure.
 ;  =maxshift Constraints on the initial X/Y shifts.
 ;  /usewcs   Use the WCS for initial matching.  This is the default.
 ;  /fake     Run for artificial stars.  The MCH file should be input
@@ -82,7 +83,7 @@ end
 
 ;---------------------------------------------------------------
 
-pro daomatch_tile,files,tile,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
+pro daomatch_tile,files,tilestr,groupstr,mchbase,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
              maxshift=maxshift,fake=fake
 
 t0 = systime(1)
@@ -91,7 +92,7 @@ undefine,error
 
 nfiles = n_elements(files)
 if nfiles eq 0 then begin
-  print,'Syntax - daomatch_tile,files,tile,fake=fake,stp=stp,verbose=verbose'
+  print,'Syntax - daomatch_tile,files,tilestr,fake=fake,stp=stp,verbose=verbose'
   error = 'Not enough inputs'
   return
 end
@@ -119,102 +120,123 @@ CD,current=curdir
 dir = FILE_DIRNAME(files[0])
 CD,dir
 
-files2 = FILE_BASENAME(files,'.als')
+bases = FILE_BASENAME(files,'.als')
 
-; FAKE, running for artificial star tests
-if keyword_set(fake) then begin
-
-  ; Check that MCH file exists
-  if file_test(files2[0]+'.mch') eq 0 then begin
-    error = '/fake set but '+files2[0]+'.mch NOT FOUND'
-    printlog,logf,error
-    return
-  endif
-   
-  ; Keep backup of original mch file
-  FILE_DELETE,files2[0]+'.mch.orig',/allow_nonexistent
-  FILE_COPY,files2[0]+'.mch',files2[0]+'.mch.orig' 
-   
-  ; Remove the output files
-  FILE_DELETE,files2[0]+'.raw',/allow_nonexistent
-  FILE_DELETE,files2[0]+'.tfr',/allow_nonexistent
-   
-  goto,rundaomaster
-endif
-
+;; FAKE, running for artificial star tests
+;if keyword_set(fake) then begin
+;
+;  ; Check that MCH file exists
+;  if file_test(bases[0]+'.mch') eq 0 then begin
+;    error = '/fake set but '+bases[0]+'.mch NOT FOUND'
+;    printlog,logf,error
+;    return
+;  endif
+;   
+;  ; Keep backup of original mch file
+;  FILE_DELETE,bases[0]+'.mch.orig',/allow_nonexistent
+;  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.orig' 
+;   
+;  ; Remove the output files
+;  FILE_DELETE,bases[0]+'.raw',/allow_nonexistent
+;  FILE_DELETE,bases[0]+'.tfr',/allow_nonexistent
+;   
+;  goto,rundaomaster
+;endif
+;
 ; Remove the output files
-FILE_DELETE,files2[0]+'.mch',/allow_nonexistent
-FILE_DELETE,files2[0]+'.raw',/allow_nonexistent
-FILE_DELETE,files2[0]+'.tfr',/allow_nonexistent
+FILE_DELETE,bases[0]+'.mch',/allow_nonexistent
+FILE_DELETE,bases[0]+'.raw',/allow_nonexistent
+FILE_DELETE,bases[0]+'.tfr',/allow_nonexistent
 
 undefine,mchfinal
 
-; Check that the reference file exists
-test = FILE_TEST(files[0])
-if (test eq 0) then begin
-  error = 'REFERENCE FILE '+files[0]+' NOT FOUND'
-  printlog,logf,error
-  return
-endif
-
-; Load the reference data
-LOADALS,files[0],refals,count=count
-if (count lt 1) then begin
-  error = 'PROBLEM LOADING '+files[0]
-  printlog,logf,error
-  return
-endif
-
-; Need the TILE structure input
-;  code below mostly copied from allframe_combine.pro
-
+;; Check that the reference file exists
+;test = FILE_TEST(files[0])
+;if (test eq 0) then begin
+;  error = 'REFERENCE FILE '+files[0]+' NOT FOUND'
+;  printlog,logf,error
+;  return
+;endif
+;
+;; Load the reference data
+;LOADALS,files[0],refals,count=count
+;if (count lt 1) then begin
+;  error = 'PROBLEM LOADING '+files[0]
+;  printlog,logf,error
+;  return
+;endif
 
 
 ; Gather information on all of the files
 printlog,logf,'Gathering file information'
-fitsfiles = repstr(files,'.als','.fits')
-ntrans = n_elements(trans[0,*])
-filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),$
-                      vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,$
-                      background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,$
-                      resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles)
-filestr.fitsfile = fitsfiles
-filestr.catfile = files
-filestr.trans = transpose(trans)
-filestr.magoff = magoff
-filestr.resampfile = outfiles
-filestr.resampmask = outmaskfiles
-for i=0,nfiles-1 do begin
-  FITS_READ,filestr[i].fitsfile,im1,head1,/no_abort
-  filestr[i].head = ptr_new(head1)
-  filestr[i].nx = sxpar(head1,'NAXIS1')
-  filestr[i].ny = sxpar(head1,'NAXIS2')
-  HEAD_XYAD,head1,[0,filestr[i].nx-1,filestr[i].nx-1,0],[0,0,filestr[i].ny-1,filestr[i].ny-1],vra,vdec,/degree
-  filestr[i].vertices_ra = vra
-  filestr[i].vertices_dec = vdec
-  GETPIXSCALE,'',pixscale,head=head1
-  filestr[i].pixscale = pixscale
-  saturate = sxpar(head1,'SATURATE',count=nsaturate,/silent)
-  if nsaturate eq 0 then saturate=50000L
-  filestr[i].saturate = saturate
-  gdpix = where(im1 lt saturate,ngdpix,ncomp=nbdpix)
-  background = median(im1[gdpix])
-  filestr[i].background = background
-endfor
+fitsfiles = bases+'.fits'
+bdfits = where(file_test(fitsfiles) eq 0,nbdfits)
+if nbdfits gt 0 then fitsfiles[bdfits]+='.fz'
+PHOTRED_GATHERFILEINFO,fitsfiles,filestr
+ntrans = 6
+add_tag,filestr,'catfile','',filestr
+add_tag,filestr,'resamptrans',dblarr(ntrans),filestr
+add_tag,filestr,'resamptransrms',0.0,filestr
+filestr.catfile = bases+'.als'
+
+;ntrans = n_elements(trans[0,*])
+;filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),$
+;                      vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,$
+;                      background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,$
+;                      resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles)
+;filestr.fitsfile = fitsfiles
+;filestr.catfile = files
+;filestr.trans = transpose(trans)
+;filestr.magoff = magoff
+;filestr.resampfile = outfiles
+;filestr.resampmask = outmaskfiles
+;for i=0,nfiles-1 do begin
+;  FITS_READ,filestr[i].fitsfile,im1,head1,/no_abort
+;  filestr[i].head = ptr_new(head1)
+;  filestr[i].nx = sxpar(head1,'NAXIS1')
+;  filestr[i].ny = sxpar(head1,'NAXIS2')
+;  HEAD_XYAD,head1,[0,filestr[i].nx-1,filestr[i].nx-1,0],[0,0,filestr[i].ny-1,filestr[i].ny-1],vra,vdec,/degree
+;  filestr[i].vertices_ra = vra
+;  filestr[i].vertices_dec = vdec
+;  GETPIXSCALE,'',pixscale,head=head1
+;  filestr[i].pixscale = pixscale
+;  saturate = sxpar(head1,'SATURATE',count=nsaturate,/silent)
+;  if nsaturate eq 0 then saturate=50000L
+;  filestr[i].saturate = saturate
+;  gdpix = where(im1 lt saturate,ngdpix,ncomp=nbdpix)
+;  background = median(im1[gdpix])
+;  filestr[i].background = background
+;endfor
+
 
 ; Creating new MCH file for the combined file
 for i=0,nfiles-1 do begin
+  ; Get the header
+  if strmid(filestr[i].file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fhead = headfits(filestr[i].file,exten=1)
+    ; Fix the NAXIS1/2 in the header
+    sxaddpar,fhead,'NAXIS1',sxpar(fhead,'ZNAXIS1')
+    sxaddpar,fhead,'NAXIS2',sxpar(fhead,'ZNAXIS2')
+  endif else begin
+    fhead = headfits(filestr[i].file)
+  endelse
+
   ; Convert X/Y of this system into the combined reference frame
   ;  The pixel values are 1-indexed like DAOPHOT uses.
+  ;  Use a 2D grid of points in the image and the WCS to get
+  ;  the transformation.
   ngridbin = 50
   nxgrid = filestr[i].nx / ngridbin
   nygrid = filestr[i].ny / ngridbin
   xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid)
   ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1)
-  HEAD_XYAD,(*filestr[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
-  HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
+  HEAD_XYAD,fhead,xgrid-1,ygrid-1,ragrid,decgrid,/deg
+  HEAD_ADXY,tilestr.head,ragrid,decgrid,refxgrid,refygrid,/deg
   refxgrid += 1  ; convert 0-indexed to 1-indexed
   refygrid += 1
+  ; Convert to tile X/Y values
+  refxgrid -= groupstr.x0
+  refygrid -= groupstr.y0
 
   ; Now fit the transformation
   xdiff = refxgrid-xgrid
@@ -264,6 +286,8 @@ for i=0,nfiles-1 do begin
   ; Printing the transformation
   printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms
 endfor
+stop
+
 ; Write to the new MCH file
 combmch = mchbase+'_comb.mch'
 WRITELINE,combmch,mchfinal
@@ -513,7 +537,7 @@ endfor  ; ALS file loop
 
 
 ; Writing the final mchfile
-WRITELINE,files2[0]+'.mch',mchfinal
+WRITELINE,bases[0]+'.mch',mchfinal
 
 ;stop
 
@@ -533,7 +557,7 @@ tempbase = FILE_BASENAME(MKTEMP('temp'))
 FILE_DELETE,tempbase,/allow       ; remove empty file
 tempbase = REPSTR(tempbase,'.','')   ; remove the dot
 tempmch = tempbase+'.mch'
-FILE_COPY,files2[0]+'.mch',tempmch,/overwrite,/allow
+FILE_COPY,bases[0]+'.mch',tempmch,/overwrite,/allow
 
 ; Make the DAOMASTER script
 ;--------------------------
@@ -575,7 +599,7 @@ FILE_CHMOD,tempscript,'755'o
 
 ; Run DAOMASTER
 ;---------------
-;cmd2 = '/net/home/dln5q/bin/daomaster.sh '+files2[0]
+;cmd2 = '/net/home/dln5q/bin/daomaster.sh '+bases[0]
 ;cmd2 = './daomaster.sh '+tempbase
 cmd2 = tempscript+' '+tempbase
 SPAWN,cmd2,out2,errout2
@@ -592,7 +616,7 @@ FILE_DELETE,tempscript,/allow_non
 ; MCH file
 mchfile = FILE_SEARCH(tempbase+'.mch',count=nmchfile)
 if (nmchfile gt 0) then begin
-  FILE_COPY,mchfile[0],files2[0]+'.mch',/overwrite,/allow
+  FILE_COPY,mchfile[0],bases[0]+'.mch',/overwrite,/allow
   FILE_DELETE,mchfile,/allow
 endif else begin
   error = 'NO FINAL MCH FILE'
@@ -602,7 +626,7 @@ endelse
 ; TFR file
 tfrfile = FILE_SEARCH(tempbase+'.tfr',count=ntfrfile)
 if (ntfrfile gt 0) then begin
-  FILE_COPY,tfrfile[0],files2[0]+'.tfr',/overwrite,/allow
+  FILE_COPY,tfrfile[0],bases[0]+'.tfr',/overwrite,/allow
   FILE_DELETE,tfrfile,/allow
 endif else begin
   error = 'NO FINAL TFR FILE'
@@ -612,7 +636,7 @@ endelse
 ; RAW file
 rawfile = FILE_SEARCH(tempbase+'.raw',count=nrawfile)
 if (nrawfile gt 0) then begin
-  FILE_COPY,rawfile[0],files2[0]+'.raw',/overwrite,/allow
+  FILE_COPY,rawfile[0],bases[0]+'.raw',/overwrite,/allow
   FILE_DELETE,rawfile,/allow
 endif else begin
   error = 'NO FINAL RAW FILE'
@@ -622,8 +646,8 @@ endelse
 
 ; FAKE, copy back the original MCH file
 if keyword_set(fake) then begin
-  FILE_COPY,files2[0]+'.mch',files2[0]+'.mch.daomaster',/overwrite,/allow
-  FILE_MOVE,files2[0]+'.mch.orig',files2[0]+'.mch',/overwrite,/allow
+  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.daomaster',/overwrite,/allow
+  FILE_MOVE,bases[0]+'.mch.orig',bases[0]+'.mch',/overwrite,/allow
 endif
 
 ; Were there any errors
@@ -637,7 +661,7 @@ endif
 
 ; Print out the final transformations
 if keyword_set(verbose) then begin
-  LOADMCH,files2[0]+'.mch',files,trans
+  LOADMCH,bases[0]+'.mch',files,trans
   nfiles = n_elements(files)
   printlog,logf,''
   printlog,logf,'Final DAOMASTER Transformations:'

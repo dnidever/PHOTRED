@@ -379,7 +379,7 @@ wait,1
       tilefile = dirs[i]+'/'+thisfield+'.tiling'
       PHOTRED_LOADTILEFILE,tilefile,tilestr,logfile=logfile,error=loaderror
       if n_elements(loaderror) gt 0 then goto,BOMB
-       
+
       ;; Group them into tiles
       printlog,logfile,'Gathering file information and grouping by tiles.'
       PHOTRED_TILEGROUPS,basefits,tilestr,groupstr,logfile=logfile,error=grperror
@@ -396,9 +396,12 @@ wait,1
 
       ;; Loop through the tile groups
       ngroups = n_elements(groupstr)
+      printlog,logfile,'There are '+strtrim(ngroups,2)+' groups'
       for k=0,ngroups-1 do begin
         groupstr1 = groupstr[k]
         groupfiles = *groupstr1.files
+        grouptileinfo = tilestr.tiles[k]
+        printlog,logfile,'  Group '+strtrim(k+1,2)+' - '+strtrim(n_elements(groupfiles),2)+' file(s)'
 
         ;; Create the tile directory
         ;; and make the sym links if they don't exist already
@@ -406,15 +409,19 @@ wait,1
         tiledir = groupstr1.tilename
         if file_test(tiledir) eq 0 then FILE_MKDIR,tiledir
         ; Loop through the files
+        alsfiles = strarr(groupstr1.nfiles)
         for l=0,groupstr1.nfiles-1 do begin
           tilesuffix = 'T'+strtrim(groupstr1.tilenum,2)
-          groupbase1 = FILE_BASENAME(groupfiles[l],'.fits')
-          origfiles = groupbase1+['.fits','.psf','.als']
-          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+['.fits','.psf','.als']
+          if strmid(groupfiles[l],6,7,/reverse_offset) eq 'fits.fz' then fext='.fits.fz' else fext='.fits'
+          groupbase1 = FILE_BASENAME(groupfiles[l],fext)
+          origfiles = groupbase1+[fext,'.psf','.als']
+          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+[fext,'.psf','.als']
           ; Make the necessary symbolic links
           needit = where(file_test(newfiles) eq 0,nneedit)
           if nneedit gt 0 then FILE_LINK,'../'+origfiles[needit],newfiles[needit]
+          alsfiles[l] = tiledir+'/'+groupbase1+'.'+tilesuffix+'.als'
         endfor
+  
         stop
 
         ;; Does it matter if the reference image isn't represented
@@ -427,7 +434,9 @@ wait,1
         ;; Run DAOMATCH
         ;; maybe make daomatch_tile.pro to use the tile projection
         ;; coords in the mch file. 
-        ;; I started daomatch_tile.pro.        
+        ;; I started daomatch_tile.pro.  
+        mchbase = refstr.base
+      ;  DAOMATCH_TILE,alsfiles,tilestr,grouptileinfo,mchbase
 
       endfor ; tile/group loop
          
