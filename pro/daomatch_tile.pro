@@ -83,8 +83,8 @@ end
 
 ;---------------------------------------------------------------
 
-pro daomatch_tile,files,tilestr,groupstr,mchbase,stp=stp,verbose=verbose,hi=hi,logfile=logfile,error=error,$
-             maxshift=maxshift,fake=fake
+pro daomatch_tile,files,tilestr,groupstr,mchbase,stp=stp,verbose=verbose,logfile=logfile,$
+             error=error,maxshift=maxshift,fake=fake
 
 t0 = systime(1)
 
@@ -92,24 +92,13 @@ undefine,error
 
 nfiles = n_elements(files)
 if nfiles eq 0 then begin
-  print,'Syntax - daomatch_tile,files,tilestr,fake=fake,stp=stp,verbose=verbose'
+  print,'Syntax - daomatch_tile,files,tilestr,groupstr,mchbase,fake=fake,stp=stp,verbose=verbose'
   error = 'Not enough inputs'
   return
 end
 
-; Default parameters
-if n_elements(usewcs) eq 0 then usewcs=1  ; use WCS by default
-
 ; Logfile
 if keyword_set(logfile) then logf=logfile else logf=-1
-
-; Only one file, can't match
-if nfiles eq 1 then begin
-  printlog,logf,'ONLY ONE FILE INPUT.  No matching, simply creating .mch and .raw file'
-  ;printlog,logf,'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
-  ;error = 'ONLY ONE FILE INPUT.  NEED AT *LEAST* TWO'
-  ;return
-endif
 
 ; Compile MATCHSTARS.PRO
 RESOLVE_ROUTINE,'matchstars',/compile_full_file
@@ -142,29 +131,6 @@ bases = FILE_BASENAME(files,'.als')
 ;   
 ;  goto,rundaomaster
 ;endif
-;
-; Remove the output files
-FILE_DELETE,bases[0]+'.mch',/allow_nonexistent
-FILE_DELETE,bases[0]+'.raw',/allow_nonexistent
-FILE_DELETE,bases[0]+'.tfr',/allow_nonexistent
-
-undefine,mchfinal
-
-;; Check that the reference file exists
-;test = FILE_TEST(files[0])
-;if (test eq 0) then begin
-;  error = 'REFERENCE FILE '+files[0]+' NOT FOUND'
-;  printlog,logf,error
-;  return
-;endif
-;
-;; Load the reference data
-;LOADALS,files[0],refals,count=count
-;if (count lt 1) then begin
-;  error = 'PROBLEM LOADING '+files[0]
-;  printlog,logf,error
-;  return
-;endif
 
 
 ; Gather information on all of the files
@@ -179,37 +145,8 @@ add_tag,filestr,'resamptrans',dblarr(ntrans),filestr
 add_tag,filestr,'resamptransrms',0.0,filestr
 filestr.catfile = bases+'.als'
 
-;ntrans = n_elements(trans[0,*])
-;filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),$
-;                      vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,$
-;                      background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,$
-;                      resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles)
-;filestr.fitsfile = fitsfiles
-;filestr.catfile = files
-;filestr.trans = transpose(trans)
-;filestr.magoff = magoff
-;filestr.resampfile = outfiles
-;filestr.resampmask = outmaskfiles
-;for i=0,nfiles-1 do begin
-;  FITS_READ,filestr[i].fitsfile,im1,head1,/no_abort
-;  filestr[i].head = ptr_new(head1)
-;  filestr[i].nx = sxpar(head1,'NAXIS1')
-;  filestr[i].ny = sxpar(head1,'NAXIS2')
-;  HEAD_XYAD,head1,[0,filestr[i].nx-1,filestr[i].nx-1,0],[0,0,filestr[i].ny-1,filestr[i].ny-1],vra,vdec,/degree
-;  filestr[i].vertices_ra = vra
-;  filestr[i].vertices_dec = vdec
-;  GETPIXSCALE,'',pixscale,head=head1
-;  filestr[i].pixscale = pixscale
-;  saturate = sxpar(head1,'SATURATE',count=nsaturate,/silent)
-;  if nsaturate eq 0 then saturate=50000L
-;  filestr[i].saturate = saturate
-;  gdpix = where(im1 lt saturate,ngdpix,ncomp=nbdpix)
-;  background = median(im1[gdpix])
-;  filestr[i].background = background
-;endfor
 
-
-; Creating new MCH file for the combined file
+; Creating MCH file in the tile coordinate system
 for i=0,nfiles-1 do begin
   ; Get the header
   if strmid(filestr[i].file,6,7,/reverse_offset) eq 'fits.fz' then begin
@@ -280,396 +217,200 @@ for i=0,nfiles-1 do begin
   ; Need a leading space to separate the numbers.
   strans = ' '+[strtrim(string(trans[0:1],format='(F30.4)'),2),$
                strtrim(string(trans[2:5],format='(F30.9)'),2)]
-  newline = STRING("'",filestr[i].catfile,"'", strans, filestr[i].magoff[0], rms, format=format)
+  newline = STRING("'",filestr[i].catfile,"'", strans, 0.0, rms, format=format)
   PUSH,mchfinal,newline
 
   ; Printing the transformation
-  printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms
+  printlog,logf,format='(A-22,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,0.0,rms
 endfor
-stop
 
 ; Write to the new MCH file
-combmch = mchbase+'_comb.mch'
-WRITELINE,combmch,mchfinal
-
-stop
-
-
-
-;; Get initial guess for X/Y shifts from WCS
-;if keyword_set(initwcs) then begin
-;  fitsfiles = file_basename(files,'.als')+'.fits'
-;  if total(file_test(fitsfiles)) eq nfiles then begin
-;    raarr = dblarr(nfiles) & decarr=dblarr(nfiles)
-;    getpixscale,fitsfiles[0],pixscale
-;    for i=0,nfiles-1 do begin
-;      head = headfits(fitsfiles[i])
-;      head_xyad,head,0,0,a,d,/deg
-;      raarr[i]=a & decarr[i]=d
-;    endfor
-;    initwcs_xoff = (raarr-raarr[0])*3600*cos(decarr[0]/!radeg)/pixscale
-;    initwcs_yoff = (decarr-decarr[0])*3600/pixscale
-;    print,'Initial offsets from WCS'
-;    for i=0,nfiles-1 do print,files[i],initwcs_xoff[i],initwcs_yoff[i]
-;stop
-;
-;  endif else print,'Not all FITS files found'
-;endif
-
-
-; Use WCS
-if keyword_set(usewcs) then begin
-  ; Checking WCS of first file
-  fitsfile1 = file_basename(files[0],'.als')+'.fits'
-  if file_test(fitsfile1) eq 0 then begin
-    print,fitsfile1,' NOT FOUND. Cannot use WCS for matching'
-  endif else begin
-    head1 = headfits(fitsfile1)
-    extast,head1,astr1,noparams1
-    if noparams1 lt 1 then print,fitsfile1,' has NO WCS.  Cannot use WCS for matching'
-  endelse
-endif
-
-
-format = '(A2,A-30,A1,2F10.2,4F10.5,2F10.3)'
-newline = STRING("'",files[0],"'",0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, format=format)
-PUSH,mchfinal,newline
-
-
-
-if keyword_set(verbose) then $
-  printlog,logf,'Initial Transformations:'
-
-; Printing the first line
-if keyword_set(verbose) then $
-  printlog,logf,format='(A-20,2F10.4,4F12.8)',files[0], 0.0, 0.0, 1.0, 0.0, 0.0, 1.0
-
-
-
-; Run DAOMATCH for each pair (N-1 times)
-for i=1,nfiles-1 do begin
-
-  undefine,als,alshead,trans,ind1,ind2,count
-
-  ; Check that the file exists
-  test = FILE_TEST(files[i])
-  if (test eq 0) then begin
-    error = 'FILE '+files[i]+' NOT FOUND'
-    printlog,logf,error
-    return
-  endif
-
-  ; Load the current data
-  LOADALS,files[i],als,alshead,count=count
-  if (count lt 1) then begin
-    error = 'PROBLEM LOADING '+files[i]
-    printlog,logf,error
-    return
-  endif
-
-
-  ; Getting FRAD
-  headarr = strsplit(alshead[1],' ',/extract)
-  frad = float(first_el(headarr,/last))
-
-  ; Make CHI, SHARP and ERR cuts here
-
-  ; CUTS for REFALS
-  gdref = where(abs(refals.sharp) lt 1.0 and refals.chi lt 2.0 and refals.mag lt 50.0 and $
-                refals.err lt 0.2,ngdref)
-  if (ngdref lt 100) then begin
-    gdref = where(abs(refals.sharp) lt 1.5 and refals.chi lt 3.0 and refals.mag lt 50.0 and $
-                  refals.err lt 0.5,ngdref)
-  endif
-  if (ngdref lt 100) then begin
-    gdref = where(abs(refals.sharp) lt 1.5 and refals.chi lt 3.0 and refals.mag lt 50.0 and $
-                  refals.err lt 1.0,ngdref)
-  endif
-  if (ngdref eq 0) then begin
-    error = 'NO good reference stars '+files[0]
-    printlog,logf,error
-    return
-  endif
-  ; Cuts for ALS
-  gdals = where(abs(als.sharp) lt 1.0 and als.chi lt 2.0 and als.mag lt 50.0 and $
-                als.err lt 0.2,ngdals)
-  if (ngdals lt 100) then begin
-    gdals = where(abs(als.sharp) lt 1.5 and als.chi lt 3.0 and als.mag lt 50.0 and $
-                  als.err lt 0.5,ngdals)
-  endif
-  if (ngdals lt 100) then begin
-    gdals = where(abs(als.sharp) lt 1.5 and als.chi lt 3.0 and als.mag lt 50.0 and $
-                  als.err lt 1.0,ngdals)
-  endif
-  if (ngdals eq 0) then begin
-    error = 'NO good stars for '+files[i]
-    printlog,logf,error
-    return
-  endif
-
-
-  ; --- Use WCS ---
-  if keyword_set(usewcs) and noparams1 ge 1 then begin
-    ; Checking WCS of second file
-    fitsfile2 = file_basename(files[i],'.als')+'.fits'
-    if file_test(fitsfile2) eq 0 then begin
-      printlog,logf,fitsfile2+' NOT FOUND. Cannot use WCS for matching'
-      goto,BOMB1
-    endif
-    head2 = headfits(fitsfile2)
-    extast,head2,astr2,noparams2
-    if noparams2 lt 1 then begin
-      printlog,logf,fitsfile2+' has NO WCS.  Cannot use WCS for matching'
-      goto,BOMB1
-    endif
-
-    ; Get coordinates for the stars
-    head_xyad,head1,refals.x-1,refals.y-1,a1,d1,/deg
-    head_xyad,head2,als.x-1,als.y-1,a2,d2,/deg
-
-    SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
-  
-    ; If no matches, try with looser cuts
-    if count lt 3 then begin
-      printlog,logf,'No matches, trying looser cuts'
-      gdref = where(refals.mag lt 50.0 and refals.err lt 1.0,ngdref)
-      gdals = where(als.mag lt 50.0 and als.err lt 1.0,ngdals)
-      SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
-      if count lt 3 then $
-        SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],3.0,ind1,ind2,count=count,/sph
-    endif
-
-    if count gt 0 then begin 
-      xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
-      ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
-      xmed = median([xdiff],/even)
-      ymed = median([ydiff],/even)
-      ; Fit rotation with linear fits if enough points
-      if count gt 1 then begin
-        coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)  ; fit rotation term
-        coef1b = dln_poly_fit(als[gdals[ind2]].y,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap)
-        coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)  ; fit rotation term
-        coef2b = dln_poly_fit(als[gdals[ind2]].x,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err,/bootstrap)
-        ;theta = mean([-coef1[1],coef2[1]])
-        WMEANERR,[-coef1[1],coef2[1]],[coef1err[1],coef2err[1]],theta,thetaerr
-
-        ; [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)]
-        ;trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-        trans = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
-        ; Adjust Xoff, Yoff with this transformation
-        xyout = trans_coo(als[gdals[ind2]].x,als[gdals[ind2]].y,trans)
-        trans[0] += median([refals[gdref[ind1]].x - xyout[0,*]],/even) 
-        trans[1] += median([refals[gdref[ind1]].y - xyout[1,*]],/even)
-      endif else trans=[xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-
-      ; Fit full six parameters if there are enough stars
-      if count gt 10 then begin
-        fa = {x1:refals[gdref[ind1]].x,y1:refals[gdref[ind1]].y,x2:als[gdals[ind2]].x,y2:als[gdals[ind2]].y}
-        ;initpar = fltarr(6)
-        ;initpar = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-        ;initpar = [xmed, ymed, 1.0-theta^2, theta, -theta, 1.0-theta^2]
-        initpar = trans
-        fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,$
-                      bestnorm=chisq, dof=dof, autoderivative=1, /quiet) 
-        trans = fpar
-      endif
-    endif
-;print,files[i],' ',count
-;stop
-    BOMB1:
-  endif ; use WCS
-
-  ; Match stars with X/Y coordinates
-  if (count lt 1) then begin
-    ;MATCHSTARS,refals.x,refals.y,als.x,als.y,ind1,ind2,trans,count=count,/silent
-    MATCHSTARS,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,ind1,ind2,trans,count=count,/silent
-  endif
-
-  ; No good matches, try srcmatch with "small" shifts
-  if (count lt 1) then begin
-    SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,100,ind1a,ind2a,count=count1
-    if count1 gt 0 then begin
-      xdiff1 = refals[gdref[ind1a]].x-als[gdals[ind2a]].x
-      ydiff1 = refals[gdref[ind1a]].y-als[gdals[ind2a]].y
-      xmed1 = median([xdiff1],/even)
-      ymed1 = median([ydiff1],/even)
-      ; redo the search
-      SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,20,ind1,ind2,count=count
-      if count eq 0 then begin
-        SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,100,ind1,ind2,count=count
-      endif
-      xdiff = refals[gdref[ind1]].x-als[gdals[ind2]].x
-      ydiff = refals[gdref[ind1]].y-als[gdals[ind2]].y
-      xmed = median([xdiff],/even)
-      ymed = median([ydiff],/even)
-      trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0]
-    endif
-  endif
-
-  ; No good match
-  if (count lt 1) then begin
-    printlog,logf,'NO MATCHES.  Using XSHIFT=YSHIFT=ROTATION=0'
-    trans = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
-  endif
-
-  ; Shift too large
-  if keyword_set(maxshift) then begin
-    if max(abs(trans[0:1])) gt maxshift then begin
-      printlog,logf,'SHIFTS TOO LARGE. ',strtrim(trans[0:1],2),' > ',strtrim(maxshift,2),$
-                    ' Using XSHIFT=YSHIFT=ROTATION=0'
-      trans = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
-    endif
-  endif
-
-  ; The output is:
-  ; filename, xshift, yshift, 4 trans, FRAD (from als file), 0.0
-  format = '(A2,A-30,A1,2F10.2,4F10.5,2F10.3)'
-  newline = STRING("'",files[i],"'",trans, frad, 0.0, format=format)
-  PUSH,mchfinal,newline
-
-  ; Printing the transformation
-  if keyword_set(verbose) then $
-    printlog,logf,format='(A-20,2F10.4,4F12.8)',files[i],trans
-
-  ;stop
-
-endfor  ; ALS file loop
-
-
-; Writing the final mchfile
-WRITELINE,bases[0]+'.mch',mchfinal
-
-;stop
-
+mchfile = mchbase+'.mch'
+WRITELINE,mchfile,mchfinal
 
 
 ;#####################
-; Running DAOMASTER
+; Create the RAW file
 ;#####################
+; I can't use daomaster because it won't work for non-overlapping
+; images, and it always makes the first image the reference.
 rundaomaster:
 
-; DAOMASTER has problems with files that have extra dots in them 
-; (i.e. F1.obj1123_1.mch).
-; Do everything with a temporary file, then rename the output files
-; at the end.
-;tempbase = MAKETEMP('temp','')
-tempbase = FILE_BASENAME(MKTEMP('temp'))
-FILE_DELETE,tempbase,/allow       ; remove empty file
-tempbase = REPSTR(tempbase,'.','')   ; remove the dot
-tempmch = tempbase+'.mch'
-FILE_COPY,bases[0]+'.mch',tempmch,/overwrite,/allow
+; Create the Schema
+schema = {id:0L,x:0.0,y:0.0}
+for i=0,nfiles-1 do $
+  schema=create_struct(schema,'MAG'+strtrim(i+1,2),99.99,'ERR'+strtrim(i+1,2),9.99)
+schema = create_struct(schema,'chi',99.99,'sharp',99.99,'nobs',0)
+rawtags = tag_names(schema)
 
-; Make the DAOMASTER script
-;--------------------------
-undefine,cmdlines
-PUSH,cmdlines,'#!/bin/csh'
-PUSH,cmdlines,'set input=${1}'
-PUSH,cmdlines,'daomaster << DONE'
-PUSH,cmdlines,'${input}.mch'
-PUSH,cmdlines,'1,1,1'
-PUSH,cmdlines,'99.'
-PUSH,cmdlines,'6'
-PUSH,cmdlines,'10'
-PUSH,cmdlines,'5'
-PUSH,cmdlines,'4'
-PUSH,cmdlines,'3'
-PUSH,cmdlines,'2'
-PUSH,cmdlines,'1'
-PUSH,cmdlines,'1'
-PUSH,cmdlines,'1'
-PUSH,cmdlines,'1'
-PUSH,cmdlines,'0'
-PUSH,cmdlines,'y'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'y'
-PUSH,cmdlines,''
-PUSH,cmdlines,'y'
-PUSH,cmdlines,''
-PUSH,cmdlines,''
-PUSH,cmdlines,'y'
-PUSH,cmdlines,''
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'n'
-PUSH,cmdlines,'DONE'
-;tempscript = MAKETEMP('daomaster','.sh')
-tempscript = MKTEMP('daomaster')   ; absolute filename
-WRITELINE,tempscript,cmdlines
-FILE_CHMOD,tempscript,'755'o
+; Number of sources in each als
+nalsarr = lonarr(nfiles)
+for i=0,nfiles-1 do nalsarr[i]=file_lines(bases[i]+'.als')-3
 
-; Run DAOMASTER
-;---------------
-;cmd2 = '/net/home/dln5q/bin/daomaster.sh '+bases[0]
-;cmd2 = './daomaster.sh '+tempbase
-cmd2 = tempscript+' '+tempbase
-SPAWN,cmd2,out2,errout2
+; Initialize the RAW structure
+raw = REPLICATE(schema,total(nalsarr))
 
-;stop
+; Loop over the images
+;---------------------
+tfr = lonarr(n_elements(raw),nfiles)   ; tfr array
+count = 0LL
+For i=0,nfiles-1 do begin
+  if keyword_set(verbose) then printlog,logf,strtrim(i+1,2),' ',bases[i]
 
-; Remove temporary DAOMASTER script
-;-----------------------------------
-FILE_DELETE,tempscript,/allow_non
+  ; Get the header
+  if strmid(filestr[i].file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fhead = headfits(filestr[i].file,exten=1)
+    ; Fix the NAXIS1/2 in the header
+    sxaddpar,fhead,'NAXIS1',sxpar(fhead,'ZNAXIS1')
+    sxaddpar,fhead,'NAXIS2',sxpar(fhead,'ZNAXIS2')
+  endif else begin
+    fhead = headfits(filestr[i].file)
+  endelse
+
+  ; Load the ALS file
+  LOADALS,bases[i]+'.als',als,alshead
+  nals = n_elements(als)
+  alsind = lindgen(nals)+1
+  if i eq 0 then rawhead=alshead
+
+  ; Convert to tile coordinates
+  HEAD_XYAD,fhead,als.x-1,als.y-1,ra,dec,/deg
+  HEAD_ADXY,tilestr.head,ra,dec,xref,yref,/deg
+  xref += 1  ; convert 0-indexed to 1-indexed
+  yref += 1
+  ; Convert to tile X/Y values
+  xref -= groupstr.x0
+  yref -= groupstr.y0
+
+  ; Get mag/err columns
+  magind = where(rawtags eq 'MAG'+strtrim(i+1,2),nmagind)
+  errind = where(rawtags eq 'ERR'+strtrim(i+1,2),nerrind)
+
+  ; First image
+  if i eq 0 then begin
+    raw[0:nals-1].id = lindgen(nals)+1
+    raw[0:nals-1].x = xref
+    raw[0:nals-1].y = yref
+    raw[0:nals-1].(magind) = als.mag
+    raw[0:nals-1].(errind) = als.err
+    raw[0:nals-1].chi = als.chi
+    raw[0:nals-1].sharp = als.sharp 
+    raw[0:nals-1].nobs++
+    count += nals
+    ; TFR
+    tfr[0:nals-1,i] = alsind
+
+  ; Second and later images, crossmatch
+  endif else begin
+
+    ; Cross-match
+    SRCMATCH,raw[0:count-1].x,raw[0:count-1].y,xref,yref,2,ind1,ind2,count=nmatch
+    if keyword_set(verbose) then printlog,logf,strtrim(nmatch,2),' matches'
+
+    ; Some matches, add data to existing records for these sources
+    if nmatch gt 0 then begin
+      raw[ind1].(magind) = als[ind2].mag
+      raw[ind1].(errind) = als[ind2].err
+      raw[ind1].chi += als[ind2].chi      ; cumulative sum
+      raw[ind1].sharp += als[ind2].sharp  ; cumulative sum
+      raw[ind1].nobs++
+      ; TFR
+      tfr[ind1,i] = ind2
+      ; Remove stars
+      if nmatch lt nals then REMOVE,ind2,als,xref,yref,alsind else undefine,als
+      nals = n_elements(als)
+    endif
+
+    ; Add leftover sources
+    if nals gt 0 then begin
+      if keyword_set(verbose) then printlog,logf,'Adding ',strtrim(nals,2),' leftover sources'
+      raw[count:count+nals-1].id = lindgen(nals)+1+count
+      raw[count:count+nals-1].x = xref
+      raw[count:count+nals-1].y = yref
+      raw[count:count+nals-1].(magind) = als.mag
+      raw[count:count+nals-1].(errind) = als.err
+      raw[count:count+nals-1].chi += als.chi
+      raw[count:count+nals-1].sharp += als.sharp
+      raw[count:count+nals-1].nobs++
+      count += nals
+      ; TFR
+      tfr[count:count+nals-1,i] = alsind
+    endif
+
+  endelse
+Endfor
+; Trim extra elements
+raw = raw[0:count-1]
+tfr = tfr[0:count-1,*]
+; Calculate average chi/sharp
+raw.chi /= (raw.nobs>1)
+raw.sharp /= (raw.nobs>1)
+nraw = n_elements(raw)
 
 
-; Rename the outputs
+; Write out the RAW file
+;-----------------------
+openw,unit,/get_lun,mchbase+'.raw'
+; Header
+printf,unit,rawhead[0]
+printf,unit,rawhead[1]
+printf,unit,''
+; Create MAG/ERR array
+magarr = fltarr(nraw,nfiles*2)
+for i=0,nfiles-1 do begin
+  magind = where(rawtags eq 'MAG'+strtrim(i+1,2),nmagind)
+  errind = where(rawtags eq 'ERR'+strtrim(i+1,2),nerrind)
+  magarr[*,i*2] = raw.(magind)
+  magarr[*,i*2+1] = raw.(errind)
+endfor
+; Only 12 mag/err/chi/sharp columns per row
+nrows = ceil((nfiles*2+2)/12.)
+; Loop over raw elements
+for i=0,nraw-1 do begin
+  ; The floating point numbers, MAG, ERR, CHI, SHARP
+  arr = [reform(magarr[i,*]),raw[i].chi,raw[i].sharp]
+  narr = n_elements(arr)
+  ; Loop over rows for this object
+  for j=0,nrows-1 do begin
+    if narr gt 12 then begin
+      thisarr = arr[0:11]
+      arr = arr[12:*]
+      narr = n_elements(arr)
+    endif else begin
+      thisarr = arr
+      undefine,arr
+      narr = 0
+    endelse     
+    if j eq 0 then begin
+      format = '(A1,I8,2F9.3,'+strtrim(n_elements(thisarr),2)+'F9.4)'
+      printf,unit,'',raw[i].id,raw[i].x,raw[i].y,thisarr,format=format
+    endif else begin
+      ; 27 leading spaces
+      format = '(A27,'+strtrim(n_elements(thisarr),2)+'F9.4)'
+      printf,unit,'',thisarr,format=format
+    endelse
+  endfor
+endfor
+close,unit
+free_lun,unit
+
+
+; Write out TFR file
 ;-------------------
-; MCH file
-mchfile = FILE_SEARCH(tempbase+'.mch',count=nmchfile)
-if (nmchfile gt 0) then begin
-  FILE_COPY,mchfile[0],bases[0]+'.mch',/overwrite,/allow
-  FILE_DELETE,mchfile,/allow
-endif else begin
-  error = 'NO FINAL MCH FILE'
-  printlog,logf,error
-  return
-endelse
-; TFR file
-tfrfile = FILE_SEARCH(tempbase+'.tfr',count=ntfrfile)
-if (ntfrfile gt 0) then begin
-  FILE_COPY,tfrfile[0],bases[0]+'.tfr',/overwrite,/allow
-  FILE_DELETE,tfrfile,/allow
-endif else begin
-  error = 'NO FINAL TFR FILE'
-  printlog,logf,error
-  return
-endelse
-; RAW file
-rawfile = FILE_SEARCH(tempbase+'.raw',count=nrawfile)
-if (nrawfile gt 0) then begin
-  FILE_COPY,rawfile[0],bases[0]+'.raw',/overwrite,/allow
-  FILE_DELETE,rawfile,/allow
-endif else begin
-  error = 'NO FINAL RAW FILE'
-  printlog,logf,error
-  return
-endelse
-
-; FAKE, copy back the original MCH file
-if keyword_set(fake) then begin
-  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.daomaster',/overwrite,/allow
-  FILE_MOVE,bases[0]+'.mch.orig',bases[0]+'.mch',/overwrite,/allow
-endif
-
-; Were there any errors
-if (errout2[0] ne '') then begin
-  printlog,logf,'DAOMASTER.SH ERROR'
-  printlog,logf,errout2
-  error = errout2
-  return
-endif
+openw,unit,/get_lun,mchbase+'.tfr'
+for i=0,nfiles-1 do printf,unit,'',bases[i]+'.als',99.9999,9.9999,format='(A1,A-30,F9.4,F9.4)'
+printf,unit,' =============================='
+format = '(I7,F9.2,F9.2,'+strtrim(nfiles,2)+'I7)'
+for i=0,nraw-1 do printf,unit,raw[i].id,raw[i].x,raw[i].y,reform(tfr[i,*]),format=format
+close,unit
+free_lun,unit
 
 
-; Print out the final transformations
-if keyword_set(verbose) then begin
-  LOADMCH,bases[0]+'.mch',files,trans
-  nfiles = n_elements(files)
-  printlog,logf,''
-  printlog,logf,'Final DAOMASTER Transformations:'
-  for i=0,nfiles-1 do begin
-    printlog,logf,format='(A-20,2F10.4,4F12.8)',files[i],transpose(trans[i,*])
-  end
-endif
-
+;; FAKE, copy back the original MCH file
+;if keyword_set(fake) then begin
+;  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.daomaster',/overwrite,/allow
+;  FILE_MOVE,bases[0]+'.mch.orig',bases[0]+'.mch',/overwrite,/allow
+;endif
 
 ; Back to the original directory
 CD,curdir
