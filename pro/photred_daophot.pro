@@ -547,7 +547,6 @@ if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
   
 endif
 
-
 ; Make the Confirmed celestial sources lists, SINGLE-CHIP, OLD METHOD
 ;--------------------------------------------------------------------
 if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
@@ -597,7 +596,6 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,$
              /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
-
 
 
 ;##############################
@@ -707,8 +705,6 @@ PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$
 ; AFTER EACH FILE IS PROCESSED!!!!!
 ; CAN PBS_DAEMON DO THAT?????
 
-
-
 ;-------------------
 ; Checking OUTPUTS
 ;-------------------
@@ -722,7 +718,7 @@ for i=0,nfitsbaselist-1 do begin
     CD,fitsdirlist[i]
 
     fil = fitsbaselist[i]
-    if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(file,'.fits.fz') else $
+    if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(fil,'.fits.fz') else $
       base = FILE_BASENAME(fil,'.fits')
     ; Check that this file has an ALS file
     alstest = FILE_TEST(base+'.als')
@@ -742,7 +738,6 @@ for i=0,nfitsbaselist-1 do begin
   CD,curdir
 
 endfor
-
 
 
 ;##########################################
