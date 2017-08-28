@@ -435,7 +435,7 @@ wait,1
         ;; maybe make daomatch_tile.pro to use the tile projection
         ;; coords in the mch file. 
         ;; I started daomatch_tile.pro.  
-        mchbase = refstr.base
+        mchbase = refstr.base+'.'+tilesuffix
       ;  DAOMATCH_TILE,alsfiles,tilestr,grouptileinfo,mchbase
 
       endfor ; tile/group loop
