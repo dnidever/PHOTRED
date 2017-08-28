@@ -106,15 +106,15 @@ if dokeepmef eq '0' or dokeepmef eq '-1' then keepmef = 0
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files
-; OUTLIST        FITS files
-; SUCCESSLIST    FITS files
+; INLIST         FITS or FITS.FZ files
+; OUTLIST        FITS or FITS.FZ files
+; SUCCESSLIST    FITS or FITS.FZ files
 
 
 ; Get input
 ;-----------
 precursor = 'RENAME'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
+lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext=['fits','fits.fz'])
 ninputlines = lists.ninputlines
 
 ; No files to process
@@ -149,7 +149,8 @@ FOR i=0,ninputlines-1 do begin
   file = inputlines[i]
   filedir = FILE_DIRNAME(file)
   name = FILE_BASENAME(file)
-  base = FILE_BASENAME(file,'.fits')
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(file,'.fits.fz') else $
+    base = FILE_BASENAME(file,'.fits')
 
   CD,filedir
 
@@ -161,22 +162,11 @@ FOR i=0,ninputlines-1 do begin
     goto,BOMB
   endif
 
-  ; Is this a mutli-extension file
-  UNDEFINE,im,hh
-  FITS_READ,file,im,hh,exten=1,message=message,/no_abort,/header_only
-  if strtrim(message,2) eq '' then mef=1 else mef=0
-
-  ; How many extensions are there
-  if (mef eq 1) then begin
-
-    count = 0
-    while(strtrim(message,2) eq '') do begin
-      count++
-      FITS_READ,file,im,hh,exten=count,message=message,/no_abort,/header_only
-    endwhile
-    next = count-1
-
-  endif
+  ; Does this have multiple extensions
+  FITS_OPEN,file,fcb,message=message0
+  next = fcb.nextend
+  FITS_CLOSE,fcb
+  if next gt 0 then mef=1 else mef=0
 
   ;----------------------
   ; MULTI-EXTENSION FILE

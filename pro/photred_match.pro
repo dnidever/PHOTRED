@@ -330,7 +330,8 @@ FOR i=0,ndirs-1 do begin
     foundarr = intarr(nbase)+1
     for k=0,nbase-1 do begin
       fitsfile = FILE_SEARCH(base[k]+'.fits',count=nfitsfile)
-      if (nfitsfile eq 0) then begin
+      fzfile = FILE_SEARCH(base[k]+'.fits.fz',count=nfzfile)
+      if (nfitsfile eq 0 and nfzfile eq 0) then begin
         printlog,logfile,'NO ASSOCIATED FITS FILE FOR ',base
         PUSH,failurelist,dirs[i]+'/'+base[k]+'.als'
         foundarr[k] = 0
@@ -377,6 +378,7 @@ wait,1
        
       ;; Group them into tiles
       printlog,logfile,'Gathering file information and grouping by tiles.'
+  ; MAKE THIS SO IT WILL WORK WITH FITS.FZ FILES AS WELL!!!
       PHOTRED_TILEGROUPS,base+'.fits',tilestr,groupstr,logfile=logfile,error=grperror
       if n_elements(grperror) gt 0 then goto,BOMB
 
@@ -558,11 +560,15 @@ wait,1
           ; Get filters for first amp
           ind1 = where(amp eq amps[0],nind1)
           base1 = base[ind1]
-          filters = PHOTRED_GETFILTER(base1+'.fits')
-          exptime = PHOTRED_GETEXPTIME(base1+'.fits')
+          ; Get fits/fits.fz file name
+          base1fits = strarr(nind1)
+          for l=0,nind1-1 do $
+            if FILE_TEST(base1[l]+'.fits') eq 1 then base1fits[l]=base1[l]+'.fits' else base1fits[l]=base1[l]+'.fits.fz'
+          filters = PHOTRED_GETFILTER(base1fits)
+          exptime = PHOTRED_GETEXPTIME(base1fits)
           rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
-          utdate = PHOTRED_GETDATE(base1+'.fits')
-          uttime = PHOTRED_GETUTTIME(base1+'.fits')
+          utdate = PHOTRED_GETDATE(base1fits)
+          uttime = PHOTRED_GETUTTIME(base1fits)
           dateobs = utdate+'T'+uttime
           jd = dblarr(nind1)
           for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
@@ -619,8 +625,12 @@ wait,1
         endif else begin
           ind1 = where(amp eq amps[0],nind1)
           base1 = base[ind1]
-          filters = PHOTRED_GETFILTER(base1+'.fits')
-          exptime = PHOTRED_GETEXPTIME(base1+'.fits')
+          ; Get fits/fits.fz file name
+          base1fits = strarr(nind1)
+          for l=0,nind1-1 do $
+            if FILE_TEST(base1[l]+'.fits') eq 1 then base1fits[l]=base1[l]+'.fits' else base1fits[l]=base1[l]+'.fits.fz'          
+          filters = PHOTRED_GETFILTER(base1fits)
+          exptime = PHOTRED_GETEXPTIME(base1fits)
           gdref = where(file_test(base1+'.mch') eq 1,ngdref)
           if ngdref eq 0 then begin
             printlog,logfile,'/FAKE, no existing MCH file for '+amps[0]
@@ -782,11 +792,15 @@ wait,1
         ;  use photred_pickreferenceframe.pro
         if not keyword_set(fake) then begin
           ; Get filters 
-          filters = PHOTRED_GETFILTER(base+'.fits')
-          exptime = PHOTRED_GETEXPTIME(base+'.fits')
+          ; Get fits/fits.fz file name
+          basefits = strarr(nbase)
+          for l=0,nbase-1 do $
+            if FILE_TEST(base[l]+'.fits') eq 1 then basefits[l]=base[l]+'.fits' else basefits[l]=base[l]+'.fits.fz'
+          filters = PHOTRED_GETFILTER(basefits)
+          exptime = PHOTRED_GETEXPTIME(basefits)
           rexptime = round(exptime*10)/10.  ; rounded to nearest 0.1s
-          utdate = PHOTRED_GETDATE(base1+'.fits')
-          uttime = PHOTRED_GETUTTIME(base1+'.fits')
+          utdate = PHOTRED_GETDATE(basefits)
+          uttime = PHOTRED_GETUTTIME(basefits)
           dateobs = utdate+'T'+uttime
           jd = dblarr(nind1)
           for l=0,nind1-1 do jd[l]=DATE2JD(dateobs[l])
@@ -836,8 +850,12 @@ wait,1
         ; FAKE, pick reference image of existing MCH file
         ;  This ensures that we use exactly the same reference frame.
         endif else begin
-          filters = PHOTRED_GETFILTER(base+'.fits')
-          exptime = PHOTRED_GETEXPTIME(base+'.fits')
+          ; Get fits/fits.fz file name
+          basefits = strarr(nbase)
+          for l=0,nbase-1 do $
+            if FILE_TEST(base[l]+'.fits') eq 1 then basefits[l]=base[l]+'.fits' else basefits[l]=base[l]+'.fits.fz'
+          filters = PHOTRED_GETFILTER(basefits)
+          exptime = PHOTRED_GETEXPTIME(basefits)
           gdref = where(file_test(base+'.mch') eq 1,ngdref)
           if ngdref eq 0 then begin
             printlog,logfile,'/FAKE, no existing MCH file.'

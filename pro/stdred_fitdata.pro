@@ -1,5 +1,3 @@
-pro stdred_fitdata,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_FITDATA
@@ -19,6 +17,8 @@ pro stdred_fitdata,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_fitdata,redo=redo,stp=stp
 
 COMMON photred,setup
 

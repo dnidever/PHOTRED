@@ -1,5 +1,3 @@
-pro stdred_rename,redo=redo,stp=stp,testing=testing
-
 ;+
 ;
 ; STDRED_RENAME
@@ -19,6 +17,8 @@ pro stdred_rename,redo=redo,stp=stp,testing=testing
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_rename,redo=redo,stp=stp,testing=testing
 
 COMMON photred,setup
 
@@ -102,14 +102,14 @@ endif
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files, it get files from directory
-; OUTLIST        FITS files
-; SUCCESSLIST    FITS files
+; INLIST         FITS or FITS.FZ files, it get files from directory
+; OUTLIST        FITS or FITS.FZ files
+; SUCCESSLIST    FITS or FITS.FZ files
 undefine,outlist,successlist,failurelist
 
 ; Add all fits files to the INLIST
 ; This APPENDS files to the input file
-fitsfiles = FILE_SEARCH('*.fits',count=nfitsfiles,/fully)
+fitsfiles = FILE_SEARCH(['*.fits','*.fits.fz'],count=nfitsfiles,/fully)
 WRITELINE,inputfile,fitsfiles,/append
 
 ; Get input
@@ -172,8 +172,13 @@ headerproblem = 0
 for i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
   com=''
 
   ; Checking GAIN
@@ -222,7 +227,7 @@ for i=0,ninputlines-1 do begin
     testing = 1
   endif
 
-end
+endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
@@ -251,10 +256,13 @@ calibarr = intarr(ninputlines)
 FOR i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-
-  ; Load the header
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)  ; load the header
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)  ; load the header
+  endelse
 
   ; Getting object information
   object = SXPAR(head,'OBJECT',/silent)
@@ -372,10 +380,13 @@ FOR i=0,ninputlines-1 do begin
   longfile = inputlines[i]
   file = FILE_BASENAME(longfile)
   filedir = FILE_DIRNAME(longfile)
-  base = FILE_BASENAME(file,'.fits')
-
-  ; Load the header
-  head = HEADFITS(longfile)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(longfile,exten=1)  ; load the header
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(longfile)          ; load the header
+  endelse
 
   object = SXPAR(head,'OBJECT',/silent)
   exptime = PHOTRED_GETEXPTIME(longfile)

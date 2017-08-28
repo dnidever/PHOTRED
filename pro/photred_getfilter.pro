@@ -1,6 +1,3 @@
-function photred_getfilter,file,stp=stp,numeric=numeric,noupdate=noupdate,$
-             silent=silent,filtname=filtname0,error=error,fold_case=fold_case
-
 ;+
 ;
 ; PHOTRED_GETFILTER
@@ -37,6 +34,9 @@ function photred_getfilter,file,stp=stp,numeric=numeric,noupdate=noupdate,$
 ;
 ; By D.Nidever  February 2008
 ;-
+
+function photred_getfilter,file,stp=stp,numeric=numeric,noupdate=noupdate,$
+             silent=silent,filtname=filtname0,error=error,fold_case=fold_case
 
 COMMON photred,setup
 
@@ -102,9 +102,9 @@ shortnames = reform(arr[1,*])
 ; Get the filter information from the header
 if (nfile gt 0) then begin
 
-  ; Does it have the ".fits" ending
+  ; Does it have the ".fits" of ".fits.fz" ending
   ext = first_el(strsplit(file,'.',/extract),/last)
-  if ext ne 'fits' then begin
+  if ext ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz' then begin
     if not keyword_set(silent) then print,file,' IS NOT A FITS FILE'
     error = file+' IS NOT A FITS FILE'
     return,''
@@ -118,7 +118,8 @@ if (nfile gt 0) then begin
     return,''
   endif
 
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
+    head = HEADFITS(file)
 
   ; Problem with header
   if n_elements(head) eq 1 and strtrim(head[0],2) eq '-1' then begin

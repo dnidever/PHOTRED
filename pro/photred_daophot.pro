@@ -134,14 +134,14 @@ if ndaofitradfwhm eq 0 then undefine,daofitradfwhm
 ;###################
 ; GETTING INPUTLIST
 ;###################
-; INLIST         FITS files (must be split)
+; INLIST         FITS or FITS.FZ files (must be split)
 ; OUTLIST        ALS files
 ; SUCCESSLIST    FITS files
 
 ; Get input
 ;-----------
 precursor = 'WCS'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='fits')
+lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext=['fits','fits.fz'])
 ninputlines = lists.ninputlines
 
 
@@ -264,8 +264,13 @@ headerproblem = 0
 for i=0,ninputlines-1 do begin
 
   file = inputlines[i]
-  base = FILE_BASENAME(file,'.fits')
-  head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    base = FILE_BASENAME(file,'.fits.fz')
+    head = HEADFITS(file,exten=1)
+  endif else begin
+    base = FILE_BASENAME(file,'.fits')
+    head = HEADFITS(file)
+  endelse
   com=''
 
   ; Checking GAIN
@@ -300,7 +305,12 @@ endif
 
 ; FAKE, artificial star tests
 if keyword_set(fake) then begin
-  procbaselist = FILE_BASENAME(fitsbaselist,'.fits')
+  procbaselist = strarr(nfitsbaselist)
+  for i=0,nfitsbaselist-1 do begin
+    if strmid(fitsbaselist[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      procbaselist[i]=FILE_BASENAME(fitsbaselist[i],'.fits.fz') else $
+      procbaselist[i]=FILE_BASENAME(fitsbaselist[i],'.fits')
+  endfor
   procdirlist = fitsdirlist
   successarr[*] = 1
   goto,rundaophot
@@ -333,7 +343,13 @@ for i=0,ndirs-1 do begin
 
       ind = gd[j]
       fil = fitsbaselist[ind]
-      base = FILE_BASENAME(fil,'.fits')
+      if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then begin
+        fpack = 1
+        base = FILE_BASENAME(fil,'.fits.fz')
+      endif else begin
+        fpack = 0
+        base = FILE_BASENAME(fil,'.fits')
+      endelse
       printlog,logfile,fil
 
       ; Make sure that the FITS files are FLOAT
@@ -341,7 +357,7 @@ for i=0,ndirs-1 do begin
       ; Make sure that |BITPIX| > 16
       head = HEADFITS(fil)
       bitpix = long(SXPAR(head,'BITPIX',/silent))
-      if (bitpix eq 8 or bitpix eq 16) then begin
+      if (bitpix eq 8 or bitpix eq 16) and (fpack eq 0) then begin
         printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
         ; Read in the image
@@ -405,9 +421,9 @@ if ntomakeoptlist gt 0 then begin
   if n_elements(daofitradfwhm) gt 0 then cmd+=',fitradius_fwhm='+strtrim(daofitradfwhm,2)
   ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+  PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,$
+             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
-
 
 ; Check all OPT files
 ;---------------------
@@ -415,7 +431,9 @@ for i=0,nfitsbaselist-1 do begin
 
   CD,fitsdirlist[i]
 
-  base = file_basename(fitsbaselist[i],'.fits')
+  if strmid(fitsbaselist[i],6,7,/reverse_offset) eq 'fits.fz' then $
+    base = file_basename(fitsbaselist[i],'.fits.fz') else $
+    base = file_basename(fitsbaselist[i],'.fits')
 
   ; Check OPT file
   ;----------------
@@ -504,7 +522,9 @@ if (psfcomsrc eq 1) and keyword_set(psfcomglobal) then begin
   fitsfieldlist = strarr(nfitsbaselist)
   fitschiplist = strarr(nfitsbaselist)
   for i=0,nfitsbaselist-1 do begin
-    base = file_basename(fitsbaselist[i],'.fits')
+    if strmid(fitsbaselist[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      base = file_basename(fitsbaselist[i],'.fits.fz') else $
+      base = file_basename(fitsbaselist[i],'.fits')
     fitsfieldlist[i] = first_el(strsplit(base,'-',/extract))
     fitschiplist[i] = first_el(strsplit(base,thisimager.separator,/extract),/last)
   endfor
@@ -543,7 +563,9 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   fitsfieldlist = strarr(nfitsbaselist)
   fitschiplist = strarr(nfitsbaselist)
   for i=0,nfitsbaselist-1 do begin
-    base = file_basename(fitsbaselist[i],'.fits')
+    if strmid(fitsbaselist[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      base = file_basename(fitsbaselist[i],'.fits.fz') else $
+      base = file_basename(fitsbaselist[i],'.fits')
     fitsfieldlist[i] = first_el(strsplit(base,'-',/extract))
     fitschiplist[i] = first_el(strsplit(base,thisimager.separator,/extract),/last)
   endfor
@@ -572,7 +594,8 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
   endfor
 
   ; Submit the jobs to the daemon
-  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5,/cdtodir
+  PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,$
+             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
 endif
 
 
@@ -596,7 +619,13 @@ if ngd eq 0 then begin
 endif
 
 ; These are the files to process
-procbaselist = FILE_BASENAME(fitsbaselist[gd],'.fits')
+procbaselist = strarr(ngd)
+procextlist = strarr(ngd)
+for i=0,ngd-1 do begin
+  if strmid(fitsbaselist[gd[i]],6,7,/reverse_offset) eq 'fits.fz' then $
+    procextlist[i]='.fits.fz' else procextlist[i]='.fits'
+  procbaselist[i]=FILE_BASENAME(fitsbaselist[gd[i]],procextlist[i])
+endfor
 procdirlist = fitsdirlist[gd]
 nprocbaselist = n_elements(procbaselist)
 
@@ -628,7 +657,7 @@ If not keyword_set(redo) then begin
       printlog,logfile,procdirlist[bd[i]]+'/'+procbaselist[bd[i]]+' DAOPHOT ALREADY DONE'
 
     ; Add these to the "success" and "outlist" list
-    PUSH,successlist,procdirlist[bd]+'/'+procbaselist[bd]+'.fits'
+    PUSH,successlist,procdirlist[bd]+'/'+procbaselist[bd]+procextlist[bd]
     PUSH,outlist,procdirlist[bd]+'/'+procbaselist[bd]+'.als'
     PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                         failurelist=failurelist,/silent
@@ -652,7 +681,6 @@ If not keyword_set(redo) then begin
 
 Endif ; some done already?
 
-;stop
 
 ;----------------------
 ; RUNNING THE COMMANDS
@@ -672,7 +700,8 @@ endif else begin
 endelse
   
 ; Submit the jobs to the daemon
-PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,waittime=5,/cdtodir
+PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$
+           waittime=5,/cdtodir,scriptsdir=scriptsdir
 
 ; IT WOULD BE BETTER TO UPDATE THE LISTS
 ; AFTER EACH FILE IS PROCESSED!!!!!
@@ -693,7 +722,8 @@ for i=0,nfitsbaselist-1 do begin
     CD,fitsdirlist[i]
 
     fil = fitsbaselist[i]
-    base = FILE_BASENAME(fil,'.fits')
+    if strmid(fil,6,7,/reverse_offset) eq 'fits.fz' then base=FILE_BASENAME(file,'.fits.fz') else $
+      base = FILE_BASENAME(fil,'.fits')
     ; Check that this file has an ALS file
     alstest = FILE_TEST(base+'.als')
     if alstest eq 1 then alslines=FILE_LINES(base+'.als') else alslines=0
@@ -727,7 +757,12 @@ if nind gt 0 then successlist = inputlines[ind] else UNDEFINE,successlist
 ; Output List
 ; Creating the new output array, ALS files
 if (nind gt 0) then begin
-  bases = FILE_BASENAME(fitsbaselist[ind],'.fits')
+  bases = strarr(nind)
+  for i=0,nind-1 do begin
+    if strmid(fitsbaselist[ind[i]],6,7,/reverse_offset) eq 'fits.fz' then $
+      bases[i]=FILE_BASENAME(fitsbaselist[ind[i]],'.fits.fz') else $
+      bases[i]=FILE_BASENAME(fitsbaselist[ind[i]],'.fits')
+  endfor
   outlist = fitsdirlist[ind]+'/'+bases+'.als'
 endif else UNDEFINE,outlist
 

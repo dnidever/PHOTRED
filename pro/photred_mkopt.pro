@@ -1,6 +1,3 @@
-pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=inp_fitradius_fwhm,$
-                  inp_fwhm=inp_fwhm,error=error,verbose=verbose,stp=stp
-
 ;+
 ;
 ; PHOTRED_MKOPT
@@ -40,6 +37,9 @@ pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=i
 ;                           which was copied from Tony's mkopt
 ;                           fortran program
 ;-
+
+pro photred_mkopt,input,hilimit=inp_hilimit,va=inp_va,fwhm=fwhm,fitradius_fwhm=inp_fitradius_fwhm,$
+                  inp_fwhm=inp_fwhm,error=error,verbose=verbose,stp=stp
 
 undefine,error
 
@@ -94,14 +94,21 @@ endif
 
 if keyword_set(verbose) then print,'Running PHOTRED_MKOPT on ',file
 
-
-base = strtrim(FILE_BASENAME(file,'.fits'),2)
+; Get the base
+if strmid(strtrim(file,2),6,7,/reverse_offset) eq 'fits.fz' then begin
+  fpack = 1
+  base = strtrim(FILE_BASENAME(file,'.fits.fz'),2)
+endif else begin
+  fpack = 0
+  base = strtrim(FILE_BASENAME(file,'.fits'),2)
+endelse
 dir = FILE_DIRNAME(file)
 
 
 
 ; Get the FITS header
-head = HEADFITS(file,errmsg=errmsg)
+if fpack eq 1 then head=HEADFITS(file,exten=1,errmsg=errmsg) else $
+  head = HEADFITS(file,errmsg=errmsg)
 if errmsg ne '' then begin
   print,'Error reading header for ',file
   print,errmsg

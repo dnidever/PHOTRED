@@ -1,5 +1,3 @@
-pro getpixscale,file,scale,head=head,stp=stp
-
 ;+
 ;
 ; GETPIXSCALE
@@ -20,6 +18,8 @@ pro getpixscale,file,scale,head=head,stp=stp
 ; BY D. Nidever   February 2008
 ;-
 
+pro getpixscale,file,scale,head=head,stp=stp
+
 scale = -1         ; bad until proven good
 
 ; Not enough inputs
@@ -35,8 +35,12 @@ if test eq 0 and n_elements(head) eq 0 then begin
   return
 endif
 
+; Fpack or regular fits
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
+if fpack eq 1 then exten=1 else exten=0
+
 ; Read the header
-if n_elements(head) eq 0 then head = headfits(file)
+if n_elements(head) eq 0 then head = headfits(file,exten=exten)
 
 ; Does the image have a SCALE parameter
 hscale = sxpar(head,'SCALE',/silent)
@@ -85,6 +89,8 @@ endif
 
 ;; Are there any other "scale"-like values in the header
 ;gd = where(stregex(head,'scale',/boolean,/fold_case) eq 1,ngd)
+
+;stop
 
 if keyword_set(stp) then stop
 

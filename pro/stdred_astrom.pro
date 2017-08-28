@@ -1,5 +1,3 @@
-pro stdred_astrom,redo=redo,stp=stp
-
 ;+
 ;
 ; STDRED_ASTROM
@@ -16,6 +14,8 @@ pro stdred_astrom,redo=redo,stp=stp
 ;
 ; By D.Nidever  May 2008
 ;-
+
+pro stdred_astrom,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -124,6 +124,7 @@ FOR i=0,ninputlines-1 do begin
   base = FILE_BASENAME(file,'.tot')
   filedir = FILE_DIRNAME(longfile)
   fitsfile = base+'.fits'
+  if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
 
   printlog,logfile,''
   printlog,logfile,'=========================================='
@@ -164,7 +165,8 @@ FOR i=0,ninputlines-1 do begin
   printlog,logfile,'Nstars = ',strtrim(nphot,2)
 
   ; Load the header
-  head = HEADFITS(fitsfile)
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(fitsfile,exten=1) else $
+    head = HEADFITS(fitsfile)
 
   ; Checking that the header has a WCS
   EXTAST,head,astr
@@ -234,7 +236,7 @@ FOR i=0,ninputlines-1 do begin
 
   ;stop
 
-END
+ENDFOR
 
 
 ;#####################
@@ -247,8 +249,6 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
 printlog,logfile,'STDRED_ASTROM Finished  ',systime(0)
 
 if keyword_set(stp) then stop
-
-
 
 
 end

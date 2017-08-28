@@ -363,9 +363,9 @@ For i=0,ninputlines-1 do begin
     base = FILE_BASENAME(files[j],'.als')
   
     ; Checking FITS file
-    fitstest = FILE_TEST(base+'.fits')
+    fitstest = FILE_TEST(base+'.fits') OR FILE_TEST(base+'.fits.fz')
     if fitstest eq 0 then begin
-      printlog,logfile,base+'.fits NOT FOUND'
+      printlog,logfile,base+'.fits/.fits.fz NOT FOUND'
       successarr[i] = 0
     endif
 
@@ -373,9 +373,15 @@ For i=0,ninputlines-1 do begin
     ; Make sure that the FITS files are FLOAT
     ;----------------------------------------
     ; Make sure that BITPIX = -32 otherwise this can cause problems
-    head = HEADFITS(base+'.fits')
+    if file_test(base+'.fits') eq 0 and file_test(base+'.fits.fz') eq 1 then begin
+      fpack = 1
+      head = HEADFITS(base+'.fits.fz',exten=1)
+    endif else begin
+      fpack = 0
+      head = HEADFITS(base+'.fits')
+    endelse
     bitpix = long(SXPAR(head,'BITPIX',/silent))
-    if (bitpix eq 8 or bitpix eq 16 or bitpix eq 32) then begin
+    if (bitpix eq 8 or bitpix eq 16 or bitpix eq 32) and (fpack eq 0) then begin
       printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
       ; Read in the image

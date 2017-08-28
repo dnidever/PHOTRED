@@ -212,15 +212,23 @@ LOADMCH,mchfile,files,trans
 
 ; Check that the fits, als, opt, and psf files exist
 nfiles = n_elements(files)
+fpack = bytarr(nfiles)
 for i=0,nfiles-1 do begin
   ;dir = file_dirname(mchfile)
   base = file_basename(files[i],'.als')
   
   ; Checking FITS file
-  fitstest = file_test(base+'.fits')
+  fitstest = file_test(base+'.fits') or file_test(base+'.fits.fz')
   if fitstest eq 0 then begin
-    printlog,logf,base+'.fits NOT FOUND'
+    printlog,logf,base+'.fits/.fits.fz NOT FOUND'
     return
+  endif
+
+  ; Uncompress FPACK FITS files if necessary, temporarily
+  if file_test(base+'.fits') eq 0 and file_test(base+'.fits.fz') eq 1 then begin
+    fpack[i] = 1
+    printlog,logf,'Temporarily uncompressing '+base+'.fits.fz'
+    spawn,['funpack',base+'.fits.fz'],/noshell
   endif
 
   ; Checking OPT file
@@ -272,6 +280,7 @@ endfor
 
 ; REMOVE the .mag file if it exists
 if FILE_TEST(mchbase+'.mag') then FILE_DELETE,mchbase+'.mag',/allow,/quiet
+
 
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
@@ -455,7 +464,8 @@ magfile = mchbase+'.makemag'
 ; combmch = FILEBASE.mch        ORIG
 ; combmch = FILEBASE_comb.mch   NEW
 ; The tfr file will have the same name but with .tfr
-MAKEMAG,file_basename(combmch,'.mch')+'.tfr',magfile
+MAKEMAG,file_basename(combmch,'.mch')+'.tfr',magfile,error=magerror
+if n_elements(magerror) gt 0 then goto,BOMB
 
 ; Prepend the ALF header to the makemag file
 line1='' & line2='' & line3=''
@@ -536,6 +546,10 @@ printlog,logf,'FINAL ALLFRAME file = ',finalfile
 printlog,logf,systime(0)
 
 BOMB:
+
+; Delete temporarily funpacked files
+bdfpack = where(fpack eq 1,nbdfpack)
+if nbdfpack gt 0 then FILE_DELETE,file_basename(files[bdfpack],'.als')+'.fits',/allow
 
 if keyword_set(stp) then stop
 
