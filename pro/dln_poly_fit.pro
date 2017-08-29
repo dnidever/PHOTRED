@@ -300,6 +300,7 @@ done:
       ; Bootstrap loop
       btcoef = dblarr(numbootstrap,ndegree+1)
       btstatus = lonarr(numbootstrap)
+      seed = 1.0  ; initialize the seed
       For i=0,numbootstrap-1 do begin
         rndind = round( randomu(seed,n)*(n-1) )
         x2 = x[rndind]

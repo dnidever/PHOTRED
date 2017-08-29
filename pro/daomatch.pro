@@ -295,8 +295,14 @@ for i=1,nfiles-1 do begin
       printlog,logf,fitsfile2+' NOT FOUND. Cannot use WCS for matching'
       goto,BOMB1
     endif
-    if strmid(fitsfile2,6,7,/reverse_offset) eq 'fits.fz' then head2=headfits(fitsfile2,exten=1) else $
+    if strmid(fitsfile2,6,7,/reverse_offset) eq 'fits.fz' then begin
+      head2 = headfits(fitsfile2,exten=1)
+      ; Fix the NAXIS1/2 in the header
+      sxaddpar,head2,'NAXIS1',sxpar(head2,'ZNAXIS1')
+      sxaddpar,head2,'NAXIS2',sxpar(head2,'ZNAXIS2')      
+    endif else begin
       head2 = headfits(fitsfile2)
+    endelse
     EXTAST,head2,astr2,noparams2
     if noparams2 lt 1 then begin
       printlog,logf,fitsfile2+' has NO WCS.  Cannot use WCS for matching'
@@ -410,8 +416,6 @@ for i=1,nfiles-1 do begin
   ; Printing the transformation
   if keyword_set(verbose) then $
     printlog,logf,format='(A-20,2F10.4,4F12.8)',files[i],trans
-
-  ;stop
 
 endfor  ; ALS file loop
 
