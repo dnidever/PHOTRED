@@ -1,5 +1,3 @@
-pro randomize,inarray,num,outarray,indx=indx
-
 ;+
 ;
 ;  This program randomly picks a given number of elements
@@ -8,6 +6,7 @@ pro randomize,inarray,num,outarray,indx=indx
 ; INPUTS:
 ;  inarray	The input array of values to use
 ;  num		How many numbers to output
+;  =seed        The seed value to use.
 ;
 ; OUTPUTS:
 ;  outarray     The outputs array of randomly selected values
@@ -18,6 +17,8 @@ pro randomize,inarray,num,outarray,indx=indx
 ;
 ; by D.Nidever   June 2007
 ;-
+
+pro randomize,inarray,num,outarray,indx=indx,seed=seed
 
 ; Not enough inputs
 if n_elements(inarray) eq 0 or n_elements(num) eq 0 then begin

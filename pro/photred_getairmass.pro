@@ -56,6 +56,7 @@ if n_elements(obs) eq 0 then obs=''
 if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
   head = HEADFITS(file,exten=1)
   ; Fix the NAXIS1/NAXIS2 in the header
+  orig_head = head
   sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
   sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
 endif else begin
@@ -161,6 +162,9 @@ if nam eq 0 or float(am) lt 0.9 or keyword_set(recalculate) then begin
     undefine,errmsg
     ; Fpack compressed FITS file
     if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+      ; Put the original NAXIS1/2 values back
+      sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
+      sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
       ; Create temporary symbolic link to make modfits.pro
       ; think this is an ordinary FITS file
       tempfile = MAKETEMP('temp')

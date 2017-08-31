@@ -639,7 +639,8 @@ if (ncat3 lt 3) then begin
 endif
 
 ; Randomly pick 3
-RANDOMIZE,cat3.x,3,dum,indx=indx
+;  input same seed so the results are reproducible
+RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
 ra3 = double(refcat3[indx].raj2000)
 dec3 = double(refcat3[indx].dej2000)
 x3 = cat3[indx].x
@@ -684,7 +685,8 @@ case strupcase(proj) of
     for i=0,niter-1 do begin
 
       ; Randomly pick 3
-      RANDOMIZE,cat3.x,3,dum,indx=indx
+      ;  input same seed so the results are reproducible
+      RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
       ra3 = double(refcat3[indx].raj2000)
       dec3 = double(refcat3[indx].dej2000)
       x3 = cat3[indx].x
@@ -831,7 +833,8 @@ End ; TNX
     for i=0,niter-1 do begin
 
       ; Randomly pick 3
-      RANDOMIZE,cat3.x,3,dum,indx=indx
+      ;  input same seed so the results are reproducible
+      RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
       ra3 = double(refcat3[indx].raj2000)
       dec3 = double(refcat3[indx].dej2000)
       x3 = cat3[indx].x
@@ -981,7 +984,8 @@ else: begin
   for i=0,niter-1 do begin
 
     ; Randomly pick 3
-    RANDOMIZE,cat3.x,3,dum,indx=indx
+    ;  input same seed so the results are reproducible
+    RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
     ra3 = double(refcat3[indx].raj2000)
     dec3 = double(refcat3[indx].dej2000)
     x3 = cat3[indx].x
@@ -2651,7 +2655,7 @@ if not keyword_set(noupdate) then begin
       MWRFITS,im,filename,head,/create
       ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
     endif else begin
-      ; But the original NAXIS1/2 values back
+      ; Put the original NAXIS1/2 values back
       sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
       sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
       ; Create temporary symbolic link to make modfits.pro think
