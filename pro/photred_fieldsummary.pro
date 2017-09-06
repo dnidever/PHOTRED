@@ -568,13 +568,14 @@ For i=0,nchips-1 do begin
   ; Fill in transformation equation info
   if n_elements(trans) gt 0 then begin
     ; CHIP-SPECIFIC transformation equations
-    if tag_exist(trans,'CHIP') then begin
+    inptrans = trans  ; global trans eqns by default
+    if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
       inptransfile = ''
       ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
       chip = long(ext)
       ind = where(trans.chip eq chip,nind)
       if nind gt 0 then inptrans=trans[ind]
-    endif else inptrans=trans  ; global trans eqns
+    endif
 
     ; We have transformation equations
     if n_elements(inptrans) gt 0 then begin 
