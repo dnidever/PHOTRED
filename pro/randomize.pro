@@ -34,6 +34,31 @@ if n lt num then begin
 end
 good=0
 
+; Initialize seed
+;  Use the first value of INARRAY to set seed
+;  so it's always the same and reproducible for
+;  the same data set.
+if n_elements(seed) eq 0 then begin
+  val = inarray[0]
+  type = size(val,/type)
+  ; Check if we have a number that we can use
+  dum = where(type eq [1,2,3,4,5,6,9,12,13,14,15],isnum)
+  if type eq 7 then isnum=valid_num(val,val)
+  ; Number
+  if isnum eq 1 then begin
+    ; Convert all types to float
+    val = fix(val,type=4)
+    ; It's a finite number
+    if finite(val) eq 1 then begin
+       frac = abs(alog10(val))-floor(abs(alog10(val)))
+       seed = round(frac*1000) > 1  ; number between 1 and 1000
+    endif else seed=1
+  ; Non-number
+  endif else begin
+    seed = 1
+  endelse
+endif
+
 rnd = randomu(seed,n)   ; uniformly distributed random numbers
 rint = sort(rnd)          ; the sorted indices will be random
 indx = rint[0:num-1]

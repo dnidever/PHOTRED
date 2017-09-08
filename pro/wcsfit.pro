@@ -639,8 +639,7 @@ if (ncat3 lt 3) then begin
 endif
 
 ; Randomly pick 3
-;  input same seed so the results are reproducible
-RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
+RANDOMIZE,cat3.x,3,dum,indx=indx
 ra3 = double(refcat3[indx].raj2000)
 dec3 = double(refcat3[indx].dej2000)
 x3 = cat3[indx].x
@@ -685,8 +684,7 @@ case strupcase(proj) of
     for i=0,niter-1 do begin
 
       ; Randomly pick 3
-      ;  input same seed so the results are reproducible
-      RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
+      RANDOMIZE,cat3.x,3,dum,indx=indx
       ra3 = double(refcat3[indx].raj2000)
       dec3 = double(refcat3[indx].dej2000)
       x3 = cat3[indx].x
@@ -833,8 +831,7 @@ End ; TNX
     for i=0,niter-1 do begin
 
       ; Randomly pick 3
-      ;  input same seed so the results are reproducible
-      RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
+      RANDOMIZE,cat3.x,3,dum,indx=indx
       ra3 = double(refcat3[indx].raj2000)
       dec3 = double(refcat3[indx].dej2000)
       x3 = cat3[indx].x
@@ -984,8 +981,7 @@ else: begin
   for i=0,niter-1 do begin
 
     ; Randomly pick 3
-    ;  input same seed so the results are reproducible
-    RANDOMIZE,cat3.x,3,dum,indx=indx,seed=1
+    RANDOMIZE,cat3.x,3,dum,indx=indx
     ra3 = double(refcat3[indx].raj2000)
     dec3 = double(refcat3[indx].dej2000)
     x3 = cat3[indx].x
