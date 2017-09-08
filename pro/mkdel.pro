@@ -1,5 +1,3 @@
-pro mkdel,inffile
-
 ;+
 ;
 ; MKDEL
@@ -28,6 +26,8 @@ pro mkdel,inffile
 ;
 ; By D.Nidever  December 2006 (copy of Tony's fortran code)
 ;-
+
+pro mkdel,inffile
 
 ; No input
 if n_elements(inffile) eq 0 then begin
