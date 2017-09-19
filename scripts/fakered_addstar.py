@@ -1347,17 +1347,18 @@ def process_argv(args, mch_ext):
 
     try:
         magext = {}
-        # MAGEXT values could be directly given or a file could be specified
+        # MAGEXT data given in setup file should have format values:... or file:...
+        magext_data = args[ARG_MAGEXT].lower().split(":")  # magext_data: [0] -> 'values' or 'file', [1] -> data
+ 
 
-        ##########################################################
-        # MAGEXT -> VALUES
-        ##########################################################
-        # if magext begins with "values:", it should be a common float value or array of floats (one per filter)
-        if args[ARG_MAGEXT].lower().startswith("values:"):
+        # if magext begins with "values:", it should be a common float value or a list of floats (CSV, one per filter)
+        if magext_data[0].strip() == "values": 
+            ##########################################################
+            # MAGEXT -> VALUES
+            ##########################################################
             num_filters = 0
-            mag_values = args[ARG_MAGEXT].split(":")[1]
             # Try to get the values splitting the list
-            magext_aux  = [float(x) for x in mag_values.replace(" ","").split(',')]
+            magext_aux = [float(x) for x in magext_data[1].replace(" ","").split(',')]
 
             # Go for each filter:
             for flt in cols_order:
@@ -1376,28 +1377,19 @@ def process_argv(args, mch_ext):
                     num_filters += 1
 
             if len(magext) != num_filters or (len(magext_aux) != 1 and len(magext_aux) != num_filters):
-                error_msg += " * MagExt should be one common value or has a value for each filter\n"
-        else:
+                error_msg += " * MagExt should be one common value or have a value for each filter\n"
+
+        # if magext begins with "file:", get the filename and process its content
+        elif magext_data[0].strip() == "file":
             ##########################################################
             # MAGEXT -> FILE
             ##########################################################
-            # Magext should be a FILE
-            MAGEXT_FILE_DEFAULT = "extinction"
-            magext_file = ""
-            # Check if specified file exists
-            if args[ARG_MAGEXT] and os.path.isfile(args[ARG_MAGEXT]):
-                magext_file = args[ARG_MAGEXT]
-            elif os.path.isfile(MAGEXT_FILE_DEFAULT):
-                magext_file = MAGEXT_FILE_DEFAULT
-            else: 
-                # There is no file, use 0 instead 
-                for flt in cols_order:
-                    if flt != STAR_ID and flt != IGNORE_COL:
-                        magext[flt] = 0             # One common value
-                #error_msg += " * MagExt is not a valid file or an array of values\n"
-         
-            # Process file 
-            if magext_file != "": 
+            # Magext should be a FILE located in magext_data[1]
+            magext_file = magext_data[1].strip()
+
+            if not os.path.isfile(magext_file): 
+                error_msg += " * MagExt: file '" + magext_file + "' does NOT exist or it is not possible to read it"
+            else:
                 with open(magext_file) as f:
                     for line in f:
                         # Ignore comments 
@@ -1411,8 +1403,10 @@ def process_argv(args, mch_ext):
                 # Check we have data for all filters
                 for flt in cols_order:
                     if flt != STAR_ID and flt != IGNORE_COL and not flt in magext:
-                        error_msg += " * File " + args[ARG_MAGEXT] + " does NOT cointain Mag.Ext. value for filter '" + flt + "'\n"
+                        error_msg += " * MagExt: file '" + magext_file + "' does NOT cointain Mag.Ext. value for filter '" + flt + "'\n"
                         break
+        else:
+            error_msg += " * MagExt: Format is not correct, use 'values:v', or 'values:v1,v2,v3,...' or 'file:/path/to/extinction_file'\n"
 
     except:
         error_msg += " * MagExt\n"
