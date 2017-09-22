@@ -14,6 +14,8 @@
 ;   Antonio Dorta,  major update   June/July 2017
 ;-
 
+
+;----------------------------------------------------------------------
 function getField, fn, remove_path=remove_path
   ; Given a file, returns the FIELD. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (FX will be returned)
@@ -22,6 +24,7 @@ function getField, fn, remove_path=remove_path
   return, tmp[0]
 end
 
+;----------------------------------------------------------------------
 function getChip, fn, remove_path=remove_path
   ; Given a file, returns the CHIP. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (YY will be returned)
@@ -99,7 +102,7 @@ datadir         = getparam(datadir         , 'datadir'         , setup, '.'     
 datatransfer    = getparam(datatransfer    , 'datatransfer'    , setup, 'skip'        , logfile)
 chipsfile       = getparam(chipsfile       , 'chipssfile'      , setup, '*chips.fits' , logfile)
 maxccdsize      = getparam(maxccdsize      , 'maxccdsize'      , setup, '2048,4096'   , logfile)
-magext          = getparam(magext          , 'magext'          , setup, ''            , logfile)
+magext          = getparam(magext          , 'magext'          , setup, '0'           , logfile)
 radcent         = getparam(radcent         , 'radcent'         , setup, '*'           , logfile)
 dimfield        = getparam(dimfield        , 'dimfield'        , setup, '*'           , logfile)
 distance        = getparam(distance        , 'distance'        , setup, '0'           , logfile)
