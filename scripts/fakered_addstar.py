@@ -359,7 +359,7 @@ def get_input_stars(fn_stars, cols_order, stars_shuffle):
 def in_rectangle(corners, point):
     """Check if a point is contained in a rectangle given by two opposite corners
 
-     corners -- array with 4 values that cointains the two opposite corners of
+     corners -- array with 4 values that contains the two opposite corners of
                 the rectangle that defines the CCD
                 corners = [x0, y0, x1, y1]  ->   x0 <= x1, y0 <= y1
        point -- array with the two coordinates (X,Y) 
@@ -1346,18 +1346,44 @@ def process_argv(args, mch_ext):
         error_msg += " * Column order\n"
 
     try:
-        magext = {}
-        # MAGEXT values could be directly given or a file could be specified
+        # Magnitude Extinctions: it could be a float, a list of float (CSV) or a file using 'file:/path/to/extinction_file
+        magext = {}                                 # List of magnitude extinctions
+        magext_data = args[ARG_MAGEXT].strip()
 
-        ##########################################################
-        # MAGEXT -> VALUES
-        ##########################################################
-        # if magext begins with "values:", it should be a common float value or array of floats (one per filter)
-        if args[ARG_MAGEXT].lower().startswith("values:"):
+        # Check if magext values are coming from a file (then magext_data should begin with 'file:')
+        MAGEXT_FILE='file:'
+        if magext_data.startswith(MAGEXT_FILE):
+            ##########################################################
+            # MAGEXT -> FILE
+            ##########################################################
+            magext_file = magext_data[len(MAGEXT_FILE):].strip()   # Get the filename removing the 'file:'
+
+            if not os.path.isfile(magext_file): 
+                error_msg += " * MagExt: file '" + magext_file + "' does NOT exist or it is not possible to read it"
+            else:
+                with open(magext_file) as f:    # Process the file and get values for filters
+                    for line in f:
+                        if line.strip().startswith("#"): continue   # Ignore comments 
+                        # Split line: left filter, right value
+                        line_data = line.strip().split()
+                        # Check if filter is in list and assign value! 
+                        if len(line_data) == 2 and line_data[0] in cols_order:
+                            magext[line_data[0]] = float(line_data[1])
+
+                # Check we have data for all filters
+                for flt in cols_order:
+                    if flt != STAR_ID and flt != IGNORE_COL and not flt in magext:
+                        error_msg += " * MagExt: file '" + magext_file + "' does NOT contain Mag.Ext. value for filter '" + flt + "'\n"
+                        break
+
+        # if magext does NOT begin with 'file:', it should be a common float value or a list of floats (CSV, one per filter)
+        else:
+            ##########################################################
+            # MAGEXT -> VALUES
+            ##########################################################
             num_filters = 0
-            mag_values = args[ARG_MAGEXT].split(":")[1]
             # Try to get the values splitting the list
-            magext_aux  = [float(x) for x in mag_values.replace(" ","").split(',')]
+            magext_aux = [float(x) for x in magext_data.replace(" ","").split(',')]
 
             # Go for each filter:
             for flt in cols_order:
@@ -1376,43 +1402,7 @@ def process_argv(args, mch_ext):
                     num_filters += 1
 
             if len(magext) != num_filters or (len(magext_aux) != 1 and len(magext_aux) != num_filters):
-                error_msg += " * MagExt should be one common value or has a value for each filter\n"
-        else:
-            ##########################################################
-            # MAGEXT -> FILE
-            ##########################################################
-            # Magext should be a FILE
-            MAGEXT_FILE_DEFAULT = "extinction"
-            magext_file = ""
-            # Check if specified file exists
-            if args[ARG_MAGEXT] and os.path.isfile(args[ARG_MAGEXT]):
-                magext_file = args[ARG_MAGEXT]
-            elif os.path.isfile(MAGEXT_FILE_DEFAULT):
-                magext_file = MAGEXT_FILE_DEFAULT
-            else: 
-                # There is no file, use 0 instead 
-                for flt in cols_order:
-                    if flt != STAR_ID and flt != IGNORE_COL:
-                        magext[flt] = 0             # One common value
-                #error_msg += " * MagExt is not a valid file or an array of values\n"
-         
-            # Process file 
-            if magext_file != "": 
-                with open(magext_file) as f:
-                    for line in f:
-                        # Ignore comments 
-                        if not line.strip().startswith("#"):
-                            # Split line: left filter, right value
-                            line_data = line.strip().split()
-                            # Check if filter is in list and assign value! 
-                            if len(line_data) == 2 and line_data[0] in cols_order:
-                                magext[line_data[0]] = float(line_data[1])
-
-                # Check we have data for all filters
-                for flt in cols_order:
-                    if flt != STAR_ID and flt != IGNORE_COL and not flt in magext:
-                        error_msg += " * File " + args[ARG_MAGEXT] + " does NOT cointain Mag.Ext. value for filter '" + flt + "'\n"
-                        break
+                error_msg += " * MagExt should be one common value or have a value for each filter\n"
 
     except:
         error_msg += " * MagExt\n"

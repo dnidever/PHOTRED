@@ -14,6 +14,8 @@
 ;   Antonio Dorta,  major update   June/July 2017
 ;-
 
+
+;----------------------------------------------------------------------
 function getField, fn, remove_path=remove_path
   ; Given a file, returns the FIELD. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (FX will be returned)
@@ -22,6 +24,7 @@ function getField, fn, remove_path=remove_path
   return, tmp[0]
 end
 
+;----------------------------------------------------------------------
 function getChip, fn, remove_path=remove_path
   ; Given a file, returns the CHIP. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (YY will be returned)
@@ -99,7 +102,7 @@ datadir         = getparam(datadir         , 'datadir'         , setup, '.'     
 datatransfer    = getparam(datatransfer    , 'datatransfer'    , setup, 'skip'        , logfile)
 chipsfile       = getparam(chipsfile       , 'chipssfile'      , setup, '*chips.fits' , logfile)
 maxccdsize      = getparam(maxccdsize      , 'maxccdsize'      , setup, '2048,4096'   , logfile)
-magext          = getparam(magext          , 'magext'          , setup, ''            , logfile)
+magext          = getparam(magext          , 'magext'          , setup, '0'           , logfile)
 radcent         = getparam(radcent         , 'radcent'         , setup, '*'           , logfile)
 dimfield        = getparam(dimfield        , 'dimfield'        , setup, '*'           , logfile)
 distance        = getparam(distance        , 'distance'        , setup, '0'           , logfile)
@@ -166,27 +169,48 @@ endfor ; scripts loop
 ;---------------------------------------------------------------
 CHECK_PYTHON,pythontest,pythonbin=pythonbin
 if pythontest eq 0 then begin
-  print,'PYTHON TEST FAILED.  EXITING'
+  printlog,logfile,'PYTHON TEST FAILED.  EXITING'
+  printlog,logfile,''
   return
 endif
+
+;-------------------------------------------------
+; MORE CHECKS TO SEE IF PROGRAMS AND FILES EXIST!
+;-------------------------------------------------
 
 ; Check that the DAOPHOT programs exist
 SPAWN,'which daophot',out,errout
 daophotfile = FILE_SEARCH(out,count=ndaophotfile)
 if (ndaophotfile eq 0) then begin
-  print,'DAOPHOT PROGRAM NOT AVAILABLE'
+  printlog,logfile,'DAOPHOT PROGRAM NOT AVAILABLE'
+  printlog,logfile,''
   return
 endif
 
+; Check that the DAOMSATER programs exist
 if refinemch gt 0 then begin
-  ; Check that the DAOMSATER programs exist
   SPAWN,'which daomaster',out,errout
   daomasterfile = FILE_SEARCH(out,count=ndaomasterfile)
   if (ndaomasterfile eq 0) then begin
-    print,'DAOMASTER PROGRAM NOT AVAILABLE'
+    printlog,logfile,'DAOMASTER PROGRAM NOT AVAILABLE'
+    printlog,logfile,''
     return
   endif
 endif
+
+; # Check if magext data is coming from a file if that file exists!! Syntax in fakered.setup:   magext   file:/path/to/magext_file
+magext_kw='file:'
+if STRMATCH(magext, magext_kw+'*') eq 1 then begin  ; Check if magext_data begins with file:... (file:*)
+  magext_file = STRMID(magext,strlen(magext_kw))    ; Remove "file:" from beginning to get filename 
+  if not FILE_TEST(magext_file) then begin          ; Check if file exists!!
+    printlog,logfile,"ERROR!! File '"+   $
+      strcompress(magext_file)+"' does NOT exist (it was specified in setup.fakered using 'magext' parameter)"
+    printlog,logfile,''
+    return
+  endif
+endif
+
+
 
 
 ;##########################################################
@@ -239,7 +263,6 @@ printlog,logfile,'------------------------'
 printlog,logfile,' PROCESSING INPUT FILES '
 printlog,logfile,'------------------------'
 printlog,logfile,''
-
 
 CD,current= curdir
 undefine,cmd,cmddir
