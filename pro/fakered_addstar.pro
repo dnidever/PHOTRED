@@ -198,18 +198,6 @@ if refinemch gt 0 then begin
   endif
 endif
 
-; # Check if magext data is coming from a file if that file exists!! Syntax in fakered.setup:   magext   file:/path/to/magext_file
-magext_kw='file:'
-if STRMATCH(magext, magext_kw+'*') eq 1 then begin  ; Check if magext_data begins with file:... (file:*)
-  magext_file = STRMID(magext,strlen(magext_kw))    ; Remove "file:" from beginning to get filename 
-  if not FILE_TEST(magext_file) then begin          ; Check if file exists!!
-    printlog,logfile,"ERROR!! File '"+   $
-      strcompress(magext_file)+"' does NOT exist (it was specified in setup.fakered using 'magext' parameter)"
-    printlog,logfile,''
-    return
-  endif
-endif
-
 
 
 
@@ -263,6 +251,20 @@ printlog,logfile,'------------------------'
 printlog,logfile,' PROCESSING INPUT FILES '
 printlog,logfile,'------------------------'
 printlog,logfile,''
+
+; # Check if magext data is coming from a file if that file exists!! Syntax in fakered.setup:   magext   file:/path/to/magext_file
+magext_kw='file:'
+if STRMATCH(magext, magext_kw+'*') eq 1 then begin  ; Check if magext_data begins with file:... (file:*)
+  magext_file = STRMID(magext,strlen(magext_kw))    ; Remove "file:" from beginning to get filename 
+  if not FILE_TEST(magext_file) then begin          ; Check if file exists!!
+    printlog,logfile,"ERROR!! File '"+   $
+      strcompress(magext_file)+"' does NOT exist (it was specified in setup.fakered using 'magext' parameter)"
+    printlog,logfile,''
+    return
+  endif
+endif
+
+
 
 CD,current= curdir
 undefine,cmd,cmddir
