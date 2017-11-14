@@ -361,6 +361,22 @@ if keyword_set(usehist) then begin
   ind1 = where(result gt -1,count)
   if count gt 0 then ind2=result[ind1]
 
+  ; Sometimes there is one index value that is out of range
+  if count gt 0 then begin
+    bd = where(ind1 gt (nx1-1) or ind2 gt (nx2-1),nbd,ncomp=ngd)
+    ; Some bad ones to remove
+    if nbd gt 0 then begin
+      ; No good matches left
+      if ngd eq 0 then begin
+        ind1 = -1
+        ind2 = -1
+        count = 0
+        return
+      endif
+      REMOVE,bd,ind1,ind2
+    endif
+  endif
+
   return
 endif
 
