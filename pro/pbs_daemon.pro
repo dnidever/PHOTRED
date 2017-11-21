@@ -24,6 +24,7 @@
 ;  =scriptsdir  The directory that contains the PHOTRED scripts.
 ;  =waittime    Time to wait between checking the running jobs.  Default
 ;                 is 60 sec.
+;  =verbose     Currently this only controls if the command is printed.
 ;
 ; OUTPUTS:
 ;  Jobs are run.
@@ -37,7 +38,7 @@
 pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,  $
                hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir,   $
                htcondor=htcondor, htc_idlvm=htcondor_idlvm,                 $
-               pythonbin=pythonbin, scriptsdir=scriptsdir
+               pythonbin=pythonbin, scriptsdir=scriptsdir,verbose=verbose
 
 ; How many input lines
 ninput = n_elements(input)
@@ -49,6 +50,7 @@ endif
 
 if not keyword_set(htcondor) then htcondor='0' $
 else if htcondor eq "" then htcondor='0'
+if n_elements(verbose) eq 0 then verbose=1
 
 ; Current directory
 CD,current=curdir
@@ -62,7 +64,7 @@ if ndirs eq 1 then dirs = replicate(dirs,ninput)
 ; Defaults
 if n_elements(nmulti) eq 0 then nmulti=8           ; number of jobs to submit at a time
 if n_elements(waittime) eq 0 then waittime=60          ; wait time
-waittime = waittime > 1
+waittime = waittime > 0.01
 
 ; What host
 host = getenv('HOST')
@@ -470,7 +472,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         print,''
         cmd = jobs[newind[i]].input
         if keyword_set(idle) then cmd='IDL>'+cmd
-        print,'Input ',strtrim(newind[i]+1,2),'  Command: >>',cmd,'<<'
+        if verbose gt 0 then print,'Input ',strtrim(newind[i]+1,2),'  Command: >>',cmd,'<<'
 
         ; Make PBS script
         undefine,name,scriptname
