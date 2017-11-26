@@ -15,6 +15,10 @@
 ; INPUTS:
 ;  input        A string array with the IDL commands (i.e. jobs) to be run.
 ;  dirs         The directories in which the commands are to be run.
+;  =lockfiles   List of "lock" files to use indicate that a job is being
+;                 worked on either by this server or another one.
+;  =donefiles   List of "done" files to indicate a file is finished and
+;                 should not be redone.
 ;  /idle        This is an IDL command, otherwise a SHELL command.
 ;  =prefix      The prefix for the PBS script names
 ;  =nmulti      How many nodes to run these jobs on.  Default is 8.
@@ -23,7 +27,7 @@
 ;                 the same server.
 ;  =scriptsdir  The directory that contains the PHOTRED scripts.
 ;  =waittime    Time to wait between checking the running jobs.  Default
-;                 is 60 sec.
+;                 is 5 sec.
 ;  =verbose     Currently this only controls if the command is printed.
 ;
 ; OUTPUTS:
@@ -38,13 +42,22 @@
 pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,  $
                hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir,   $
                htcondor=htcondor, htc_idlvm=htcondor_idlvm,                 $
-               pythonbin=pythonbin, scriptsdir=scriptsdir,verbose=verbose
+               pythonbin=pythonbin, scriptsdir=scriptsdir,verbose=verbose,  $
+               lockfiles=lockfiles,donefiles=donefiles
 
+t0 = systime(1)
+  
 ; How many input lines
 ninput = n_elements(input)
 if ninput eq 0 then begin
   print,'Syntax - pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,'
   print,'                    hyperthread=hyperthread'
+  return
+endif
+
+; Lockfiles input but not donefiles
+if n_elements(lockfiles) gt 0 and n_elements(donefiles) eq 0 then begin
+  print,'Must use DONEFILES with LOCKFILES'
   return
 endif
 
@@ -62,8 +75,8 @@ if ndirs eq 0 then dirs = replicate(curdir,ninput)
 if ndirs eq 1 then dirs = replicate(dirs,ninput)
 
 ; Defaults
-if n_elements(nmulti) eq 0 then nmulti=8           ; number of jobs to submit at a time
-if n_elements(waittime) eq 0 then waittime=60          ; wait time
+if n_elements(nmulti) eq 0 then nmulti=8              ; number of jobs to submit at a time
+if n_elements(waittime) eq 0 then waittime=5          ; wait time
 waittime = waittime > 0.01
 
 ; What host
@@ -140,7 +153,7 @@ print,'Nmulti=',strtrim(nmulti,2)
 ;--------
 
 
-IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (htcondor ne '0')) then begin
+IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (htcondor ne '0')) then begin
 
 
   if htcondor ne '0' then begin
@@ -346,16 +359,22 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
   ; Start the "jobs" structure
   ; id will be the ID from Pleione
-  dum = {jobid:'',input:'',name:'',scriptname:'',submitted:0,done:0}
-  jobs = replicate(dum,ninput)
-  jobs.input = input
+  schema = {jobid:'',cmd:'',dir:'',name:'',scriptname:'',submitted:0,done:0}
+  if n_elements(lockfiles) gt 0 then schema=create_struct(schema,'lockfile','','donefile','','locked',0)
+  jobs = replicate(schema,ninput)
+  jobs.cmd = input
+  jobs.dir = dirs
+  if n_elements(lockfiles) gt 0 then begin
+    jobs.lockfile = lockfiles
+    jobs.donefile = donefiles
+  endif
   njobs = ninput
 
   ; Loop until all jobs are done
   ; On each loop check the pleione queue and figure out what to do
-  count = 0.
-  flag = 0
-  WHILE (flag eq 0) DO BEGIN
+  count = 0LL
+  endflag = 0
+  WHILE (endflag eq 0) DO BEGIN
 
     print,''
     print,systime(0)
@@ -427,12 +446,21 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
       if statstr.jobid eq '' then begin
         print,'Input ',strtrim(sub[i]+1,2),' ',jobs[sub[i]].name,' JobID=',jobs[sub[i]].jobid,' FINISHED'
         jobs[sub[i]].done=1
+        ; Create DONE file
+        if n_elements(donefiles) gt 0 then begin
+          if file_test(jobs[sub[i]].donefile) eq 0 then begin
+             doneline = 'Finished '+systime(0)+'  PID='+jobs[sub[i]].jobid+'  HOST='+host+'  '+jobs[sub[i]].scriptname
+             WRITELINE,jobs[sub[i]].donefile,doneline            
+          endif
+        endif
+        ; Remove lockfile
+        if jobs[sub[i]].lockfile ne '' then FILE_DELETE,jobs[sub[i]].lockfile,/allow,/quiet
       endif
 
 
       ; Check for errors as well!! and put in jobs structure
 
-    end
+    endfor ; check jobs loop
 
 
     ; How many jobs are still in the queue
@@ -441,25 +469,25 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
 
     ; How many have not been done yet
     ;--------------------------------
-    dum = where(jobs.submitted eq 0,Nnosubmit)
+    dum = where(jobs.submitted eq 0 and jobs.done eq 0,Nnosubmit)
 
     ; What is the current summary
     ;----------------------------------
-    dum = where(jobs.done eq 1,nfinished)
+    dum = where(jobs.done eq 1,ndone)       ; we finished these
+    dum = where(jobs.done gt 0,nfinished)   ; finished by all processes
     print,'--Jobs Summary--'
-    print,strtrim(ninput,2),' total, ',strtrim(nfinished,2),' finished, ',strtrim(Ninqueue,2),$
+    print,strtrim(ninput,2),' total, ',strtrim(ndone,2),'/',strtrim(nfinished,2),' done/finished, ',strtrim(Ninqueue,2),$
           ' running, ',strtrim(Nnosubmit,2),' left'
 
 
     ; Need to Submit more jobs
     ;-------------------------
-    Nnew = (nmulti-ninqueue) > 0
+    Nnew = 0 > (nmulti-ninqueue) < Nnosubmit
     Nnew = Nnew < Nnosubmit
     If (Nnew gt 0) then begin
 
       ; Get the indices of new jobs to be submitted
-      nosubmit = where(jobs.submitted eq 0)
-      newind = nosubmit[0:nnew-1]
+      nosubmit = where(jobs.submitted eq 0 and jobs.done eq 0,n_nosubmit)
 
       print,''
       print,'--Updating Queue--'
@@ -467,16 +495,35 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
       print,'Submitting ',strtrim(nnew,2),' more job(s)'
 
       ; Loop through the new submits
-      For i=0,nnew-1 do begin
+      submitflag = 0
+      i = 0L
+      newsubmitted = 0L
+      WHILE (submitflag eq 0) do begin
 
+        ; Checking DONE and LOCK files
+        if n_elements(lockfiles) gt 0 then begin
+           ; Check if the DONEFILE exists
+           test = file_test(jobs[nosubmit[i]].donefile)
+           if test eq 1 then begin
+              jobs[nosubmit[i]].done = 2
+              goto,BOMB_SUBMIT
+           endif
+           ; Check the lockfile
+           lock = LOCKFILE(jobs[nosubmit[i]].lockfile)
+           if lock eq 0 then begin
+             jobs[nosubmit[i]].locked = 1
+             goto,BOMB_SUBMIT
+           endif
+        endif
+         
         print,''
-        cmd = jobs[newind[i]].input
+        cmd = jobs[nosubmit[i]].cmd
         if keyword_set(idle) then cmd='IDL>'+cmd
-        if verbose gt 0 then print,'Input ',strtrim(newind[i]+1,2),'  Command: >>',cmd,'<<'
+        if verbose gt 0 then print,'Input ',strtrim(nosubmit[i]+1,2),'  Command: >>',cmd,'<<'
 
         ; Make PBS script
         undefine,name,scriptname
-        PBS_MAKESCRIPT,jobs[newind[i]].input,dir=dirs[newind[i]],name=name,scriptname=scriptname,$
+        PBS_MAKESCRIPT,jobs[nosubmit[i]].cmd,dir=jobs[nosubmit[i]].dir,name=name,scriptname=scriptname,$
                        prefix=prefix,idle=idle,hyperthread=hyperthread
 
         ; Check that the script exists
@@ -487,7 +534,7 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
           SPAWN,'qsub '+scriptname[0],out,errout
         endif else begin
           if keyword_set(idle) then batchprog=scriptsdir+'/idlbatch' else batchprog=scriptsdir+'/runbatch'
-          if keyword_set(cdtodir) then cd,dirs[newind[i]]
+          if keyword_set(cdtodir) then cd,jobs[nosubmit[i]].dir
           SPAWN,batchprog+' '+scriptname[0],out,errout
           if keyword_set(cdtodir) then cd,curdir
         endelse
@@ -509,30 +556,38 @@ IF (ninput gt 1) and (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hype
         print,'Submitted ',scriptname[0],'  JobID=',jobid[0]
 
         ; Updating the jobs structure
-        jobs[newind[i]].submitted = 1
-        jobs[newind[i]].jobid = jobid[0]
-        jobs[newind[i]].name = name[0]
-        jobs[newind[i]].scriptname = scriptname[0]
+        jobs[nosubmit[i]].submitted = 1
+        jobs[nosubmit[i]].jobid = jobid[0]
+        jobs[nosubmit[i]].name = name[0]
+        jobs[nosubmit[i]].scriptname = scriptname[0]
 
-        ;stop
+        newsubmitted++  ; increment
+        
+        BOMB_SUBMIT:
 
-      Endfor  ; submitting new jobs loop
-
-    Endif  ; new jobs to submit
+        ; Are we done?
+        if (newsubmitted eq nnew) or (i eq n_nosubmit-1) then submitflag=1
+        i++                     ; increment 
+      Endwhile  ; submitting new jobs loop
+      if newsubmitted eq 0 then print,'No jobs to submit'
+    Endif   ; new jobs to submit
 
 
     ; Are we done?
     ;-------------
-    dum = where(jobs.done eq 1,ndone)
-    if ndone eq njobs then flag=1
+    dum = where(jobs.done gt 0,ndone)
+    if n_elements(lockfiles) gt 0 then dum = where(jobs.done gt 0 or jobs.locked eq 1,ndone)
+    if ndone eq njobs then endflag=1
 
 
     ; Wait a minute
     ;--------------
-    print,''
-    print,'Waiting '+strtrim(waittime,2)+'s'
-    if flag eq 0 then wait,waittime
-
+    if endflag eq 0 then begin
+      print,''
+      print,'Waiting '+strtrim(waittime,2)+'s'
+      wait,waittime
+    endif
+      
     ; Increment the counter
     count++
 
@@ -590,6 +645,8 @@ ENDIF ELSE BEGIN
 
 ENDELSE
 
+print,''
+print,'dt = ',strtrim(systime(1)-t0,2),' sec'
 
 BOMB:
 
