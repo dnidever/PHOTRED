@@ -33,8 +33,8 @@ function lockfile, filename
       return, 0
    endif
 
-   openw, olun, filename, /append, /get_lun
-   if ((fstat(olun)).size EQ 0) then begin
+   openw, olun, filename, /append, /get_lun, error=err
+   if ((fstat(olun)).size EQ 0) or (err ne 0) then begin
       writeu, olun, 1B
       flush, olun ; Flush output immediately
       res = 1
