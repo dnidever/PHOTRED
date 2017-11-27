@@ -454,7 +454,8 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
           endif
         endif
         ; Remove lockfile
-        if jobs[sub[i]].lockfile ne '' then FILE_DELETE,jobs[sub[i]].lockfile,/allow,/quiet
+        if n_elements(lockfiles) gt 0 then $
+          if jobs[sub[i]].lockfile ne '' then FILE_DELETE,jobs[sub[i]].lockfile,/allow,/quiet
       endif
 
 
