@@ -1,5 +1,3 @@
-pro roi_cut,xcut,ycut,x,y,ind,cutind,fac=fac,silent=silent
-
 ;+
 ;
 ; ROI_CUT
@@ -32,6 +30,26 @@ pro roi_cut,xcut,ycut,x,y,ind,cutind,fac=fac,silent=silent
 ;
 ; By D.Nidever 2006
 ;-
+
+function polyfillv_exists
+
+Catch, theError
+IF theError NE 0 THEN BEGIN
+  Catch, /CANCEL
+  RETURN,0
+ENDIF
+
+xc = [1.0,4.0,4.0,1.0]
+yc = [1.0,1.0,4.0,4.0]
+out = polyfillv(xc,yc,10,10)
+
+return,1
+
+end
+
+;--------
+
+pro roi_cut,xcut,ycut,x,y,ind,cutind,fac=fac,silent=silent
 
 ; Not enough inputs
 if n_params() lt 4 then begin
@@ -93,7 +111,14 @@ yind = y3-ymin2
 
 ; Using polyfillv to get the good indices of the cut
 ; using positions relative to (xmin2,ymin2)
-ind1d = polyfillv(xcut2-xmin2,ycut2-ymin2,nx,ny)
+if polyfillv_exists() eq 1 then begin
+  ind1d = polyfillv(xcut2-xmin2,ycut2-ymin2,nx,ny)
+endif else begin
+  ; Make the arrays
+  xarr = (findgen(nx)#replicate(1,ny))(*)
+  yarr = (replicate(1,nx)#findgen(ny))(*)
+  ind1d = inside(xarr,yarr,xcut2-xmin2,ycut2-ymin2)
+endelse
 ind2d = array_indices(fltarr(nx,ny),ind1d)
 indx = reform(ind2d(0,*)) 
 indy = reform(ind2d(1,*))
