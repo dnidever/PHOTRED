@@ -341,7 +341,9 @@ endelse
 
 
 ; --- Use the HISTOGRAM_ND matching programs instead ---
-if n_elements(usehist) eq 0 then usehist=1  ; default
+if n_elements(usehist) eq 0 then begin
+  if running_gdl() eq 1 then usehist=0 else usehist=1  ; default
+endif
 if keyword_set(usehist) then begin
   ; Matching options
   ;  if option=1 or 2 then one_to_one=0, but default is to use one-to-one
