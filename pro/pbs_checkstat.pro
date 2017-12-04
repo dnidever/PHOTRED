@@ -1,5 +1,3 @@
-pro pbs_checkstat,statstr,jobid=jobid,stp=stp,hyperthread=hyperthread
-
 ;+
 ;
 ; PBS_CHECKSTAT
@@ -22,6 +20,8 @@ pro pbs_checkstat,statstr,jobid=jobid,stp=stp,hyperthread=hyperthread
 ;
 ; By D.Nidever   February 2008
 ;-
+
+pro pbs_checkstat,statstr,jobid=jobid,stp=stp,hyperthread=hyperthread
 
 njobid = n_elements(jobid)
 
@@ -72,9 +72,17 @@ Endif else begin
 
   ;SPAWN,['ps','-p',strtrim(jobid[0],2)],out,errout,/noshell
   SPAWN,['ps','-o','pid,user,etime,command','-p',strtrim(jobid[0],2)],out,errout,/noshell
+  if n_elements(out) eq 0 then $
+    SPAWN,['ps','-o','pid,user,etime,command','-p',strtrim(jobid[0],2)],out,errout,/noshell
 
   ; can put in the column that you want
   ; ps -o etime -p jobid
+
+  ; Nothing returned
+  if n_elements(out) eq 0 then begin
+    statstr = {jobid:strtrim(jobid[0],2),name:'?',user:'?',timeuse:'?',status:'?',queue:'hyperthread'}
+    return
+  endif
 
   out = strtrim(out,2)
   gd = where(stregex(out,'^'+strtrim(jobid,2),/boolean) eq 1,ngd)
