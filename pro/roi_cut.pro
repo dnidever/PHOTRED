@@ -31,24 +31,6 @@
 ; By D.Nidever 2006
 ;-
 
-function polyfillv_exists
-
-Catch, theError
-IF theError NE 0 THEN BEGIN
-  Catch, /CANCEL
-  RETURN,0
-ENDIF
-
-xc = [1.0,4.0,4.0,1.0]
-yc = [1.0,1.0,4.0,4.0]
-out = polyfillv(xc,yc,10,10)
-
-return,1
-
-end
-
-;--------
-
 pro roi_cut,xcut,ycut,x,y,ind,cutind,fac=fac,silent=silent
 
 ; Not enough inputs
@@ -111,13 +93,16 @@ yind = y3-ymin2
 
 ; Using polyfillv to get the good indices of the cut
 ; using positions relative to (xmin2,ymin2)
-if polyfillv_exists() eq 1 then begin
+if running_gdl() eq 0 then begin
   ind1d = polyfillv(xcut2-xmin2,ycut2-ymin2,nx,ny)
 endif else begin
-  ; Make the arrays
+  ; Use INSIDE.PRO, this gives slightly different results than POLYFILLV
+  ;  points on the edges are almost always considered "inside" by INSIDE
+  ;  but about half of the time POLYFILLV considers then "outside".
   xarr = (findgen(nx)#replicate(1,ny))(*)
   yarr = (replicate(1,nx)#findgen(ny))(*)
-  ind1d = inside(xarr,yarr,xcut2-xmin2,ycut2-ymin2)
+  inmask = inside(xarr,yarr,xcut2-xmin2,ycut2-ymin2)
+  ind1d = where(inmask eq 1,nind1d)
 endelse
 ind2d = array_indices(fltarr(nx,ny),ind1d)
 indx = reform(ind2d(0,*)) 
