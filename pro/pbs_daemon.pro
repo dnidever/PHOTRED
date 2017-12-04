@@ -390,21 +390,22 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
     ; Linux
     ;SPAWN,'df -B 1M '+dirs[0],dfout,dfouterr
     ; Mac OS X
+    available = -1.0
     SPAWN,'df -m '+dirs[0],dfout,dfouterr
-    dfarr = strsplitter(dfout,' ',/extract)
-    nline = n_elements(dfout)
-    ;;available = float(reform(dfarr[3,1]))
-    ;available = float(reform(dfarr[2,nline-1]))
-    available = float(reform(dfarr[3,nline-1]))
-    ;available = float(reform(dfarr[2,nline-1]))
-    ;available = available[0]/1000.0     ; convert to MB
-    print,''
-    print,strtrim(available[0],2),' MB of disk space available'
-    ; Not enough disk space available
-    if available[0] lt 100. then begin
-      print,'NOT enough disk space available'
-      return
+    if n_elements(dfout) gt 1 and dfouterr[0] eq '' then begin
+      line = first_el(dfout,/last) 
+      dfarr = strsplit(line,' ',/extract)
+      if n_elements(dfarr) ge 4 then available = float(dfarr[3])
     endif
+    if available gt 0 then begin
+      print,''
+      print,strtrim(available[0],2),' MB of disk space available'
+      ; Not enough disk space available
+      if available[0] lt 100. then begin
+        print,'NOT enough disk space available'
+        return
+      endif
+    endif else print,'Cannot determine available disk space'
 
 
     ; Check for kill file
