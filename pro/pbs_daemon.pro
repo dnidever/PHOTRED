@@ -106,6 +106,11 @@ if keyword_set(idle) then begin
   endif else begin
     idlprog = FILE_SEARCH(out[0],count=nidlprog)
   endelse
+  ; Try GDL
+  if (nidlprog eq 0) then begin
+    SPAWN,'which gdl',out,errout
+    idlprog = FILE_SEARCH(out[0],count=nidlprog)
+  endif
   if (nidlprog eq 0) then begin
     print,'IDL PROGRAM NOT AVAILABLE'
     return
