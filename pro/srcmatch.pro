@@ -376,9 +376,9 @@ if keyword_set(usehist) then begin
         return
       endif
       REMOVE,bd,ind1,ind2
+      count -= nbd
     endif
   endif
-
   return
 endif
 
