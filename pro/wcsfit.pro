@@ -2045,7 +2045,7 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='USNO-B1'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='GAIA/GAIA'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
