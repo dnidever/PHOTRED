@@ -112,7 +112,6 @@ for j=0.,numstar-1 do begin
   fmt='(I9,2F9.3,'+strtrim(ncol-3,2)+'F9.4)'   ; makemag output
   reads,instr,inline,format=fmt
   mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
-stop
 endfor
 
 close, unit
