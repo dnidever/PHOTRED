@@ -100,7 +100,8 @@ for j=0.,numstar-1 do begin
     readf, unit, instr1
     ;instr += instr1
     ; remove extra 25 spaces at the beginning of extra/wrap lines
-    if k eq 0 then instr+=instr1 else instr+=strmid(instr1,25)
+    ;   but need 2 space to fit seamlessly with the other lines
+    if k eq 0 then instr+=instr1 else instr+=strmid(instr1,27)
   endfor
   ; We need to use the formatted read because sometimes there are
   ; NO spaces between the numbers in the columns.
@@ -111,6 +112,7 @@ for j=0.,numstar-1 do begin
   fmt='(I9,2F9.3,'+strtrim(ncol-3,2)+'F9.4)'   ; makemag output
   reads,instr,inline,format=fmt
   mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
+stop
 endfor
 
 close, unit
