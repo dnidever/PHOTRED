@@ -10,8 +10,6 @@
 ;
 ; INPUTS:
 ;  photfiles     List of AST phot files.
-;  bigsynthfile  File with all of the calibrated photometry for the
-;                   artificial stars.
 ;  =imager       The imager information structure.
 ;  =logfile      A logfile to print output to.
 ;  =maindir      The main directory for this PHOTRED run.
@@ -22,38 +20,26 @@
 ;  =error     The error message if there was one.
 ;
 ; USAGE:
-;  IDL>completeness,photfiles,bigsynthfile,imager=imager,maindir=maindir
+;  IDL>completeness,photfiles,imager=imager,maindir=maindir
 ; 
 ; By D.Nidever  based on getcomplete.pro   July 2017
 ;-
 
-pro completeness,photfiles,bigsynthfile,imager=imager,logfile=logfile,$
+pro completeness,photfiles,imager=imager,logfile=logfile,$
                  maindir=maindir,error=error
 
 undefine,error
   
 ; Not enough inputs
 nphotfiles = n_elements(photfiles)
-if nphotfiles eq 0 or n_elements(bigsynthfile) eq 0 or n_elements(imager) eq 0 or n_elements(maindir) eq 0 then begin
+if nphotfiles eq 0 or n_elements(imager) eq 0 or n_elements(maindir) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - completeness,photfiles,bigsynthfile,imager=imager,maindir=maindir,logfile=logfile,error=error'
+  print,'Syntax - completeness,photfiles,imager=imager,maindir=maindir,logfile=logfile,error=error'
   return
 endif
 
 ; Logfile
 if keyword_set(logfile) then logf=logfile else logf=-1
-
-; Load the file with all the artificial star information
-;   and the calibrated photometry
-if (file_info(bigsynthfile)).exists eq 0 then begin
-  error = 'BIGSYNTHFILE='+bigsynthfile+' NOT FOUND'
-  printlog,logfile,error
-  return
-endif
-printlog,logf,'Loading the artifical star file: '+bigsynthfile
-if first_el(strsplit(bigsynthfile,'.',/extract),/last) eq 'fits' then $
-  bigsynthstr = MRDFITS(bigsynthfile,1,/silent) else $
-  bigsynthstr = IMPORTASCII(bigsynthfile,/header,/silent)
 
 ; Get the "short" field name, e.g. F4
 ;  The names should look like this: F4M6-00478573_22.phot
@@ -96,7 +82,7 @@ For i=0,nchips-1 do begin
 
   ichip = uchips[i]
   chipind = where(allchips eq ichip,nmocks)
-  if i gt 0 and nchips gt 1 then printlog,logfile' '
+  if i gt 0 and nchips gt 1 then printlog,logfile,' '
   printlog,logfile,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mock(s)'
 
   ; Loop over the mocks for this chip
@@ -105,11 +91,11 @@ For i=0,nchips-1 do begin
   For j=0,nmocks-1 do begin
     mockphotfile = photfiles[chipind[j]]
     mockphotdir = file_dirname(mockphotfile)
-    mockphotbase = file_basename(mockphotfile)
+    mockphotbase = file_basename(mockphotfile,'.phot')
     ; Get the mock number for the filename, e.g. F2M5- gives mocknum=5
     fieldmockname = first_el(strsplit(mockphotbase,'-',/extract))
     mocknum = long(first_el(strsplit(fieldmockname,'M',/extract),/last))
-    if j gt 0 and nmocks gt 1 then printlog,logfile' '
+    if j gt 0 and nmocks gt 1 then printlog,logfile,' '
     printlog,logfile,'  MOCK='+strtrim(mocknum,2)
 
     ; Get the reference exposure number
@@ -127,7 +113,7 @@ For i=0,nchips-1 do begin
     nphot = n_elements(phot)
     
     ; -- Add average magnitudes to PHOT file --
-    ; We need average magnitues per band for reach object
+    ; We need average magnitues per band for each object
     phottags = tag_names(phot)
     photavgmag = where(stregex(phottags,'MAG$',/boolean) eq 1,nphotavgmag)
     if nphotavgmag eq 0 then begin
@@ -213,6 +199,28 @@ For i=0,nchips-1 do begin
     if allframe eq 1 then LOADMAG,synthfile,synth else LOADRAW,synthfile,synth
     nsynth = n_elements(synth)
     printlog,logfile,'  NSYNTH='+strtrim(nsynth,2)
+    ; Remove stars with NO good magnitudes, were not actually used
+    stags = tag_names(synth)
+    smagind = where(stregex(stags,'^MAG',/boolean) eq 1 and stregex(stags,'ERR$',/boolean) eq 0,nsmagind)
+    badmask = lonarr(n_elements(synth))+1
+    for k=0,nsmagind-1 do badmask = badmask AND (synth.(smagind[k]) gt 50)
+    sbdmag = where(badmask eq 1,nsbdmag)
+    if nsbdmag gt 0 then begin
+      printlog,logfile,'  Removing '+strtrim(nsbdmag,2)+' synthetic stars with NO good magnitudes'
+      REMOVE,sbdmag,synth
+      nsynth = n_elements(synth)
+    endif
+    
+    ; Get the calibrated photometry from the CALMAG synthetic star file.
+    ;  This has calibrated, apparent magnitudes for the synthetic
+    ;  stars for this chip+mock.
+    calsynthfile = mockphotdir+'/'+fieldmockname+'-calmag'+imager.separator+string(ichip,format='(i02)')+'.mag'
+    if (file_info(calsynthfile)).exists eq 0 then begin
+      printlog,logfile,synthfile+' NOT FOUND'
+      goto,BOMB1
+    endif
+    calsynth = IMPORTASCII(calsynthfile,/header,count=ncalsynth,/silent)
+    printlog,logfile,'  NCALSYNTH='+strtrim(ncalsynth,2)
 
     ; Do the CROSS-MATCHING between the three lists (final/orig/synth)
     ;-----------------------------------------------------------------
@@ -232,10 +240,10 @@ For i=0,nchips-1 do begin
     astschema = {astid:'',photid:'',recovered:-1,field:'',chip:0L,mock:0L,$
               inp_x:0.0d0,inp_y:0.0d0}
     ; Add columns for input synthetic calibrated photometry
-    bigsynthtags = tag_names(bigsynthstr)
-    bigsynthphotcolind = where(bigsynthtags ne 'ID',nbigsynthphotcolind)
-    bigsynthphotcols = bigsynthtags[bigsynthphotcolind]
-    for k=0,nbigsynthphotcolind-1 do astschema=CREATE_STRUCT(astschema,'INP_'+bigsynthphotcols[k],0.0)
+    calsynthtags = tag_names(calsynth)
+    calsynthphotcolind = where(calsynthtags ne 'ID',ncalsynthphotcolind)
+    calsynthphotcols = calsynthtags[calsynthphotcolind]
+    for k=0,ncalsynthphotcolind-1 do astschema=CREATE_STRUCT(astschema,'INP_'+calsynthphotcols[k],0.0)
     ; Add recovered information
     astschema = CREATE_STRUCT(astschema,'ID','','X',0.0d0,'Y',0.d0,'NDET',0L)
     ; Add columms from PHOT file
@@ -265,26 +273,25 @@ For i=0,nchips-1 do begin
     ; Copy over the input synth data
     ;   ASTID is a unique name across all mocks and chips
     ast.astid = shfield+'.'+strtrim(ichip,2)+'.'+strtrim(mocknum,2)+'.'+strtrim(synth.id,2)
-    ast.photid = synth.id
+    ast.photid = strtrim(synth.id,2)
     ast.field = shfield
     ast.chip = ichip
     ast.mock = mocknum
     ast.inp_x = synth.x
     ast.inp_y = synth.y
-    ; Get the calibrated photometry from BIGSYNTHSTR
-    ;  match2.pro deals with duplicates better
-    ;  The IDs in the add.mag file (SYNTH) and BIGSYNTHSTR should match
-    MATCH2,bigsynthstr.id,synth.id,ind1,ind2
-    dum = where(ind2 gt -1,nbigmatch)
-    if nbigmatch ne nsynth then begin
-      printlog,logfile,'Not all synth elements found matches in bigsynthstr'
+
+    ; Stick in the calibration synthetic input photometry from CALSYNTH    
+    MATCH2,calsynth.id,synth.id,ind1,ind2
+    dum = where(ind2 gt -1,ncalmatch)
+    if ncalmatch ne nsynth then begin
+      printlog,logfile,'Not all synth elements found matches in calsynth'
       goto,BOMB1
     endif
-    ; loop over bigsynth columns and copy
-    for k=0,nbigsynthphotcolind-1 do begin
-      asttagind = where(asttags eq 'INP_'+bigsynthphotcols[k],nasttagind)
-      bigsynthtagind = where(bigsynthtags eq bigsynthphotcols[k],nbigsynthtagind)
-      ast.(asttagind) = bigsynthstr[ind2].(bigsynthtagind)
+    ; Loop over calsynth columns and copy
+    for k=0,ncalsynthphotcolind-1 do begin
+      asttagind = where(asttags eq 'INP_'+calsynthphotcols[k],nasttagind)
+      calsynthtagind = where(calsynthtags eq calsynthphotcols[k],ncalsynthtagind)
+      ast.(asttagind) = calsynth[ind2].(calsynthtagind)
     endfor
     ; Copy over the recovered values using STRUCT_ASSIGN
     ;  LEFT was created from the PHOT structure
@@ -295,8 +302,9 @@ For i=0,nchips-1 do begin
     temp = ast[sind]
     STRUCT_ASSIGN,phot[find],temp,/nozero
     ast[sind] = temp
+    ast.recovered = 0  ; nothing recovered to start
     ast[sind].recovered = 1
-    
+
     ; Write out the ast file for this mock
     outmockfile = mockphotdir+'/'+mockphotbase+'_complete.fits'
     print,'  Writing AST catalog for this Field/Chip/Mock to ',outmockfile
@@ -317,7 +325,7 @@ For i=0,nchips-1 do begin
       chipastschema = chipast[0]
       struct_assign,{dum:''},chipastschema
       temp = chipast
-      chipast = REPLICATE(chipasttags,nchipast+nsynth)
+      chipast = REPLICATE(chipastschema,nchipast+nsynth)
       chipast[0:nchipast-1] = temp
       chipast[nchipast:*] = ast
       undefine,temp
@@ -327,8 +335,7 @@ For i=0,nchips-1 do begin
       chipasttags = tag_names(chipast)
     endelse
       
-    BOMB1:
-    
+    BOMB1:    
   Endfor  ; mock loop
 
   ; Write AST structure for this chip
@@ -386,15 +393,41 @@ if file_test(outastfile+'.gz') then file_delete,outastfile+'.gz'
 SPAWN,['gzip',outastfile],/noshell
 
 
-; Figure out the completeness
+; Make the figures
+;-----------------
 gdrecover = where(bigast.recovered eq 1,ngdrecover)
+; Use g and i if they exist
+if tag_exist(bigast,'INP_G') eq 1 and tag_exist(bigast,'INP_I') eq 1 then begin
+  mag1ind = where(bigasttags eq 'INP_G',nmag1ind)
+  mag2ind = where(bigasttags eq 'INP_I',nmag2ind) 
+  xtit = 'g-i'
+  ytit = 'g'
+endif else begin
+  ; Use 1st and 2nd mag columns
+  magcols = where(strmid(bigasttags,0,4) eq 'INP_',nmagind)
+  mag1ind = magcols[0]
+  mag2ind = magcols[1]
+  xtit = strmid(bigasttags[mag1ind],4)+'-'+strmid(bigasttags[mag2ind],4)
+  ytit = strmid(bigasttags[mag1ind],4)
+endelse
+; Color and magnitude
+mag = bigast.(mag1ind)
+col = bigast.(mag1ind)-bigast.(mag2ind)
+; Ranges and stepsizes
+xr = [min(col),max(col)]
+xr = [floor(xr[0]*20)/20., ceil(xr[1]*20)/20.]  ; round to nearest 0.05
+yr = [min(mag),max(mag)]
+yr = [floor(yr[0]*20)/20., ceil(yr[1]*20)/20.]  ; round to nearest 0.05
 dx = 0.2
 dy = 0.4
-xr = [-1,3.5]
-yr = [17.0,27.0]
-; GENERALIZE THE RANGES AND MAYBE MAGNITUDES/COLORS BETTER
-hess,bigast.inp_g-bigast.inp_i,bigast.inp_g,dum,imall,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
-hess,bigast[gdrecover].inp_g-bigast[gdrecover].inp_i,bigast[gdrecover].inp_g,dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+;xr = [-1,3.5]
+;yr = [17.0,27.0]
+; Bin the data in the CMD
+undefine,dum
+hess,col,mag,dum,imall,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+if ngdrecover gt 0 then begin
+  hess,col[gdrecover],mag[gdrecover],dum,imrec,dx=dx,dy=dy,xr=xr,yr=yr,xarr=xarr,yarr=yarr,/noplot
+endif else imrec=imall*0
 
 ; Make some figures
 if file_test(maindir+'plots/',/directory) eq 0 then file_mkdir,maindir+'/plots/'
@@ -405,7 +438,7 @@ setdisp
 file = maindir+'/plots/'+globalfield+'_input'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,imall,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Input ASTs for '+globalfield,charsize=1.3
+displayc,imall,xarr,yarr,/yflip,xtit=xtit,ytit=ytit,tit='Input ASTs for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
@@ -413,7 +446,7 @@ spawn,['epstopdf',file+'.eps'],/noshell
 file = maindir+'/plots/'+globalfield+'_recovered'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,imrec,xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Recovered ASTs for '+globalfield,charsize=1.3
+displayc,imrec,xarr,yarr,/yflip,xtit=xtit,ytit=ytit,tit='Recovered ASTs for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
@@ -421,13 +454,14 @@ spawn,['epstopdf',file+'.eps'],/noshell
 file = maindir+'/plots/'+globalfield+'_completeness'
 ps_open,file,/color,thick=4,/encap
 device,/inches,xsize=8.5,ysize=10.5
-displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit='g-i',ytit='g',tit='Completeness for '+globalfield,charsize=1.3
+displayc,float(imrec)/(imall>1),xarr,yarr,/yflip,xtit=xtit,ytit=ytit,tit='Completeness for '+globalfield,charsize=1.3
 ps_close
 ps2png,file+'.eps',/eps
 spawn,['epstopdf',file+'.eps'],/noshell
 ; Combine the figures
 pdffiles = maindir+'/plots/'+globalfield+'_'+['input','recovered','completeness']+'.pdf'
 spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+maindir+'/plots/'+globalfield+'_complete.pdf '+strjoin(pdffiles,' ')
+printlog,logfile,'Completeness plots are in '+maindir+'/plots/'+globalfield+'_complete.pdf'
 
 ;stop
 

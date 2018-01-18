@@ -81,7 +81,7 @@ scriptsdir      = getparam(scriptsdir      , 'scriptsdir'      , setup, ''      
 sepfielddir     = getparam(sepfielddir     , 'sepfielddir'     , setup, '0'           , logfile, /bool)
 sepchipdir      = getparam(sepchipdir      , 'sepchipdir'      , setup, '0'           , logfile, /bool)
 starssplit      = getparam(starssplit      , 'starssplit'      , setup, '0'           , logfile, /bool)
-starsfile       = getparam(starsfile       , 'starsfile'       , setup, ''            , logfile)
+;starsfile       = getparam(starsfile       , 'starsfile'       , setup, ''            , logfile)
 starscols       = getparam(starscols       , 'starscols'       , setup, ''            , logfile)
 datadir         = getparam(datadir         , 'datadir'         , setup, '.'           , logfile)
 datatransfer    = getparam(datatransfer    , 'datatransfer'    , setup, 'skip'        , logfile)
@@ -107,11 +107,11 @@ if scriptsdir eq '' or file_test(scriptsdir,/directory) ne 1 then begin
 endif
 
 ; Check if starsfile exists
-if starsfile eq '' or file_test(starsfile,/read) ne 1 then begin
-  printlog,logfile,'ERROR: STARSFILE "',starsfile,' NOT FOUND'
-  error='STARSFILE "'+starsfile+' NOT FOUND'
-  return
-endif
+;if starsfile eq '' or file_test(starsfile,/read) ne 1 then begin
+;  printlog,logfile,'ERROR: STARSFILE "',starsfile,' NOT FOUND'
+;  error='STARSFILE "'+starsfile+' NOT FOUND'
+;  return
+;endif
 
 ; Check if starscols is NOT empty
 if starscols eq '' then begin
@@ -238,7 +238,8 @@ photbaselist = FILE_BASENAME(inputlines)
 nphotbaselist = n_elements(alsbaselist)
 
 ; Unique fields
-allfields = reform( (strsplitter(photbaselist,'-',/extract))[0,*] )
+;  The files have names like this: F1M1-00388968_01.phot
+allfields = reform( (strsplitter(photbaselist,'M',/extract))[0,*] )
 ui = uniq(allfields,sort(allfields))
 ufields = allfields[ui]
 nfields = n_elements(ufields)
@@ -259,8 +260,7 @@ For i=0,nfields-1 do begin
   printlog,logfile,strtrim(i+1,2)+'/'+strtrim(nfields,2)+' '+ufields[i]+' - '+strtrim(nind,2)+' phot files'
   printlog,logfile,'----------------' 
   printlog,logfile,''
-
-  COMPLETENESS,ffiles,starsfile,imager=thisimager,maindir=maindir,logfile=logfile
+  COMPLETENESS,ffiles,imager=thisimager,maindir=maindir,logfile=logfile
 Endfor
 
 

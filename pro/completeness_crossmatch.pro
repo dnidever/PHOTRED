@@ -10,6 +10,7 @@
 ;  orig      The original photometry structure.
 ;  synth     The injected artificial stars information structure.
 ;  =logfile  The logfile name.
+;  /verbose  Print out information for each duplicate.
 ;
 ; OUTPUTS:
 ;  find      The index for recovered artificial stars in "final".
@@ -23,7 +24,7 @@
 ; By D. Nidever  August 2017
 ;-
 
-pro completeness_crossmatch,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=error
+pro completeness_crossmatch,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=error,verbose=verbose
 
 undefine,find,sind
 undefine,error
@@ -31,7 +32,7 @@ nmatch = 0
 
 ; Not enough inputs
 if n_elements(final) eq 0 or n_elements(orig) eq 0 or n_elements(synth) eq 0 then begin
-  print,'Syntax - completeness_crossmatch,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=error'
+  print,'Syntax - completeness_crossmatch,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=error,verbose=verbose'
   error = 'Not enough inputs'
   return 
 endif
@@ -62,11 +63,11 @@ if nfinaldbl gt 0 then begin
   synthdbl = lonarr(nfinaldbl)
   ; Get magnitude column indices for the three structures
   finaltags = tag_names(final)
-  finalmagind = where(stregex(finaltags,'^MAG',/boolean) eq 1,nfinalmagind)
+  finalmagind = where(stregex(finaltags,'^MAG',/boolean) eq 1 and stregex(finaltags,'ERR$',/boolean) eq 0,nfinalmagind)
   origtags = tag_names(orig)
-  origmagind = where(stregex(origtags,'^MAG',/boolean) eq 1,norigmagind)
+  origmagind = where(stregex(origtags,'^MAG',/boolean) eq 1 and stregex(origtags,'ERR$',/boolean) eq 0,norigmagind)
   synthtags = tag_names(synth)
-  synthmagind = where(stregex(synthtags,'^MAG',/boolean) eq 1,nsynthmagind)
+  synthmagind = where(stregex(synthtags,'^MAG',/boolean) eq 1 and stregex(synthtags,'ERR$',/boolean) eq 0,nsynthmagind)
   if nfinalmagind ne norigmagind or nfinalmagind ne nsynthmagind then begin
     printlog,logf,'  FINAL/ORIG/SYNTH photometry files have different magnitude columns'
     error = 'FINAL/ORIG/SYNTH photometry files have different magnitude columns'
@@ -74,6 +75,7 @@ if nfinaldbl gt 0 then begin
     return
   endif
   ; Loop over duplicates
+  if keyword_set(verbose) then print,'NUM ODIST  OMAGDIFF OFINALDIFF  ADIST  AMAGDIFF  AFINALDIFF  REAL/AST'
   for k=0,nfinaldbl-1 do begin
     finaldbl1 = finaldbl[k]  ; the FINAL index
     final1 = final[finaldbl1]
@@ -113,7 +115,7 @@ if nfinaldbl gt 0 then begin
     if keyword_set(verbose) then $
       printlog,logf,'  '+strtrim(k+1,2),odist,omagdiff,ofinaldiff,' ',adist,amagdiff,afinaldiff,com
     ;if amagdiff lt omagdiff and adist gt odist then stop
-  endfor  ; duplicates loop
+  endfor                         ; duplicates loop
 
   ; Remove ASTs from the "ORIG" list
   bdomatch = where(flag eq 1,nbdomatch,ncomp=ngdomatch)  
