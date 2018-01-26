@@ -92,12 +92,15 @@ For i=0,nchips-1 do begin
     mockphotfile = photfiles[chipind[j]]
     mockphotdir = file_dirname(mockphotfile)
     mockphotbase = file_basename(mockphotfile,'.phot')
+    mockfitsfile = mockphotdir+'/'+mockphotbase+'.fits'
     ; Get the mock number for the filename, e.g. F2M5- gives mocknum=5
     fieldmockname = first_el(strsplit(mockphotbase,'-',/extract))
     mocknum = long(first_el(strsplit(fieldmockname,'M',/extract),/last))
     if j gt 0 and nmocks gt 1 then printlog,logfile,' '
     printlog,logfile,'  MOCK='+strtrim(mocknum,2)
-
+    ; Load the FITS header
+    head = headfits(mockfitsfile)
+    
     ; Get the reference exposure number
     ;  00379732 in F4M4-00379732_22.phot
     refname = (strsplit(mockphotbase,'-'+imager.separator,/extract))[1]
@@ -238,14 +241,14 @@ For i=0,nchips-1 do begin
 
     ; --- Create the structure schema ---
     astschema = {astid:'',photid:'',recovered:-1,field:'',chip:0L,mock:0L,$
-              inp_x:0.0d0,inp_y:0.0d0}
+              inp_x:0.0d0,inp_y:0.0d0,inp_ra:0.0d0,inp_dec:0.0d0}
     ; Add columns for input synthetic calibrated photometry
     calsynthtags = tag_names(calsynth)
     calsynthphotcolind = where(calsynthtags ne 'ID',ncalsynthphotcolind)
     calsynthphotcols = calsynthtags[calsynthphotcolind]
     for k=0,ncalsynthphotcolind-1 do astschema=CREATE_STRUCT(astschema,'INP_'+calsynthphotcols[k],0.0)
     ; Add recovered information
-    astschema = CREATE_STRUCT(astschema,'ID','','X',0.0d0,'Y',0.d0,'NDET',0L)
+    astschema = CREATE_STRUCT(astschema,'ID','','X',0.0d0,'Y',0.d0,'RA',0.0d0,'DEC',0.0d0,'NDET',0L)
     ; Add columms from PHOT file
     ;   get all of the unique filters, anything with MAG and not I_ and
     ;   not with ERR
@@ -260,14 +263,14 @@ For i=0,nchips-1 do begin
     allphotmags = reform((strsplitter(allphotmags,'MAG',/extract))[0,*])  ; just the mag name
     uiphotmags = uniq(allphotmags,sort(allphotmags))
     uphotmags = allphotmags[uiphotmags]
-    nphotmags = n_elements(photmags)
+    nphotmags = n_elements(uphotmags)
     ;  Add three columns for each filter: magnitude, error, Ndetections
     for k=0,nphotmags-1 do $
-       astschema=CREATE_STRUCT(astschema,photmags[k],0.0,photmags[k]+'ERR',0.0,'NDET'+photmags[k],0L)
+       astschema=CREATE_STRUCT(astschema,uphotmags[k],0.0,uphotmags[k]+'ERR',0.0,'NDET'+uphotmags[k],0L)
     ; Add final morphology columns
     astschema = CREATE_STRUCT(astschema,'chi',0.0,'sharp',0.0,'flag',0L,'prob',0.0)
     asttags = tag_names(astschema)
-    
+
     ; --- Make the structure and copy over the data ---
     ast = replicate(astschema,nsynth)
     ; Copy over the input synth data
@@ -279,7 +282,12 @@ For i=0,nchips-1 do begin
     ast.mock = mocknum
     ast.inp_x = synth.x
     ast.inp_y = synth.y
-
+    ; Add the RA/DEC values using the input X/Y coordinates
+    ;  and the reference header
+    HEAD_XYAD,head,ast.inp_x-1,ast.inp_y-1,inpra,inpdec,/deg
+    ast.inp_ra = inpra
+    ast.inp_dec = inpdec
+    
     ; Stick in the calibration synthetic input photometry from CALSYNTH    
     MATCH2,calsynth.id,synth.id,ind1,ind2
     dum = where(ind2 gt -1,ncalmatch)
@@ -301,6 +309,7 @@ For i=0,nchips-1 do begin
     ;ast[aind2].recovered = 1
     temp = ast[sind]
     STRUCT_ASSIGN,phot[find],temp,/nozero
+    temp.id = strtrim(temp.id,2)
     ast[sind] = temp
     ast.recovered = 0  ; nothing recovered to start
     ast[sind].recovered = 1
@@ -334,7 +343,7 @@ For i=0,nchips-1 do begin
       chipast = ast
       chipasttags = tag_names(chipast)
     endelse
-      
+
     BOMB1:    
   Endfor  ; mock loop
 
