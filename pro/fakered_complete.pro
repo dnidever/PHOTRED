@@ -180,7 +180,8 @@ printlog,logfile,"Separator = '"+thisimager.separator+"'"
 printlog,logfile,''
 
 
-
+; Load "fields" file to get "global" field name
+READCOL,maindir+'/fields',field_shnames,field_lnames,format='A,A',/silent
 
 ;---------------------------------------------------------------
 ; Run CHECK_PYTHON.PRO to make sure that you can run PYTHON from IDL
@@ -241,7 +242,7 @@ nphotbaselist = n_elements(alsbaselist)
 ;  The files have names like this: F1M1-00388968_01.phot
 allfields = reform( (strsplitter(photbaselist,'M',/extract))[0,*] )
 ui = uniq(allfields,sort(allfields))
-ufields = allfields[ui]
+ufields = allfields[ui]   ; F1, F2, etc.
 nfields = n_elements(ufields)
 printlog,logfile,strtrim(nfields,2)+' unique fields to process'
 
@@ -261,6 +262,27 @@ For i=0,nfields-1 do begin
   printlog,logfile,'----------------' 
   printlog,logfile,''
   COMPLETENESS,ffiles,imager=thisimager,maindir=maindir,logfile=logfile
+
+  ; Get field name
+  nameind = where(stregex(field_shnames,'^'+ufields[i]+'M',/boolean) eq 1,nnameind)
+  if nnameind eq 0 then begin
+     error = 'Short field name >>'+ufields[i]+'<< not found in "fields" file'
+     printlog,logfile,error
+     goto,BOMB
+  endif
+  globalfield = field_lnames[nameind[0]]
+  
+  ; Check that they were successful
+  compfile = file_dirname(ffiles)+'/'+file_basename(ffiles,'.phot')+'_complete.fits.gz'
+  finalfile = maindir+'/'+globalfield+'_complete.fits.gz'
+  gd = where(file_test(compfile) eq 1 and file_test(finalfile) eq 1,ngd,comp=bd,ncomp=nbd)
+  if ngd gt 0 then begin
+    PUSH,successlist,ffiles[gd]
+    PUSH,outlist,finalfile
+  endif
+  if nbd gt 0 then PUSH,failurelist,ffiles[bd]
+
+  BOMB:
 Endfor
 
 
