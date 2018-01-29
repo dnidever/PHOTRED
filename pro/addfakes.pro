@@ -8,8 +8,9 @@ if n_elements(field) eq 0 then begin
   return
 endif
 
-fakedir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/'
+;fakedir = '/datalab/users/dnidever/smash/cp/red/photred/addfakes/'
 rootdir = smashred_rootdir()+'cp/red/photred/'
+fakedir = rootdir+'addfakes/'
 
 ; Defaults
 if n_elements(dir) eq 0 then begin

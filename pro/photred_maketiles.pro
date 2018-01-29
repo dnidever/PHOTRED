@@ -54,12 +54,17 @@ printlog,logfile,'Generating TILING scheme for Field >>'+field+'<< in directory 
 
 ;; Find all existing FITS files for this group
 if thisimager.namps gt 1 then $
-  fieldfiles = FILE_SEARCH(dir+'/'+field+'-*'+thisimager.separator+'*.fits',count=nfieldfiles) else $
-  fieldfiles = FILE_SEARCH(dir+'/'+field+'-*.fits',count=nfieldfiles)
+  fieldfiles = FILE_SEARCH(dir+'/'+field+'-*'+thisimager.separator+'*'+['.fits','.fits.fz'],count=nfieldfiles) else $
+  fieldfiles = FILE_SEARCH(dir+'/'+field+'-*'+['.fits','.fits.fz'],count=nfieldfiles)
 
 ; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
 if nfieldfiles gt 0 then begin
-  fbases = FILE_BASENAME(fieldfiles,'.fits')
+  fbases = strarr(nfieldfiles)
+  for i=0,nfieldfiles-1 do begin
+    if strmid(fieldfiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+  endfor
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $ ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $ ; allstar subtracted file
               stregex(fbases,'_0$',/boolean) eq 1 or $ ; _0 head file from split

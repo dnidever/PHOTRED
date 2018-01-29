@@ -1,6 +1,3 @@
-pro phot_overlap,inpstr1,inpstr2,outstr,dcr=dcr,stp=stp,silent=silent,$
-    s1=s1,s2=s2,magindarr=magindarr,error=error,posonly=posonly
-
 ;+
 ;
 ; This combines overlapping photometry
@@ -26,6 +23,9 @@ pro phot_overlap,inpstr1,inpstr2,outstr,dcr=dcr,stp=stp,silent=silent,$
 ;
 ; By D.Nidever Jan 2007
 ;-
+
+pro phot_overlap,inpstr1,inpstr2,outstr,dcr=dcr,stp=stp,silent=silent,$
+    s1=s1,s2=s2,magindarr=magindarr,error=error,posonly=posonly
 
 undefine,outstr,error
 

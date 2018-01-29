@@ -165,7 +165,6 @@ endif else begin
 endelse
 
 
-
 ;##########################################################
 ;#  PROCESSING THE FILES
 ;##########################################################
@@ -174,7 +173,7 @@ printlog,logfile,'-----------------------'
 printlog,logfile,'PROCESSING THE FILES'
 printlog,logfile,'-----------------------'
 printlog,logfile,''
-printlog,systime(0)
+printlog,logfile,systime(0)
 
 ; Initializing arrays
 fieldarr = strarr(ninputlines)
@@ -363,9 +362,8 @@ if (ngd gt 0) then begin
 
   ; Load old "fields" file
   undefine,oldshortnames,oldfields
-  if FILE_TEST('fields') eq 1 then begin
+  if FILE_TEST('fields') eq 1 then $
     READCOL,'fields',oldshortnames,oldfields,format='A,A',/silent
-  endif
 
   ; Combine them
   undefine,newfields
@@ -404,9 +402,9 @@ endelse
 newfilearr = strarr(ninputlines)
 
 
-printlog,logfile,'-------------------------------------------------------------------------------------------------------------'
-printlog,logfile,'     TYPE          FILENAME               NEW FILENAME            OBJECT         FILTER  EXPTIME   UT TIME'
-printlog,logfile,'-------------------------------------------------------------------------------------------------------------'
+printlog,logfile,'---------------------------------------------------------------------------------------------------------------'
+printlog,logfile,'     TYPE          FILENAME                 NEW FILENAME            OBJECT         FILTER  EXPTIME   UT TIME'
+printlog,logfile,'---------------------------------------------------------------------------------------------------------------'
 
 ; Rename the files
 FOR i=0,ninputlines-1 do begin
@@ -441,7 +439,7 @@ FOR i=0,ninputlines-1 do begin
 
     if calibarr[i] eq 1 then com='Calib'
     if stdarr[i] eq 1 then com='Standard'
-    fmt = '(A10,A20,A25,A25,A5,A8,A16)'
+    fmt = '(A-10,A-22,A-25,A25,A5,A8,A16)'
     printlog,logfile,com,file,newfile,object,filter,exptime,ut,format=fmt
 
     ; Moving files
@@ -478,7 +476,7 @@ FOR i=0,ninputlines-1 do begin
 
 
     com = 'Object'
-    fmt = '(A10,A20,A25,A25,A5,F8.2,A17)'
+    fmt = '(A-10,A-22,A-25,A25,A5,F8.2,A17)'
     printlog,logfile,com,file,newfile,object,filter,exptime,ut,format=fmt
 
 

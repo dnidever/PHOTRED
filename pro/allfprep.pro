@@ -473,8 +473,6 @@ WHILE (flag eq 0) do begin
 
   Endelse  ; DAOPHOT
 
-  ;stop
-
   ;-----------------------------------------------------
   ; Run ALLSTAR on all sources found so far
   ; on original frame
@@ -484,7 +482,8 @@ WHILE (flag eq 0) do begin
 
   ; Make input file
   undefine,cmd
-  push,cmd,'    '
+  READLINE,base+'.als.opt',alsoptlines  ; make sure we use the right als options
+  push,cmd,alsoptlines
   push,cmd,base+'.fits'       ; image file
   push,cmd,base+'.psf'        ; psf file
   push,cmd,coofile            ; coordinate file
@@ -511,9 +510,6 @@ WHILE (flag eq 0) do begin
 
   ; Increment counter
   count++
-
-  ;stop
-
 
 ENDWHILE
 

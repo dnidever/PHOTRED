@@ -252,8 +252,14 @@ For i=0,nfieldfiles-1 do begin
 
   ; From FITS header
   ;  nx, ny, ctype, scale, ra, dec
-  if fpack eq 1 then head=headfits(fitsfile,exten=1) else $
+  if fpack eq 1 then begin
+    head = headfits(fitsfile,exten=1)
+    ; Fix the NAXIS1/NAXIS2 in the header
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  endif else begin
     head = headfits(fitsfile)
+  endelse
   nx = sxpar(head,'NAXIS1',count=n_nx)
   if n_nx gt 0 then chipstr[i].nx = nx
   ny = sxpar(head,'NAXIS2',count=n_ny)
@@ -562,13 +568,14 @@ For i=0,nchips-1 do begin
   ; Fill in transformation equation info
   if n_elements(trans) gt 0 then begin
     ; CHIP-SPECIFIC transformation equations
-    if tag_exist(trans,'CHIP') then begin
+    inptrans = trans  ; global trans eqns by default
+    if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
       inptransfile = ''
       ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
       chip = long(ext)
       ind = where(trans.chip eq chip,nind)
       if nind gt 0 then inptrans=trans[ind]
-    endif else inptrans=trans  ; global trans eqns
+    endif
 
     ; We have transformation equations
     if n_elements(inptrans) gt 0 then begin 
@@ -599,8 +606,14 @@ For i=0,nchips-1 do begin
     if fitstest eq 1 and (alstest eq 1 or cootest eq 1) then begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
         LOADCOO,coofile,cat
-      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=headfits(fitsfile,exten=1) else $
+      if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
+        head = headfits(fitsfile,exten=1)
+        ; Fix the NAXIS1/NAXIS2 in the header
+        sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+        sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+      endif else begin
         head = headfits(fitsfile)
+      endelse
       HEAD_XYAD,head,cat.x-1,cat.y-1,ra,dec,/deg
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch
       if nmatch gt 0 then begin

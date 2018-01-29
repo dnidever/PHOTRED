@@ -297,8 +297,14 @@ FOR i=0,ninputlines-1 do begin
 
 
   ; Load the FITS header
-  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(fitsfile,exten=1) else $
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
+    head = HEADFITS(fitsfile,exten=1)
+    ; Fix the NAXIS1/2 values in the header
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  endif else begin
     head = HEADFITS(fitsfile)
+  endelse
 
   ; Checking that the header has a WCS
   EXTAST,head,astr
@@ -342,6 +348,7 @@ FOR i=0,ninputlines-1 do begin
   ; Output the structure to the AST file
   astfile = base+'.ast'
   printlog,logfile,'File with RA/DEC coordinates is: ',astfile
+
   PRINTSTR,phot,astfile
 
   ; Check that the file AST file is there
