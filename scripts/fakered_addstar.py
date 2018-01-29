@@ -10,8 +10,8 @@ __author__     = "Antonio Dorta"
 __copyright__  = "Copyright 2016, The Local Group in Multi-Dimensions | SIEie@IAC"
 __credits__    = [""] 
 __license__    = ""
-__date__       = "2017-03-02"
-__version__    = "0.1.3"
+__date__       = "2018-01-26"
+__version__    = "0.2.0"
 __maintainer__ = "Antonio Dorta"
 __email__      = "adorta@iac.es"
 __status__     = "Developtment"
@@ -415,8 +415,8 @@ def get_mode(ncols, fname, main_mode, ALLOWED_MODES):
 ########################################################################################
 
 def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, mtrans, 
-                     chip_info, radcent, dimfield, distance, corners, MAX_COEF, numcaj, 
-                     numstar, offset, shift):
+                     chip_info, radcent, dimfield, distance, magext, filters, corners, 
+                     MAX_COEF, numcaj, numstar, offset, shift):
     """
     Apply the transformations and generate the .add files with results
     Make .add files (one per line in file.mch) to be used with add task in DAOPHOT.
@@ -457,6 +457,10 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
                 to be applied: [xmin ymin xmax ymax]
     
     distance -- Distance Modulus to calculate calibrated magnitude
+  
+      magext -- Data of magnitude extinctions (one per each filter)
+ 
+     filters -- List of filters (order is given by cols_order)
 
      corners -- Coordinates of the corners of the images
                 [x0, y0, x1, y1]  x0 <= x1, y0 <= y1
@@ -661,9 +665,14 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
     for k in xrange(nimages):
         fidimag.append(open(filenames[k], "w"))
 
-    # Create the MAG file with stars to be added
+    # Create the MAG files with stars to be added
     fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
     f_mag = open(fn_mag, "w+")
+    fn_inimag = "%sM%d-inimag_%s.mag" % (field, numcaj, chip)
+    f_inimag = open(fn_inimag, "w+")
+    fn_calmag = "%sM%d-calmag_%s.mag" % (field, numcaj, chip)
+    f_calmag = open(fn_calmag, "w+")
+ 
     # Copy HEADER from ref. image .als (3 first lines)
     mag_header = ""
     with open(mch_fnames[0]+".als", "r") as f_als:
@@ -674,6 +683,14 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
             if n_line >= 3:
                 break
     f_mag.write(mag_header)
+
+    inimag_header = "#%9s" % "ID"
+    for flt in filters:
+        inimag_header += "%11s" % flt
+    inimag_header += '\n'
+    calmag_header = inimag_header
+    f_inimag.write(inimag_header)
+    f_calmag.write(calmag_header)
 
 
     # Init arrays of stars inside/outside rectangle (just to print some stats)
@@ -707,6 +724,15 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
         mag_line = "%9d %8.3f %8.3f" % (star_id, xpos_init, ypos_init)
        
         # -------------------------------------------------------------------------
+
+        star_ok = False   # Check if the star is eventually being included or discarded
+        # Initialize the ebv data (it will be used to write the calmag info to a file)
+        data_ebv = {}
+        count_ebv = {}
+        for flt in filters:
+            data_ebv[flt] = 0.0
+            count_ebv[flt] = 0
+
 
         #############################################
         # TRANSFORM ALL IMAGES
@@ -749,24 +775,31 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
             # TRANSFORMATIONS DONE
 
-            
+            # Get EBV data from all images to later calculate the average (needed to write calmag files)
+            chip_img = chip_info[nimg]
+            flt = chip_img['FILTER']
+            data_ebv[flt] += chip_img['EBV']
+            count_ebv[flt] += 1
+
             # After transformations, SAVE TO FILE (xpos, ypos) ONLY if it is inside rectangle given by corners
             if in_rectangle (corners, [xpos, ypos]):
                 # This star is INSIDE the limits, transform the MAGNITUDE and write it to ADD
                 try:
+                    # Get calibrated magnitude after applying absorption and distance modulus
+                    calmag = get_calmag(data_in[flt][star_pos], distance, chip_img['EBV'], magext[flt])
                     # Get calibrated color: colsign * (band - colband)
-                    chip_img = chip_info[nimg]
                     color = chip_img['COLSIGN'] * (data_in[chip_img['BAND']][star_pos] - data_in[chip_img['COLBAND']][star_pos]) 
                     # PERFORM MAGNITUDE TRANSFORMATION
-                    calmag = get_mag(chip_img, data_in[chip_img['FILTER']][star_pos], color, chip_img['FILTER'], distance, magext)
+                    instmag = get_instmag(chip_img, calmag, color)
                 except:
                     exit_error_msg("There was a problem when processing magnitude for image " + mch_fnames[nimg])
 
                 # Write it to ADD file 
                 fidimag[nimg + (numcaj - numcajorg) * nimages].write('%6i %8.3f %8.3f %8.3f\n' % 
-                                (star_id, xpos, ypos, calmag))
-                mag_line += "%9.4f   0.0000" % calmag
+                                (star_id, xpos, ypos, instmag))
+                mag_line += "%9.4f   0.0000" % instmag
                 stars_in[nimg]  += 1
+                star_ok = True
             else:
                 # This point is outside corners, just ignore it
                 mag_line += "%9.4f   9.9999" % 99.9999
@@ -778,15 +811,31 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
  
 
 #-----------------------------------------------------------------------------
-        # END MAG file with fixed fields: CHI SHARP FLAG PROB
+        # Write files ONLY if the star is included in any image(s) (not discarded)
+        if star_ok:
+            # END MAG file with fixed fields: CHI SHARP FLAG PROB
+            num_cols += 2
+            mag_line += "   1.0000   0.0000"
+            if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%23s" % ''
+            mag_line += "    0   1.00\n"
+            #mag_line += "   1.0000   0.0000    0   1.00\n"
+            f_mag.write(mag_line)
 
-        num_cols += 2
-        mag_line += "   1.0000   0.0000"
-        if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%23s" % ''
-        mag_line += "    0   1.00\n"
-        #mag_line += "   1.0000   0.0000    0   1.00\n"
-        f_mag.write(mag_line)
+            # Write to file with the original magnitudes (inimag) and
+            # the calibrated ones (calmag), after applying absorption 
+            # and distance  modulus
+            out_inimag = "%10d" % star_id
+            out_calmag = "%10d" % star_id
+            for flt in filters:
+                inimag = data_in[flt][star_pos]  
+                # EBV depends on the image, get the average value
+                ebv_val = data_ebv[flt]/count_ebv[flt]
+                calmag = get_calmag(inimag, distance, ebv_val, magext[flt])
+                out_inimag += " %10.3f" % inimag
+                out_calmag += " %10.3f" % calmag
 
+            f_inimag.write(out_inimag+"\n")
+            f_calmag.write(out_calmag+"\n")
 
 #-----------------------------------------------------------------------------
 
@@ -825,12 +874,23 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
             for k in xrange(nimages):
                 fidimag.append(open(filenames[nfopen * nimages + k], 'w'))
 
+    
             # Close previous MAG file and create new one for current iteration
             f_mag.close()
             fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
             f_mag = open(fn_mag, "w+")
             f_mag.write(mag_header)
- 
+
+            f_inimag.close()
+            fn_inimag = "%sM%d-inimag_%s.mag" % (field, numcaj, chip)
+            f_inimag = open(fn_inimag, "w+")
+            f_inimag.write(inimag_header)
+
+            f_calmag.close()
+            fn_calmag = "%sM%d-calmag_%s.mag" % (field, numcaj, chip)
+            f_calmag = open(fn_calmag, "w+")
+            f_calmag.write(calmag_header)
+
             print ('Writing set of files %s...' % numcaj)
 
 
@@ -842,6 +902,8 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
         if not f.closed:
             f.close()
     f_mag.close()
+    f_inimag.close()
+    f_calmag.close()
 
 
 #-----------------------------------------------------------------------------
@@ -1102,7 +1164,7 @@ def get_dimfield_from_file(fname, corners, radcent):
 
 ########################################################################################
 
-def process_mch(mch_file, input_data, cols_order, star_ini, number_stars, ALLOWED_MODES, MAX_COEF):
+def process_mch(mch_file, input_data, star_ini, number_stars, ALLOWED_MODES, MAX_COEF):
     """
     Read Main MCH file and the input file, in order to establish the correspondences between them, since we
     need to know which column of input file corresponds to each secondary MCH file of those that appear in the
@@ -1110,7 +1172,6 @@ def process_mch(mch_file, input_data, cols_order, star_ini, number_stars, ALLOWE
 
          mch_file -- filename of the main MCH file (with .alf images)
        input_data -- data in input file 
-       cols_order -- information about columns of input file given by user in the config file
          star_ini -- first star to process (count begins in 0)
      number_stars -- number of starts to process (defined by user)
     ALLOWED_MODES -- List of allowed models of MCH files 
@@ -1256,6 +1317,7 @@ def process_argv(args, mch_ext):
         * chips_file:    filename of the chips data file
         * input_file:    filename of the input file 
         * cols_order:    array with associations between Main MCH files and Input columns 
+        * filters:       list of filters (order is given by cols_order)
         * corners:       array with opposite corners of CCD: [x0,y0, x1,y1]
         * radcent:       value of radcent
         * dimfield:      array: [xmin, xmax, ymin, ymax]
@@ -1342,6 +1404,12 @@ def process_argv(args, mch_ext):
         cols_order    = args[ARG_STARSCOLS].replace(" ","").split(',')
         if not STAR_ID in cols_order:
             error_msg += " * Column order (it MUST contain " + STAR_ID + " to specify stars ID)\n"
+
+        # Get Filters
+        filters = [];
+        for flt in cols_order:
+            if flt != STAR_ID and flt != IGNORE_COL:
+                filters.append(flt)
     except:
         error_msg += " * Column order\n"
 
@@ -1473,6 +1541,7 @@ def process_argv(args, mch_ext):
         print_subtitle("  Chips data file: " + chips_file)       
         print_subtitle("       Input file: " + input_file)
         print_subtitle("     Column order: " + str(cols_order))
+        print_subtitle("          Filters: " + str(filters))
         print_subtitle("          Corners: " + str(corners))
         print_subtitle("          Radcent: " + str(radcent))
         print_subtitle("         Dimfield: " + str(dimfield))  
@@ -1486,30 +1555,46 @@ def process_argv(args, mch_ext):
         else: print_subtitle("    Shuffle stars: NO") 
 
 
-        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, magext, corners, radcent, 
+        return [main_mch_file, chips_file, input_file, stars_shuffle, cols_order, filters, magext, corners, radcent, 
                 dimfield, distance, field, chip, max_iters, refine_mch]
 
 ########################################################################################
 
-def get_mag(data, calmag, colsub, star_filt, distance, magext):
-    """ Perform magnitude transformation following next equation:
+def get_calmag(inimag, distance, ebv_val, magext_val):
+    """ Apply the absorption and distance modulus
         color = colsub  * 3.07 * EBV
-        instmag = calmag + zpterm + amterm*X + colterm*COLOR + apcorr - 2.5*alog10(exptime)  [X = airmass]
 
-       data   -- chip values for the current image
-       calmag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
-       colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
-    star_filt -- filter used in this image
+       inimag -- magnitude from star star[chip[FILTER] (it should be = star[chip[BAND]]
      distance -- Distance Modulus used to calculate the calibrated magnitude
-       magext -- magnitude extinctions
+      ebv_val -- value of EBV
+   magext_val -- value of magnitude extinction
 
     RETURNS:
      * calculated magnitude according to the given equation
     """
 
-    absorption = magext[star_filt] * data['EBV']
-    calmag += absorption + distance
-    instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] + data['COLTERM'] * colsub + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
+    absorption = magext_val * ebv_val
+    calmag = inimag + absorption + distance
+    return calmag
+ 
+
+########################################################################################
+
+def get_instmag(data, calmag, colsub):
+    """ Perform magnitude transformation following next equation:
+        color = colsub  * 3.07 * EBV
+        instmag = calmag + zpterm + amterm*X + colterm*COLOR + apcorr - 2.5*alog10(exptime)  [X = airmass]
+
+         data -- chip values for the current image
+       calmag -- calibrated magnitude from star (after applying absorption and distance modulus)
+       colsub -- color given by: chip[COLSIGN] * (star[chip[BAND]] - star[chip[COLBAND]])
+
+    RETURNS:
+     * calculated magnitude according to the given equation
+    """
+
+    instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] \
+                     + data['COLTERM'] * colsub + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     return instmag
  
 
@@ -1841,6 +1926,7 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
  stars_file,      \
  stars_shuffle,   \
  cols_order,      \
+ filters,         \
  magext,          \
  corners,         \
  radcent,         \
@@ -1866,7 +1952,7 @@ star_init = number_stars = 0
  mch_data,        \
  data_in,         \
  nstars]          \
- = process_mch(mch_file, stars, cols_order, star_init, number_stars, ALLOWED_MODES, MAX_COEF)
+ = process_mch(mch_file, stars, star_init, number_stars, ALLOWED_MODES, MAX_COEF)
 
 # Get info from chips 
 chip_info = get_chip_info(chips_file, mch_fnames)
@@ -1888,7 +1974,7 @@ shift   = 0
 # PROCESS TRANSFORMATIONS
 ###########################################################
 numiters = crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, data_in, mmtrans, 
-                            chip_info, radcent, dimfield, distance, corners, MAX_COEF, 
+                            chip_info, radcent, dimfield, distance, magext, filters, corners, MAX_COEF, 
                             None, star_init, offset, shift)
 
 ###########################################################
