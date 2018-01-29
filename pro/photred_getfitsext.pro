@@ -64,7 +64,7 @@ Case usecase of
   ; full, basename and extension
   4: if nfiles eq 1 then out=strarr(2) else out=strarr(nfiles,2)
   else: ; Not supported
-Case
+Endcase
 
 ; Loop through the files
 For i=0,nfiles-1 do begin
