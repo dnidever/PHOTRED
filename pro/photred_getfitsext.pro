@@ -96,8 +96,6 @@ For i=0,nfiles-1 do begin
   Endcase
 Endfor
 
-stop
-
 return,out
 
 end
