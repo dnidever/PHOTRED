@@ -206,7 +206,7 @@ printlog,logfile,'Creating cmn.coo and cmn.ap for ',strtrim(nfieldfiles,2),' fil
 
 ; Now run PBS_DAEMON.PRO
 if n_elements(cmd) gt 0 then $
-  PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=5,scriptsdir=scriptsdir
+  PBS_DAEMON,cmd,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,/idle,waittime=1,scriptsdir=scriptsdir
 
 ; Now concatenate and merge all of the catalogs
 ;----------------------------------------------
