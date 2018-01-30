@@ -397,7 +397,6 @@ FOR n=0,nnights-1 do begin
   printlog,logfile,systime(0)
   SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout
 
-
   ; DAOGROW Converged
   ;----------------------
   ; Read in the log file

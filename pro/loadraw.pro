@@ -136,7 +136,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
       ; Loop through the lines per star
       for k=0l,nstarline-1 do begin
         readf, unit, instr1
-        if k gt 0 then instr1=strmid(instr1,24) ; 2nd and later lines have 25 leading spaces
+        if k gt 0 then instr1=strmid(instr1,25) ; 2nd and later lines have 25 leading spaces
         instr += instr1
       endfor
 

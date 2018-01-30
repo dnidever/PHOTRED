@@ -132,17 +132,18 @@ For i=0,nchips-1 do begin
       allphotmagsband = reform((strsplitter(allphotmags,'MAG',/extract))[0,*])  ; just the band name
       ; Unique magnitudes
       uiphotmagsband = uniq(allphotmagsband,sort(allphotmagsband))
-      uphotmagsband = allphotmags[uiphotmagsband]
-      nphotmagsband = n_elements(photmagsband)
+      uphotmagsband = allphotmagsband[uiphotmagsband]
+      nphotmagsband = n_elements(uphotmagsband)
       ; Add the columns to PHOT
       photschema = phot[0]
-      STRUCT_ASSIGN,photschema,{dum:0}  ; blank it out
+      STRUCT_ASSIGN,{dum:0},photschema  ; blank it out
       for k=0,nphotmagsband-1 do $
-        photschema=CREATE_STRUCT(photschema,uphotmagsband[k]+'MAG',0.0,uphotmagsband[k]+'ERR',0.0)
+         photschema=CREATE_STRUCT(photschema,uphotmagsband[k]+'MAG',99.99,uphotmagsband[k]+'ERR',9.99,$
+                                  'NDET'+uphotmagsband[k],0)
       temp = phot & undefine,phot
       phot = REPLICATE(photschema,nphot)  ; put in new structure format
       STRUCT_ASSIGN,temp,phot,/nozero
-      phottag = tag_names(phot)  ; new phot tags
+      phottags = tag_names(phot)  ; new phot tags
       
       ; Loop over unique bands and average
       for k=0,nphotmagsband-1 do begin
@@ -156,17 +157,67 @@ For i=0,nchips-1 do begin
           tempmag[*,l]=phot.(tagindphmag1)
           temperr[*,l]=phot.(tagindphmag1+1)  ; ERR is always the next one
         endfor
-          
+          stop
         ; Average the mags
         AVERAGEMAG,tempmag,temperr,newmag,newerr,/robust
         magind = where(phottags eq uphotmagsband[k]+'MAG',nmagind)
         errind = where(phottags eq uphotmagsband[k]+'ERR',nerrind)
         phot.(magind) = newmag
         phot.(errind) = newerr
-      endfor  ; unique band loop      
-    endif  ; adding average photometry per band      
+        ndet = long(total(tempmag lt 50,2))
+        detind = where(phottags eq 'NDET'+strupcase(uphotmagsband[k]),ndetind)
+        phot.(detind) = ndet
+        phot.ndet += ndet
+     endfor                     ; unique band loop      
 
-    
+    ; Add NDETX columns
+    endif else begin
+
+      ; Find all the magnitude columns
+      photmagind = where(stregex(photcols,'MAG',/boolean) eq 1 and $
+                         stregex(photcols,'^I_',/boolean) eq 0 and $
+                         stregex(photcols,'ERR',/boolean) eq 0,nphotmagind)
+      if nphotmagind eq 0 then begin
+        printlog,logfile,'NO photometric magnitudes found in '+mockphotfile
+        goto,BOMB1 
+      endif
+      allphotmags = photcols[photmagind]  ; iMAG3, zMAG
+      allphotmagsband = reform((strsplitter(allphotmags,'MAG',/extract))[0,*])  ; just the band name
+      ; Unique magnitudes
+      uiphotmagsband = uniq(allphotmagsband,sort(allphotmagsband))
+      uphotmagsband = allphotmagsband[uiphotmagsband]
+      nphotmagsband = n_elements(uphotmagsband)
+      ; Add the columns to PHOT
+      photschema = phot[0]
+      STRUCT_ASSIGN,{dum:0},photschema  ; blank it out
+      for k=0,nphotmagsband-1 do $
+         photschema=CREATE_STRUCT(photschema,'NDET'+uphotmagsband[k],0)
+      photschema=CREATE_STRUCT(photschema,'NDET',0)
+      
+      temp = phot & undefine,phot
+      phot = REPLICATE(photschema,nphot)  ; put in new structure format
+      STRUCT_ASSIGN,temp,phot,/nozero
+      phottags = tag_names(phot)  ; new phot tags
+
+      ; Loop over unique bands and average
+      for k=0,nphotmagsband-1 do begin
+        indphmag = where(allphotmagsband eq uphotmagsband[k] and $   ; indices into ALLPHOTMAGS/PHOTCOLS
+                         allphotmags ne uphotmagsband[k],nindphmag)        ; exclude avg mag
+        phmagcols = photcols[photmagind[indphmag]]
+        MATCH,phottags,phmagcols,tagindphmag,ind2,/sort  ; indices for 
+        tempmag = fltarr(nphot,nindphmag)
+        for l=0,nindphmag-1 do begin
+          MATCH,phottags,strupcase(phmagcols[l]),tagindphmag1,ind2,/sort
+          tempmag[*,l]=phot.(tagindphmag1)
+        endfor
+        ndet = long(total(tempmag lt 50,2))
+        detind = where(phottags eq 'NDET'+strupcase(uphotmagsband[k]),ndetind)
+        phot.(detind) = ndet
+        phot.ndet += ndet
+     endfor               ; unique band loop      
+      
+    endelse     ; no avg phot mags
+
     ; Load the final, recovered photometry file, but use the mag/raw
     ;  instrumental photometry.  Use this to match up recovered to
     ;  original objects.
@@ -248,7 +299,7 @@ For i=0,nchips-1 do begin
     calsynthphotcols = calsynthtags[calsynthphotcolind]
     for k=0,ncalsynthphotcolind-1 do astschema=CREATE_STRUCT(astschema,'INP_'+calsynthphotcols[k],0.0)
     ; Add recovered information
-    astschema = CREATE_STRUCT(astschema,'ID','','X',0.0d0,'Y',0.d0,'RA',0.0d0,'DEC',0.0d0,'NDET',0L)
+    astschema = CREATE_STRUCT(astschema,'ID','','X',999999.0d0,'Y',999999.d0,'RA',999999.0d0,'DEC',999999.0d0,'NDET',0L)
     ; Add columms from PHOT file
     ;   get all of the unique filters, anything with MAG and not I_ and
     ;   not with ERR
@@ -266,9 +317,9 @@ For i=0,nchips-1 do begin
     nphotmags = n_elements(uphotmags)
     ;  Add three columns for each filter: magnitude, error, Ndetections
     for k=0,nphotmags-1 do $
-       astschema=CREATE_STRUCT(astschema,uphotmags[k],0.0,uphotmags[k]+'ERR',0.0,'NDET'+uphotmags[k],0L)
+       astschema=CREATE_STRUCT(astschema,uphotmags[k],99.99,uphotmags[k]+'ERR',9.99,'NDET'+uphotmags[k],0L)
     ; Add final morphology columns
-    astschema = CREATE_STRUCT(astschema,'chi',0.0,'sharp',0.0,'flag',0L,'prob',0.0)
+    astschema = CREATE_STRUCT(astschema,'chi',999999.0,'sharp',999999.0,'flag',-1L,'prob',999999.0)
     asttags = tag_names(astschema)
 
     ; --- Make the structure and copy over the data ---
@@ -310,6 +361,11 @@ For i=0,nchips-1 do begin
     temp = ast[sind]
     STRUCT_ASSIGN,phot[find],temp,/nozero
     temp.id = strtrim(temp.id,2)
+    for k=0,nphotmags-1 do begin
+       tind1 = where(asttags eq strupcase(uphotmags[k]),ntind1)         ; U, G, R,..
+       tind2 = where(phottags eq strupcase(uphotmags[k])+'MAG',ntind2)  ; UMAG, GMAG, RMAG, ...
+       temp.(tind1) = phot[find].(tind2)
+    endfor
     ast[sind] = temp
     ast.recovered = 0  ; nothing recovered to start
     ast[sind].recovered = 1

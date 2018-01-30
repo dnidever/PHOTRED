@@ -496,6 +496,9 @@ if (coolines ge 4 and aplines ge 4) then begin
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     fitsfile = base+'.fits.fz'
     head = headfits(fitsfile,exten=1)
+    ; Fix the NAXIS1/2 in header
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin  
     fitsfile = base+'.fits'
     head = headfits(fitsfile)
@@ -582,6 +585,9 @@ For i=0,nfieldfiles-1 do begin
     if fpack eq 1 then begin
       fitsfile = ibase+'.fits.fz'
       head1 = headfits(fitsfile,exten=1)
+      ; Fix the NAXIS1/2 in header
+      sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
+      sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
     endif else begin
       fitsfile = ibase+'.fits'
       head1 = headfits(fitsfile)

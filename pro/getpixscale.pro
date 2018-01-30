@@ -36,11 +36,21 @@ if test eq 0 and n_elements(head) eq 0 then begin
 endif
 
 ; Fpack or regular fits
-if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
-if fpack eq 1 then exten=1 else exten=0
+if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+  fpack = 1
+  exten = 1
+endif else begin
+  fpack = 0
+  exten = 0
+endelse
 
 ; Read the header
 if n_elements(head) eq 0 then head = headfits(file,exten=exten)
+; Fix NAXIS1/2 in header
+if fpack eq 1 then begin
+  sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+  sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+endif
 
 ; Does the image have a SCALE parameter
 hscale = sxpar(head,'SCALE',/silent)

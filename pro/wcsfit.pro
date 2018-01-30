@@ -1426,7 +1426,16 @@ if message ne '' then begin
   print,error
   return    
 endif
-if fpack eq 1 then head=headfits(filename,exten=1)  ; fits_read will modify the header improperly
+if fpack eq 1 then begin
+  head = headfits(filename,exten=1)  ; fits_read will modify the header improperly
+  ; NAXIS1/NAXIS2 get modified by fpack, need to temporarily
+  ;  put back the originals which are saved in ZNAXIS1/2
+  ;  But save the fpack header so we can put things back
+  ;  when we update the header at the end
+  orig_head = head
+  sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+  sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+endif
 im = float(im)
 
 ; Information structure
@@ -1478,8 +1487,13 @@ if nastr gt 0 then begin
   projhead = strtrim(projhead,2)
 
   ; Getting central RA/DEC
-  nx = SXPAR(head,'NAXIS1',/silent)
-  ny = SXPAR(head,'NAXIS2',/silent)
+  if fpack eq 0 then begin
+    nx = SXPAR(head,'NAXIS1',/silent)
+    ny = SXPAR(head,'NAXIS2',/silent)
+  endif else begin
+    nx = SXPAR(head,'ZNAXIS1',/silent)
+    ny = SXPAR(head,'ZNAXIS2',/silent)
+  endelse
   HEAD_XYAD,head,0.5*nx,0.5*ny,cenra0,cendec0,/degree
 
 endif
@@ -2031,7 +2045,7 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='USNO-B1'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='GAIA/GAIA'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
@@ -2637,6 +2651,9 @@ if not keyword_set(noupdate) then begin
       MWRFITS,im,filename,head,/create
       ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
     endif else begin
+      ; Put the original NAXIS1/2 values back
+      sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
+      sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
       ; Create temporary symbolic link to make modfits.pro think
       ; this is an ordinary FITS file
       tempfile = MAKETEMP('temp')
