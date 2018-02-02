@@ -130,10 +130,15 @@ endelse
 if nfieldfiles gt 0 then begin
   ; Get base names
   fbases = strarr(nfieldfiles)
+  fext = strarr(nfieldfiles)
   for i=0,nfieldfiles-1 do begin
-    if strmid(fieldfiles[i],6,7,/reverse_offset) eq 'fits.fz' then $
-      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz') else $
+    if strmid(fieldfiles[i],6,7,/reverse_offset) eq 'fits.fz' then begin
+      fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits.fz')
+      fext[i] = 'fits.fz'
+    endif else begin
       fbases[i] = FILE_BASENAME(fieldfiles[i],'.fits')
+      fext[i] = 'fits'
+    endelse
   endfor
   bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
               stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
@@ -149,10 +154,30 @@ if nfieldfiles gt 0 then begin
       undefine,fieldfiles
       nfieldfiles = 0
     endif else begin
-      REMOVE,bad,fieldfiles
+      REMOVE,bad,fieldfiles,fbases,fext
       nfieldfiles = n_elements(fieldfiles)
     endelse
   endif ; some ones to remove
+  ; Make sure they are unique
+  ;  sometimes you can accidentally get a fits and fits.fz files
+  ;  for the same image
+  if nfieldfiles gt 0 then begin
+    dbl = doubles(fbases,count=ndbl)
+    dblall = doubles(fbases,/all)
+    badmask = bytarr(nfieldfiles)
+    for i=0,ndbl-1 do begin
+      MATCH,fbases[dblall],fbases[dbl[i]],ind1,ind2,/sort,count=nmatch
+      ind = dblall[ind1]
+      badmask[ind] = 1
+      ; keep the fits.fz ending over the fits one
+      ;  else take the first fits file
+      gd = where(fext[ind] eq 'fits.fz',ngd)
+      if ngd gt 0 then badmask[ind[gd[0]]]=0 else badmask[ind[0]]=0     
+    endfor
+    bad = where(badmask eq 1,nbad)
+    if nbad gt 0 then REMOVE,bad,fieldfiles,fbases,fext
+    nfieldfiles = n_elements(fieldfiles)
+  endif
 endif else begin  ; some fieldfiles
   printlog,logfile,'No ',field,' files found in current directory'
   return
