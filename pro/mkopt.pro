@@ -235,7 +235,7 @@ for i=0,nfiles-1 do begin
 
   ; Calculating some things
   FW = FW < 20             ; daophot won't accept anything higher than 20
-  RE = RD/GA
+  RE = RD/GA > 0.01
   FI = FW < 51             ; daophot won't accept anything higher than 51
   PS = (4.0*FW) < 51       ; daophot won't accept anything higher than 51
   IS = (FI - 1.0) < 35     ; daophot won't accept anything higher than 35
