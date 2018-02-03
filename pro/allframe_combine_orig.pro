@@ -701,6 +701,7 @@ Endif else begin
   rdnoisearr = fltarr(nfiles)
   for i=0,nfiles-1 do rdnoisearr[i] = PHOTRED_GETRDNOISE(base[i]+'.fits')
   rdnoise = sqrt(total((weights*rdnoisearr)^2))
+  rdnoise = rdnoise > 0.01   ; must be >=0.01 or it will be 0.00 in the opt file and daophot will crash
   dummy = PHOTRED_GETRDNOISE(combfile,keyword=rdnoisekey) ; get keyword
   sxaddpar,combhead,rdnoisekey,rdnoise
 
