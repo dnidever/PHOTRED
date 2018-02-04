@@ -62,6 +62,17 @@ synth.z = zi + synth.i
 
 ; Get the images
 files = file_search(dir+field+'/'+field+'-*_??.fits',count=nfiles)
+if nfiles eq 0 then begin
+  fzfiles = file_search(dir+field+'/'+field+'-*_??.fits.fz',count=nfzfiles)
+  ; Need to uncompress the files
+  if nfzfiles gt 0 then begin
+    print,'Found ',strtrim(nfzfiles,2),' fits.fz files.  Uncompressing.'
+    for i=0,nfzfiles-1 do spawn,['funpack',fzfiles[i]],/noshell
+    files = file_dirname(fzfiles)+'/'+file_basename(fzfiles,'.fz')
+    nfiles = n_elements(files)
+  endif
+endif
+
 print,'Found ',strtrim(nfiles,2),' files to add artificial stars to'
 if nfiles eq 0 then begin
   print,'No files found'
