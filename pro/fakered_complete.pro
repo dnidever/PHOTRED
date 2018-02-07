@@ -252,16 +252,34 @@ printlog,logfile,strtrim(nfields,2)+' unique fields to process'
 printlog,logfile,''
 printlog,logfile,systime(0)
 
+; Make commands
+undefine,cmd,cmddir
+For i=0,nfields-1 do begin
+  ind = where(allfields eq ufields[i],nind)
+  ffiles = inputlines[ind]
+  if nind gt 0 then fils='["'+strjoin(ffiles,'","')+'"]' else fils='"'+ffiles+'"'
+  imgr = '{namps:'+strtrim(thisimage.namps,2)+'L,separator:"'+thisimager.separator+'"}'
+  cmd1 = 'completeness,'+fils+',imager="'+imgr+',maindir="'+maindir+'"'
+  cmddir1 = file_expand_path(file_dirname(inputlines[0]))
+  if keyword_set(sepchipdir) then cmddir1=file_dirname(cmddir1) ; strip off chip directory
+  push,cmd,cmd1
+  push,cmddir,cmddir1
+Endfor
+  
+; Submit the jobs to the daemon
+PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='cmplt',hyperthread=hyperthread,$
+           waittime=5,/cdtodir,scriptsdir=scriptsdir
+
+
+;-------------------
+; Checking OUTPUTS
+;-------------------
+
+
 ; Loop over the fields
 For i=0,nfields-1 do begin
   ind = where(allfields eq ufields[i],nind)
   ffiles = inputlines[ind]
-  
-  printlog,logfile,'----------------' 
-  printlog,logfile,strtrim(i+1,2)+'/'+strtrim(nfields,2)+' '+ufields[i]+' - '+strtrim(nind,2)+' phot files'
-  printlog,logfile,'----------------' 
-  printlog,logfile,''
-  COMPLETENESS,ffiles,imager=thisimager,maindir=maindir,logfile=logfile
 
   ; Get field name
   nameind = where(stregex(field_shnames,'^'+ufields[i]+'M',/boolean) eq 1,nnameind)
