@@ -84,7 +84,8 @@ For i=0,nchips-1 do begin
   chipind = where(allchips eq ichip,nmocks)
   if i gt 0 and nchips gt 1 then printlog,logfile,' '
   printlog,logfile,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mock(s)'
-
+  printlog,logfile,systime(0)
+  
   ; Loop over the mocks for this chip
   ;----------------------------------
   undefine,chipast
