@@ -221,28 +221,31 @@ baselist = FILE_BASENAME(inputlines,'.phot')
 nbaselist = n_elements(baselist)
 
 
-; Loop over the files
+; Loop over the reference chip files
 undefine,outlist,successlist,failurelist
 For i=0,nbaselist-1 do begin
   dir1 = dirlist[i]
   base1 = baselist[i]
+
+  mchfile = dir1+'/'+base1+'.mch'
+  LOADMCH,mchfile,files
+  nfiles = n_elements(files)
+  bases = file_basename(files,'.als')
+  ; Loop over all of the exposures
+  for j=0,nfiles-1 do $
+    FILE_DELETE,dir1+'/'+bases[j]+['.add','.fits','.alf'],/allow
   
   ; Reference exposure files
-  if file_test(dir1+'/'+base1+'.mch') eq 1 then begin
-     ; For ALLFRAME
-     FILE_DELETE,dir1+'/'+base1+['.mch','.outlist','.inlist','.shift','.mag','.makemag','_comb.bpm.fits','_comb.fits',$
-                                '_comb.mask.fits','_comb.coo','_comb.als.inp','_comb.als','_combs.fits','_comb.log',$
-                                '_comb.sex','_comb_sub.cat','_comb_allf.sex','_comb_all.coo','_comb_sub.als','_comb_sub.fits',$
-                                '_comb_allf.als','.comb.mch','.nmg','.tfr','.ast','.input','.phot'],/allow
-  endif
-
-  ; Regular exposure files
-  FILE_DELETE,dir1+'/'+base1+['.add','.fits','.alf'],/allow
+  ;  most of these are ALLFRAME-related files
+  FILE_DELETE,dir1+'/'+base1+['.mch','.outlist','.inlist','.shift','.mag','.makemag','_comb.bpm.fits','_comb.fits',$
+                              '_comb.mask.fits','_comb.coo','_comb.als.inp','_comb.als','_combs.fits','_comb.log',$
+                              '_comb.sex','_comb_sub.cat','_comb_allf.sex','_comb_all.coo','_comb_sub.als','_comb_sub.fits',$
+                              '_comb_allf.als','.comb.mch','.nmg','.tfr','.ast','.input','.phot'],/allow
 
   ; Check that they were successful
-  PUSH,successlist,dir1+'/'+base
-  PUSH,outlist,dir1+'/'+base
-
+  PUSH,successlist,dir1+'/'+base1
+  PUSH,outlist,dir1+'/'+base1
+  
   BOMB:
 Endfor
 
