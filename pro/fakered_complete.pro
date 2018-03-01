@@ -268,7 +268,7 @@ Endfor
 
 ; Submit the jobs to the daemon
 PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='cmplt',hyperthread=hyperthread,$
-           waittime=5,/cdtodir,scriptsdir=scriptsdir
+           waittime=5,/cdtodir,/idle,scriptsdir=scriptsdir
 
 
 ;-------------------
