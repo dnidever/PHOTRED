@@ -48,7 +48,7 @@ allfieldname = reform( (strsplitter(allfieldmockname,'M',/extract))[0,*] )
 uifieldname = uniq(allfieldname,sort(allfieldname))
 if n_elements(uifieldname) gt 1 then begin
   error = 'ERROR: files for more than one field input'
-  printlog,logfile,error
+  printlog,logf,error
   return
 endif
 shfield = allfieldname[0]  ; they should all be the same
@@ -66,13 +66,13 @@ READCOL,maindir+'/fields',shnames,lnames,format='A,A',/silent
 nameind = where(shnames eq shfield,nnameind)
 if nnameind eq 0 then begin
   error = 'Short field name >>'+shfield+'<< not found in "fields" file'
-  printlog,logfile,error
+  printlog,logf,error
   return
 endif
 globalfield = lnames[nameind[0]]
 
-printlog,logfile,'Getting completeness function for ',shfield,' = ',globalfield
-printlog,logfile,'-------------------------------------------------------------'
+printlog,logf,'Getting completeness function for ',shfield,' = ',globalfield
+printlog,logf,'-------------------------------------------------------------'
 
 
 ; Loop over the separate chips
@@ -82,9 +82,9 @@ For i=0,nchips-1 do begin
 
   ichip = uchips[i]
   chipind = where(allchips eq ichip,nmocks)
-  if i gt 0 and nchips gt 1 then printlog,logfile,' '
-  printlog,logfile,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mock(s)'
-  printlog,logfile,systime(0)
+  if i gt 0 and nchips gt 1 then printlog,logf,' '
+  printlog,logf,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mock(s)'
+  printlog,logf,systime(0)
   
   ; Loop over the mocks for this chip
   ;----------------------------------
@@ -97,8 +97,8 @@ For i=0,nchips-1 do begin
     ; Get the mock number for the filename, e.g. F2M5- gives mocknum=5
     fieldmockname = first_el(strsplit(mockphotbase,'-',/extract))
     mocknum = long(first_el(strsplit(fieldmockname,'M',/extract),/last))
-    if j gt 0 and nmocks gt 1 then printlog,logfile,' '
-    printlog,logfile,'  MOCK='+strtrim(mocknum,2)
+    if j gt 0 and nmocks gt 1 then printlog,logf,' '
+    printlog,logf,'  MOCK='+strtrim(mocknum,2)
     ; Load the FITS header
     head = headfits(mockfitsfile)
     
@@ -112,7 +112,7 @@ For i=0,nchips-1 do begin
     probind = where(strupcase(photcols) eq 'PROB',nprobind)
     if nprobind gt 0 then allframe=1 else allframe=0
     ; Load the PHOT file
-    printlog,logfile,'  Loading '+mockphotfile
+    printlog,logf,'  Loading '+mockphotfile
     phot = IMPORTASCII(mockphotfile,/header,/silent)
     nphot = n_elements(phot)
     
@@ -126,7 +126,7 @@ For i=0,nchips-1 do begin
                          stregex(photcols,'^I_',/boolean) eq 0 and $
                          stregex(photcols,'ERR',/boolean) eq 0,nphotmagind)
       if nphotmagind eq 0 then begin
-        printlog,logfile,'NO photometric magnitudes found in '+mockphotfile
+        printlog,logf,'NO photometric magnitudes found in '+mockphotfile
         goto,BOMB1 
       endif
       allphotmags = photcols[photmagind]  ; iMAG3, zMAG
@@ -179,7 +179,7 @@ For i=0,nchips-1 do begin
                          stregex(photcols,'^I_',/boolean) eq 0 and $
                          stregex(photcols,'ERR',/boolean) eq 0,nphotmagind)
       if nphotmagind eq 0 then begin
-        printlog,logfile,'NO photometric magnitudes found in '+mockphotfile
+        printlog,logf,'NO photometric magnitudes found in '+mockphotfile
         goto,BOMB1 
       endif
       allphotmags = photcols[photmagind]  ; iMAG3, zMAG
@@ -226,34 +226,34 @@ For i=0,nchips-1 do begin
     if allframe eq 1 then magext='.mag' else magext='.raw'
     finalfile = repstr(mockphotfile,'.phot','.mag')
     if (file_info(finalfile)).exists eq 0 then begin
-      printlog,logfile,finalfile+' NOT FOUND'
+      printlog,logf,finalfile+' NOT FOUND'
       goto,BOMB1
     endif
     if allframe eq 1 then LOADMAG,finalfile,final else LOADRAW,finalfile,final
     nfinal = n_elements(final)
-    printlog,logfile,'  NFINAL='+strtrim(nfinal,2)
+    printlog,logf,'  NFINAL='+strtrim(nfinal,2)
     
     ; Load the original "real" star data file
     ;  Use .raw or .mag file depending if allframe was used.
     origfile = mockphotdir+'/'+shfield+'-'+refname+imager.separator+string(ichip,format='(i02)')+magext
     if (file_info(origfile)).exists eq 0 then begin
-      printlog,logfile,origfile+' NOT FOUND'
+      printlog,logf,origfile+' NOT FOUND'
       goto,BOMB1
     endif
     if allframe eq 1 then LOADMAG,origfile,orig else LOADRAW,origfile,orig
     norig = n_elements(orig)
-    printlog,logfile,'  NORIG='+strtrim(norig,2)
+    printlog,logf,'  NORIG='+strtrim(norig,2)
     
     ; Load the artificial star data file, with information on
     ;   the injected stars
     synthfile = mockphotdir+'/'+fieldmockname+'-'+refname+'-add'+imager.separator+string(ichip,format='(i02)')+magext
     if (file_info(synthfile)).exists eq 0 then begin
-      printlog,logfile,synthfile+' NOT FOUND'
+      printlog,logf,synthfile+' NOT FOUND'
       goto,BOMB1
     endif
     if allframe eq 1 then LOADMAG,synthfile,synth else LOADRAW,synthfile,synth
     nsynth = n_elements(synth)
-    printlog,logfile,'  NSYNTH='+strtrim(nsynth,2)
+    printlog,logf,'  NSYNTH='+strtrim(nsynth,2)
     ; Remove stars with NO good magnitudes, were not actually used
     stags = tag_names(synth)
     smagind = where(stregex(stags,'^MAG',/boolean) eq 1 and stregex(stags,'ERR$',/boolean) eq 0,nsmagind)
@@ -261,7 +261,7 @@ For i=0,nchips-1 do begin
     for k=0,nsmagind-1 do badmask = badmask AND (synth.(smagind[k]) gt 50)
     sbdmag = where(badmask eq 1,nsbdmag)
     if nsbdmag gt 0 then begin
-      printlog,logfile,'  Removing '+strtrim(nsbdmag,2)+' synthetic stars with NO good magnitudes'
+      printlog,logf,'  Removing '+strtrim(nsbdmag,2)+' synthetic stars with NO good magnitudes'
       REMOVE,sbdmag,synth
       nsynth = n_elements(synth)
     endif
@@ -271,11 +271,11 @@ For i=0,nchips-1 do begin
     ;  stars for this chip+mock.
     calsynthfile = mockphotdir+'/'+fieldmockname+'-calmag'+imager.separator+string(ichip,format='(i02)')+'.mag'
     if (file_info(calsynthfile)).exists eq 0 then begin
-      printlog,logfile,synthfile+' NOT FOUND'
+      printlog,logf,synthfile+' NOT FOUND'
       goto,BOMB1
     endif
     calsynth = IMPORTASCII(calsynthfile,/header,count=ncalsynth,/silent)
-    printlog,logfile,'  NCALSYNTH='+strtrim(ncalsynth,2)
+    printlog,logf,'  NCALSYNTH='+strtrim(ncalsynth,2)
 
     ; Do the CROSS-MATCHING between the three lists (final/orig/synth)
     ;-----------------------------------------------------------------
@@ -284,8 +284,8 @@ For i=0,nchips-1 do begin
     ; We don't want to think we recovered an artificial star when it's
     ; actually a real star (likely bright one).
     ; We are using the instrumental photomery (.mag/.raw) to do this matching.
-    printlog,logfile,'  Matching'
-    COMPLETENESS_CROSSMATCH,final,orig,synth,find,sind,nmatch=nmatch,logfile=logfile,error=xmatcherror
+    printlog,logf,'  Matching'
+    COMPLETENESS_CROSSMATCH,final,orig,synth,find,sind,nmatch=nmatch,logfile=logf,error=xmatcherror
     if n_elements(xmatcherror) gt 0 then goto,BOMB1
     
     ; Put all AST information into one structure
@@ -308,7 +308,7 @@ For i=0,nchips-1 do begin
                        stregex(photcols,'^I_',/boolean) eq 0 and $
                        stregex(photcols,'ERR',/boolean) eq 0,nphotmagind)
     if nphotmagind eq 0 then begin
-      printlog,logfile,'NO photometric magnitudes found in '+mockphotfile
+      printlog,logf,'NO photometric magnitudes found in '+mockphotfile
       goto,BOMB1 
     endif
     allphotmags = photcols[photmagind]  ; iMAG3, zMAG
@@ -344,7 +344,7 @@ For i=0,nchips-1 do begin
     MATCH2,calsynth.id,synth.id,ind1,ind2
     dum = where(ind2 gt -1,ncalmatch)
     if ncalmatch ne nsynth then begin
-      printlog,logfile,'Not all synth elements found matches in calsynth'
+      printlog,logf,'Not all synth elements found matches in calsynth'
       goto,BOMB1
     endif
     ; Loop over calsynth columns and copy
@@ -383,7 +383,7 @@ For i=0,nchips-1 do begin
       chipasttags = tag_names(chipast)
       bad = where(chipasttags ne asttags,nbad)
       if nbad gt 0 then begin
-        printlog,logfile,'  AST structures do NOT match between MOCKS'
+        printlog,logf,'  AST structures do NOT match between MOCKS'
         return 
       endif
       ; Combine
@@ -416,7 +416,7 @@ For i=0,nchips-1 do begin
     bigasttags = tag_names(bigast)
     bad = where(bigasttags ne chipasttags,nbad)
     if nbad gt 0 then begin
-      printlog,logfile,'  AST structures do NOT match between CHIPS'
+      printlog,logf,'  AST structures do NOT match between CHIPS'
       return 
     endif
     ; Combine
@@ -444,7 +444,7 @@ Endfor  ; chip loop
 ; Nothing to save
 if n_elements(bigast) eq 0 then begin
   error = 'Nothing to save'
-  printlog,logfile,error
+  printlog,logf,error
   return
 endif
 
@@ -527,7 +527,7 @@ spawn,['epstopdf',file+'.eps'],/noshell
 ; Combine the figures
 pdffiles = maindir+'/plots/'+globalfield+'_'+['input','recovered','completeness']+'.pdf'
 spawn,'gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile='+maindir+'/plots/'+globalfield+'_complete.pdf '+strjoin(pdffiles,' ')
-printlog,logfile,'Completeness plots are in '+maindir+'/plots/'+globalfield+'_complete.pdf'
+printlog,logf,'Completeness plots are in '+maindir+'/plots/'+globalfield+'_complete.pdf'
 
 ;stop
 
