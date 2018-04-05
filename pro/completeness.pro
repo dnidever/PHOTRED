@@ -426,6 +426,7 @@ For i=0,nchips-1 do begin
   ; Combine the chip AST structure for this field
   CHIPCOMBINE:
   if n_elements(bigast) gt 0 and n_elements(chipast) gt 0 then begin
+    chipasttags = tag_names(chipast)
     bigasttags = tag_names(bigast)
     bad = where(bigasttags ne chipasttags,nbad)
     if nbad gt 0 then begin
