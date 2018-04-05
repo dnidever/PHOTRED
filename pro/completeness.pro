@@ -94,8 +94,8 @@ For i=0,nchips-1 do begin
   outchipfile = photdir+'/'+shfield+'-'+refname+imager.separator+string(ichip,format='(i02)')+'_complete.fits'
   if file_test(outchipfile+'.gz') eq 1 and not keyword_set(redo) then begin
     print,outchipfile,' already EXISTS and /redo NOT set.  Loading the existing file.'
-    chipast = MRDFITS(outchipfile+'.gz',1,/silent)
-    goto,chipcombine
+    chipast = MRDFITS(outchipfile+'.gz',1,status=rdstatus,/silent)
+    if rdstatus eq 0 then goto,chipcombine   ; successful read
   endif
   
   ; Loop over the mocks for this chip
