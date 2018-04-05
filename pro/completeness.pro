@@ -13,6 +13,7 @@
 ;  =imager       The imager information structure.
 ;  =logfile      A logfile to print output to.
 ;  =maindir      The main directory for this PHOTRED run.
+;  /redo         Recreate AST files if they already exist.
 ;
 ; OUTPUTS:
 ;  The structure of artificial stars and information on whether
@@ -26,7 +27,7 @@
 ;-
 
 pro completeness,photfiles,imager=imager,logfile=logfile,$
-                 maindir=maindir,error=error
+                 maindir=maindir,error=error,redo=redo
 
 undefine,error
   
@@ -34,7 +35,7 @@ undefine,error
 nphotfiles = n_elements(photfiles)
 if nphotfiles eq 0 or n_elements(imager) eq 0 or n_elements(maindir) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - completeness,photfiles,imager=imager,maindir=maindir,logfile=logfile,error=error'
+  print,'Syntax - completeness,photfiles,imager=imager,maindir=maindir,logfile=logfile,error=error,redo=redo'
   return
 endif
 
@@ -85,6 +86,15 @@ For i=0,nchips-1 do begin
   if i gt 0 and nchips gt 1 then printlog,logf,' '
   printlog,logf,'  '+strtrim(i+1,2)+'/'+strtrim(nchips,2)+' CHIP='+strtrim(ichip,2)+' - '+strtrim(nmocks,2)+' mock(s)'
   printlog,logf,systime(0)
+
+  ; Check if the chip output file already exists
+  mockphotdir = file_dirname(photfiles[chipind[0]])
+  outchipfile = mockphotdir+'/'+shfield+'-'+refname+imager.separator+string(ichip,format='(i02)')+'_complete.fits'
+  if file_test(outchipfile+'.gz') eq 0 and not keyword_set(redo) then begin
+    print,outchipfile,' already EXISTS and /redo NOT set.  Just loading in the existing file.'
+    chipast = MRDFITS(outchipfile+'.gz',1,/silent)
+    goto,chipcombine
+  endif
   
   ; Loop over the mocks for this chip
   ;----------------------------------
@@ -412,6 +422,7 @@ For i=0,nchips-1 do begin
   SPAWN,['gzip',outchipfile],/noshell
 
   ; Combine the chip AST structure for this field
+  CHIPCOMBINE:
   if n_elements(bigast) gt 0 and n_elements(chipast) gt 0 then begin
     bigasttags = tag_names(bigast)
     bad = where(bigasttags ne chipasttags,nbad)
