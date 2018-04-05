@@ -284,10 +284,14 @@ if FILE_TEST(mchbase+'.mag') then FILE_DELETE,mchbase+'.mag',/allow,/quiet
 
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
-  ; weights, scale, zero, comb_psf, _shift.mch
-  if keyword_set(cmborig) then $
-    chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch'] else $
-    chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch']
+  ; In early versions of ALLFRAME _comb.mch was called _shift.mch
+  ;  Use new name with link
+  if file_test(mchbase+'_comb.mch') eq 0 and file_test(mchbase+'_shift.mch') eq 1 then begin
+    print,'Linking '+mchbase+'_comb.mch to '+mchbase+'_shift.mch'
+    FILE_LINK,mchbase+'_shift.mch',mchbase+'_comb.mch' 
+  endif
+  ; weights, scale, zero, comb_psf, _comb.mch
+  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch']
   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
   if nbdfiles gt 0 then begin
     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
