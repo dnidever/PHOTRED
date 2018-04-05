@@ -92,7 +92,7 @@ For i=0,nchips-1 do begin
   photbase = file_basename(photfiles[chipind[0]],'.phot')  
   refname = (strsplit(photbase,'-'+imager.separator,/extract))[1]
   outchipfile = photdir+'/'+shfield+'-'+refname+imager.separator+string(ichip,format='(i02)')+'_complete.fits'
-  if file_test(outchipfile+'.gz') eq 0 and not keyword_set(redo) then begin
+  if file_test(outchipfile+'.gz') eq 1 and not keyword_set(redo) then begin
     print,outchipfile,' already EXISTS and /redo NOT set.  Just loading in the existing file.'
     chipast = MRDFITS(outchipfile+'.gz',1,/silent)
     goto,chipcombine
