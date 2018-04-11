@@ -705,12 +705,12 @@ FOR i=0L,ninp-1 do begin
     ;  only want to match lines with file=''
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
        MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
-             ':'+strtrim(inp.night,2)+':'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+             ':'+strtrim(inp.night[j],2)+':'+strtrim(inp.chip[j],2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try chip + band
     ;  only want to match lines with file='' and night=-1
     if nmatch eq 0 and transchipinfo eq 1 then $
        MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
-             ':-1:'+strtrim(inp.chip,2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+             ':-1:'+strtrim(inp.chip[j],2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
     ; Try just the band
     ;  only want to match lines with file='', night=-1 and chip=-1
     if nmatch eq 0 then $
@@ -723,6 +723,7 @@ FOR i=0L,ninp-1 do begin
     endif else begin
       printlog,logf,'NO TRANSFORMATION INPUT FOR  REFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
+stop
       return
     endelse
 
