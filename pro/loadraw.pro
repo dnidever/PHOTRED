@@ -141,7 +141,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
           ; Use the first character AFTER the first column to figure out
           ;   how many spaces we need to strip off
           trial = strmid(instr1,34,1)
-          if trial eq ' ' then nspaces=25 else nspaces=24
+          if trial eq ' ' then nspaces=24 else nspaces=25
           instr1 = strmid(instr1,nspaces)
         endif
         ;if k gt 0 then instr1=strmid(instr1,25) ; 2nd and later lines have 25 leading spaces

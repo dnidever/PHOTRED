@@ -261,9 +261,13 @@ FOR i=0,ninputlines-1 do begin
     ; Loop through the lines per star
     for k=0l,nstarline-1 do begin
       readf, unit, instr1
-      ;instr += instr1
+      ; There are leading spaces, 24 or 25                                                                                                                                       
+      ; Use the first character AFTER the first column to figure out                                                                                                             
+      ;   how many spaces we need to strip off                                                                                                                                   
+      trial = strmid(instr1,34,1)
+      if trial eq ' ' then nspaces=24 else nspaces=25
       ; remove extra 25 spaces at the beginning of extra/wrap lines
-      if k eq 0 then instr+=instr1 else instr+=strmid(instr1,25)
+      if k eq 0 then instr+=instr1 else instr+=strmid(instr1,nspaces)
     endfor
     ; We need to use the formatted read because sometimes there are
     ; NO spaces between the numbers in the columns.
