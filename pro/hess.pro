@@ -67,6 +67,9 @@
 ;   =ysize    Sets the y image size for PS output.
 ;   =zbot     Set the bottom of the z-scale for /AVG
 ;   =ztop     Set the top of the z-scale for /AVG
+;   =maskvalue    The value to which bad/missing data is flagged.  Pixels
+;                   with this value are set to 0B
+;   =maskcolor    The color to use for "bad data".  The default is 0B.
 ;
 ;  OUTPUTS
 ;   im        The image that is plotted
@@ -267,7 +270,7 @@ end
 
 pro hess_avg,im,x,y,z,xmin,ymin,dx,dy,nx,ny,colnorm=colnorm,rownorm=rownorm,bot=bot,top=top,$
              zbot=zbot,ztop=ztop,log=log,minhue=minhue,maxhue=maxhue,minbright=minbright,$
-             maxbright=maxbright,saturation=saturation
+             maxbright=maxbright,saturation=saturation,maskcolor=maskcolor,maskvalue=maskvalue
 
 ; AVERAGE
 
@@ -540,7 +543,7 @@ pro hess,xx,yy,zz,im,color=color,nx=nx0,ny=ny0,dx=dx0,dy=dy0,$
           maximum=maximum,force=force,perc=perc,format=format,$
           xsize=xsize,ysize=ysize,zbot=zbot,ztop=ztop,$
           xtickformat=xtickformat,ytickformat=ytickformat,xstyle=xstyle,$
-          ystyle=ystyle,indim=indim
+          ystyle=ystyle,indim=indim,maskvalue=maskvalue,maskcolor=maskcolor
 
 
 
@@ -981,7 +984,7 @@ endif
           charthick=charthick,framecolor=framecolor,$
           background_color=background_color,color=color,max=top,min=bot,$
           xsize=xsize,ysize=ysize,xtickformat=xtickformat,ytickformat=ytickformat,$
-          xstyle=xstyle,ystyle=ystyle
+          xstyle=xstyle,ystyle=ystyle,maskvalue=maskvalue,maskcolor=maskcolor
 
   colpos = [0.08*dx1+x0,0.92*dy1+y0,0.95*dx1+x0,0.95*dy1+y0]
   ;colpos = [0.08,0.92,0.95,0.95]

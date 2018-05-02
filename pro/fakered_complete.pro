@@ -260,6 +260,7 @@ For i=0,nfields-1 do begin
   if nind gt 0 then fils='["'+strjoin(ffiles,'","')+'"]' else fils='"'+ffiles+'"'
   imgr = '{namps:'+strtrim(thisimager.namps,2)+'L,separator:"'+thisimager.separator+'"}'
   cmd1 = 'completeness,'+fils+',imager='+imgr+',maindir="'+maindir+'"'
+  if keyword_set(redo) then cmd1+=',/redo'
   cmddir1 = file_expand_path(file_dirname(inputlines[0]))
   if keyword_set(sepchipdir) then cmddir1=file_dirname(cmddir1) ; strip off chip directory
   push,cmd,cmd1
