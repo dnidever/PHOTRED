@@ -223,7 +223,7 @@ For i=0,nchips-1 do begin
           MATCH,phottags,strupcase(phmagcols[l]),tagindphmag1,ind2,/sort
           tempmag[*,l]=phot.(tagindphmag1)
         endfor
-        ndet = long(total(tempmag lt 50,2))
+        if nindphmag gt 1 then ndet = long(total(tempmag lt 50,2)) else ndet = long(tempmag lt 50)
         detind = where(phottags eq 'NDET'+strupcase(uphotmagsband[k]),ndetind)
         phot.(detind) = ndet
         phot.ndet += ndet
