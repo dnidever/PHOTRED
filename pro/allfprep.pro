@@ -242,6 +242,12 @@ WHILE (flag eq 0) do begin
     printlog,logf,'Running SExtractor'
     FILE_DELETE,catfile,/allow               ; delete sextractor catalog file
     SPAWN,'sex '+subfile+' -c '+sexconfigfile,out,errout
+    if n_elements(errout) gt 1 or errout[0] ne '' then begin  ; SExtractor error
+      printlog,logf,'Error when running SExtractor:'
+      printlog,logf,errout
+      error = errout
+      return
+    endif
     num = file_lines(catfile)
     printlog,logf,'SExtractor found '+strtrim(num,2)+' sources'
 
