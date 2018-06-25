@@ -72,6 +72,9 @@ endif
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
+; Minimum number of detections
+ndetmin = READPAR(setup,'NDETMIN')
+if (ndetmin eq '-1' or ndetmin eq '0' or ndetmin eq '') then undefine,ndetmin else ndetmin=long(ndetmin)
 
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
@@ -349,6 +352,27 @@ FOR i=0,ninputlines-1 do begin
   phot.ra = ra
   phot.dec = dec
 
+
+  ; Apply minimum number of detections, NDETMIN
+  if n_elements(ndetmin) gt 0 then begin
+    printlog,logfile,'Applying NDETMIN = '+strtrim(ndetmin,2)
+    ; ID X Y MAG1 MAG1ERR MAG2 MAG2ERR MAG3 MAG3ERR MAG4 MAG4ERR
+    magind = where(stregex(tags,'^MAG',/boolean) eq 1 and stregex(tags,'ERR$',/boolean) eq 0,nmagind)
+    printlog,logfile,strtrim(nmagind,2)+' magnitude columns'
+    ndet = lonarr(n_elements(phot))
+    for i=0,nmagind-1 do ndet += (phot.(magind[i]) lt 50)
+    gddet = where(ndet ge ndetmin,ngddet)
+    if ngddet gt 0 then begin
+      printlog,logfile,'Keeping '+strtrim(ngddet,2)+' of '+strtrim(n_elements(phot),2)+' sources'
+    endif else begin
+      printlog,logfile,'NO SOURCES PASS.  Keeping the first source.'      
+      gddet = 0
+      ngddet = 1
+    endelse
+    phot = phot[gddet]
+  endif
+  
+  
   ; Output the structure to the AST file
   astfile = base+'.ast'
   printlog,logfile,'File with RA/DEC coordinates is: ',astfile

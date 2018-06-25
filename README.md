@@ -345,6 +345,7 @@ alftrimcmb  |  Trim off "extra" parts of the combined/stacked image that aren't 
 alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from ALLFRAME processing.
 alfusecmn  |  Use the reference image common sources file to pick PSF stars for the combined image.
 alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
+ndetmin  |  Apply minimum number of detections per source in ASTROM stage.
 ddo51radoffset  |  There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
 cmbforce  |  Force COMBINE to combine the files even though not all expected amps/chips are there
 keepinstr | CALIB should keep the instrumental magnitudes in the final output file.
