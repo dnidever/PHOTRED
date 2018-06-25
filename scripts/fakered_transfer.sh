@@ -8,6 +8,7 @@
 ##
 ## AUTHOR: Antonio Dorta <adorta@iac.es>
 ## DATE: 2017-03-02
+##       2018-02-08: if starssplit == 2 -> Split stars using first column as chip ID
 ##
 ## Operations:
 ## 1) Read filenames to get the number of chips
@@ -27,7 +28,7 @@
 # New extension for MCH with .alf 
 ext=".alf.mch"
 # Files to be copied
-EXT_TO_COPY=(.fits .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .weights .scale .zero _comb.psf _comb.opt _comb.als.opt _shift.mch .phot)
+EXT_TO_COPY=(.fits .fits.fz .opt .alf .mch .psf .als .opt .als.opt .ap .raw .mag .log .weights .scale .zero _comb.psf _comb.opt _comb.als.opt _shift.mch .phot)
 #EXT_TO_COPY=(alf)
 FILES_TO_COPY=(apcor.lst extinction fields)
 
@@ -172,8 +173,19 @@ then
   done
 
 else
-  cp $starsOrig $starsDest/${starsFn}.txt
-  starsFile=${starsFn}.txt
+  if [[ $starsSplit -eq 2 ]]
+  then
+    # SPLIT input stars file using the FIRST COLUMN as chip ID
+    for chip in "${CHIPS[@]}"
+    do
+      grep "^$chip " $starsOrig > $starsDest/${starsFn}_${chip}.txt
+    done
+
+  else
+    # NO splitting
+    cp $starsOrig $starsDest/${starsFn}.txt
+    starsFile=${starsFn}.txt
+  fi
 fi
 
 
@@ -277,7 +289,7 @@ do
     # Transfer stars file
 
     cd $destDir
-    if [[ $starsSplit -eq 1 ]]
+    if [[ $starsSplit -ne 0 ]]
     then
       starsFile="*${chp}.txt" 
     fi

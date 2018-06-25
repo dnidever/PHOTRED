@@ -342,6 +342,8 @@ def get_input_stars(fn_stars, cols_order, stars_shuffle):
                 stars[col] = stars_raw[pos]
                 if col == STAR_ID:
                 	  print ("Column " + str(pos+1) + ": stars ID. Total stars: " + str(len(stars[col])))
+                elif col == XPOS_COL or col == YPOS_COL:
+                	  print ("Column " + str(pos+1) + ": Position " + col + ". Total stars: " + str(len(stars[col])))
                 else:
                 	  print ("Column " + str(pos+1) + ": filter " + col + ". Total stars: " + str(len(stars[col])))
             else:
@@ -490,7 +492,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
      offset -- random values of offset [offx, offy]
 
-      shift -- shift in magnitude to move the stars in the CMD after every iteration
+      shift -- shift in magnitude to move the stars in the CMD after every iteration (NOT USED!!)
 
     """
 
@@ -511,7 +513,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
         offset = [random.uniform(-lim,lim), random.uniform(-lim,lim)]
     if shift is None:
         lim = 0.07
-        shift = random.uniform(-lim,lim)
+        shift = random.uniform(-lim,lim) # NOT USED!!!
 
     # Get dimensions
     radcent /= 2
@@ -704,14 +706,21 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
     xaux = 0 
     yaux = 0 
 
+    # See whether we have to create the GRID or the positions are given
+    GIVEN_POS = XPOS_COL in data_in and YPOS_COL in data_in
+
  
     rowpos = 0
     print ('Writing set of files %s...' % numcaj)
     for star_pos,star_id in enumerate(data_in[STAR_ID]):
 
-        # Get initial positions
-        xpos_init = xmin + (2 * (xaux + 1) - 1) * radcent + offx
-        ypos_init = ymin + (2 * (yaux + 1) - 1) * radcent + offy
+        if GIVEN_POS:
+            xpos_init = data_in[XPOS_COL][star_pos]
+            ypos_init = data_in[YPOS_COL][star_pos]
+        else:
+            # Get initial positions
+            xpos_init = xmin + (2 * (xaux + 1) - 1) * radcent + offx
+            ypos_init = ymin + (2 * (yaux + 1) - 1) * radcent + offy
 
         # Write line in file .mag for the current star. Format:
         # ID  XREF YREF   F1 F1ERR  F2 F2ERR ... FN FNERR  CHI  SHARP  FLAG  PROB
@@ -777,16 +786,16 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
             # Get EBV data from all images to later calculate the average (needed to write calmag files)
             chip_img = chip_info[nimg]
-            flt = chip_img['FILTER']
-            data_ebv[flt] += chip_img['EBV']
-            count_ebv[flt] += 1
+            flt_img = chip_img['FILTER']
+            data_ebv[flt_img] += chip_img['EBV']
+            count_ebv[flt_img] += 1
 
             # After transformations, SAVE TO FILE (xpos, ypos) ONLY if it is inside rectangle given by corners
             if in_rectangle (corners, [xpos, ypos]):
                 # This star is INSIDE the limits, transform the MAGNITUDE and write it to ADD
                 try:
                     # Get calibrated magnitude after applying absorption and distance modulus
-                    calmag = get_calmag(data_in[flt][star_pos], distance, chip_img['EBV'], magext[flt])
+                    calmag = get_calmag(data_in[flt_img][star_pos], distance, chip_img['EBV'], magext[flt_img])
                     # Get calibrated color: colsign * (band - colband)
                     color = chip_img['COLSIGN'] * (data_in[chip_img['BAND']][star_pos] - data_in[chip_img['COLBAND']][star_pos]) 
                     # PERFORM MAGNITUDE TRANSFORMATION
@@ -829,7 +838,10 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
             for flt in filters:
                 inimag = data_in[flt][star_pos]  
                 # EBV depends on the image, get the average value
-                ebv_val = data_ebv[flt]/count_ebv[flt]
+                if count_ebv[flt] > 0:
+                  ebv_val = data_ebv[flt]/count_ebv[flt]
+                else:
+                  ebv_val = 0
                 calmag = get_calmag(inimag, distance, ebv_val, magext[flt])
                 out_inimag += " %10.3f" % inimag
                 out_calmag += " %10.3f" % calmag
@@ -839,59 +851,60 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
 
 #-----------------------------------------------------------------------------
 
-        # UPDATE COUNTERS: Get ready for next iteration over the stars loop 
-        # (Go to next star and next col of CCD)
-        cn -= 1
-        yaux += 1
-    		# If we are in the last col, go to first position of next row 
-        if (yaux >= ysize):
-            xaux += XSEP
-            rowpos += 1
-            # If we are in even row, y position is half in order to distribute stars in triangles
-            if (rowpos % 2) == 0:
-                yaux = 0.0
-            else:
-                yaux = 0.5
+        if not GIVEN_POS:
+            # UPDATE COUNTERS: Get ready for next iteration over the stars loop 
+            # (Go to next star and next col of CCD)
+            cn -= 1
+            yaux += 1
+        		# If we are in the last col, go to first position of next row 
+            if (yaux >= ysize):
+                xaux += XSEP
+                rowpos += 1
+                # If we are in even row, y position is half in order to distribute stars in triangles
+                if (rowpos % 2) == 0:
+                    yaux = 0.0
+                else:
+                    yaux = 0.5
 
 
-        # Check if CCD is FULL (xaux >= xsize) and there are still some stars to process (cn > 0)
-        if (xaux >= xsize) and (cn > 0):
+            # Check if CCD is FULL (xaux >= xsize) and there are still some stars to process (cn > 0)
+            if (xaux >= xsize) and (cn > 0):
 
-            # Check if we have reached the limit of iters (Mocks). If so, quit loop!
-            if numcaj >= addmax: break        
+                # Check if we have reached the limit of iters (Mocks). If so, quit loop!
+                if numcaj >= addmax: break        
 
-            # CCD IS FULL, write in new files
-            xaux = 0
-            yaux = 0
-            numcaj += 1
-            nfopen += 1
+                # CCD IS FULL, write in new files
+                xaux = 0
+                yaux = 0
+                numcaj += 1
+                nfopen += 1
 
-            # Close all open files
-            for f in fidimag:
-                if not f.closed:
-                    f.close()
-            # Open new files
-            for k in xrange(nimages):
-                fidimag.append(open(filenames[nfopen * nimages + k], 'w'))
+                # Close all open files
+                for f in fidimag:
+                    if not f.closed:
+                        f.close()
+                # Open new files
+                for k in xrange(nimages):
+                    fidimag.append(open(filenames[nfopen * nimages + k], 'w'))
 
     
-            # Close previous MAG file and create new one for current iteration
-            f_mag.close()
-            fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
-            f_mag = open(fn_mag, "w+")
-            f_mag.write(mag_header)
+                # Close previous MAG file and create new one for current iteration
+                f_mag.close()
+                fn_mag = get_iter_filename(mch_fnames[0], field, chip, numcaj, ".mag").replace("_", "-add_")
+                f_mag = open(fn_mag, "w+")
+                f_mag.write(mag_header)
 
-            f_inimag.close()
-            fn_inimag = "%sM%d-inimag_%s.mag" % (field, numcaj, chip)
-            f_inimag = open(fn_inimag, "w+")
-            f_inimag.write(inimag_header)
+                f_inimag.close()
+                fn_inimag = "%sM%d-inimag_%s.mag" % (field, numcaj, chip)
+                f_inimag = open(fn_inimag, "w+")
+                f_inimag.write(inimag_header)
 
-            f_calmag.close()
-            fn_calmag = "%sM%d-calmag_%s.mag" % (field, numcaj, chip)
-            f_calmag = open(fn_calmag, "w+")
-            f_calmag.write(calmag_header)
+                f_calmag.close()
+                fn_calmag = "%sM%d-calmag_%s.mag" % (field, numcaj, chip)
+                f_calmag = open(fn_calmag, "w+")
+                f_calmag.write(calmag_header)
 
-            print ('Writing set of files %s...' % numcaj)
+                print ('Writing set of files %s...' % numcaj)
 
 
 #-----------------------------------------------------------------------------
@@ -1333,8 +1346,8 @@ def process_argv(args, mch_ext):
     ARG_STARSSHUF  = argc; argc+=1
     ARG_MAGEXT     = argc; argc+=1
     ARG_MAXCCDSIZE = argc; argc+=1
-    ARG_DIMFIELD   = argc; argc+=1
     ARG_RADCENT    = argc; argc+=1
+    ARG_DIMFIELD   = argc; argc+=1
     ARG_DISTANCE   = argc; argc+=1
     ARG_REFINEMCH  = argc; argc+=1
     NUM_ARGS       = argc
@@ -1408,7 +1421,7 @@ def process_argv(args, mch_ext):
         # Get Filters
         filters = [];
         for flt in cols_order:
-            if flt != STAR_ID and flt != IGNORE_COL:
+            if flt != STAR_ID and flt != IGNORE_COL and flt != XPOS_COL and flt != YPOS_COL:
                 filters.append(flt)
     except:
         error_msg += " * Column order\n"
@@ -1454,7 +1467,7 @@ def process_argv(args, mch_ext):
             magext_aux = [float(x) for x in magext_data.replace(" ","").split(',')]
 
             # Go for each filter:
-            for flt in cols_order:
+            for flt in filters:
 
                 # Check whether we have already processed all filters
                 if len(magext_aux) != 1 and num_filters >= len(magext_aux):
@@ -1462,12 +1475,11 @@ def process_argv(args, mch_ext):
                     break
  
                 # Skip STAR_ID or columns to ignore 
-                if flt != STAR_ID and flt != IGNORE_COL:
-                    if len(magext_aux) == 1:
-                        magext[flt] = magext_aux[0]             # One common value
-                    else:
-                        magext[flt] = magext_aux[num_filters]   # List of values
-                    num_filters += 1
+                if len(magext_aux) == 1:
+                    magext[flt] = magext_aux[0]             # One common value
+                else:
+                    magext[flt] = magext_aux[num_filters]   # List of values
+                num_filters += 1
 
             if len(magext) != num_filters or (len(magext_aux) != 1 and len(magext_aux) != num_filters):
                 error_msg += " * MagExt should be one common value or have a value for each filter\n"
@@ -1902,6 +1914,8 @@ ALLOWED_MODES = [6, 12, 20]  # Allowed modes in DAOMASTER (Transformations of mo
 MAX_COEF      = 22                      # Max. number of coefficients in MCH files (with NO filename)
 STAR_ID       = "@"
 IGNORE_COL    = "*"
+XPOS_COL      = "XPOS"
+YPOS_COL      = "YPOS"
 FILE_ITER_SEP = 'M'			           # Separator used when creating the "add" files
 FILE_ITER_EXT = 'add'              # Add files extension
 MCH_FILE_EXT  = '.alf.mch'         # Extension of MCH files

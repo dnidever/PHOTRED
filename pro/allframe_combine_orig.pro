@@ -219,7 +219,8 @@ endfor
 ; FAKE, check that we have all the files that we need
 if keyword_set(fake) then begin
   ; weights, scale, zero, comb_psf, _shift.mch
-  chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
+  ; adorta chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_shift.mch']
+  chkfiles = mchbase+['.weights','.scale','.zero']
   bdfiles = where(file_test(chkfiles) eq 0,nbdfiles)
   if nbdfiles gt 0 then begin
     error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ')
