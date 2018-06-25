@@ -39,8 +39,8 @@ openr,unit,/get_lun,filename
 readf,unit,line1
 readf,unit,line2
 readf,unit,line3
-readf,unit,line4
-readf,unit,line5
+;readf,unit,line4
+;readf,unit,line5
 close,unit
 free_lun,unit
 
@@ -66,12 +66,10 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   endflag = 0
   nstarline = 1
   continuation = 0
-  WHILE (endflag ne 1) do begin
+  WHILE (endflag ne 1) and ~eof(unit) do begin
 
     line4 = ''
-    if ~eof(unit) then begin
-      readf,unit,line4
-    endif else endflag = 1
+    readf,unit,line4
 
     ; If there are too many frames/columns then these
     ; go on separate lines and lead with 27 blank spaces
@@ -83,7 +81,6 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
       ncol += narr4
       nstarline++
       continuation=1
-      if eof(unit) then endflag=1
     endif else endflag=1
   ENDWHILE
   close,unit
