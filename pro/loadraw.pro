@@ -69,7 +69,9 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   WHILE (endflag ne 1) do begin
 
     line4 = ''
-    readf,unit,line4
+    if ~eof(unit) then begin
+      readf,unit,line4
+    endif else endflag = 1
 
     ; If there are too many frames/columns then these
     ; go on separate lines and lead with 27 blank spaces
@@ -81,6 +83,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
       ncol += narr4
       nstarline++
       continuation=1
+      if eof(unit) then endflag=1
     endif else endflag=1
   ENDWHILE
   close,unit
@@ -177,7 +180,12 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
     fieldnames = [fieldnames,'CHI','SHARP']
 
     mastable2 = transpose(mastable)
-    phot = ARR2STR(mastable2,fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    if numstar gt 1 then begin
+      phot = ARR2STR(mastable2,fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    endif else begin
+      ; arr2str needs a 2D array, make it [Ncol, 1]
+      phot = ARR2STR(reform(mastable2,n_elements(mastable2),1),fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    endelse
 
   endelse ; nfiles >=12
 

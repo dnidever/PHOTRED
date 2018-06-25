@@ -52,7 +52,11 @@ nstarline = 1
 WHILE (endflag ne 1) do begin
 
   line4 = ''
-  readf,unit,line4
+  if ~eof(unit) then begin
+    readf,unit,line4
+  endif else begin
+    endflag = 1
+  endelse
 
   ; If there are too many frames/columns then DAOMASTER puts
   ; these on separate lines and lead with ~27 blank spaces
@@ -64,6 +68,7 @@ WHILE (endflag ne 1) do begin
     narr4 = n_elements(arr4)
     ncol += narr4
     nstarline++
+    if eof(unit) then endflag=1
   endif else endflag=1
 ENDWHILE
 close,unit
