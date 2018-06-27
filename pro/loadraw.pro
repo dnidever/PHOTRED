@@ -39,8 +39,8 @@ openr,unit,/get_lun,filename
 readf,unit,line1
 readf,unit,line2
 readf,unit,line3
-readf,unit,line4
-readf,unit,line5
+;readf,unit,line4
+;readf,unit,line5
 close,unit
 free_lun,unit
 
@@ -66,7 +66,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   endflag = 0
   nstarline = 1
   continuation = 0
-  WHILE (endflag ne 1) do begin
+  WHILE (endflag ne 1) and ~eof(unit) do begin
 
     line4 = ''
     readf,unit,line4
@@ -177,7 +177,12 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
     fieldnames = [fieldnames,'CHI','SHARP']
 
     mastable2 = transpose(mastable)
-    phot = ARR2STR(mastable2,fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    if numstar gt 1 then begin
+      phot = ARR2STR(mastable2,fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    endif else begin
+      ; arr2str needs a 2D array, make it [Ncol, 1]
+      phot = ARR2STR(reform(mastable2,n_elements(mastable2),1),fieldnames=fieldnames,fieldtypes=fieldtypes,/noprint)
+    endelse
 
   endelse ; nfiles >=12
 

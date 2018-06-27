@@ -49,7 +49,7 @@ ncol = narr4
 ; Check for continuation lines
 endflag = 0
 nstarline = 1
-WHILE (endflag ne 1) do begin
+WHILE (endflag ne 1) and ~eof(unit) do begin
 
   line4 = ''
   readf,unit,line4
