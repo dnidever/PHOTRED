@@ -1,4 +1,4 @@
-function mktemp,prefix,directory=directory,error=error,outdir=outdir
+function mktemp,prefix,directory=directory,nodot=nodot,error=error,outdir=outdir
 
 ;+
 ;
@@ -14,6 +14,7 @@ function mktemp,prefix,directory=directory,error=error,outdir=outdir
 ;  /directory  This is for a directory.
 ;  =outdir     The output directory.  If not given then the
 ;                current directory is used.
+;  /nodot      Do not add dot after prefix.
 ;
 ; OUTPUTS:
 ;  temp      The filename of the temporary file or directory.
@@ -37,8 +38,10 @@ CD,current=curdir
 
 if n_elements(outdir) eq 0 then begin
   template = curdir+'/'+prefix+'.XXXXXX'
+  if keyword_set(nodot) then template = curdir+'/'+prefix+'XXXXXX' 
 endif else begin
   template = outdir+'/'+prefix+'.XXXXXX'
+  if keyword_set(nodot) then template = outdir+'/'+prefix+'XXXXXX' 
 endelse
 
 ; Use the UNIX "mktemp" to get the "random" portion
