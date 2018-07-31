@@ -133,7 +133,8 @@ function dust_getval, gall, galb, infile=infile, skipline=skipline, $
     readcol, infile, gall, galb, format='F,F', skipline=skipline
 
    if keyword_set(ipath) then begin
-       dum = findfile(ipath+'SFD*.fits', count=ct)
+       ;dum = findfile(ipath+'SFD*.fits', count=ct)
+       dum = file_search(ipath+'SFD*.fits', count=ct)
        if (ct EQ 0) then begin
            message, 'Bad file path!'
            return, -1
@@ -145,7 +146,8 @@ function dust_getval, gall, galb, infile=infile, skipline=skipline, $
       if (dust_dir NE '') then ipath = dust_dir+'/maps/' $
        else ipath = './'
    endif
-   dum = findfile(ipath+'SFD*.fits', count=ct)
+   ;dum = findfile(ipath+'SFD*.fits', count=ct)
+   dum = file_search(ipath+'SFD*.fits', count=ct)
    if (ct EQ 0) then begin
        message, 'No data files found in path'
        return, -1

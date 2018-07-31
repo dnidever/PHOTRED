@@ -242,6 +242,11 @@ WHILE (flag eq 0) do begin
     printlog,logf,'Running SExtractor'
     FILE_DELETE,catfile,/allow               ; delete sextractor catalog file
     SPAWN,'sex '+subfile+' -c '+sexconfigfile,out,errout
+    if file_test(catfile) eq 0 then begin  ; not output file
+      error = 'Error when running SExtractor'
+      printlog,logf,error
+      return
+    endif
     num = file_lines(catfile)
     printlog,logf,'SExtractor found '+strtrim(num,2)+' sources'
 
@@ -477,25 +482,35 @@ WHILE (flag eq 0) do begin
   ; Run ALLSTAR on all sources found so far
   ; on original frame
   printlog,logf,'Running ALLSTAR'
-  FILE_DELETE,subfile,/allow          ; delete subfile
+  FILE_DELETE,subfile,/allow          ; delete fits subfile
   FILE_DELETE,subbase+'.als',/allow   ; delete als output file
-
-  ; Make input file
+  ; Sometimes the filenames get too long for daophot/allstar,
+  ; use temporary files and symlinks
+  tbase = (file_basename(MKTEMP('base',/nodot)))[0]  ; create base, leave so other processes won't take it
+  tsub = (file_basename(MKTEMP('sub',/nodot)))[0]    ; create sub base, leave so other processes won't take it 
+  tbasefits = tbase+'.fits'       & file_delete,tbasefits,/allow & file_link,base+'.fits',tbasefits
+  tbasepsf = tbase+'.psf'         & file_delete,tbasepsf,/allow  & file_link,base+'.psf',tbasepsf
+  tcoofile = (file_basename(MKTEMP('coo',/nodot))+'.coo')[0] & file_delete,tcoofile,/allow  & file_link,coofile,tcoofile
+  tsubals = tsub+'.als'           & file_delete,tsubals,/allow
+  tsubfits = tsub+'.fits'         & file_delete,tsubals,/allow
+  ; Make Input file
   undefine,cmd
   READLINE,base+'.als.opt',alsoptlines  ; make sure we use the right als options
   push,cmd,alsoptlines
-  push,cmd,base+'.fits'       ; image file
-  push,cmd,base+'.psf'        ; psf file
-  push,cmd,coofile            ; coordinate file
-  push,cmd,subbase+'.als'     ; new als file
-  push,cmd,subbase+'.fits'    ; subtracted fits file
-  ;cmdfile = maketemp('temp','.inp')
+  push,cmd,tbasefits          ; image file (symlink)
+  push,cmd,tbasepsf           ; psf file (symlink)
+  push,cmd,tcoofile           ; coordinate file (symlink)
+  push,cmd,tsubals            ; new als file (temporary file)
+  push,cmd,tsubfits           ; subtracted fits file (temporary file)
   cmdfile = MKTEMP('temp')
   WRITELINE,cmdfile,cmd
   SPAWN,'allstar < '+cmdfile,out,errout
-
+  ; Copy and clean up
+  FILE_MOVE,tsubals,subbase+'.als',/allow,/over
+  FILE_MOVE,tsubfits,subbase+'.fits',/allow,/over
   FILE_DELETE,cmdfile,/allow
-
+  FILE_DELETE,[tbase,tsub,tbasefits,tbasepsf,tcoofile],/allow
+  
   ; Load ALS file
   LOADALS,subbase+'.als',als,alshead
   nals = n_elements(als)

@@ -49,7 +49,7 @@ ncol = narr4
 ; Check for continuation lines
 endflag = 0
 nstarline = 1
-WHILE (endflag ne 1) do begin
+WHILE (endflag ne 1) and ~eof(unit) do begin
 
   line4 = ''
   readf,unit,line4
@@ -100,7 +100,8 @@ for j=0.,numstar-1 do begin
     readf, unit, instr1
     ;instr += instr1
     ; remove extra 25 spaces at the beginning of extra/wrap lines
-    if k eq 0 then instr+=instr1 else instr+=strmid(instr1,25)
+    ;   but need 2 space to fit seamlessly with the other lines
+    if k eq 0 then instr+=instr1 else instr+=strmid(instr1,27)
   endfor
   ; We need to use the formatted read because sometimes there are
   ; NO spaces between the numbers in the columns.

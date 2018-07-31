@@ -1,7 +1,7 @@
 pro plotc,x,y,z,min=min0,psym=psym,symsize=symsize,nocolorbar=nocolorbar,max=max0,_extra=extra,stp=stp,$
           trim=trim,format=format,overplot=overplot,yflip=yflip,xflip=xflip,xrange=xrange,$
           yrange=yrange,framecolor=framecolor,nodata=nodata,colpos=colpos,coldivisions=coldivisions,$
-          log=log,bottom=bottom,ncolors=ncolors,thick=thick,xerr=xerr,yerr=yerr
+          log=log,bottom=bottom,ncolors=ncolors,thick=thick,xerr=xerr,yerr=yerr,colcharsize=colcharsize
 
 ;+
 ;
@@ -29,6 +29,7 @@ pro plotc,x,y,z,min=min0,psym=psym,symsize=symsize,nocolorbar=nocolorbar,max=max
 ;  =colpos       Position array for the colorbar.
 ;  =coldivisions The number of colorbar divisions.  There will be
 ;                  (coldivisions+1) annotations.  The default is 6.
+;  =colcharsize  The character size for the colorbar.
 ;  /log          Plot logarithm of Z.
 ;  =xerr         Errors in x-values.
 ;  =yerr         Errors in y-values.
@@ -219,7 +220,7 @@ if nz gt 0 then begin
 
     ; Displaying the colorbar
     DF_COLORBAR,minrange=minrange,maxrange=maxrange,position=colpos,bottom=bottom,ncolors=ncolors,format=form,$
-               color=framecolor,divisions=coldivisions,xlog=xlog,minor=minor
+               color=framecolor,divisions=coldivisions,xlog=xlog,minor=minor,charsize=colcharsize
 
   endif
 
