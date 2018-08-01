@@ -259,7 +259,7 @@ For i=0,nfiles-1 do begin
   outfile = filestr[i].dir+'/'+fname+'-'+filestr[i].expnum+'_'+string(filestr[i].chip,format='(i02)')+'.fits'
   print,'Adding ',strtrim(nind2,2),' artificial stars to ',file_basename(outfile)
   DAOPHOT_ADDSTAR,infile,addcat,outfile,/clobber
-stop
+
   ; Save the input catalog
   add_tag,fsynth2,'x',0.0,fsynth2  
   add_tag,fsynth2,'y',0.0,fsynth2  

@@ -240,7 +240,8 @@ if keyword_set(blank) then FILE_DELETE,inptmpfile,/allow
 CD,curdir
 
 ; If outfile exists, move to it's originally intended location
-if file_test(dir+file_basename(outfile)) eq 1 then begin
+info = file_info(dir+file_basename(outfile))
+if info.exists eq 1 and info.size gt 0 then begin
   FILE_MOVE,dir+file_basename(outfile),outfile,/allow  ; nothing will happen if they are the same filename
 
 ; Output file not found
