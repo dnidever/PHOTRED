@@ -420,11 +420,19 @@ FILE_DELETE,base+'j.fits',/allow
 FILE_DELETE,base+'k.fits',/allow
 FILE_DELETE,base+'.alf',/allow
 
+; Sometimes the filenames get too long for allframe,
+; use temporary files and symlinks
+tbase = (file_basename(MKTEMP('allf',/nodot)))[0]  ; create base, leave so other processes won't take it
+tmch = tbase+'.mch'  &  file_delete,tmch,/allow  &  file_link,combmch,tmch
+tals = tbase+'.als'  &  file_delete,tals,/allow  &  file_link,mchbase+'_comb_allf.als',tals
+
 ; Make input file
 undefine,cmd
 push,cmd,'    '
-push,cmd,combmch               ; mch file
-push,cmd,mchbase+'_comb_allf.als'  ; coord file
+;push,cmd,combmch               ; mch file
+;push,cmd,mchbase+'_comb_allf.als'  ; coord file
+push,cmd,tmch
+push,cmd,tals
 push,cmd,'    '
 ;cmdfile = maketemp('temp','.inp')
 cmdfile = MKTEMP('temp')
@@ -432,9 +440,12 @@ WRITELINE,cmdfile,cmd
 
 SPAWN,'allframe < '+cmdfile
 
+; Rename tfr and nmg files
+FILE_MOVE,tbase+'.tfr',mchbase+'.tfr',/over,/allow
+FILE_MOVE,tbase+'.nmg',mchbase+'.nmg',/over,/allow
 FILE_DELETE,cmdfile,/allow
 FILE_DELETE,file_basename(files,'.als')+'j.fits',/allow   ; delete subtracted images
-
+FILE_DELETE,[tbase,tmch,tals],/allow   ; delete temporary files and links
 
 
 ;###########################################
