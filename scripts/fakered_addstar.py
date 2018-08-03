@@ -584,9 +584,9 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
     if max_iters > 0 and max_iters < addmax:
         print_warning("Limiting number of Mocks to " + str(max_iters))
         addmax = max_iters
-    max_files = int(round(999/nimages)-1)
-    if addmax > max_files:
-       exit_error_msg('Too many open files\nMaximun number is: ' + str(max_files) + "\nDecrease the total number of artificial stars", False)
+    #max_files = int(round(999/nimages)-1)
+    #if addmax > max_files:
+    #   exit_error_msg('Too many open files\nMaximun number is: ' + str(max_files) + "\nDecrease the total number of artificial stars", False)
 
 
     #-----------------------------------------------------------------------------
@@ -730,7 +730,11 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
         # Second and consecutive lines has 27 spaces before first data
         MAX_MAG_COLS = 12
         num_cols = 0
-        mag_line = "%9d %8.3f %8.3f" % (star_id, xpos_init, ypos_init)
+        #mag_line = "%9d %8.3f %8.3f" % (star_id, xpos_init, ypos_init)
+        mag_line = "%9d" % star_id
+        # if we have negative numbers of 4 digits, remove one decimal to leave place for sign
+        mag_line += " %8.3f" % xpos_init if xpos_init > -1000.0 else " %7.2f" % xpos_init
+        mag_line += " %8.3f" % ypos_init if ypos_init > -1000.0 else " %7.2f" % ypos_init
        
         # -------------------------------------------------------------------------
 
@@ -825,7 +829,7 @@ def crowdingmultipro(max_iters, field, chip, mode, mch_fnames, mch_data, caja, m
             # END MAG file with fixed fields: CHI SHARP FLAG PROB
             num_cols += 2
             mag_line += "   1.0000   0.0000"
-            if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%23s" % ''
+            if num_cols % MAX_MAG_COLS == 0: mag_line += "\n%25s" % ''
             mag_line += "    0   1.00\n"
             #mag_line += "   1.0000   0.0000    0   1.00\n"
             f_mag.write(mag_line)
@@ -1608,7 +1612,7 @@ def get_instmag(data, calmag, colsub):
     instmag = calmag + data['ZPTERM'] + data['AMTERM'] * data['AIRMASS'] \
                      + data['COLTERM'] * colsub + data['APCOR'] - 2.5 * log10(data['EXPTIME'])
     return instmag
- 
+
 
 ########################################################################################
 
@@ -1951,6 +1955,27 @@ print ("INIT TIME " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
  max_iters,       \
  refine_mch]      \
  = process_argv(sys.argv, MCH_FILE_EXT)
+
+
+
+# XXX XXX XXX XXX XXX XXX XXX
+# def check_add_files(field, chip):
+#
+#  
+#  add_fn = field+"M*-*_"+chip+".add"
+#  add_list = glob.glob(add_fn)
+#  numiters = 0
+#  for add in add_list:
+#    mock = int((add.replace("%sM" % field, "").split("-")[0]))
+#    if mock  > numiters:
+#      numiters = mock
+#  print(numiters)
+#  sys.exit()
+#
+#check_add_files(field, chip)
+# XXX XXX XXX XXX XXX XXX XXX
+    
+    
 
 
 # Get and process mch_file of MCH 
