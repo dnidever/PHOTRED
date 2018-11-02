@@ -11,6 +11,7 @@
 ;             are input and the respective PDFs don't exist then they
 ;             will be created.
 ;  outfile  The output file name.
+;  /reconv  Redo the conversion to PDF if EPS filenames input.
 ;  /clobber Overwrite the output file if it already exists.
 ;
 ; OUTPUTS:
@@ -22,17 +23,17 @@
 ; By D. Nidever,  August 2018
 ;-
 
-pro pdfcombine,input,outfile,clobber=clobber
+pro pdfcombine,input,outfile,clobber=clobber,reconv=reconv
 
 ;; Not enough inputs
 if n_elements(input) eq 0 or n_elements(outfile) eq 0 then begin
-  print,'Syntax - pdfcombine,input,outfile,clobber=clobber'
+  print,'Syntax - pdfcombine,input,outfile,clobber=clobber,reconv=reconv'
   return
 endif
 
 ;; Output file exists already and /clobber not set
 if file_test(outfile) eq 1 and not keyword_set(clobber) then begin
-  print,outfile,' already exist and /clober NOT set'
+  print,outfile,' already exist and /clobber NOT set'
   return
 endif
 
@@ -46,7 +47,7 @@ for i=0,nfiles-1 do begin
   ext = first_el(strsplit(file_basename(file),'.',/extract),/last)
   if ext eq 'eps' then begin
     pdffile = repstr(file,'.eps','.pdf')
-    if file_test(pdffile) eq 0 then begin
+    if file_test(pdffile) eq 0 or keyword_set(reconv) then begin
       print,'Converting ',file,' to PDF'
       spawn,['epstopdf',file],/noshell 
       pdffiles[i] = pdffile
