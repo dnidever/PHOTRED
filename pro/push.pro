@@ -1,4 +1,4 @@
-pro push,arr1,arr2,count=count,stp=stp
+pro push,arr1,arr2,count=count,stp=stp,error=error
 
 ;+
 ;
@@ -18,6 +18,7 @@ pro push,arr1,arr2,count=count,stp=stp
 ;  arr1    The final array.
 ;  =count  The number of final elements in arr1.  This is set to -1
 ;             if there was an error.
+;  =error  The error message if one occurred.
 ;
 ; USAGE:
 ;  IDL>push,arr1,arr2
@@ -26,6 +27,7 @@ pro push,arr1,arr2,count=count,stp=stp
 ;-
 
 count = 0
+undefine,error
 
 ; Error Handling
 ;------------------
@@ -35,7 +37,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'PUSH ERROR: ', !ERROR_STATE.MSG  
+   error = 'PUSH ERROR: '+!ERROR_STATE.MSG  
+   print,error
    count = -1            ; There was an error
    CATCH, /CANCEL 
    return
