@@ -1,13 +1,13 @@
-pro curpdiff,sph=sph,arcsec=arcsec
+pro curpdiff,sph=sph,arcsec=arcsec,device=device,norm=norm
 
 ; This program allows you to find the distance between two points.
 
 print,'FIRST CLICK'
-cursor,x1,y1
+cursor,x1,y1,device=device,norm=norm
 wait,0.2
 
 print,'SECOND CLICK'
-cursor,x2,y2
+cursor,x2,y2,device=device,norm=norm
 
 ; Spherical ra/dec coordinates (or similar)
 ;  use cos(dec) correction 
