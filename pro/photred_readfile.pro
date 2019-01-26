@@ -131,7 +131,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
          endif else begin
            ; Get the fieldnames and fieldtypes
            ; We need ID to be STRING not LONG
-           tempfile = MKTEMP('temp')
+           tempfile = MKTEMP('temp',outdir='/tmp')
            READLINE,filename,lines,nlineread=40 
            WRITELINE,tempfile,lines
            temp = IMPORTASCII(tempfile,/header,/silent)
