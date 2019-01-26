@@ -22,7 +22,7 @@
 ; By D. Nidever, Jan 2019
 ;-
 
-function photread_readfile,filename,meta=meta,count=count,error=error
+function photred_readfile,filename,meta=meta,count=count,error=error
 
   undefine,error
   
@@ -40,6 +40,8 @@ function photread_readfile,filename,meta=meta,count=count,error=error
   dir = file_dirname(filename[0])
   base = file_basename(filename[0])
   ext = first_el(strsplit(base,'.',/extract),/last)
+  if isfits eq 1 and ext eq 'gz' then ext='fits'  ; gzipped FITS file
+  if isfits eq 1 and ext eq 'fz' then ext='fits'  ; fpacked FITS file  
   
   ;; Go through the various options
   CASE ext of
