@@ -68,7 +68,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'mch': begin
          LOADMCH,filename,files,trans,magoff,count=count
          ntrans = n_elements(trans[0,*])
-         str = replicate({file:'',trans:fltarr(ntrans),magoff:fltarr(2)},count)
+         str = replicate({file:'',trans:dblarr(ntrans),magoff:fltarr(2)},count)
          str.file = files
          str.trans = transpose(trans)
          str.magoff = magoff
