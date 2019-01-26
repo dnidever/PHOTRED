@@ -25,6 +25,8 @@
 function photred_readfile,filename,meta=meta,count=count,error=error
 
   undefine,error
+  undefine,meta
+  count = -1
   
   ;; Check that file exists
   if file_test(filename[0]) eq 0 then begin
@@ -64,7 +66,12 @@ function photred_readfile,filename,meta=meta,count=count,error=error
          return,phot
        end
     'mch': begin
-         LOADMCH,filename,trans,meta,count=count
+         LOADMCH,filename,files,trans,magoff,count=count
+         ntrans = n_elements(trans[0,*])
+         str = replicate({file:'',trans:fltarr(ntrans),magoff:fltarr(2)},count)
+         str.file = files
+         str.trans = transpose(trans)
+         str.magoff = magoff
          return,trans
        end
     'raw': begin
