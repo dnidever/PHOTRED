@@ -72,7 +72,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
          str.file = files
          str.trans = transpose(trans)
          str.magoff = magoff
-         return,trans
+         return,str
        end
     'raw': begin
          LOADRAW,filename,phot,meta
