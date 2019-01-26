@@ -77,7 +77,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'raw': begin
          LOADRAW,filename,phot,meta
          count = n_elements(phot)
-         return,raw
+         return,phot
        end
     'tfr': begin
          LOADTFR,filename,files,str
