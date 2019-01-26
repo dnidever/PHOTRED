@@ -143,7 +143,8 @@ function photred_readfile,filename,meta=meta,count=count,error=error
            idind = where(fieldnames eq 'ID',nidind)
            fieldtypes[idind[0]] = 7
            phot = IMPORTASCII(filename,fieldnames=fieldnames,fieldtypes=fieldtypes,skip=1,/noprint)
-           count = n_elements(phot) 
+           count = n_elements(phot)
+           return,phot
          endelse
        end
     'cmb': begin
