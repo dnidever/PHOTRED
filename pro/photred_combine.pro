@@ -100,6 +100,11 @@ if n_elements(cmbposonly) eq 0 then begin
   if cmbposonly eq '1' then cmbposonly=1 else cmbposonly=0
 endif
 
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
 if scriptsdir eq '' then begin
@@ -212,7 +217,7 @@ For i=0,ninputlines-1 do begin
   file = FILE_BASENAME(inputlines[i])
   shortfield = first_el(strsplit(file,sep,/extract))
   shortfieldarr[i] = shortfield
-End
+Endfor
 
 ui = uniq(shortfieldarr,sort(shortfieldarr))
 ui = ui[sort(ui)]
@@ -351,26 +356,21 @@ FOR i=0,nsfields-1 do begin
         goto,BOMB2
       endif
 
-      ; Get the fieldnames and fieldtypes
-      ; We need ID to be STRING not LONG
-      tempfile = MKTEMP('temp')
-      SPAWN,'head '+file+' >> '+tempfile,out,errout
-      temp = IMPORTASCII(tempfile,/header,/noprint)
-      FILE_DELETE,tempfile,/allow,/quiet
-      fieldnames = TAG_NAMES(temp)
-      nfieldnames = n_elements(fieldnames)
-      fieldtypes = lonarr(nfieldnames)
-      for k=0,nfieldnames-1 do fieldtypes[k] = SIZE(temp[0].(k),/type)
-      idind = where(fieldnames eq 'ID',nidind)
-      fieldtypes[idind[0]] = 7
-      ; FORCE it to be the same for ALL chip files, otherwise we sometimes
+      ; Load the PHOT file
+      str = PHOTRED_READFILE(file,count=nstr)
+
+      ;; Get the column names and types
+      fieldnames = tag_names(str)
+      fieldtypes = lonarr(n_elements(fieldnames))
+      for k=0,n_elements(fieldnames)-1 do fieldtypes[k]=size(str[0].(k),/type)
+      
+      ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
       ;  get "type mismatch" errors with double/floats
       if j eq 0 then begin
         fieldnames0 = fieldnames
         fieldtypes0 = fieldtypes
         file0 = file
       endif
-        
       ; Check that the fieldnames are the same
       if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
         PUSH,failurelist,file
@@ -384,11 +384,7 @@ FOR i=0,nsfields-1 do begin
         printlog,logfile,file+' format does NOT agree with '+file0
         goto,BOMB2
       endif
-
-      ; Load the PHOT file
-      str = IMPORTASCII(file,fieldnames=fieldnames0,fieldtypes=fieldtypes0,skip=1,/noprint)
-      nstr = n_elements(str)
-
+      
 
       ; Print out the file info
       printlog,logfile,''
@@ -537,9 +533,7 @@ FOR i=0,nsfields-1 do begin
     ;----------------
     outname = basedir+'/'+basename+'.cmb'
     printlog,logfile,'OUTPUTTING data to '+outname
-stop
-    
-    PRINTSTR,all,outname
+    if catformat eq 'ASCII' then PRINTSTR,all,outname else MWRFITS,all,outname,/create
 
     ; Make sure that it exists, and add to OUTLIST
     outtest = FILE_TEST(outname)
@@ -583,22 +577,8 @@ stop
       goto,BOMB1
     endif
 
-    ; Get the fieldnames and fieldtypes
-    ; We need ID to be STRING not LONG
-    tempfile = MKTEMP('temp')
-    SPAWN,'head '+file+' >> '+tempfile,out,errout
-    temp = IMPORTASCII(tempfile,/header,/noprint)
-    FILE_DELETE,tempfile,/allow,/quiet
-    fieldnames = TAG_NAMES(temp)
-    nfieldnames = n_elements(fieldnames)
-    fieldtypes = lonarr(nfieldnames)
-    for k=0,nfieldnames-1 do fieldtypes[k] = SIZE(temp[0].(k),/type)
-    idind = where(fieldnames eq 'ID',nidind)
-    fieldtypes[idind[0]] = 7
-
     ; Load the PHOT file
-    str = IMPORTASCII(file,fieldnames=fieldnames,fieldtypes=fieldtypes,skip=1,/noprint)
-    nstr = n_elements(str)
+    str = PHOTRED_READFILE(file,count=nstr)
 
     ; Print out the file info
     printlog,logfile,filebase,' Nstars='+strtrim(nstr,2)
@@ -616,7 +596,7 @@ stop
     ;FILE_MOVE,file,file+'.orig',/overwrite,/allow_same       ; save the original
     outname = basedir+'/'+base+'.cmb'
     printlog,logfile,'OUTPUTTING data to '+outname
-    PRINTSTR,str,outname
+    if catformat eq 'ASCII' then PRINTSTR,all,outname else MWRFITS,all,outname,/create
 
     ; Make sure that it exists, and add to OUTLIST
     outtest = FILE_TEST(outname)
