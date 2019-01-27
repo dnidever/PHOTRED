@@ -193,9 +193,9 @@ phot.x = x
 phot.y = y
 for i=0,nfiles-1 do begin
   magind = where(tags eq 'MAG'+strtrim(i+1,2),nmagind)
-  phot.(magind) = magarr
+  phot.(magind) = magarr[*,i]
   errind = where(tags eq 'MAG'+strtrim(i+1,2)+'ERR',nerrind)   
-  phot.(errind) = magerrarr
+  phot.(errind) = magerrarr[*,i]
 endfor
 phot.chiarr = chiarr
 phot.sharparr = sharparr
