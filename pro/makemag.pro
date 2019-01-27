@@ -197,8 +197,8 @@ for i=0,nfiles-1 do begin
   errind = where(tags eq 'MAG'+strtrim(i+1,2)+'ERR',nerrind)   
   phot.(errind) = magerrarr[*,i]
 endfor
-phot.chiarr = chiarr
-phot.sharparr = sharparr
+phot.chiarr = transpose(chiarr)
+phot.sharparr = transpose(sharparr)
 phot.chi = chimean
 phot.sharp = sharpmean
 
