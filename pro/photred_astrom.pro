@@ -80,7 +80,10 @@ if (ndetmin eq '-1' or ndetmin eq '0' or ndetmin eq '') then undefine,ndetmin el
 telescope = READPAR(setup,'TELESCOPE')
 instrument = READPAR(setup,'INSTRUMENT')
 
-
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
 
 
 ;###################
@@ -197,109 +200,15 @@ FOR i=0,ninputlines-1 do begin
   numobs = nalsfiles
 
   ; Load the photometry file
-  ;-------------------------
-  ; This is copied from LOADRAW.PRO
-  ;  We should really use LOADRAW.PRO, but I'm not sure
-  ;  if it works for .mag files.
-
-  ; Figure out the number of columns
-  line1='' & line2='' & line3='' & line4='' & line5=''
-  openr,unit,/get_lun,photfile
-  readf,unit,line1
-  readf,unit,line2
-  readf,unit,line3
-
-  ; First line for the first star
-  readf,unit,line4
-  arr4 = strsplit(line4,' ',/extract)
-  narr4 = n_elements(arr4)
-  ncol = narr4
-
-  ; Check for continuation lines
-  endflag = 0
-  nstarline = 1
-  WHILE (endflag ne 1) do begin
-
-    line4 = ''
-    readf,unit,line4
-
-    ; If there are too many frames/columns then DAOMASTER puts
-    ; these on separate lines and lead with ~27 blank spaces
-    ;  Not sure if this is needed for MAG files as well
-
-    ; This is a continuation line
-    if strtrim(strmid(line4,0,15),2) eq '' then begin
-      arr4 = strsplit(line4,' ',/extract)
-      narr4 = n_elements(arr4)
-      ncol += narr4
-      nstarline++
-    endif else endflag=1
-  ENDWHILE
-  close,unit
-  free_lun,unit
-
-  ; Stars in this file
-  numstar = (FILE_LINES(photfile)-3L )/nstarline
-
-  nextra = ncol - 2*numobs    ; nextra includes, ID, X, Y, CHI, SHARP, etc.
-
-  ; mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
-  mastable = fltarr(numstar,2*numobs+nextra)
-
-  ; Reading in the magnitude file
-  get_lun,unit
-  openr, unit, photfile
-
-  line=''
-  readf,unit,line
-  readf,unit,line
-  readf,unit,line
-
-  ; Loop through the stars
-  for j=0.,numstar-1 do begin
-    instr=''
-    instr1=''
-    inline = fltarr(2*numobs+nextra)
-
-    ; Loop through the lines per star
-    for k=0l,nstarline-1 do begin
-      readf, unit, instr1
-      ; There are leading spaces, 24 or 25                                                                                                                                       
-      ; Use the first character AFTER the first column to figure out                                                                                                             
-      ;   how many spaces we need to strip off                                                                                                                                   
-      trial = strmid(instr1,34,1)
-      if trial eq ' ' then nspaces=24 else nspaces=25
-      ; remove extra 25 spaces at the beginning of extra/wrap lines
-      if k eq 0 then instr+=instr1 else instr+=strmid(instr1,nspaces)
-    endfor
-    ; We need to use the formatted read because sometimes there are
-    ; NO spaces between the numbers in the columns.
-    ; ***BUT if the daomaster format changes then this will be MESSED UP!!!!***
-    ; MAKEMAG.PRO uses a slightly different format than daomaster
-    ;  more space for larger integers
-    ;  fmt='(A1,I8,2F9.3,'+strtrim(nfiles*2+2,2)+'F9.4)'
-    if ending eq 'mag' then fmt='(I9,2F9.3,'+strtrim(ncol-3,2)+'F9.4)' else $  ; makemag output
-      fmt='(I7,2F9.3,'+strtrim(ncol-3,2)+'F9.4)'   ; daomaster output
-    reads,instr,inline,format=fmt
-    mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
-  endfor
-
-  close, unit
-  free_lun,unit
-
-  ; Now convert to PHOT structure
-  dum = {id:0L,x:0.0,y:0.0}
-  for m=0,numobs-1 do begin
-    dum = CREATE_STRUCT(dum,'MAG'+strtrim(m+1,2),0.0,'MAG'+strtrim(m+1,2)+'ERR',0.0)
-  endfor
-  dum = CREATE_STRUCT(dum,'CHI',0.0,'SHARP',0.0)
-  if ending eq 'mag' then dum = CREATE_STRUCT(dum,'FLAG',0L,'PROB',0.0)
-  dum = CREATE_STRUCT(dum,'RA',0.0d0,'DEC',0.0d0)
-  phot = REPLICATE(dum,numstar)
-  ncopy = 2*numobs+nextra
-  for j=0,ncopy-1 do phot.(j)=reform(mastable[*,j])
-  
-  nphot = n_elements(phot)
+  ;-------------------------  
+  phot0 = PHOTRED_READFILE(photfile)
+  nphot = n_elements(phot0)
+  schema = phot0[0]
+  struct_assign,{dum:''},schema
+  schema = CREATE_STRUCT(schema,'RA',0.0d0,'DEC',0.0d0)
+  phot = REPLICATE(schema,nphot)
+  struct_assign,phot0,phot
+  undefine,phot0
   printlog,logfile,'Nstars = '+strtrim(nphot,2)
 
 
@@ -377,8 +286,12 @@ FOR i=0,ninputlines-1 do begin
   astfile = base+'.ast'
   printlog,logfile,'File with RA/DEC coordinates is: ',astfile
 
-  PRINTSTR,phot,astfile
-
+  if catformat eq 'FITS' then begin
+    MWRFITS,phot,astfile,/create
+  endif else begin   ; ASCII
+    PRINTSTR,phot,astfile
+  endelse
+    
   ; Check that the file AST file is there
   asttest = FILE_TEST(astfile)
   if (asttest eq 1) then begin

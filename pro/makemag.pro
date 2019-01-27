@@ -1,4 +1,4 @@
-pro makemag,tfrfile,outfile,stp=stp,error=error
+pro makemag,tfrfile,outfile,phot=phot,nowrite=nowrite,stp=stp,error=error
 
 ; This combines the ALLFRAME alf photometry output files
 
@@ -179,21 +179,42 @@ magoutarr = fltarr(nstars,nfiles*2)
 magoutarr[*,indgen(nfiles)*2] = magarr
 magoutarr[*,indgen(nfiles)*2+1] = magerrarr
 
+;; Create PHOT structure
+schema = {id:0L,x:0.0,y:0.0}
+for i=0,nfiles-1 do begin
+  schema = create_struct(schema,'MAG'+strtrim(i+1,2),0.0)
+  schema = create_struct(schema,'MAG'+strtrim(i+1,2)+'ERR',0.0)
+endfor
+schema = create_struct(schema,'chiarr',fltarr(nfiles),'sharparr',fltarr(nfiles),'chi',0.0,'sharp',0.0)
+tags = tag_names(schema)
+phot = replicate(schema,nstars)
+phot.id = id
+phot.x = x
+phot.y = y
+for i=0,nfiles-1 do begin
+  magind = where(tags eq 'MAG'+strtrim(i+1,2),nmagind)
+  phot.(magind) = magarr
+  errind = where(tags eq 'MAG'+strtrim(i+1,2)+'ERR',nerrind)   
+  phot.(errind) = magerrarr
+endfor
+phot.chiarr = chiarr
+phot.sharparr = sharparr
+phot.chi = chimean
+phot.sharp = sharpmean
+
 
 ; Print the output
-OPENW,unit,/get_lun,outfile
-
-for i=0,nstars-1 do begin
- ;format(1x,I8,2f9.3,100f9.4)
- format = '(A1,I8,2F9.3,'+strtrim(nfiles*2+2,2)+'F9.4)'
- ;printf,unit,format=format,'',id[i],x[i],y[i],reform(magoutarr[i,*]),chi[i],sharp[i]
- printf,unit,format=format,'',id[i],x[i],y[i],reform(magoutarr[i,*]),chimean[i],sharpmean[i]
-end
-
-
-CLOSE,unit
-FREE_LUN,unit
-
+if not keyword_set(nowrite) then begin
+  OPENW,unit,/get_lun,outfile
+  for i=0,nstars-1 do begin
+    ;format(1x,I8,2f9.3,100f9.4)
+    format = '(A1,I8,2F9.3,'+strtrim(nfiles*2+2,2)+'F9.4)'
+    ;printf,unit,format=format,'',id[i],x[i],y[i],reform(magoutarr[i,*]),chi[i],sharp[i]
+    printf,unit,format=format,'',id[i],x[i],y[i],reform(magoutarr[i,*]),chimean[i],sharpmean[i]
+  endfor
+  CLOSE,unit
+  FREE_LUN,unit
+endif
 
 if keyword_set(stp) then stop
 

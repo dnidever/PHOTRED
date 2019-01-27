@@ -537,7 +537,8 @@ FOR i=0,nsfields-1 do begin
     ;----------------
     outname = basedir+'/'+basename+'.cmb'
     printlog,logfile,'OUTPUTTING data to '+outname
-
+stop
+    
     PRINTSTR,all,outname
 
     ; Make sure that it exists, and add to OUTLIST
