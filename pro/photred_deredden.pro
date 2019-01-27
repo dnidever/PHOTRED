@@ -85,6 +85,11 @@ if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 telescope = READPAR(setup,'TELESCOPE')
 instrument = READPAR(setup,'INSTRUMENT')
 
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+
 
 
 ;###################
@@ -222,13 +227,12 @@ if (ntodered gt 0) then begin
 
     EXT_BOMB:
 
-  end  ; todered loop
+  endfor  ; todered loop
 
 
   ; Print out magnitudes/colors to deredden
   ntoderedstr = n_elements(toderedstr)
   for i=0,ntoderedstr-1 do begin
-
     ; Print header
     if (i eq 0) then begin
       printlog,logfile,''
@@ -237,7 +241,6 @@ if (ntodered gt 0) then begin
       printlog,logfile,'MAG/COLOR  A(M)/E(M1-M2)'
       printlog,logfile,'------------------------'
     endif
-
     tstr = toderedstr[i]
 
     ; Magnitude
@@ -248,24 +251,17 @@ if (ntodered gt 0) then begin
     endif else begin
       red = tstr.extratio1-tstr.extratio2
       printlog,logfile,'',tstr.input,red,format='(A3,A-8,F8.3)'
-
     endelse
 
     ; Print footer
-    if (i eq (ntoderedstr-1)) then begin
-      printlog,logfile,'------------------------'
-    endif
-
-  end
-
-
+    if (i eq (ntoderedstr-1)) then printlog,logfile,'------------------------'
+  endfor
+  
 ; No mags/colors to deredden
 endif else begin
   printlog,logfile,'NO MAGNITUDES/COLORS to DEREDDEN'
 endelse
 
-
-;stop
 
 ; Extinction values to add
 ;----------------------------
@@ -308,7 +304,6 @@ if (ntoextadd gt 0) then begin
       ; Add to structure
       PUSH,toextaddstr,iextaddstr
 
-
     ; Color
     endif else begin
       iextaddstr.type = 0
@@ -349,9 +344,9 @@ if (ntoextadd gt 0) then begin
 
     EXT_BOMB2:
 
-  end  ; todered loop
+  endfor  ; todered loop
 
-
+  
   ; Print out magnitudes/colors to deredden
   ntoextaddstr = n_elements(toextaddstr)
   for i=0,ntoextaddstr-1 do begin
@@ -375,16 +370,10 @@ if (ntoextadd gt 0) then begin
     endif else begin
       red = tstr.extratio1-tstr.extratio2
       printlog,logfile,'',tstr.input,red,format='(A3,A-8,F8.3)'
-
     endelse
-
     ; Print footer
-    if (i eq (ntoextaddstr-1)) then begin
-      printlog,logfile,'------------------------'
-    endif
-
-  end
-
+    if (i eq (ntoextaddstr-1)) then printlog,logfile,'------------------------'
+  endfor
 
 ; No extinctions to add
 endif else begin
@@ -395,11 +384,8 @@ endelse
 ; Only adding E(B-V)
 ntoderedstr = n_elements(toderedstr)
 ntoextaddstr = n_elements(toextaddstr)
-if (ntoderedstr eq 0) and (ntoextaddstr eq 0) then begin
-  printlog,logfile,'ONLY ADDING E(B-V)'
-endif
+if (ntoderedstr eq 0) and (ntoextaddstr eq 0) then printlog,logfile,'ONLY ADDING E(B-V)'
 
-;stop
 
 ;##################################################
 ;#  PROCESSING THE FILES
@@ -446,7 +432,7 @@ FOR i=0,ninputlines-1 do begin
   ; Load the data file
   ;--------------------
   printlog,logfile,'Loading file'
-  str = IMPORTASCII(file,/header,/noprint)
+  str = PHOTRED_READFILE(file,count=nstr)
 
   ; Checking that we've got coordinates
   tags = TAG_NAMES(str)
@@ -685,7 +671,7 @@ FOR i=0,ninputlines-1 do begin
   ; Output the structure to the DERED file
   deredfile = base+'.dered'
   printlog,logfile,'New file with extinctions is: ',deredfile
-  PRINTSTR,str,deredfile
+  if catformat eq 'ASCII' then PRINTSTR,str,deredfile else MWRFITS,str,deredfile,/create
 
   ; Check that the file DERED file is there
   deredtest = FILE_TEST(deredfile)
