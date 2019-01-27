@@ -600,6 +600,7 @@ FOR i=0L,ninp-1 do begin
   ;# READING IN THE PHOTOMETRY
   ;#############################
   phot = PHOTRED_READFILE(magfile)
+  numstar = n_elements(phot)
   tags = tag_names(phot)
   ncol = n_tags(phot)
   nextra = ncol - 2*numobs
