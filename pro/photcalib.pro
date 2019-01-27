@@ -976,8 +976,8 @@ stop
     colnames = strsplit(headline,' ',/extract)
     if colnames[0] eq '#' then colnames=colnames[1:*]
     ;; Create the schema
-    schema = create_struct(colnames[0],fix('',types[0]))
-    for j=1,ncolumns-1 do schema=create_struct(schema,colnames[j],fix('',types[j]))
+    schema = create_struct(colnames[0],fix('',type=types[0]))
+    for j=1,ncolumns-1 do schema=create_struct(schema,colnames[j],fix('',type=types[j]))
     ;; Copy in the data
     final = create_struct(schema,numstar)
     for j=0,ncolumns-1 do final.(j)=finalstar[*,j]
