@@ -36,6 +36,8 @@ function file_isfits,filename
   hdr = bytarr(80,/nozero)
   ON_IOERROR,badread
   READU,unit,hdr
+  CLOSE,unit
+  FREE_LUN,unit
   head = string(hdr)
   if strmid(head,0,9) eq 'SIMPLE  =' then return,1
 
@@ -45,11 +47,15 @@ function file_isfits,filename
   hdr = bytarr(80,/nozero)
   ON_IOERROR,badread  
   READU,unit,hdr
+  CLOSE,unit
+  FREE_LUN,unit
   head = string(hdr)
   if strmid(head,0,9) eq 'SIMPLE  =' then return,1 
 
   ;; Not a FITS file
   badread:
+  CLOSE,unit
+  FREE_LUN,unit
   return,0
 
   end
