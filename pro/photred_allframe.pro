@@ -152,6 +152,11 @@ if n_elements(tiletype) eq 0 then begin
   if alftiletype eq '0' or alftiletype eq '' or alftiletype eq '-1' then tiletype='ORIG' else tiletype=alftiletype
 endif
 
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------
 irafdir = READPAR(setup,'IRAFDIR')
@@ -535,7 +540,7 @@ printlog,logfile,systime(0)
 
 ; Make commands for allframe
 cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
-      ",detectprog='"+alfdetprog+"',tile={type:'"+strupcase(tiletype)+"'}"
+      ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile={type:'"+strupcase(tiletype)+"'}"
 if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
 if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
 if keyword_set(alfusecmn) then cmd+=",/usecmn"

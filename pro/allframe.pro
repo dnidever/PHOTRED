@@ -32,6 +32,7 @@
 ;  =logfile       A logfile to print to output to.
 ;  /usecmn        Use the common sources file of the reference image.
 ;  /fake          Run for artificial star tests.
+;  =catformat     Catalog format to use: FITS or ASCII.  Default is ASCII.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -50,7 +51,7 @@
 pro allframe,file,tile=tile,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake
+             usecmn=usecmn,fake=fake,catformat=catformat
 
 COMMON photred,setup
 
@@ -99,6 +100,8 @@ if nsetup gt 0 then begin
   irafdir = READPAR(setup,'IRAFDIR')
 endif
 
+; Catalog format
+if n_elements(catformat) eq 0 then catformat='ASCII'
 
 ; No irafdir
 if n_elements(scriptsdir) eq 0 then begin
@@ -530,31 +533,38 @@ if FILE_TEST(sexfile) eq 1 then begin
   ; Write the final output file
   ;----------------------------
   finalfile = mchbase+'.mag'
-  ; How many observations are there
-  tags = tag_names(mag)
-  ntags = n_elements(tags)
-  magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
-
-  ; Copy the structure to a string array, then print it out
-  outarr = strarr(ntags,nmag)
-  fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
-  outfmt='(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
-  for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
-  openw,unit,/get_lun,finalfile
-  printf,unit,format=outfmt,outarr
-  close,unit
-  free_lun,unit
-
-  ; Prepend the ALF header
-  WRITELINE,finalfile,[alfhead,' '],/prepend
-
+  if catformat eq 'FITS' then begin
+    MWRFITS,mag,finalfile,/create,/silent
+  endif else begin  ; ASCII
+    ; How many observations are there
+    tags = tag_names(mag)
+    ntags = n_elements(tags)
+    magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
+    ; Copy the structure to a string array, then print it out
+    outarr = strarr(ntags,nmag)
+    fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
+    outfmt='(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
+    for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
+    openw,unit,/get_lun,finalfile
+    printf,unit,format=outfmt,outarr
+    close,unit
+    free_lun,unit
+    ; Prepend the ALF header
+    WRITELINE,finalfile,[alfhead,' '],/prepend
+  endelse
+    
 ; DAOPHOT
 endif else begin
 
   ; No SExtractor information, just copy .makemag to .mag
   finalfile = mchbase+'.mag'
-  FILE_COPY,mchbase+'.makemag',finalfile,/allow,/over
-
+  if catformat eq 'FITS' then begin
+    LOADRAW,mchbase+'.makemag',mag,alfhead
+    MWRFITS,mag,finalfile,/create,/silent
+  endif else begin  ; ASCII
+    FILE_COPY,mchbase+'.makemag',finalfile,/allow,/over
+  endelse
+    
 endelse
 
 printlog,logf,'FINAL ALLFRAME file = ',finalfile
