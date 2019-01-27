@@ -585,7 +585,8 @@ FOR i=0,ninputlines-1 do begin
     inptransfile = ''
     ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
     chip = long(ext)
-    ind = where(trans.chip eq chip,nind)
+    ;ind = where(trans.chip eq chip,nind)
+    ind = where(trans.chip eq chip or trans.chip eq -1,nind)      ; keep trans without chip info as well
 
     ; Nothing for this chip
     if nind eq 0 then begin

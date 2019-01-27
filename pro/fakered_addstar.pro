@@ -14,6 +14,8 @@
 ;   Antonio Dorta,  major update   June/July 2017
 ;-
 
+
+;----------------------------------------------------------------------
 function getField, fn, remove_path=remove_path
   ; Given a file, returns the FIELD. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (FX will be returned)
@@ -22,6 +24,7 @@ function getField, fn, remove_path=remove_path
   return, tmp[0]
 end
 
+;----------------------------------------------------------------------
 function getChip, fn, remove_path=remove_path
   ; Given a file, returns the CHIP. Filename is expected with
   ; format FX-NNNNNNN_YY.ext (YY will be returned)
@@ -99,7 +102,7 @@ datadir         = getparam(datadir         , 'datadir'         , setup, '.'     
 datatransfer    = getparam(datatransfer    , 'datatransfer'    , setup, 'skip'        , logfile)
 chipsfile       = getparam(chipsfile       , 'chipssfile'      , setup, '*chips.fits' , logfile)
 maxccdsize      = getparam(maxccdsize      , 'maxccdsize'      , setup, '2048,4096'   , logfile)
-magext          = getparam(magext          , 'magext'          , setup, ''            , logfile)
+magext          = getparam(magext          , 'magext'          , setup, '0'           , logfile)
 radcent         = getparam(radcent         , 'radcent'         , setup, '*'           , logfile)
 dimfield        = getparam(dimfield        , 'dimfield'        , setup, '*'           , logfile)
 distance        = getparam(distance        , 'distance'        , setup, '0'           , logfile)
@@ -166,27 +169,35 @@ endfor ; scripts loop
 ;---------------------------------------------------------------
 CHECK_PYTHON,pythontest,pythonbin=pythonbin
 if pythontest eq 0 then begin
-  print,'PYTHON TEST FAILED.  EXITING'
+  printlog,logfile,'PYTHON TEST FAILED.  EXITING'
+  printlog,logfile,''
   return
 endif
+
+;-------------------------------------------------
+; MORE CHECKS TO SEE IF PROGRAMS AND FILES EXIST!
+;-------------------------------------------------
 
 ; Check that the DAOPHOT programs exist
 SPAWN,'which daophot',out,errout
 daophotfile = FILE_SEARCH(out,count=ndaophotfile)
 if (ndaophotfile eq 0) then begin
-  print,'DAOPHOT PROGRAM NOT AVAILABLE'
+  printlog,logfile,'DAOPHOT PROGRAM NOT AVAILABLE'
+  printlog,logfile,''
   return
 endif
 
+; Check that the DAOMSATER programs exist
 if refinemch gt 0 then begin
-  ; Check that the DAOMSATER programs exist
   SPAWN,'which daomaster',out,errout
   daomasterfile = FILE_SEARCH(out,count=ndaomasterfile)
   if (ndaomasterfile eq 0) then begin
-    print,'DAOMASTER PROGRAM NOT AVAILABLE'
+    printlog,logfile,'DAOMASTER PROGRAM NOT AVAILABLE'
+    printlog,logfile,''
     return
   endif
 endif
+
 
 
 
@@ -240,6 +251,19 @@ printlog,logfile,'------------------------'
 printlog,logfile,' PROCESSING INPUT FILES '
 printlog,logfile,'------------------------'
 printlog,logfile,''
+
+; # Check if magext data is coming from a file if that file exists!! Syntax in fakered.setup:   magext   file:/path/to/magext_file
+magext_kw='file:'
+if STRMATCH(magext, magext_kw+'*') eq 1 then begin  ; Check if magext_data begins with file:... (file:*)
+  magext_file = STRMID(magext,strlen(magext_kw))    ; Remove "file:" from beginning to get filename 
+  if not FILE_TEST(magext_file) then begin          ; Check if file exists!!
+    printlog,logfile,"ERROR!! File '"+   $
+      strcompress(magext_file)+"' does NOT exist (it was specified in setup.fakered using 'magext' parameter)"
+    printlog,logfile,''
+    return
+  endif
+endif
+
 
 
 CD,current= curdir
@@ -336,7 +360,6 @@ lists = photred_getinput(thisprog)
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,  $
                     failurelist=failurelist,/silent
 
-
 ; ---------------------------------------
 ;  GATHER AND MERGE PARTIAL FILES
 ; ---------------------------------------
@@ -349,9 +372,11 @@ partial_files = [{fn_full:'apcor.lst',   fn_part:'*partial_apcor*.lst'}, $
                  {fn_full:'calib.trans', fn_part:'*partial_calib*.trans'}]
 
 for i=0,n_elements(partial_files)-1 do begin
-  ; If the destination file exists, save a BAK
-  if file_test(partial_files[i].fn_full) then $    
-    file_move, partial_files[i].fn_full, partial_files[i].fn_full+'.bak', /OVERWRITE
+  ; If the destination file exists, save a BAK (if there is NOT already another bak)
+  bak_file = partial_files[i].fn_full+'.bak'  
+  if file_test(partial_files[i].fn_full) and (not file_test(bak_file)) then $
+    file_move, partial_files[i].fn_full, bak_file, /OVERWRITE, /ALLOW_SAME
+  file_delete,partial_files[i].fn_full, /ALLOW_NONEXISTENT, /QUIET
 
   ; Search for all partial files, read them and write all content in a single file
   partial_fn = file_search("", partial_files[i].fn_part, /FULLY)
@@ -381,8 +406,6 @@ if file_test(FIELDS_FILE) then begin
   newfields = []
   ; Read old field file
   READCOL,FIELDS_FILE,oldshortfields,oldfields,format='A,A',/silent
-  ; Backup old file (-> fields.bak)
-  file_move, FIELDS_FILE, FIELDS_FILE+".bak", /OVERWRITE
   ; Process the outlist to get the new shortfields (they include mocks)
   for i=0,n_elements(outlist)-1 do begin
     fn = file_basename(outlist[i])
@@ -418,8 +441,19 @@ if file_test(FIELDS_FILE) then begin
   endfor
 
   ; Write to file...
-  out = newshortfields+'   '+newfields
-  WRITELINE,FIELDS_FILE,out
+  if n_elements(newshortfields) gt 0 then begin
+    ; Backup old file (fields -> fields.bak)
+    bak_file = FIELDS_FILE+'.bak'  
+    if not file_test(bak_file) then $
+      file_move, FIELDS_FILE, bak_file, /OVERWRITE, /ALLOW_SAME
+    file_delete, FIELDS_FILE, /ALLOW_NONEXISTENT, /QUIET
+    ; Write new fields for mocks!
+    out = newshortfields+'   '+newfields
+    WRITELINE,FIELDS_FILE,out
+  endif else begin
+    print,"WARNING: There are no new fields for mocks!"
+  end
+  
 endif else printlog,logfile,"WARNING: NO fields field found!!"
   
   

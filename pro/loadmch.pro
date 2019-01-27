@@ -60,7 +60,7 @@ arr2 = strsplitter(lines2,' ',/extract)
 files = reform(arr2[0,*])
 
 ; Initializing the array
-trans = fltarr(nlines,ntrans)
+trans = dblarr(nlines,ntrans)
 ; Filling the aray
 for i=0,nlines-1 do begin
   arr = strsplit(lines2[i],' ',/extract)

@@ -1,26 +1,26 @@
 ;+
 ;
-; FAKERED_COMPLETE
+; FAKERED_CLEAN
 ;
-; Derive the completeness function.
+; Clean up the files.
 ;
 ; INPUTS:
 ;  /redo Redo files that were already done.
 ;  /stp  Stop at the end of the program.
 ;
 ; OUTPUTS:
-;  The artificial star completeness function
+;  No outputs.  Just deleting some of the temporary files.
 ;
-; By D.Nidever  July 2017
+; By D.Nidever  February 2018
 ;-
 
-pro fakered_complete,redo=redo,stp=stp
+pro fakered_clean,redo=redo,stp=stp
 
 COMMON photred,setup
 
 print,''
 print,'########################'
-print,'RUNNING FAKERED_COMPLETE'
+print,'RUNNING FAKERED_CLEAN'
 print,'########################'
 print,''
 
@@ -32,7 +32,7 @@ if testlogs eq 0 then FILE_MKDIR,'logs'
 
 ; Log files
 ;----------
-thisprog = 'COMPLETE'
+thisprog = 'CLEAN'
 logfile = 'logs/'+thisprog+'.log'
 logfile = FILE_EXPAND_PATH(logfile)  ; want absolute filename
 inputfile = 'logs/'+thisprog+'.inlist'
@@ -192,22 +192,6 @@ if pythontest eq 0 then begin
   return
 endif
 
-; Check that the DAOPHOT programs exist
-SPAWN,'which daophot',out,errout
-daophotfile = FILE_SEARCH(out,count=ndaophotfile)
-if (ndaophotfile eq 0) then begin
-  print,'DAOPHOT PROGRAM NOT AVAILABLE'
-  return
-endif
-
-; Check that the DAOMASTER programs exist
-SPAWN,'which daomaster',out,errout
-daomasterfile = FILE_SEARCH(out,count=ndaomasterfile)
-if (ndaomasterfile eq 0) then begin
-  print,'DAOMASTER PROGRAM NOT AVAILABLE'
-  return
-endif
-
 
 ;##########################################################
 ;#  PROCESSING THE FILES
@@ -220,8 +204,8 @@ printlog,logfile,''
 
 ; Get input
 ;-----------
-precursor = 'CALIB'
-lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='phot')
+precursor = 'COMPLETE'
+lists = PHOTRED_GETINPUT(thisprog,'COMPLETE.success',redo=redo,ext='phot')
 ninputlines = lists.ninputlines
 
 ; No files to process
@@ -232,75 +216,36 @@ if ninputlines eq 0 then begin
 endif
 
 inputlines = lists.inputlines
+dirlist = FILE_DIRNAME(inputlines)
+baselist = FILE_BASENAME(inputlines,'.phot')
+nbaselist = n_elements(baselist)
 
 
-photdirlist = FILE_DIRNAME(inputlines)
-photbaselist = FILE_BASENAME(inputlines)
-nphotbaselist = n_elements(alsbaselist)
+; Loop over the reference chip files
+undefine,outlist,successlist,failurelist
+For i=0,nbaselist-1 do begin
+  dir1 = dirlist[i]
+  base1 = baselist[i]
 
-; Unique fields
-;  The files have names like this: F1M1-00388968_01.phot
-allfields = reform( (strsplitter(photbaselist,'M',/extract))[0,*] )
-ui = uniq(allfields,sort(allfields))
-ufields = allfields[ui]   ; F1, F2, etc.
-nfields = n_elements(ufields)
-printlog,logfile,strtrim(nfields,2)+' unique fields to process'
-
-;----------------------
-; RUNNING THE COMMANDS
-;----------------------
-printlog,logfile,''
-printlog,logfile,systime(0)
-
-; Make commands
-undefine,cmd,cmddir
-For i=0,nfields-1 do begin
-  ind = where(allfields eq ufields[i],nind)
-  ffiles = inputlines[ind]
-  if nind gt 0 then fils='["'+strjoin(ffiles,'","')+'"]' else fils='"'+ffiles+'"'
-  imgr = '{namps:'+strtrim(thisimager.namps,2)+'L,separator:"'+thisimager.separator+'"}'
-  cmd1 = 'completeness,'+fils+',imager='+imgr+',maindir="'+maindir+'"'
-  if keyword_set(redo) then cmd1+=',/redo'
-  cmddir1 = file_expand_path(file_dirname(inputlines[0]))
-  if keyword_set(sepchipdir) then cmddir1=file_dirname(cmddir1) ; strip off chip directory
-  push,cmd,cmd1
-  push,cmddir,cmddir1
-Endfor
-
-; Submit the jobs to the daemon
-PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='cmplt',hyperthread=hyperthread,$
-           waittime=5,/cdtodir,/idle,scriptsdir=scriptsdir
-
-
-;-------------------
-; Checking OUTPUTS
-;-------------------
-
-
-; Loop over the fields
-For i=0,nfields-1 do begin
-  ind = where(allfields eq ufields[i],nind)
-  ffiles = inputlines[ind]
-
-  ; Get field name
-  nameind = where(stregex(field_shnames,'^'+ufields[i]+'M',/boolean) eq 1,nnameind)
-  if nnameind eq 0 then begin
-     error = 'Short field name >>'+ufields[i]+'<< not found in "fields" file'
-     printlog,logfile,error
-     goto,BOMB
-  endif
-  globalfield = field_lnames[nameind[0]]
+  mchfile = dir1+'/'+base1+'.mch'
+  LOADMCH,mchfile,files
+  nfiles = n_elements(files)
+  bases = file_basename(files,'.als')
+  ; Loop over all of the exposures
+  for j=0,nfiles-1 do $
+    FILE_DELETE,dir1+'/'+bases[j]+['.add','.fits','.alf'],/allow
   
-  ; Check that they were successful
-  compfile = file_dirname(ffiles)+'/'+file_basename(ffiles,'.phot')+'_complete.fits.gz'
-  finalfile = maindir+'/'+globalfield+'_complete.fits.gz'
-  gd = where(file_test(compfile) eq 1 and file_test(finalfile) eq 1,ngd,comp=bd,ncomp=nbd)
-  if ngd gt 0 then begin
-    PUSH,successlist,ffiles[gd]
-    PUSH,outlist,finalfile
-  endif
-  if nbd gt 0 then PUSH,failurelist,ffiles[bd]
+  ; Reference exposure files
+  ;  most of these are ALLFRAME-related files
+  FILE_DELETE,dir1+'/'+base1+['.mch','.outlist','.inlist','.shift','.mag','.makemag','_comb.bpm.fits','_comb.fits',$
+                              '_comb.mask.fits','_comb.coo','_comb.als.inp','_comb.als','_combs.fits','_comb.log',$
+                              '_comb.sex','_comb_sub.cat','_comb_allf.sex','_comb_all.coo','_comb_sub.als','_comb_sub.fits',$
+                              '_comb_allf.als','.comb.mch','.nmg','.tfr','.ast','.input','.phot'],/allow
 
+  ; Check that they were successful
+  PUSH,successlist,dir1+'/'+base1
+  PUSH,outlist,dir1+'/'+base1
+  
   BOMB:
 Endfor
 
@@ -309,7 +254,7 @@ Endfor
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                     failurelist=failurelist,/silent
 
-printlog,logfile,'FAKERED_COMPLETE Finished  ',systime(0)
+printlog,logfile,'FAKERED_CLEAN Finished  ',systime(0)
 
 if keyword_set(stp) then stop
 

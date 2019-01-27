@@ -309,6 +309,14 @@ docomplete = READPAR(setup,'COMPLETE')
 if docomplete ne '0' then $
 FAKERED_COMPLETE,redo=redo
 
+;-------
+; CLEAN
+;-------
+; Clean up the files
+doclean = READPAR(setup,'CLEAN')
+if doclean ne '0' then $
+FAKERED_CLEAN,redo=redo
+
 
 print,'FAKERED FINISHED'
 

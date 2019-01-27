@@ -20,7 +20,7 @@ pro fakered_summary,stp=stp
 
 ;
 stages = ['COPY','ADDSTAR','DAOPHOT','MATCH','ALLFRAME','ASTROM',$
-          'CALIB','COMBINE','COMPLETE']  
+          'CALIB','COMBINE','COMPLETE','CLEAN']
 nstages = n_elements(stages)
 
 ; Does the logs directory exist

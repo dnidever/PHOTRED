@@ -264,6 +264,7 @@ trans       nocalib.trans
 ##### OPTIONAL #####
 sepfielddir  1
 keepmef      0
+catformat    FITS
 redo         0
 #skipwcs     0
 #wcsup       N
@@ -322,6 +323,7 @@ trans | The name of the file that contains the photometric transformation equati
 **OPTIONAL**  |  **OPTIONAL**
 sepfielddir |  Put each field in a separate directory (this is now the default option), otherwise everything will go in the main directory and can slow down processing because a very large (~100,000) number of fileds.
 keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
+catformat | The type of catalog format to use: FITS or ASCII.  The default is ASCII
 redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
 skipwcs | Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
@@ -345,6 +347,7 @@ alftrimcmb  |  Trim off "extra" parts of the combined/stacked image that aren't 
 alfexclude  |  Comma-delimited list of fields (e.g., F1, F3, F5) to exclude from ALLFRAME processing.
 alfusecmn  |  Use the reference image common sources file to pick PSF stars for the combined image.
 alftiletype  |  The type of combination method to use.  The old method is "ORIG" while the new and improved method is "WCS".
+ndetmin  |  Apply minimum number of detections per source in ASTROM stage.
 ddo51radoffset  |  There is a photometric offset in the DDO51 filter that depends on the radial distance from the center of the field. Currently this is only observed in the CTIO+MOSAIC data. Setting this parameter will remove this offset (done in CALIB). If you use this make sure to also use it in STDRED.
 cmbforce  |  Force COMBINE to combine the files even though not all expected amps/chips are there
 keepinstr | CALIB should keep the instrumental magnitudes in the final output file.
