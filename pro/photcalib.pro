@@ -940,7 +940,9 @@ stop
     ; Get column types
     ncolumns = n_elements(finalstar[0,*])
     formatarr1 = strsplit(strmid(format,1,strlen(format)-2),',',/extract)
-    ; Deal with repeats, eg.g 5F9.4
+    bdf = where(stregex(formatarr1,'X',/boolean,/fold_case) eq 1,nbdf)
+    if nbdf gt 0 then REMOVE,bdf,formatarr1
+    ;; Deal with repeats, eg.g 5F9.4
     undefine,formatarr
     for j=0,n_elements(formatarr1)-1 do begin
       if valid_num(strmid(formatarr1[j],0,1)) eq 1 then begin
