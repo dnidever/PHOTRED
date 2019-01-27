@@ -70,6 +70,7 @@
 ;  /keepinstrumental  Keep the instrumental magnitudes and errors.
 ;                     They will have names of "I_MAG","I_MAGERR".
 ;  /header  The column names are in the first line.
+;  =catformat  Catalog format, FITS or ASCII.  ASCII by default.
 ;  /silent  Don't print anything out
 ;  /stp     Stop at the end of the program
 ;
@@ -368,7 +369,8 @@ end
 
 PRO  photcalib,inpfile,transfile,silent=silent,stp=stp,average=average,$
                onlyaverage=onlyaverage,keepinstrumental=keepinstrumental,$
-               combine=combine,header=header,logfile=logfile,inptrans=inptrans
+               combine=combine,header=header,logfile=logfile,$
+               catformat=catformat,inptrans=inptrans
 
 ;=====================================================================
 ;
@@ -386,7 +388,8 @@ endif
 
 ; Logfile
 if keyword_set(logfile) then logf=logfile else logf=-1
-
+; Catalog format
+if n_elements(catformat) eq 0 then catformat='ASCII'
 
 ; Testing the files
 test = file_test(inpfile)
@@ -566,16 +569,17 @@ FOR i=0L,ninp-1 do begin
   ; in the mag file
   
   ; Stars in this file
-  numstar = file_lines(magfile)-3L
-
-  ; For 12+ files DAOMASTER starts writing on a second line
-  if (numobs ge 12) then begin
-    numstar = numstar / 2L
-  endif
-
-  ; Not DAOPHOT file, Header line
-  if keyword_set(header) then numstar = file_lines(magfile)-1L
-
+  if file_isfits(magfile) eq 0 then begin
+    numstar = file_lines(magfile)-3L
+    ; For 12+ files DAOMASTER starts writing on a second line
+    if (numobs ge 12) then numstar = numstar / 2L
+    ; Not DAOPHOT file, Header line
+    if keyword_set(header) then numstar = file_lines(magfile)-1L
+  endif else begin
+    hd1 = headfits(magfile,exten=1,/silent)
+    numstar = sxpar(hd1,'NAXIS1') 
+  endelse
+    
   ; Print file info
   if not keyword_set(silent) then begin
     printlog,logf,format='(A-9,A-20)','FILE ',input[i].magfile
@@ -595,85 +599,19 @@ FOR i=0L,ninp-1 do begin
   ;#############################
   ;# READING IN THE PHOTOMETRY
   ;#############################
-  If keyword_set(header) then begin
-
-    phot = IMPORTASCII(magfile,/header,/noprint)
-    tags = tag_names(phot)
-    ncol = n_tags(phot)
-    nextra = ncol - 2*numobs
-    mastable = dblarr(numstar,2*numobs+nextra)
-    for j=0,ncol-1 do mastable[*,j] = phot.(j)
-
-  ; Daophot/ALLframe input
-  Endif else begin
-
-    ; Figure out how many columns there are
-    line1='' & line2='' & line3='' & line4='' & line5=''
-    openr,unit,/get_lun,magfile
-    readf,unit,line1
-    readf,unit,line2
-    readf,unit,line3
-    readf,unit,line4
-    readf,unit,line5
-    close,unit
-    free_lun,unit
-    arr = strsplit(line4,' ',/extract)
-    ncol = n_elements(arr)
-
-    ; For 12+ files DAOMASTER starts writing on a second line
-    if (numobs ge 12) then begin
-      arr5 = strsplit(line5,' ',/extract)
-      ncol2 = n_elements(arr5)
-      ncol = ncol + ncol2
-    endif
-
-    nextra = ncol - 2*numobs    ; nextra includes, ID, X, Y, CHI, SHARP, etc.
-
-    ; mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
-    ;mastable = fltarr(numstar,2*numobs+5)
-    mastable = dblarr(numstar,2*numobs+nextra)
-
-    ; Reading in the magnitude file
-    get_lun,unit
-    openr, unit, magfile
-
-    line=''
-    readf,unit,line
-    readf,unit,line
-    readf,unit,line
-
-    for j=0l,numstar-1 do begin
-      instr=' '
-      ;inline = fltarr(2*numobs+5)
-      inline = fltarr(2*numobs+nextra)
-      readf, unit, instr
-
-      ; For 12+ files DAOMASTER starts writing on a second line
-      if (numobs ge 12) then begin
-        instr2 = ''
-        readf,unit,instr2
-        instr = instr+instr2
-      endif
-
-      reads,instr,inline
-      ;mastable[j,0:2*numobs+4] = inline[0:2*numobs+4]
-      mastable[j,0:2*numobs+nextra-1] = inline[0:2*numobs+nextra-1]
-    endfor
-
-    close, unit
-    free_lun,unit
-
-  Endelse
-
+  phot = PHOTRED_READFILE(magfile)
+  tags = tag_names(phot)
+  ncol = n_tags(phot)
+  nextra = ncol - 2*numobs
+  mastable = dblarr(numstar,2*numobs+nextra)
+  for j=0,ncol-1 do mastable[*,j] = phot.(j)
 
   raarray = reform(mastable[*,1])
   decarray = reform(mastable[*,2])
 
   ; Initializing the arrays
-  ;goodstar = fltarr(2*numbands+5)
   goodstar = dblarr(2*numbands+nextra)
   manystars = dblarr(2*numobs)
-  ;startable = fltarr(numstar,2*numbands+5)
   startable = dblarr(numstar,2*numbands+nextra)
   indystar = dblarr(numstar,2*numobs)
 
@@ -723,7 +661,6 @@ FOR i=0L,ninp-1 do begin
     endif else begin
       printlog,logf,'NO TRANSFORMATION INPUT FOR  REFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
-stop
       return
     endelse
 
@@ -752,7 +689,6 @@ stop
   ;########################
 
   ; Getting the unique passbands
-  ;ui = uniq(mastrans.band)
   ui = uniq(mastrans.band,sort(mastrans.band))
   ui = ui[sort(ui)]
   ubands = mastrans[ui].band
@@ -763,7 +699,6 @@ stop
   ;--------------
   finalstar = goodstar[*,0:2]
   headline = '     ID       X         Y     '
-  ;headline = '    ID       X         Y     '
   ;;format = '(2X,I5,2F9.3'
   ;format = '(2X,I5,2F10.3'
   format = '(2X,I6,2F10.3'
@@ -779,28 +714,21 @@ stop
     
     ; Add to the final array
     finalstar = [ [finalstar], [instrstar] ]
-
-
+    
     ; Looping through the unique bands
     instroutband = strarr(numobs)
     instrouterr = strarr(numobs)
     for j=0,nubands-1 do begin
-      gdbands = where(mastrans.band eq ubands[j],ngdbands)
-      
+      gdbands = where(mastrans.band eq ubands[j],ngdbands)      
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
-
         instroutband[gdbands] = 'I_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)
         instrouterr[gdbands] = 'I_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
-        ;instroutband[gdbands] = 'INSTR_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)
-        ;instrouterr[gdbands] = 'INSTR_'+ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
 
       ; Only ONE obs in this band
       endif else begin
         instroutband[gdbands[0]] = 'I_'+ubands[j]
         instrouterr[gdbands[0]] = 'I_'+ubands[j]+'ERR'
-        ;instroutband[gdbands[0]] = 'INSTR_'+ubands[j]
-        ;instrouterr[gdbands[0]] = 'INSTR_'+ubands[j]+'ERR'
       endelse
       
     end  ; looping through unique bands
@@ -814,9 +742,6 @@ stop
 
     ; format
     format = format+','+strtrim(2*numobs,2)+'F9.4'
-
-    ;stop
-
   endif
 
 
@@ -824,7 +749,6 @@ stop
   ; Calibrated Individual Magnitudes columns
   ;------------------------------------------
   if not keyword_set(onlyaverage) then begin
-
     indivstar = goodstar[*,3:(numobs*2)+2]
 
     ; Add to the final array
@@ -838,19 +762,15 @@ stop
       
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
-
         outband[gdbands] = ubands[j]+'MAG'+strtrim(indgen(ngdbands)+1,2)
-        ;outband[gdbands] = ubands[j]+strtrim(indgen(ngdbands)+1,2)
         outerr[gdbands] = ubands[j]+strtrim(indgen(ngdbands)+1,2)+'ERR'
 
       ; Only ONE obs in this band
       endif else begin
         outband[gdbands[0]] = ubands[j]+'MAG'
-        ;outband[gdbands[0]] = ubands[j]
         outerr[gdbands[0]] = ubands[j]+'ERR'
       endelse
-      
-    end  ; looping through unique bands
+    endfor  ; looping through unique bands
 
     ; header
     bandspace = strarr(numobs)
@@ -861,9 +781,6 @@ stop
 
     ; format
     format = format+','+strtrim(2*numobs,2)+'F9.4'
-
-    ;stop
-
   endif
 
 
@@ -872,17 +789,12 @@ stop
   ;---------------------------------------
   if keyword_set(average) or keyword_set(combine) or keyword_set(onlyaverage) then begin
 
-
     ; Looping through the unique bands
     undefine,multibands,multierr
-    ;multioutband = strarr(numobs)
-    ;multiouterr = strarr(numobs)
     for j=0,nubands-1 do begin
       gdbands = where(mastrans.band eq ubands[j],ngdbands)
-      
       ; More than one observation in this band
       if (ngdbands gt 1) then begin
-
         PUSH,multibands,ubands[j]+'MAG'
         ;PUSH,multibands,ubands[j]
         PUSH,multierr,ubands[j]+'ERR'
@@ -891,14 +803,11 @@ stop
       endif else begin
         if keyword_set(onlyaverage) then begin
           PUSH,multibands,ubands[j]+'MAG'
-          ;PUSH,multibands,ubands[j]
           PUSH,multierr,ubands[j]+'ERR'
         endif
       endelse
-      
-    end  ; looping through unique bands
+    endfor  ; looping through unique bands
     nmultibands = n_elements(multibands)
-
 
     ; We have some multi observations
     if (nmultibands gt 0) then begin
@@ -908,29 +817,21 @@ stop
 
       ; Looping through the unique bands
       for j=0,nmultibands-1 do begin
-
         gdband = where(mastrans.band+'MAG' eq multibands[j],ngdband)
-
         ; Multiple exposures in this band
         if (ngdband gt 1) then begin
-
           ; Average the mags
           AVERAGEMAG,goodstar[*,3+2*gdband],goodstar[*,4+2*gdband],newmag,newerr,/robust
-
           ; Now put in the final output array
           combstar[*,j*2] = newmag
           combstar[*,j*2+1] = newerr
 
         ; One exposure in this band
         endif else begin
-
           combstar[*,j*2] = goodstar[*,3+2*gdband[0]]    ; transfer mag
           combstar[*,j*2+1] = goodstar[*,4+2*gdband[0]]    ; transfer error
-
         endelse
-
-      end ; multiband loop
-
+      endfor ; multiband loop
 
       ; Add to the final array
       finalstar = [ [finalstar], [combstar] ]
@@ -945,11 +846,9 @@ stop
       ; format
       format = format+','+strtrim(2*nmultibands,2)+'F9.4'
 
-    end  ; nmultibands gt 0
-
-    ;stop
-
-  endif
+    endif   ; nmultibands gt 0
+  endif  ; combine, average or onlyaverage
+  
 
   ;---------------
   ; Extra columns
@@ -994,7 +893,7 @@ stop
     ; We have FLAG/PROB colums
     if (nextra eq 7) then begin
       headline = headline+'  FLAG  PROB'
-    end
+    endif
     ; We have other columns
     if nextra gt 5 and nextra ne 7 then begin
       for j=0,nextra-6 do headline = headline+'    EXTRA'+strtrim(j+1,2)
@@ -1005,13 +904,12 @@ stop
     ; We have FLAG/PROB colums   
     if nextra eq 7 then begin
       format = format+',I5,F7.2'
-    end
+    endif
     ; We have other columns
     if nextra gt 5 and nextra ne 7 then begin
       for j=0,nextra-6 do format = format+','+strtrim(nextra-5,2)+'F9.4'
     endif
     format = format+')'
-
   endelse
 
 
@@ -1024,22 +922,74 @@ stop
   ; Header information is printed (an index of columns) and then
   ; the stars, one by one
   outfile = input[i].outfile
-  
-  OPENW,unit,/get_lun,outfile
-  
-  ; Print the header
-  printf,unit,headline
 
-  ; Loop through the stars
-  for d=0l,numstar-1 do printf,unit,format=format,finalstar[d,*]
-    
-  CLOSE,unit
-  FREE_LUN,unit
+  ;; ASCII file
+  if catformat eq 'ASCII' then begin
+stop
+    OPENW,unit,/get_lun,outfile  
+    ; Print the header
+    printf,unit,headline
+    ; Loop through the stars
+    for d=0l,numstar-1 do printf,unit,format=format,finalstar[d,*]
+    CLOSE,unit
+    FREE_LUN,unit
+
+  ;; FITS file
+  endif else begin
+    ; Get column types
+    ncolumns = n_elements(finalstar[0,*])
+    formatarr1 = strsplit(strmid(format,1,strlen(format)-2),',',/extract)
+    ; Deal with repeats, eg.g 5F9.4
+    undefine,formatarr
+    for j=0,n_elements(formatarr1)-1 do begin
+      if valid_num(strmid(formatarr1[j],0,1)) eq 1 then begin
+        vnum = intarr(strlen(formatarr1[j]))
+        fbytes = byte(formatarr1[j])
+        for k=0,strlen(formatarr1[j])-1 do vnum[k]=valid_num(fbytes[k])
+        hi = first_el(where(vnum eq 0))
+        fnum = strmid(formatarr1[j],0,hi)
+        fmt1 = strmid(formatarr1[j],hi)
+        push,formatarr,replicate(fmt1,fnum)
+      endif else push,formatarr,formatarr1[j]
+    endfor
+    ; Convert format codes to column types
+    types = lonarr(ncolumns)
+    for j=0,ncolumns-1 do begin
+       let = strmid(formatarr[j],0,1)
+       dum = strsplit(strmid(formatarr[j],1),'.')
+       ndig = dum[0]
+       if n_elements(dum) gt 1 then ndec=dum[1] else ndec=0
+       case let of
+        'A': types[j]=7                                    ; string
+        'I': begin
+              if ndig lt 9 then types[j]=1                 ; byte
+              if ndig ge 9 and ndig lt 12 then types[j]=2  ; int
+              if ndig ge 12 then types[j]=3                ; long
+           end
+        'F': begin
+              types[j]=4                                   ; float
+              if ndig ge 13 or ndec ge 6 then types[j]=5   ; double
+           end
+        else:
+      endcase
+    endfor
+    ;; Get the column names
+    colnames = strsplit(headline,' ',/extract)
+    if colnames[0] eq '#' then colnames=colnames[1:*]
+    ;; Create the schema
+    schema = create_struct(colnames[0],fix('',types[0]))
+    for j=1,ncolumns-1 do schema=create_struct(schema,colnames[j],fix('',types[j]))
+    ;; Copy in the data
+    final = create_struct(schema,numstar)
+    for j=0,ncolumns-1 do final.(j)=finalstar[*,j]
+stop
+    ;; Write the file
+    MWRFITS,final,outfile,/create
+  endelse ; FITS
 
   printlog,logf,'Final Photometry File is = ',outfile
   
   BOMB:
-
 
 ENDFOR ; loop through the magnitude files
 
