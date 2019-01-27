@@ -76,6 +76,10 @@ if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 telescope = READPAR(setup,'TELESCOPE')
 instrument = READPAR(setup,'INSTRUMENT')
 
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
 
 
 ;###################
