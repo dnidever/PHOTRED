@@ -926,7 +926,6 @@ FOR i=0L,ninp-1 do begin
 
   ;; ASCII file
   if catformat eq 'ASCII' then begin
-stop
     OPENW,unit,/get_lun,outfile  
     ; Print the header
     printf,unit,headline
@@ -979,9 +978,8 @@ stop
     schema = create_struct(colnames[0],fix('',type=types[0]))
     for j=1,ncolumns-1 do schema=create_struct(schema,colnames[j],fix('',type=types[j]))
     ;; Copy in the data
-    final = create_struct(schema,numstar)
+    final = replicate(schema,numstar)
     for j=0,ncolumns-1 do final.(j)=finalstar[*,j]
-stop
     ;; Write the file
     MWRFITS,final,outfile,/create
   endelse ; FITS
