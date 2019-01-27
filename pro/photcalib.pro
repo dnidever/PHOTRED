@@ -964,11 +964,7 @@ stop
        if n_elements(dum) gt 1 then ndec=dum[1] else ndec=0
        case let of
         'A': types[j]=7                                    ; string
-        'I': begin
-              if ndig lt 9 then types[j]=1                 ; byte
-              if ndig ge 9 and ndig lt 12 then types[j]=2  ; int
-              if ndig ge 12 then types[j]=3                ; long
-           end
+        'I': types[j]=3                                    ; long
         'F': begin
               types[j]=4                                   ; float
               if ndig ge 13 or ndec ge 6 then types[j]=5   ; double
