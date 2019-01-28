@@ -399,7 +399,7 @@ FOR i=0,ndirs-1 do begin
 
         ;; Create the tile directory
         ;; and make the sym links if they don't exist already
-        ;; fits, als, psf files
+        ;; fits, als, psf, ap, opt, als.opt, log files
         tiledir = groupstr1.tilename
         if file_test(tiledir) eq 0 then FILE_MKDIR,tiledir
         ; Loop through the files
@@ -409,8 +409,8 @@ FOR i=0,ndirs-1 do begin
           tilesuffix = 'T'+strtrim(groupstr1.tilenum,2)
           if strmid(groupfiles[l],6,7,/reverse_offset) eq 'fits.fz' then fext='.fits.fz' else fext='.fits'
           groupbase1 = FILE_BASENAME(groupfiles[l],fext)
-          origfiles = groupbase1+[fext,'.psf','.als']
-          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+[fext,'.psf','.als']
+          origfiles = groupbase1+[fext,'.psf','.als','.ap','.opt','.als.opt','.log']
+          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+[fext,'.psf','.als','.ap','.opt','.als.opt','.log']
           ; Make the necessary symbolic links
           needit = where(file_test(newfiles) eq 0,nneedit)
           if nneedit gt 0 then FILE_LINK,'../'+origfiles[needit],newfiles[needit]
