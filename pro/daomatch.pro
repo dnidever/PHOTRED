@@ -31,7 +31,7 @@
 ;-
 
 pro daomatch_dummy
-FORWARD_FUNCTION test_trans, trans_coo
+FORWARD_FUNCTION test_trans, trans_coo, trans_coo_dev
 end
 
 ;---------------------------------------------------------------

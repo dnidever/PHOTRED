@@ -24,7 +24,7 @@
 ;  =error    The error message if one occurred.
 ;
 ; USAGE:
-;  IDL>daomatch,['obj1034_1.als','obj1035_1.als','obj1036_1.als']
+;  IDL>daomatch_tile,['obj1034_1.als','obj1035_1.als','obj1036_1.als']
 ;
 ; Add options to freeze the scale and/or rotation.
 ; 
@@ -32,7 +32,7 @@
 ;-
 
 pro daomatch_dummy
-FORWARD_FUNCTION test_trans, trans_coo
+FORWARD_FUNCTION test_trans, trans_coo, trans_coo_dev
 end
 
 ;---------------------------------------------------------------
@@ -111,26 +111,17 @@ CD,dir
 
 bases = FILE_BASENAME(files,'.als')
 
-;; FAKE, running for artificial star tests
-;if keyword_set(fake) then begin
-;
-;  ; Check that MCH file exists
-;  if file_test(bases[0]+'.mch') eq 0 then begin
-;    error = '/fake set but '+bases[0]+'.mch NOT FOUND'
-;    printlog,logf,error
-;    return
-;  endif
-;   
-;  ; Keep backup of original mch file
-;  FILE_DELETE,bases[0]+'.mch.orig',/allow_nonexistent
-;  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.orig' 
-;   
-;  ; Remove the output files
-;  FILE_DELETE,bases[0]+'.raw',/allow_nonexistent
-;  FILE_DELETE,bases[0]+'.tfr',/allow_nonexistent
-;   
-;  goto,rundaomaster
-;endif
+; FAKE, running for artificial star tests
+if keyword_set(fake) then begin
+  ; Check that MCH file exists
+  if file_test(mchbase+'.mch') eq 0 then begin
+    error = '/fake set but '+mchbase+'.mch NOT FOUND'
+    printlog,logf,error
+    return
+  endif
+  ;; Skip the MCH creation process
+  goto,rundaomaster
+endif
 
 
 ; Gather information on all of the files
@@ -278,7 +269,7 @@ For i=0,nfiles-1 do begin
   HEAD_ADXY,tilestr.head,ra,dec,xref,yref,/deg
   xref += 1  ; convert 0-indexed to 1-indexed
   yref += 1
-  ; Convert to tile X/Y values
+  ; Convert to tile group X/Y values
   xref -= groupstr.x0
   yref -= groupstr.y0
 
@@ -296,9 +287,9 @@ For i=0,nfiles-1 do begin
     raw[0:nals-1].chi = als.chi
     raw[0:nals-1].sharp = als.sharp 
     raw[0:nals-1].nobs++
-    count += nals
     ; TFR
     tfr[0:nals-1,i] = alsind
+    count += nals
 
   ; Second and later images, crossmatch
   endif else begin
@@ -332,11 +323,10 @@ For i=0,nfiles-1 do begin
       raw[count:count+nals-1].chi += als.chi
       raw[count:count+nals-1].sharp += als.sharp
       raw[count:count+nals-1].nobs++
-      count += nals
       ; TFR
       tfr[count:count+nals-1,i] = alsind
+      count += nals
     endif
-
   endelse
 Endfor
 ; Trim extra elements
@@ -382,11 +372,11 @@ for i=0,nraw-1 do begin
       narr = 0
     endelse     
     if j eq 0 then begin
-      format = '(A1,I8,2F9.3,'+strtrim(n_elements(thisarr),2)+'F9.4)'
-      printf,unit,'',raw[i].id,raw[i].x,raw[i].y,thisarr,format=format
+      format = '(I7,2F9.3,'+strtrim(n_elements(thisarr),2)+'F9.4)'
+      printf,unit,raw[i].id,raw[i].x,raw[i].y,thisarr,format=format
     endif else begin
       ; 27 leading spaces
-      format = '(A27,'+strtrim(n_elements(thisarr),2)+'F9.4)'
+      format = '(A25,'+strtrim(n_elements(thisarr),2)+'F9.4)'
       printf,unit,'',thisarr,format=format
     endelse
   endfor
@@ -404,13 +394,6 @@ format = '(I7,F9.2,F9.2,'+strtrim(nfiles,2)+'I7)'
 for i=0,nraw-1 do printf,unit,raw[i].id,raw[i].x,raw[i].y,reform(tfr[i,*]),format=format
 close,unit
 free_lun,unit
-
-
-;; FAKE, copy back the original MCH file
-;if keyword_set(fake) then begin
-;  FILE_COPY,bases[0]+'.mch',bases[0]+'.mch.daomaster',/overwrite,/allow
-;  FILE_MOVE,bases[0]+'.mch.orig',bases[0]+'.mch',/overwrite,/allow
-;endif
 
 ; Back to the original directory
 CD,curdir

@@ -137,10 +137,14 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
       for k=0l,nstarline-1 do begin
         readf, unit, instr1
         if k gt 0 then begin
-          ; There are leading spaces, 24 or 25
-          ; Use the first character AFTER the first column to figure out
-          ;   how many spaces we need to strip off
-          trial = strmid(instr1,34,1)
+          ;; There are leading spaces, 24 or 25
+          ;; Use the first character AFTER the first column to figure out
+          ;;   how many spaces we need to strip off
+          ;; The MAG/ERR columns are F9.4, so if there are 25 spaces then
+          ;;   the 34th character (index=33) should be the last digit of MAG1 (25+9=34)
+          ;;   and be a number.  If there are 24 leading space then the
+          ;;   34th character will right after MAG1 and be a space.
+          trial = strmid(instr1,33,1)
           if trial eq ' ' then nspaces=24 else nspaces=25
           instr1 = strmid(instr1,nspaces)
         endif

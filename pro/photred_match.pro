@@ -362,14 +362,6 @@ FOR i=0,ndirs-1 do begin
     ;;=======================
     IF keyword_set(mchusetiles) then begin
 
-
-; MAKE SURE WE HAVE ALL OF THE FILES FOR THE GROUPS!!!
-print,'MAKE SURE WE HAVE ALL OF THE FILES FOR THE GROUPS!!!'
-wait,1
-;stop
-; use photred_gatherfileinfo.pro to get information on all
-; the files in INPUTLIST and in SUCCESSLIST
-
       ;; Get the FITS file names
       basefits = base+'.fits'
       bdbasefits = where(file_test(basefits) eq 0,nbdbasefits)
@@ -387,20 +379,22 @@ wait,1
 
       ;; Pick a reference exposure
       ;; mainly use this for the base names
-      PHOTRED_PICKREFERENCEFRAME,base,filtref,thisimager,refstr,logfile=logfile,error=referror
+      PHOTRED_PICKREFERENCEFRAME,base,filtref,thisimager,refstr,fake=fake,logfile=logfile,error=referror
       if n_elements(referror) gt 0 then begin
         printlog,logfile,'Failing field '+thisfield+' and going to the next'
         PUSH,failurelist,dirs[i]+'/'+base+'.als'
         goto,BOMB
       endif
 
-      ;; Loop through the tile groups
+      ;; Loop through the tile groups and run DAOMATCH_TILE
       ngroups = n_elements(groupstr)
       printlog,logfile,'There are '+strtrim(ngroups,2)+' groups'
+      undefine,failedbase
       for k=0,ngroups-1 do begin
         groupstr1 = groupstr[k]
         groupfiles = *groupstr1.files
         grouptileinfo = tilestr.tiles[k]
+        if k gt 0 then printlog,logfile,' '
         printlog,logfile,'  Group '+strtrim(k+1,2)+' - '+strtrim(n_elements(groupfiles),2)+' file(s)'
 
         ;; Create the tile directory
@@ -409,7 +403,8 @@ wait,1
         tiledir = groupstr1.tilename
         if file_test(tiledir) eq 0 then FILE_MKDIR,tiledir
         ; Loop through the files
-        alsfiles = strarr(groupstr1.nfiles)
+        grpalsfiles = strarr(groupstr1.nfiles)
+        grpalsbase = strarr(groupstr1.nfiles)
         for l=0,groupstr1.nfiles-1 do begin
           tilesuffix = 'T'+strtrim(groupstr1.tilenum,2)
           if strmid(groupfiles[l],6,7,/reverse_offset) eq 'fits.fz' then fext='.fits.fz' else fext='.fits'
@@ -419,27 +414,70 @@ wait,1
           ; Make the necessary symbolic links
           needit = where(file_test(newfiles) eq 0,nneedit)
           if nneedit gt 0 then FILE_LINK,'../'+origfiles[needit],newfiles[needit]
-          alsfiles[l] = tiledir+'/'+groupbase1+'.'+tilesuffix+'.als'
+          grpalsbase[l] = groupbase1
+          grpalsfiles[l] = tiledir+'/'+groupbase1+'.'+tilesuffix+'.als'
         endfor
-  
-        stop
-
-        ;; Does it matter if the reference image isn't represented
-        ;; in this tile???
-        ;; Will DAOMATCH crash if some of the images don't overlap??
-        ;; maybe I need make my own MCH files based on the tiling grid
-        ;; as in allframe_combine.pro, and make my own version of the
-        ;; RAW file.
          
-        ;; Run DAOMATCH
-        ;; maybe make daomatch_tile.pro to use the tile projection
-        ;; coords in the mch file. 
-        ;; I started daomatch_tile.pro.  
+        ;; Run DAOMATCH_TILE
         mchbase = refstr.base+'.'+tilesuffix
-      ;  DAOMATCH_TILE,alsfiles,tilestr,grouptileinfo,mchbase
+        DAOMATCH_TILE,grpalsfiles,tilestr,grouptileinfo,mchbase,error=daoerror
 
+        ;; Check the MCH and RAW files for each tile group
+        ;; Were we successful?
+        mchfile = file_dirname(grpalsfiles[0])+'/'+mchbase+'.mch'
+        mchtest = FILE_TEST(mchfile)
+        if mchtest eq 1 then mchlines=FILE_LINES(mchfile) else mchlines=0
+        rawfile = file_dirname(grpalsfiles[0])+'/'+mchbase+'.raw'
+        rawtest = FILE_TEST(rawfile)
+        if rawtest eq 1 then rawlines=FILE_LINES(rawfile) else rawlines=0
+
+        ;; Success
+        if ((mchlines eq groupstr1.nfiles) and (rawlines gt 3) and (n_elements(daoerror) eq 0)) then begin              
+          PUSH,outlist,dirs[i]+'/'+mchfile
+          ;; Getting total number of stars
+          nrecords = FILE_LINES(rawfile)-3
+          ; Printing the results
+          printlog,logfile,'NSTARS = ',strtrim(nrecords,2)
+          printlog,logfile,'MCH file = ',mchfile
+          printlog,logfile,'RAW file = ',rawfile
+        ;; Failure
+        endif else begin
+          PUSH,failedbase,grpalsbase
+          ;; failure information
+          if n_elements(error) gt 0 then printlog,logfile,'DAOMATCH ERROR - '+daoerror
+          if mchtest eq 0 then printlog,logfile,mchfile+' NOT FOUND'
+          if mchtest eq 1 and mchlines ne nampind then printlog,logfile,mchfile+' DOES NOT HAVE THE RIGHT NUMBER OF LINES'
+          if rawtest eq 0 then printlog,logfile,rawfile+' NOT FOUND'
+          if rawlines le 3 then printlog,logfile,'NO SOURCES IN '+rawfile
+        endelse
       endfor ; tile/group loop
-         
+
+      ;; Update success and failure lists
+      ;; This is complicated because
+      ;;   The inlist has files like
+      ;;   F1/F1-00507800_01.als
+      ;;   F1/F1-00507802_10.als
+      ;;   F1/F1-00507805_22.als
+      ;;   F1/F1-00507808_45.als
+      ;;   F1/F1-00507809_60.als
+      ;;   but my successlist has the tile-specific files
+      ;;   F1/F1-T1/F1-00507807_32.T1.als
+      ;;   F1/F1-T5/F1-00507811_45.T5.als
+      ;; Figure out which original als files we should say "succeeded"
+      ;;   only the ones that were succesful in all the groups they
+      ;;   are in
+      ;; Failure are any als files that in failed groups
+      if n_elements(failedbase) gt 0 then begin
+        failedbase = failedbase[uniq(failedbase,sort(failedbase))]  ; unique files
+        MATCH,base,failedbase,ind1,ind2,/sort,count=nmatch
+        successbase = base
+        if nmatch lt n_elements(base) then REMOVE,ind1,successbase else undefine,successbase
+        if n_elements(successbase) gt 0 then PUSH,successlist,dirs[i]+'/'+successbase+'.als'
+        PUSH,failurelist,dirs[i]+'/'+failedbase+'.als'  ; add to failure list        
+      endif else begin
+        PUSH,successlist,dirs[i]+'/'+base+'.als'
+      endelse      
+
 
     ;;===================================
     ;;  GROUPING WITH CHIP/AMP NUMBERS

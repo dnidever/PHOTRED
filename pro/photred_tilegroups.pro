@@ -2,7 +2,7 @@
 ;
 ; PHOTRED_TILEGROUPS
 ;
-; This program takes files creates groups based
+; This program takes files and creates groups based
 ; on the tiling scheme.
 ;
 ; INPUTS:
