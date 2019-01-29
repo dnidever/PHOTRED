@@ -33,6 +33,7 @@
 ;  /usecmn        Use the common sources file of the reference image.
 ;  /fake          Run for artificial star tests.
 ;  =catformat     Catalog format to use: FITS or ASCII.  Default is ASCII.
+;  =imager        Imager structure with basic information.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -51,7 +52,7 @@
 pro allframe,file,tile=tile,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake,catformat=catformat
+             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager
 
 COMMON photred,setup
 
@@ -62,7 +63,8 @@ nfile = n_elements(file)
 if (nfile eq 0) then begin
   print,'Syntax - allframe,file,tile=tile,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
-  print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,stp=stp'
+  print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
+  print,'                  imager=imager,stp=stp'
   return
 endif
 
@@ -322,7 +324,7 @@ if keyword_set(cmborig) then begin
 endif else begin
   ALLFRAME_COMBINE,file,tile=tile,fake=fake,scriptsdir=scriptsdir,error=error,logfile=logfile,$
                irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,$
-               maskdatalevel=maskdatalevel,filestr=filestr
+               maskdatalevel=maskdatalevel,filestr=filestr,imager=imager
   xoff = 0.0
   yoff = 0.0
   combmch = mchbase+'_comb.mch'

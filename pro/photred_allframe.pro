@@ -113,7 +113,18 @@ if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
+telescope = strupcase(strtrim(telescope,2))
+if (telescope eq '0' or telescope eq '' or telescope eq '-1') then begin
+  printlog,logfile,'NO TELESCOPE FOUND.  Please add to >>photred.setup<< file'
+  return
+endif
+; INSTRUMENT
 instrument = READPAR(setup,'INSTRUMENT')
+instrument = strupcase(strtrim(instrument,2))
+if (instrument eq '0' or instrument eq '' or instrument eq '-1') then begin
+  printlog,logfile,'NO INSTRUMENT FOUND.  Please add to >>photred.setup<< file'
+  return
+endif
 
 ; ALLFRAME Source Detection Program
 alfdetprog = READPAR(setup,'ALFDETPROG')
@@ -173,6 +184,54 @@ if nirafdir eq 0 then begin
   return
 endif
 
+; Get the scripts directory from setup
+scriptsdir = READPAR(setup,'SCRIPTSDIR')
+if scriptsdir eq '' then begin
+  printlog,logfile,'NO SCRIPTS DIRECTORY'
+  return
+endif
+pythonbin = READPAR(setup,'pythonbin')
+htcondor = READPAR(setup,'htcondor')
+
+; LOAD THE "imagers" FILE
+;----------------------------
+printlog,logfile,'Loading imager information'
+imagerstest = FILE_TEST(scriptsdir+'/imagers')
+if (imagerstest eq 0) then begin
+  printlog,logfile,'NO >>imagers<< file in '+scriptsdir+'  PLEASE CREATE ONE!'
+  return
+endif
+; The columns need to be: Telescope, Instrument, Naps, separator
+imagers_fieldnames = ['telescope','instrument','observatory','namps','separator']
+imagers_fieldtpes = [7,7,7,3,7]
+imagers = IMPORTASCII(scriptsdir+'/imagers',fieldnames=imagers_fieldnames,$
+                      fieldtypes=imagers_fieldtypes,comment='#')
+imagers.telescope = strupcase(strtrim(imagers.telescope,2))
+imagers.instrument = strupcase(strtrim(imagers.instrument,2))
+imagers.observatory = strupcase(strtrim(imagers.observatory,2))
+singleind = where(imagers.namps eq 1,nsingle)
+if nsingle gt 0 then imagers[singleind].separator = ''
+if (n_tags(imagers) eq 0) then begin
+  printlog,logfile,'NO imagers in '+scriptsdir+'/imagers'
+  return
+endif
+
+; What IMAGER are we using??
+;---------------------------
+ind_imager = where(imagers.telescope eq telescope and imagers.instrument eq instrument,nind_imager)
+if nind_imager eq 0 then begin
+  printlog,logfile,'TELESCOPE='+telescope+' INSTRUMENT='+instrument+' NOT FOUND in >>imagers<< file'
+  return
+endif
+thisimager = imagers[ind_imager[0]]
+; print out imager info
+printlog,logfile,''
+printlog,logfile,'USING IMAGER:'
+printlog,logfile,'Telescope = '+thisimager.telescope
+printlog,logfile,'Instrument = '+thisimager.instrument
+printlog,logfile,'Namps = '+strtrim(thisimager.namps,2)
+printlog,logfile,"Separator = '"+thisimager.separator+"'"
+printlog,logfile,''
 
 ; Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL
 ;---------------------------------------------------------------
@@ -276,15 +335,6 @@ uidirs = uniq(inputdirs,sort(inputdirs))
 uidirs = uidirs[sort(uidirs)]
 dirs = inputdirs[uidirs]
 ndirs = n_elements(dirs)
-
-; Get the scripts directory from setup
-scriptsdir = READPAR(setup,'SCRIPTSDIR')
-if scriptsdir eq '' then begin
-  printlog,logfile,'NO SCRIPTS DIRECTORY'
-  return
-endif
-pythonbin = READPAR(setup,'pythonbin')
-htcondor = READPAR(setup,'htcondor')
 
 
 
@@ -577,7 +627,7 @@ if tiletype eq 'TILES' then begin
       ;        xrange:[tstr.x0,tstr.x1],yrange:[tstr.y0,tstr.y1],$
       ;        nx:tstr.nx,ny:tstr.ny}
       ; Create the string representation of the TILE structure
-      stile = "tile={type:'WCS',naxis:["+strtrim(tilestr.nx,2)+"L,"+strtrim(tilestr.ny,2)+"L],"+$
+      stile = "{type:'WCS',naxis:["+strtrim(tilestr.nx,2)+"L,"+strtrim(tilestr.ny,2)+"L],"+$
               "cdelt:["+strdouble(tilestr.xstep)+","+strdouble(tilestr.ystep)+"],"+$
               "crpix:["+strdouble(tilestr.xref)+","+strdouble(tilestr.yref)+"],"+$
               "crval:["+strdouble(tilestr.cenra)+","+strdouble(tilestr.cendec)+"],"+$
@@ -585,9 +635,13 @@ if tiletype eq 'TILES' then begin
               "xrange:["+strtrim(tstr.x0,2)+"L,"+strtrim(tstr.x1,2)+"L],"+$
               "yrange:["+strtrim(tstr.y0,2)+"L,"+strtrim(tstr.y1,2)+"L],"+$
               "nx:"+strtrim(tstr.nx,2)+"L,ny:"+strtrim(tstr.ny,2)+"L}"
+      ; Create the string representation of the THISIMAGER structure
+      simager = "{telescope:'"+thisimager.telescope+"',instrument:'"+thisimager.instrument+"',"+$
+                "observatory:'"+thisimager.observatory+"',namps:"+strtrim(thisimager.namps,2)+","+$
+                "separator:'"+thisimager.separator+"'}"
       ; Make commands for allframe
       cmd1 = "allframe,'"+mchfile+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
-            ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',"+stile
+            ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile="+stile+",imager="+simager
       if keyword_set(alfnocmbimscale) then cmd1+=",/nocmbimscale"
       if keyword_set(alftrimcomb) then cmd1+=",/trimcomb"
       if keyword_set(alfusecmn) then cmd1+=",/usecmn"

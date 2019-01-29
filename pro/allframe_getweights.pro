@@ -11,6 +11,7 @@
 ;
 ; INPUTS:
 ;  mchfile     The MCH filename
+;  =imager     Imager structure with basic information
 ;  /stp        Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -27,7 +28,7 @@
 ;-
 
 
-pro allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp
+pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,raw=raw,stp=stp
 
 ; OUTPUTS:
 ;  actweight  The weight for each frame
@@ -36,7 +37,7 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp
 
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
-  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,raw=raw,stp=stp'
+  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,raw=raw,stp=stp'
   return
 endif
 
@@ -164,6 +165,35 @@ mag = fltarr(nfiles,nstars)
 err = fltarr(nfiles,nstars)
 for i=0,nfiles-1 do mag[i,*] = raw.(magind[i])
 for i=0,nfiles-1 do err[i,*] = raw.(errind[i])
+
+;; We are using TILES and have multiple chips/amps
+;;   F1-00507800_39.T2.als, '.T' and two dots
+if n_elements(imager) gt 0 then namps=imager.namps else namps=1
+if total(stregex(files,'.T',/boolean)) eq nfiles and $
+   total(long(byte(files[0])) eq 46) ge 2 and namps gt 1 then begin
+
+  ;; Number of unique exposures
+  expname = strarr(nfiles)
+  chip = strarr(nfiles)
+  for i=0,nfiles-1 do begin
+    base1 = file_basename(files[i],'.als')           ; F1-00507800_39.T2
+    field1 = (strsplit(base1,'-',/extract))[0]       ; F1
+    expchptile = (strsplit(base1,'-',/extract))[1]   ; 00507800_39.T2
+    expchp = (strsplit(expchptile,'.',/extract))[0]  ; 00507800_39
+    expname[i] = (strsplit(expchp,imager.separator,/extract))[0]
+    chip[i] = (strsplit(expchp,imager.separator,/extract))[1]
+  endfor
+  ;; Unique exposures
+  uiexp = uniq(expname,sort(expname))
+  uexpname = expname[uiexp]
+  nexp = n_elements(uexpname)
+
+stop
+
+endif
+
+
+stop
 
 ; Getting the reference sources
 totstars = total(mag lt 50,1)

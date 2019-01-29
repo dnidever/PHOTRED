@@ -20,6 +20,7 @@
 ;  /fake          Run for artificial star tests.
 ;  /usecmn        Use the individual cmn.lst files to construct a
 ;                   cmn.lst file for the combined image.
+;  =imager        Imager structure with basic information.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -46,7 +47,8 @@
 
 pro allframe_combine,file,tile=tileinp,stp=stp,scriptsdir=scriptsdir,error=error,$
              logfile=logfile,irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,$
-             fake=fake,maskdatalevel=maskdatalevel,usecmn=usecmn,filestr=filestr
+             fake=fake,maskdatalevel=maskdatalevel,usecmn=usecmn,filestr=filestr,$
+             imager=imager
 
 COMMON photred,setup
 
@@ -60,7 +62,8 @@ nfile = n_elements(file)
 if (nfile eq 0) then begin
   print,'Syntax - allframe_combine,file,stp=stp,scriptsdir=scriptsdir,satlevel=satlevel,'
   print,'                  nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
-  print,'                  irafdir=irafdir,fake=fake,usecmn=usecmn'
+  print,'                  irafdir=irafdir,fake=fake,usecmn=usecmn,fileestr=filestr,'
+  print,'                  imager=imager'
   return
 endif
 
@@ -196,6 +199,7 @@ outmaskfiles = base+'.mask.shft.fits'
 
 
 ; Gather information on all of the files
+;; photred_gatherfileinfo.pro can do most of this
 printlog,logf,'Gathering file information'
 ntrans = n_elements(trans[0,*])
 filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),$
@@ -338,7 +342,7 @@ printlog,logf,'------------------------'
 ;-----------------------------------
 ; Computs Weights
 if not keyword_set(fake) then begin
-  ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky ;,raw2=raw2
+  ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky,imager=imager ;,raw2=raw2
   invscales = 1.0/scales
   bdscale = where(scales lt 1e-5 or invscales gt 900,nbdscale)
   if nbdscale gt 0 then begin
