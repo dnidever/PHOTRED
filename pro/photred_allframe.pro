@@ -152,6 +152,11 @@ if n_elements(tiletype) eq 0 then begin
   if alftiletype eq '0' or alftiletype eq '' or alftiletype eq '-1' then tiletype='ORIG' else tiletype=alftiletype
 endif
 
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
+if n_elements(mchusetiles) gt 0 then tiletype='TILES'
+
 ; Catalog format to use
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
@@ -407,7 +412,6 @@ For i=0,ninputlines-1 do begin
       endif
     endif
 
-
     ; Checking OPT file
     opttest = FILE_TEST(base+'.opt')
     if opttest eq 0 then begin
@@ -538,13 +542,70 @@ printlog,logfile,'Running ALLFRAME on '+strtrim(n_elements(procbaselist),2)+' fi
 printlog,logfile,''
 printlog,logfile,systime(0)
 
-; Make commands for allframe
-cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
-      ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile={type:'"+strupcase(tiletype)+"'}"
-if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
-if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
-if keyword_set(alfusecmn) then cmd+=",/usecmn"
-if keyword_set(fake) then cmd+=",/fake"
+;; Use tiles
+if tiletype eq 'TILES' then begin
+   
+  ;; Loop over the fields in this directory                                                                             
+  dum = strsplitter(procbaselist,'-',/extract)
+  allfields = reform(dum[0,*])
+  uifields = uniq(allfields,sort(allfields))
+  ufields = allfields[uifields]
+  nfields = n_elements(ufields)
+  undefine,cmd
+  For i=0,nfields-1 do begin
+    thisfield = ufields[i]
+    gdfieldmch = where(allfields eq thisfield,ngdfieldmch)
+    fieldmchfiles = procbaselist[gdfieldmch]
+
+    ;; Load the Field tile file
+    ;;  the files for each tile are in F#/F#-TXX/ but the tile file is
+    ;;  in directory F#/
+    tilefile = procdirlist[gdfieldmch[0]]+'/'+thisfield+'.tiling'
+    if file_test(tilefile) eq 0 then tilefile = file_dirname(procdirlist[gdfieldmch[0]])+'/'+thisfield+'.tiling'
+    PHOTRED_LOADTILEFILE,tilefile,tilestr
+
+    For j=0,ngdfieldmch-1 do begin
+      mchfile = fieldmchfiles[j]  ; F1-00507801.T1.mch
+      thistile = (strsplit(mchfile,'.',/extract))[1]
+      tilename = thisfield+'-'+thistile
+      tind = where(tilestr.tiles.name eq tilename,ntind)
+      tstr = tilestr.tiles[tind[0]]
+      ; Create the TILE structure
+      ;tile = {type:'WCS',naxis:long([tilestr.nx,tilestr.ny]),cdelt:double([tilestr.xstep,tilestr.ystep]),$
+      ;        crpix:double([tilestr.xref,tilestr.yref]),$
+      ;        crval:double([tilestr.cenra,tilestr.cendec]),ctype:['RA--TAN','DEC--TAN'],$
+      ;        xrange:[tstr.x0,tstr.x1],yrange:[tstr.y0,tstr.y1],$
+      ;        nx:tstr.nx,ny:tstr.ny}
+      ; Create the string representation of the TILE structure
+      stile = "tile={type:'WCS',naxis:["+strtrim(tilestr.nx,2)+"L,"+strtrim(tilestr.ny,2)+"L],"+$
+              "cdelt:["+strdouble(tilestr.xstep)+","+strdouble(tilestr.ystep)+"],"+$
+              "crpix:["+strdouble(tilestr.xref)+","+strdouble(tilestr.yref)+"],"+$
+              "crval:["+strdouble(tilestr.cenra)+","+strdouble(tilestr.cendec)+"],"+$
+              "ctype:['RA--TAN','DEC--TAN'],"+$
+              "xrange:["+strtrim(tstr.x0,2)+"L,"+strtrim(tstr.x1,2)+"L],"+$
+              "yrange:["+strtrim(tstr.y0,2)+"L,"+strtrim(tstr.y1,2)+"L],"+$
+              "nx:"+strtrim(tstr.nx,2)+"L,ny:"+strtrim(tstr.ny,2)+"L}"
+      ; Make commands for allframe
+      cmd1 = "allframe,'"+mchfile+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+            ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',"+stile
+      if keyword_set(alfnocmbimscale) then cmd1+=",/nocmbimscale"
+      if keyword_set(alftrimcomb) then cmd1+=",/trimcomb"
+      if keyword_set(alfusecmn) then cmd1+=",/usecmn"
+      if keyword_set(fake) then cmd1+=",/fake"
+      PUSH,cmd,cmd1
+    Endfor  ; mch file loop
+  Endfor  ; field loop
+
+;; WCS or ORIG
+endif else begin
+  ; Make commands for allframe
+  cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+        ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile={type:'"+strupcase(tiletype)+"'}"
+  if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
+  if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
+  if keyword_set(alfusecmn) then cmd+=",/usecmn"
+  if keyword_set(fake) then cmd+=",/fake"
+endelse
 
 
 ; Getting NMULTI from setup file if not input
