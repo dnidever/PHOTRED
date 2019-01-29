@@ -573,7 +573,7 @@ if tiletype eq 'TILES' then begin
       ; Create the TILE structure
       ;tile = {type:'WCS',naxis:long([tilestr.nx,tilestr.ny]),cdelt:double([tilestr.xstep,tilestr.ystep]),$
       ;        crpix:double([tilestr.xref,tilestr.yref]),$
-      ;        crval:double([tilestr.cenra,tilestr.cendec]),ctype:['RA--TAN','DEC--TAN'],$
+      ;        crval:double([tilestr.cenra,tilestr.cendec]),ctype:['RA---TAN','DEC--TAN'],$
       ;        xrange:[tstr.x0,tstr.x1],yrange:[tstr.y0,tstr.y1],$
       ;        nx:tstr.nx,ny:tstr.ny}
       ; Create the string representation of the TILE structure
@@ -581,7 +581,7 @@ if tiletype eq 'TILES' then begin
               "cdelt:["+strdouble(tilestr.xstep)+","+strdouble(tilestr.ystep)+"],"+$
               "crpix:["+strdouble(tilestr.xref)+","+strdouble(tilestr.yref)+"],"+$
               "crval:["+strdouble(tilestr.cenra)+","+strdouble(tilestr.cendec)+"],"+$
-              "ctype:['RA--TAN','DEC--TAN'],"+$
+              "ctype:['RA---TAN','DEC--TAN'],"+$
               "xrange:["+strtrim(tstr.x0,2)+"L,"+strtrim(tstr.x1,2)+"L],"+$
               "yrange:["+strtrim(tstr.y0,2)+"L,"+strtrim(tstr.y1,2)+"L],"+$
               "nx:"+strtrim(tstr.nx,2)+"L,ny:"+strtrim(tstr.ny,2)+"L}"

@@ -303,14 +303,14 @@ if tag_exist(tile,'HEAD') eq 0 then begin
   SXADDPAR,tilehead,'CDELT2',tile.cdelt[1]
   SXADDPAR,tilehead,'CRPIX2',tile.crpix[1]
   SXADDPAR,tilehead,'CRVAL2',tile.crval[1]
-  SXADDPAR,tilehead,'CTYPE2',tile.crval[1]
+  SXADDPAR,tilehead,'CTYPE2',tile.ctype[1]
   if tag_exist(tile,'CD') then begin
     SXADDPAR,tilehead,'CD1_1',tile.cd[0,0]
     SXADDPAR,tilehead,'CD1_2',tile.cd[0,1]
     SXADDPAR,tilehead,'CD2_1',tile.cd[1,0]
     SXADDPAR,tilehead,'CD2_2',tile.cd[1,1]
   endif
-  EXTAST,tile.head,tileast
+  EXTAST,tilehead,tileast
   tileast.equinox = 2000
   tile = CREATE_STRUCT(tile,'HEAD',tilehead,'AST',tileast)
 endif
