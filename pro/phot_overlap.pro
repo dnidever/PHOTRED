@@ -47,10 +47,10 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'PHOT_OVERLAP ERROR: ', !ERROR_STATE.MSG  
    undefine,outstr
-   CATCH, /CANCEL 
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG
+   CATCH, /CANCEL 
    return
 endif
 

@@ -39,8 +39,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'READPAR ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG            ; There was an error
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return,-1
 endif

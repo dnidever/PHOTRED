@@ -79,8 +79,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'ALLFRAME ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG,logfile=logf
    CATCH, /CANCEL 
    return
 endif

@@ -74,12 +74,12 @@ if keyword_set(logfile) then logf=logfile else logf=-1
 ;------------------
 ; Establish error handler. When errors occur, the index of the  
 ; error is returned in the variable Error_status:  
-CATCH, Error_status 
+CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'ALLFRAME_COMBINE ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG,logfile=logf
    CATCH, /CANCEL 
    return
 endif

@@ -34,8 +34,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'CHECK_IRAF ERROR: ', !ERROR_STATE.MSG  
    test = -1            ; There was an error
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif

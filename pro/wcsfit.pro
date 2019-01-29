@@ -611,8 +611,8 @@ undefine,error
 CATCH, Error_status 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'WCSFIT_INITWCS ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
@@ -1060,8 +1060,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'WCSFIT_REFINE ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
@@ -1367,8 +1367,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'WCSFIT ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif

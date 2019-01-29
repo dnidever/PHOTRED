@@ -31,12 +31,11 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'CHECK_PYTHON ERROR: ', !ERROR_STATE.MSG  
    test = -1            ; There was an error
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
-
 
 
 ; Check that we have all the required programs

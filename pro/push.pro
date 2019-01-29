@@ -37,9 +37,9 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   error = 'PUSH ERROR: '+!ERROR_STATE.MSG  
    print,error
    count = -1            ; There was an error
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif

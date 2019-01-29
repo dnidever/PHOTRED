@@ -118,7 +118,6 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'MATCHSTARS_XCORR ERROR: ', !ERROR_STATE.MSG  
    xshift = 999999.
    yshift = 999999.
    angle = 999999.
@@ -126,6 +125,7 @@ if (Error_status ne 0) then begin
    bestcorr = -1
    matchnum = -1
    nsig = -1
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
@@ -763,9 +763,9 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'MATCHSTARS_LINEFIT ERROR: ', !ERROR_STATE.MSG  
    fpar = 999999.
    rms1 = 999999.
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
@@ -950,11 +950,11 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'MATCHSTARS ERROR: ', !ERROR_STATE.MSG  
    ind1 = -1
    ind2 = -1
    trans = -1
    count = -1          ; There was an error
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif

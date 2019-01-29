@@ -57,8 +57,8 @@ CATCH, Error_status
 
 ;This statement begins the error handler:  
 if (Error_status ne 0) then begin 
-   print,'PRINTLOG ERROR: ', !ERROR_STATE.MSG  
    error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG
    CATCH, /CANCEL 
    return
 endif
