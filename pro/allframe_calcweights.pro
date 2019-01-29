@@ -4,7 +4,7 @@
 ;
 ;-
 
-pro allframe_calcweights,mag,err,fwhm,rdnoise,medsky,actweight,scales
+pro allframe_calcweights,mag,err,fwhm,rdnoise,medsky,actweight,scales,stp=stp
 
 sz = size(mag)
 ngd = sz[2]

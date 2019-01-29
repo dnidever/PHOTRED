@@ -12,6 +12,7 @@
 ; INPUTS:
 ;  mchfile     The MCH filename
 ;  =imager     Imager structure with basic information
+;  =logfile       A logfile to print to output to.
 ;  /stp        Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -23,12 +24,11 @@
 ; USAGE:
 ;  IDL>allframe_getweights,'ccd1001.mch',weights,scales,sky,raw2=raw2
 ;
-;
 ; By D.Nidever   February 2008, broken out into its own program 4/8/15
 ;-
 
 
-pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,raw=raw,stp=stp
+pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,stp=stp
 
 ; OUTPUTS:
 ;  actweight  The weight for each frame
@@ -37,7 +37,7 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,raw=raw,st
 
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
-  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,raw=raw,stp=stp'
+  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,stp=stp'
   return
 endif
 
@@ -52,34 +52,26 @@ LOADMCH,mchfile,files,trans
 nfiles = n_elements(files)
 
 ;-----------------------------------
-; Computs Weights
-; getweights.sh does this
-
-;grep RE ${image1}_1.opt > weights_1.inp
-;grep FW ${image1}_1.opt >> weights_1.inp
-;grep Clipped ${image1}_1.log >> weights_1.inp
+; Get the information that we need
 
 ; Load the opt files
-rdnoise = fltarr(nfiles)
-fwhm = fltarr(nfiles)
-mnsky = fltarr(nfiles)
-medsky = fltarr(nfiles) 
+info = replicate({name:'',filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,mnsky:0.0,medsky:0.0,weight:0.0,scale:0.0},nfiles)
+info.name = files
 for i=0,nfiles-1 do begin
   dir = file_dirname(mchfile)
   base = file_basename(files[i],'.als')
   optfile = dir+'/'+base+'.opt'
-  logfile = dir+'/'+base+'.log'
+  logfile1 = dir+'/'+base+'.log'
 
   READCOL,optfile,name,dum,value,format='A,A,F',/silent
   name = strtrim(strupcase(name),2)
 
-
   ind_re = where(name eq 'RE',nind_re)
-  rdnoise[i] = value[ind_re[0]]
+  info[i].rdnoise = value[ind_re[0]]
   ind_fw = where(name eq 'FW',nind_fw)
-  fwhm[i] = value[ind_fw[0]]
+  info[i].fwhm = value[ind_fw[0]]
 
-  SPAWN,'grep Clipped '+logfile,out,errout
+  SPAWN,['grep','Clipped',logfile1],out,errout,/noshell
   ;              Clipped mean and median =  187.442  187.215
 
   ; daophot.sh log files are clipped on Tortoise for some reason
@@ -110,7 +102,7 @@ for i=0,nfiles-1 do begin
     SPAWN,tempscript+' '+base,out1,errout1
 
     logfile2 = base+'.find.log'
-    SPAWN,'grep Clipped '+logfile2,out,errout
+    SPAWN,['grep','Clipped',logfile2],out,errout,/noshell
     ;              Clipped mean and median =  187.442  187.215
 
     ; Delete temporary files
@@ -119,12 +111,15 @@ for i=0,nfiles-1 do begin
   endif
 
   arr = strsplit(out[0],' ',/extract)
-  mnsky[i] = float(arr[5])
-  medsky[i] = float(arr[6])
+  info[i].mnsky = float(arr[5])
+  info[i].medsky = float(arr[6])
 
-  ;stop
-
-endfor
+  ;; Get exptime and filter
+  fitsfile = base+'.fits'
+  if file_test(fitsfile) eq 0 then fitsfile+='.fz'
+  info[i].exptime = PHOTRED_GETEXPTIME(fitsfile)
+  info[i].filter = PHOTRED_GETFILTER(fitsfile)
+endfor  ;; file loop
 
     
 ;      program getweight
@@ -166,11 +161,15 @@ err = fltarr(nfiles,nstars)
 for i=0,nfiles-1 do mag[i,*] = raw.(magind[i])
 for i=0,nfiles-1 do err[i,*] = raw.(errind[i])
 
+
+;; Using TILES
+;;--------------
 ;; We are using TILES and have multiple chips/amps
 ;;   F1-00507800_39.T2.als, '.T' and two dots
 if n_elements(imager) gt 0 then namps=imager.namps else namps=1
 if total(stregex(files,'.T',/boolean)) eq nfiles and $
    total(long(byte(files[0])) eq 46) ge 2 and namps gt 1 then begin
+  usetiles = 1
 
   ;; Number of unique exposures
   expname = strarr(nfiles)
@@ -188,175 +187,89 @@ if total(stregex(files,'.T',/boolean)) eq nfiles and $
   uexpname = expname[uiexp]
   nexp = n_elements(uexpname)
 
+  ;; Combine all the catalogs for a given exposure
+  ;; Calculate the weights
+  expstr = replicate({mag:fltarr(nstars),err:fltarr(nstars),nfiles:0L,index:lonarr(nfiles),$
+                      exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nexp)
+  expmag = fltarr(nexp,nstars)
+  experr = fltarr(nexp,nstars)
+  for i=0,nexp-1 do begin
+    ind = where(expname eq uexpname[i],nind)
+    expstr[i].nfiles = nind
+    expstr[i].index[0:nind-1] = ind
+    expstr[i].filter = info[ind[0]].filter
+    expstr[i].exptime = info[ind[0]].exptime
+    expstr[i].fwhm = median(info[ind].fwhm)
+    expstr[i].rdnoise = median(info[ind].rdnoise)
+    expstr[i].medsky = median(info[ind].medsky)
+    ;; Combine the photometry
+    mag1 = mag[ind,*]
+    err1 = err[ind,*]
+    ;; Multiple chips
+    ;;   they shouldn't overlap, so just use the mean/median
+    ;;   and that should pick up the detections
+    if nind gt 1 then begin
+      bd = where(mag1 gt 50,nbd)
+      if nbd gt 0 then mag1[bd]=!values.f_nan
+      if nbd gt 0 then err1[bd]=!values.f_nan
+      expmag[i,*] = median(mag1,dim=1)
+      experr[i,*] = median(err1,dim=1)
+    endif else begin
+      expmag[i,*] = mag1
+      experr[i,*] = err1
+    endelse
+  endfor
+  ;; Replace NANs with 99.9999
+  bdmag = where(finite(expmag) eq 0,nbdmag)
+  expmag[bdmag] = 99.99
+  experr[bdmag] = 9.99
+  expstr.mag = transpose(expmag)
+  expstr.err = transpose(experr)
+  ;; Perform the weights and scales calculations
+  ALLFRAME_GETWEIGHTS_RAW,expstr,outexpstr
+  ;; Give each chip the weight of its respective exposure
+  for i=0,nexp-1 do begin
+    info[expstr[i].index[0:expstr[i].nfiles-1]].weight = outexpstr[i].weight
+    info[expstr[i].index[0:expstr[i].nfiles-1]].scale = outexpstr[i].scale
+  endfor
+
+  ;; Print out the information
+  printlog,logfile,'        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE'
+  for i=0,nfiles-1 do begin
+    printlog,logfile,info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,$
+             info[i].medsky,info[i].weight,info[i].scale,format='(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
+  endfor
+
+;; WHAT HAPPENS IF SOME OF THE CHIPS ARE NOT OVERLAPPING!!
+
 stop
 
-endif
+;; REGULAR Method
+;;---------------
+Endif else begin
+  str = replicate({mag:fltarr(nstars),err:fltarr(nstars),$
+                   exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nexp)
+  struct_assign,info,str
+  str.mag = transpose(mag)
+  str.err = transpose(err)
+  ;; Perform the weights and scales calculations
+  ALLFRAME_GETWEIGHTS_RAW,str,outstr
+  info.weight = outstr.weight
+  info.scale = outstr.scale
+Endelse
 
 
-stop
-
-; Getting the reference sources
-totstars = total(mag lt 50,1)
-si = reverse(sort(totstars))
-;gdrefstars = si[0:(99<(nstars-1))]
-gdrefstars = si[0:(49<(nstars-1))]
-nrefstars = n_elements(gdrefstars)
-; Getting the "good" frames
-totframe = total(mag[*,gdrefstars] lt 50,2)
-gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
-; No good frames, lower number of reference stars
-if ngdframe eq 0 then begin
-  gdrefstars = si[0:(29<(nstars-1))]
-  nrefstars = n_elements(gdrefstars)
-  totframe = total(mag[*,gdrefstars] lt 50,2)
-  gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
-endif
-; No good frames again, say the frame with the most detections is "good"
-;   get weights relative to that one for the others
-if ngdframe eq 0 then begin
-  ; say the frame with the most detections is "good" and
-  ;  the rest are bad, get weights relative to this one frame
-  totstarsframe = total(mag lt 50,2)
-  gdframe = first_el(maxloc(totstarsframe))
-  bdframe = lindgen(nfiles,1)
-  remove,gdframe,bdframe
-  nbdframe = n_elements(bdframe)
-  ; Get stars that are good in this frames and in ALL of the others
-  gdrefstars = where(reform(mag[gdframe,*]) lt 50 and totstars eq nfiles,nrefstars)
-  ;  lower threshold, at least half
-  if nrefstars eq 0 then gdrefstars = where(reform(mag[gdframe,*]) lt 50 and totstars gt 0.5*nfiles,nrefstars)
-  ;  just the good ones
-  if nrefstars eq 0 then begin
-    gdrefstars = where(reform(mag[gdframe,*]) lt 50,nrefstars)
-    si = reverse(sort(totstars[gdrefstars]))           ; order by how many other frames they are detected in
-    gdrefstars = gdrefstars[si[0:(49>(nrefstars-1))]]  ; only want 50
-    nrefstars = n_elements(gdrefstars)
-  endif
-endif
-
-; Calculate the weights
-actweight = fltarr(nfiles)
-scales = fltarr(nfiles)
-mag2 = mag[gdframe,*] & mag2 = mag2[*,gdrefstars]
-err2 = err[gdframe,*] & err2 = err2[*,gdrefstars]
-ALLFRAME_CALCWEIGHTS,mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe],$
-         actweight1,scales1
-actweight[gdframe] = actweight1
-scales[gdframe] = scales1
-
-; If there are some "bad" frames calculate their weights
-;  relative to some of the "good" ones
-for i=0,nbdframe-1 do begin
-
-  iframe = bdframe[i]
-
-  ; First round of "good" stars
-  totgdstars = total(mag[gdframe,*] lt 50,1)  ; stars in good frames
-  igdrefstars1 = where(mag[iframe,*] lt 50 and totgdstars ge 5,nigdrefstars1)
-  if nigdrefstars1 lt 3 then $
-    igdrefstars1 = where(mag[iframe,*] lt 50 and totgdstars ge 1,nigdrefstars1)
-  if nigdrefstars1 lt 2 then goto,BOMB
-
-  totgdstars1 = total( (mag[gdframe,*])[*,igdrefstars1] lt 50,1)
-  si1 = reverse(sort(totgdstars1))  ; get the best ones
-  igdrefstars = igdrefstars1[si1[0:(49<(nigdrefstars1-1))]]
-  nirefstars = n_elements(igdrefstars)
-
-  itotframe = total( (mag[gdframe,*])[*,igdrefstars] lt 50,2)
-  igdframe1 = where( itotframe eq nirefstars,nigdframe1)
-
-  ; Whittle down to the best stars/frames
-  if nigdframe1 eq 0 then begin
-
-    igdframe = gdframe
-    igdrefstars = igdrefstars
-
-    ; whittle down to best stars and frames
-    count = 0
-    endflag = 0
-    while endflag eq 0 do begin
-
-      ; sum over frames
-      itot1 = total( (mag[igdframe,*])[*,igdrefstars] lt 50,1)
-      si1 = sort(itot1)
-      ; remove worst 5% stars
-      if n_elements(igdrefstars) gt 3 then begin
-        bd1 = si1[0:round(n_elements(igdrefstars)*0.05)]
-        remove,bd1,igdrefstars
-      endif
-
-      ; sum over stars
-      itot2 = total( (mag[igdframe,*])[*,igdrefstars] lt 50,2)
-      si2 = sort(itot2)
-      ; remove worst 5% frames
-      if n_elements(igdframe) gt 1 then begin
-        bd2 = si2[0:round(n_elements(igdframe)*0.05)]
-        remove,bd2,igdframe
-      endif     
-
-      ; Testing if we should end
-      itotframe = total( (mag[igdframe,*])[*,igdrefstars] lt 50,2)
-      igdframe1 = where( itotframe eq n_elements(igdrefstars),nigdframe1)
-      if nigdframe1 gt 0 then endflag=1
-
-      if endflag eq 1 then igdframe=igdframe[igdframe1]
-      if count gt 50 then goto,BOMB  ; not converging, end it
-
-      count++
-    endwhile
-
-  endif else igdframe=gdframe[igdframe1]
-
-  ; Get weights relative to some "good" frames
-  indframes = [igdframe,iframe]
-  mag3 = (mag[indframes,*])[*,igdrefstars]
-  err3 = (err[indframes,*])[*,igdrefstars]
-  ALLFRAME_CALCWEIGHTS,mag3,err3,fwhm[indframes],rdnoise[indframes],medsky[indframes],$
-                       actweight3,scales3
-
-  ; Scale these relative to the original ones
-  actweight3a = actweight[igdframe]         ; original
-  actweight3b = actweight3[0:nigdframe1-1]  ; new
-  wtfrac = median(actweight3a/actweight3b)
-  scales3a = scales[igdframe]               ; original
-  scales3b = scales3[0:nigdframe1-1]        ; new
-  sclfrac = median(scales3a/scales3b)
-  new_actweight = actweight3[nigdframe1] * wtfrac
-  new_scale = scales3[nigdframe1] * sclfrac
-  actweight[iframe] = new_actweight
-  scales[iframe] = new_scale
-
-  ;print,iframe,new_actweight,new_scale
-
-  BOMB:
-
+;; Print out the information
+printlog,logfile,'        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE'
+for i=0,nfiles-1 do begin
+  printlog,logfile,info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,$
+           info[i].medsky,info[i].weight,info[i].scale,format='(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
 endfor
 
-; Normalize the weights
-actweight /= total(actweight)
-
-;; Getting only stars that are well-measured in all frames
-;gd = where(max(mag,dim=1) lt 50. and max(err,dim=1) lt 0.1,ngd)
-;if ngd lt 10 then $
-;  gd = where(max(mag,dim=1) lt 50. and max(err,dim=1) lt 0.3,ngd)
-;if ngd lt 10 then $
-;  gd = where(max(mag,dim=1) lt 50. and max(err,dim=1) lt 0.5,ngd)
-;if ngd lt 10 then $
-;  gd = where(max(mag,dim=1) lt 50.,ngd)
-;
-;;if ngd eq 0 then stop,'no good stars'
-;
-;raw2 = raw[gd]
-;mag2 = mag[*,gd]
-;err2 = err[*,gd]
-
-; Rescale SCALES so the reference frames has SCALE=1.0
-scales /= scales[0]
-
-print,'Files: ',files
-print,'Weights: ',actweight
-print,'Scales: ',scales
-print,'Sky: ',medsky
+;; Final output
+actweight = info.weight
+scales = info.scale
+medsky = info.medsky
 
 if keyword_set(stp) then stop
 

@@ -342,7 +342,7 @@ printlog,logf,'------------------------'
 ;-----------------------------------
 ; Computs Weights
 if not keyword_set(fake) then begin
-  ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky,imager=imager ;,raw2=raw2
+  ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky,imager=imager,logfile=logf ;,raw2=raw2
   invscales = 1.0/scales
   bdscale = where(scales lt 1e-5 or invscales gt 900,nbdscale)
   if nbdscale gt 0 then begin
