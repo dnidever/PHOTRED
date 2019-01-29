@@ -121,6 +121,14 @@ for i=0,nfiles-1 do begin
   info[i].filter = PHOTRED_GETFILTER(fitsfile)
 endfor  ;; file loop
 
+;; Only ONE file
+if nfiles eq 1 then begin
+  actweight = 1.0
+  scales = 1.0
+  medsky = info[0].medsky
+  return
+endif
+
     
 ;      program getweight
 ;CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
