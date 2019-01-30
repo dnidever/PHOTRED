@@ -202,9 +202,8 @@ END_DAOPHOT
 # nei file to F1.nei.  Copy this file to the right filename.  If they are the same
 # it will just give an error, but still be okay.
 # The .nei file actually isn't used for anything, but I'm not sure if this is necessary.
-# COMMENTING THIS OUT SINCE IT'S NOT NECESSARY.
-#neifile=`grep "File with PSF stars and neighbors" ${image}.psf.log | awk '{print $8}'`
-#cp -f ${neifile} ${image}.nei >& /dev/null
+neifile=`grep "File with PSF stars and neighbors" ${image}.psf.log | awk '{print $8}'`
+cp -f ${neifile} ${image}.nei >& /dev/null
 #
 #
 #################################################################################

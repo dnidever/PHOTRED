@@ -617,7 +617,7 @@ if tiletype eq 'TILES' then begin
 
     For j=0,ngdfieldmch-1 do begin
       mchfile = fieldmchfiles[j]  ; F1-00507801_01+T1.mch
-      thistile = (strsplit(mchfile,tilesep,/extract))[1]
+      thistile = (strsplit(file_basename(mchfile,'.mch'),tilesep,/extract))[1]
       tilename = thisfield+'-'+thistile
       tind = where(tilestr.tiles.name eq tilename,ntind)
       tstr = tilestr.tiles[tind[0]]

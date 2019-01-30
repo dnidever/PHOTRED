@@ -37,6 +37,7 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=lo
 ;  medsky     The sky value for each frame
 
 tilesep = '+'
+btilesep = long(byte(tilesep))
 
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
@@ -200,7 +201,7 @@ endfor
 ;;   F1-00507800_39+T2.als, '+T' and two dots
 if n_elements(imager) gt 0 then namps=imager.namps else namps=1
 if total(stregex(files,'\'+tilesep+'T',/boolean)) eq nfiles and $
-   total(long(byte(files[0])) eq 46) ge 2 and namps gt 1 then begin
+   total(long(byte(files[0])) eq btilesep) ge 2 and namps gt 1 then begin
   usetiles = 1
 
   ;; Number of unique exposures
@@ -272,7 +273,7 @@ if total(stregex(files,'\'+tilesep+'T',/boolean)) eq nfiles and $
 ;;---------------
 Endif else begin
   str = replicate({mag:fltarr(nstars),err:fltarr(nstars),$
-                   exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nfiles)
+                   exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0,flux10:0.0,fluxrate10:0.0},nfiles)
   struct_assign,info,str
   str.mag = transpose(mag)
   str.err = transpose(err)
