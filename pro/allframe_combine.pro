@@ -666,7 +666,6 @@ if not keyword_set(nocmbimscale) then begin
   FITS_READ,combfile,combim,combhead
   FITS_READ,mchbase+'_comb.bpm.fits',badmask,maskhead  ; 0-good, 1-bad
 
-
   ; Fix the gain
   ; For N averaged frames gain(N)=N*gain(1)
   ; Leave the gain as is!  We are scaling everything to the reference
@@ -716,6 +715,7 @@ if not keyword_set(nocmbimscale) then begin
 
   maskdatalevel = max(combim) + 10000       ; set "bad" data level above the highest "good" value
   combim2 = combim*(1-badmask) + maskdatalevel*badmask    ; set bad pixels to maskdatalevel
+  sxaddpar,combhead,'SATURATE',maskdatalevel
   MWRFITS,combim2,combfile,combhead,/create  ; fits_write can create an empty PDU
 
   ; Create the weight map for Sextractor using the BPM output by IMCOMBINE
@@ -807,6 +807,7 @@ Endif else begin
   badmask = float(weightmap lt 0.5)
   maskdatalevel = max(combim) + 10000       ; set "bad" data level above the highest "good" value
   combim2 = combim*(1.0-badmask) + maskdatalevel*badmask    ; set bad pixels to 100,000
+  sxaddpar,combhead,'SATURATE',maskdatalevel
   FITS_WRITE,combfile,combim2,combhead
 
 Endelse ; no scaling of images for combining

@@ -37,6 +37,7 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=lo
 ;  medsky     The sky value for each frame
 
 tilesep = '+'
+;tilesep = '.'
 btilesep = long(byte(tilesep))
 
 nmch = n_elements(mchfile)

@@ -168,6 +168,7 @@ mchusetiles = READPAR(setup,'MCHUSETILES')
 if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
 if n_elements(mchusetiles) gt 0 then tiletype='TILES'
 tilesep = '+'
+;tilesep = '.'
 
 ; Catalog format to use
 catformat = READPAR(setup,'catformat')
@@ -622,19 +623,20 @@ if tiletype eq 'TILES' then begin
       tind = where(tilestr.tiles.name eq tilename,ntind)
       tstr = tilestr.tiles[tind[0]]
       ; Create the TILE structure
-      ;tile = {type:'WCS',naxis:long([tilestr.nx,tilestr.ny]),cdelt:double([tilestr.xstep,tilestr.ystep]),$
-      ;        crpix:double([tilestr.xref,tilestr.yref]),$
-      ;        crval:double([tilestr.cenra,tilestr.cendec]),ctype:['RA---TAN','DEC--TAN'],$
-      ;        xrange:[tstr.x0,tstr.x1],yrange:[tstr.y0,tstr.y1],$
-      ;        nx:tstr.nx,ny:tstr.ny}
+      ;; Offset XREF and YREF for this tile
+      tile = {type:'WCS',naxis:long([tilestr.nx,tilestr.ny]),cdelt:double([tilestr.xstep,tilestr.ystep]),$
+              crpix:double([tilestr.xref-(tstr.x0-1),tilestr.yref-(tstr.y0-1)]),$
+              crval:double([tilestr.cenra,tilestr.cendec]),ctype:['RA---TAN','DEC--TAN'],$
+              xrange:[1,tstr.nx],yrange:[1,tstr.ny],$
+              nx:tstr.nx,ny:tstr.ny}
       ; Create the string representation of the TILE structure
       stile = "{type:'WCS',naxis:["+strtrim(tilestr.nx,2)+"L,"+strtrim(tilestr.ny,2)+"L],"+$
               "cdelt:["+strdouble(tilestr.xstep)+","+strdouble(tilestr.ystep)+"],"+$
-              "crpix:["+strdouble(tilestr.xref)+","+strdouble(tilestr.yref)+"],"+$
+              "crpix:["+strdouble(tilestr.xref-(tstr.x0-1))+","+strdouble(tilestr.yref-(tstr.y0-1))+"],"+$
               "crval:["+strdouble(tilestr.cenra)+","+strdouble(tilestr.cendec)+"],"+$
               "ctype:['RA---TAN','DEC--TAN'],"+$
-              "xrange:["+strtrim(tstr.x0,2)+"L,"+strtrim(tstr.x1,2)+"L],"+$
-              "yrange:["+strtrim(tstr.y0,2)+"L,"+strtrim(tstr.y1,2)+"L],"+$
+              "xrange:[1L,"+strtrim(tstr.nx,2)+"L],"+$
+              "yrange:[1L,"+strtrim(tstr.ny,2)+"L],"+$
               "nx:"+strtrim(tstr.nx,2)+"L,ny:"+strtrim(tstr.ny,2)+"L}"
       ; Create the string representation of the THISIMAGER structure
       simager = "{telescope:'"+thisimager.telescope+"',instrument:'"+thisimager.instrument+"',"+$

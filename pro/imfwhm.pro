@@ -16,6 +16,7 @@
 ;                 The default is 8.
 ;  /silent    Don't print anything to the screen.  By default the
 ;             filename and FWHM are printed to the screen.
+;  /verbose   Verbose output to the screen.
 ;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -130,7 +131,7 @@ end
 
 pro imfwhm,input,fwhm,ellipticity,outfile=outfile,exten=exten,silent=silent,stp=stp,im=im0,$ 
            head=head0,skymode=skymode,skysig=skysig,backgim=backgim,nsigdetect=nsigdetect,$
-           gstr=gstr,peakstr=peakstr,error=error
+           gstr=gstr,peakstr=peakstr,error=error,verbose=verbose
 
 ninput = n_elements(input)
 nim0 = n_elements(im0)
@@ -217,7 +218,6 @@ FOR f=0,nfiles-1 do begin
 
   endelse
 
-
   ; We have an image
   nim = n_elements(im)
   if (nim gt 0) then begin
@@ -246,6 +246,7 @@ FOR f=0,nfiles-1 do begin
     if nsaturate eq 0 then begin
       satlim = 40000. > satlim < 65000.   ; this is a realistic limit for now
     endif
+    if keyword_set(verbose) then print,'satlim = ',stringize(satlim,ndec=1)
 
     ; Set NAN/Inf pixels to above the saturation limit
     bdnan = where(finite(im) eq 0,nbdnan)
@@ -319,7 +320,7 @@ FOR f=0,nfiles-1 do begin
     ; Computing sky level and sigma AGAIN with
     ;  background subtracted image
     sky,im2,skymode2,skysig,highbad=satlim,/silent
-
+    if keyword_set(verbose) then print,'skymode = ',stringize(skymode,ndec=2),' skysig = ',stringize(skysig,ndec=2)
 
     ; Gaussian smooth the image to allow detection of fainter sources
     gx = findgen(5)#(fltarr(5)+1.0)
@@ -352,6 +353,7 @@ FOR f=0,nfiles-1 do begin
       gain = median(backgim)/skyscatter^2
     endif
     if gain lt 0 then gain=1.0
+    if keyword_set(verbose) then print,'gain = ',stringize(gain,ndec=2)
 
     ; Make the SIGMA map
     ;sigmap = sqrt(backgim>1) > skysig
@@ -367,7 +369,6 @@ FOR f=0,nfiles-1 do begin
     diffth = 0.0 ;skysig  ; sigmap
     ind = where(diffx1 gt diffth and diffx2 gt diffth and diffy1 gt diffth and diffy2 gt diffth $
                    and (im2 gt (nsig*sigmap)) and (im lt 0.5*satlim),nind)
-
     ; No "stars" found, try lower threshold
     if nind lt 2 and niter lt 5 then begin
       nsig *= 0.7  ; smaller drop
@@ -383,6 +384,7 @@ FOR f=0,nfiles-1 do begin
       ellipticity = 99.99
       goto,SKIP
     endif
+    if keyword_set(verbose) then print,strtrim(nind,2),' initial peaks found'
     ind2 = array_indices(im,ind)
     xind = reform(ind2[0,*])
     yind = reform(ind2[1,*])
@@ -545,7 +547,7 @@ FOR f=0,nfiles-1 do begin
       ellipticity = 99.99
       goto,SKIP
     endif
-
+    if keyword_set(verbose) then print,strtrim(ngd,2),' final good peaks'
 
     ; Fit Gaussians to the good sources
     ;------------------------------------
@@ -670,6 +672,7 @@ FOR f=0,nfiles-1 do begin
       ngd = nokay
       gstr2 = gstr[okay]
     endif else ngd=0
+    if keyword_set(verbose) then print,strtrim(ngd,2),' sources passed the Gaussian fitting cuts'
 
     ; There are some good stars
     if ngd ge 2 then begin

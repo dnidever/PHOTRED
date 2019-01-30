@@ -127,7 +127,7 @@ if n_elements(scriptsdir) eq 0 then begin
   return
 endif
 ; Check if the scripts exist in the current directory
-scripts = ['getpsf.sh','allstar.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
+scripts = ['getpsfnofind.sh','allstar.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
            'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 ; Loop through the scripts
@@ -344,6 +344,7 @@ printlog,logf,'----------------------------------------'
 printlog,logf,'STEP 2: Getting PSF for Combined Image'
 printlog,logf,'----------------------------------------'
 printlog,logf,systime(0)
+combbase = file_basename(combfile,'.fits')
 if not keyword_set(fake) then begin
   ; Make .opt files, set saturation just below the mask data level
   MKOPT,combfile,satlevel=maskdatalevel-1000
@@ -353,21 +354,28 @@ if not keyword_set(fake) then begin
   ;  print,'Using reference image COMMON SOURCE file'
   ;  file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
   ;endif
+  ;; Create the SExtractor config file
+  PHOTRED_MKSEXCONFIG,combfile,combbase+'.sex',combbase+'.cat'
+  ;; Run SExtractor for detection
+  SPAWN,['sex',combfile,'-c',combbase+'.sex'],out,errout,/noshell
+  ;; Convert to DAOPHOT coo format
+  SEX2DAOPHOT,combbase+'.cat',combfile,combbase+'.coo'
   ; Get the PSF of the combined image
-  SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
+  SPAWN,['./getpsfnofind.sh',combbase],/noshell
+  ;SPAWN,'./getpsfnofind.sh '+file_basename(combfile,'.fits')
 
   ; If getpsf failed, lower the spatial PSF variations to linear
-  if file_test(file_basename(combfile,'.fits')+'.psf') eq 0 then begin
+  if file_test(combbase+'.psf') eq 0 then begin
     printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
     MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
-    SPAWN,'./getpsf.sh '+file_basename(combfile,'.fits')
+    SPAWN,'./getpsfnofind.sh '+combbase
   stop
   endif
 
 ; FAKE, use existing comb.psf file
 endif else begin
-  printlog,logf,'Using existing '+file_basename(combfile,'.fits')+'.psf file and running ALLSTAR.'
-  SPAWN,'./allstar.sh '+file_basename(combfile,'.fits')
+  printlog,logf,'Using existing '+combbase+'.psf file and running ALLSTAR.'
+  SPAWN,'./allstar.sh '+combbase
   printlog,logf,' '
 endelse
 
@@ -446,8 +454,10 @@ WRITELINE,cmdfile,cmd
 SPAWN,'allframe < '+cmdfile
 
 ; Rename tfr and nmg files
-FILE_MOVE,tbase+'.tfr',mchbase+'.tfr',/over,/allow
-FILE_MOVE,tbase+'.nmg',mchbase+'.nmg',/over,/allow
+FILE_MOVE,tbase+'.tfr',combbase+'.tfr',/over,/allow
+FILE_MOVE,tbase+'.nmg',combbase+'.nmg',/over,/allow
+;FILE_MOVE,tbase+'.tfr',mchbase+'.tfr',/over,/allow
+;FILE_MOVE,tbase+'.nmg',mchbase+'.nmg',/over,/allow
 FILE_DELETE,cmdfile,/allow
 FILE_DELETE,file_basename(files,'.als')+'j.fits',/allow   ; delete subtracted images
 FILE_DELETE,[tbase,tmch,tals],/allow   ; delete temporary files and links
@@ -484,7 +494,7 @@ magfile = mchbase+'.makemag'
 ; combmch = FILEBASE.mch        ORIG
 ; combmch = FILEBASE_comb.mch   NEW
 ; The tfr file will have the same name but with .tfr
-MAKEMAG,file_basename(combmch,'.mch')+'.tfr',magfile,error=magerror
+MAKEMAG,combbase+'.tfr',magfile,error=magerror
 if n_elements(magerror) gt 0 then goto,BOMB
 
 ; Prepend the ALF header to the makemag file

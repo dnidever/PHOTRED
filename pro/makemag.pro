@@ -138,7 +138,7 @@ for i=0,nfiles-1 do begin
   endif
 
   ; Load the ALF file
-  LOADALS,files[i],alf,alfhead
+  LOADALS,files[i],alf,alfhead,count=nalf
 
   ind = reform(num[*,i])
   ;ind = reform(arr[i+3,*])

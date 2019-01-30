@@ -126,6 +126,7 @@ if n_elements(maxshift) gt 0 then if maxshift le 0. then undefine,maxshift
 mchusetiles = READPAR(setup,'MCHUSETILES')
 if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
 tilesep = '+'
+;tilesep = '.'
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
