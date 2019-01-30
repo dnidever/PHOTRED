@@ -12,7 +12,8 @@
 ; INPUTS:
 ;  mchfile     The MCH filename
 ;  =imager     Imager structure with basic information
-;  =logfile       A logfile to print to output to.
+;  =logfile    A logfile to print to output to.
+;  /silent     Don't print anything to the screen.
 ;  /stp        Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -28,7 +29,7 @@
 ;-
 
 
-pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,stp=stp
+pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,silent=silent,stp=stp
 
 ; OUTPUTS:
 ;  actweight  The weight for each frame
@@ -37,7 +38,7 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=lo
 
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
-  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,stp=stp'
+  print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,silent=silent,stp=stp'
   return
 endif
 
@@ -55,7 +56,8 @@ nfiles = n_elements(files)
 ; Get the information that we need
 
 ; Load the opt files
-info = replicate({name:'',filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,mnsky:0.0,medsky:0.0,weight:0.0,scale:0.0},nfiles)
+info = replicate({name:'',filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,mnsky:0.0,medsky:0.0,$
+                  mag10:99.99,flux10:0.0,fluxrate10:0.0,weight:0.0,scale:0.0},nfiles)
 info.name = files
 for i=0,nfiles-1 do begin
   dir = file_dirname(mchfile)
@@ -121,7 +123,7 @@ for i=0,nfiles-1 do begin
   info[i].filter = PHOTRED_GETFILTER(fitsfile)
 endfor  ;; file loop
 
-;; Only ONE file
+;; Only ONE file, return 1s
 if nfiles eq 1 then begin
   actweight = 1.0
   scales = 1.0
@@ -169,6 +171,26 @@ err = fltarr(nfiles,nstars)
 for i=0,nfiles-1 do mag[i,*] = raw.(magind[i])
 for i=0,nfiles-1 do err[i,*] = raw.(errind[i])
 
+;; Calculate the magnitude and flux at the 10sigma magnitude
+for i=0,nfiles-1 do begin
+  gd = where(mag[i,*] lt 50,ngd)
+  if ngd gt 0 then begin
+    mag1 = mag[i,gd]
+    snr1 = 1.087/err[i,gd]
+    gdsnr = where(abs(snr1-10.0) lt 1,ngdsnr)
+    if ngdsnr lt 5 then gdsnr = where(abs(snr1-10.0) lt 2,ngdsnr)
+    if ngdsnr lt 5 then begin
+      si = sort(abs(snr1-10.0))
+      gdsnr = si[0:99<(ngd-1)]
+      ngdsnr = n_elements(gdsnr)
+    endif
+    mag10 = median([mag1[gdsnr]])
+    info[i].mag10 = mag10
+    info[i].flux10 = 10.0^( (mag10-25.0)/(-2.5) )          ; total counts
+    info[i].fluxrate10 = info[i].flux10 / info[i].exptime  ; flux rate = counts / sec
+  endif  
+endfor
+
 
 ;; Using TILES
 ;;--------------
@@ -198,7 +220,7 @@ if total(stregex(files,'.T',/boolean)) eq nfiles and $
   ;; Combine all the catalogs for a given exposure
   ;; Calculate the weights
   expstr = replicate({mag:fltarr(nstars),err:fltarr(nstars),nfiles:0L,index:lonarr(nfiles),$
-                      exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nexp)
+                      exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0,mag10:99.99,flux10:0.0,fluxrate10:0.0},nexp)
   expmag = fltarr(nexp,nstars)
   experr = fltarr(nexp,nstars)
   for i=0,nexp-1 do begin
@@ -207,9 +229,12 @@ if total(stregex(files,'.T',/boolean)) eq nfiles and $
     expstr[i].index[0:nind-1] = ind
     expstr[i].filter = info[ind[0]].filter
     expstr[i].exptime = info[ind[0]].exptime
-    expstr[i].fwhm = median(info[ind].fwhm)
-    expstr[i].rdnoise = median(info[ind].rdnoise)
-    expstr[i].medsky = median(info[ind].medsky)
+    expstr[i].fwhm = median([info[ind].fwhm])
+    expstr[i].rdnoise = median([info[ind].rdnoise])
+    expstr[i].medsky = median([info[ind].medsky])
+    expstr[i].mag10 = median([info[ind].mag10])
+    expstr[i].flux10 = median([info[ind].flux10])
+    expstr[i].fluxrate10 = median([info[ind].fluxrate10])
     ;; Combine the photometry
     mag1 = mag[ind,*]
     err1 = err[ind,*]
@@ -241,22 +266,11 @@ if total(stregex(files,'.T',/boolean)) eq nfiles and $
     info[expstr[i].index[0:expstr[i].nfiles-1]].scale = outexpstr[i].scale
   endfor
 
-  ;; Print out the information
-  printlog,logfile,'        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE'
-  for i=0,nfiles-1 do begin
-    printlog,logfile,info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,$
-             info[i].medsky,info[i].weight,info[i].scale,format='(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
-  endfor
-
-;; WHAT HAPPENS IF SOME OF THE CHIPS ARE NOT OVERLAPPING!!
-
-stop
-
 ;; REGULAR Method
 ;;---------------
 Endif else begin
   str = replicate({mag:fltarr(nstars),err:fltarr(nstars),$
-                   exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nexp)
+                   exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0},nfiles)
   struct_assign,info,str
   str.mag = transpose(mag)
   str.err = transpose(err)
@@ -268,11 +282,13 @@ Endelse
 
 
 ;; Print out the information
-printlog,logfile,'        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE'
-for i=0,nfiles-1 do begin
-  printlog,logfile,info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,$
-           info[i].medsky,info[i].weight,info[i].scale,format='(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
-endfor
+if not keyword_set(silent) then begin
+  printlog,logfile,'        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE'
+  for i=0,nfiles-1 do begin
+    printlog,logfile,info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,$
+             info[i].medsky,info[i].weight,info[i].scale,format='(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
+  endfor
+endif
 
 ;; Final output
 actweight = info.weight

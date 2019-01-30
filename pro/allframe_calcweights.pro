@@ -76,7 +76,7 @@ for i=0,nfiles-1 do begin
   med_ratio = median(ratio)
   ;wmeanerr,ratio,ratio_error,xmean,xsigma
   scales[i] = med_ratio
-end
+endfor
 
 
 ;print,'Files: ',files

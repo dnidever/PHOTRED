@@ -39,12 +39,12 @@ if size(mag,/n_dim) eq 2 then nfiles = n_elements(mag[*,0]) else nfiles=1
 
 ; Getting the reference sources
 totstars = total(mag lt 50,1)
-si = reverse(sort(totstars))
+si = reverse(sort(totstars))   ; get the stars with the most detections
 ;gdrefstars = si[0:(99<(nstars-1))]
 gdrefstars = si[0:(49<(nstars-1))]
 nrefstars = n_elements(gdrefstars)
 ; Getting the "good" frames
-totframe = total(mag[*,gdrefstars] lt 50,2)
+totframe = total(mag[*,gdrefstars] lt 50,2)  ; # of ref stars detected per frame
 gdframe = where(totframe eq nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe)
 ; No good frames, lower number of reference stars
 if ngdframe eq 0 then begin
@@ -174,11 +174,27 @@ for i=0,nbdframe-1 do begin
 
 endfor
 
+;; Fix images with bad weights likely due to no overlap
+;;  use the FLUX values to get a weight
+bdweights = where(weights le 0.0,nbdweights,comp=gdweights,ncomp=ngdweights)
+if nbdweights gt 0 then begin
+  ;; Use fluxrate10 to get weights and flux10 to get scales
+  ;; relative to "good" frame
+  if ngdweights gt 0 then begin
+    weights[bdweights] = str[bdweights].fluxrate10 * median([weights[gdweights]/str[gdweights].fluxrate10])
+    scales[bdweights] = str[bdweights].flux10 * median([scales[gdweights]/str[gdweights].flux10])
+  ;; all bad
+  endif else begin
+    weights = str.fluxrate10
+    scales = str.flux10
+  endelse
+endif
+
 ; Normalize the weights
 weights /= total(weights)
 
 ; Rescale SCALES so the reference frames has SCALE=1.0
-scales /= scales[0]
+if scales[0] gt 0.0 then scales /= scales[0] else scales/=max(scales)
 
 ;; Create the output structure
 schema = str[0]
