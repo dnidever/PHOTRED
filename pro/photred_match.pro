@@ -125,7 +125,7 @@ if n_elements(maxshift) gt 0 then if maxshift le 0. then undefine,maxshift
 ; MCHUSETILES
 mchusetiles = READPAR(setup,'MCHUSETILES')
 if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
-
+tilesep = '+'
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
@@ -410,16 +410,16 @@ FOR i=0,ndirs-1 do begin
           if strmid(groupfiles[l],6,7,/reverse_offset) eq 'fits.fz' then fext='.fits.fz' else fext='.fits'
           groupbase1 = FILE_BASENAME(groupfiles[l],fext)
           origfiles = groupbase1+[fext,'.psf','.als','.ap','.opt','.als.opt','.log']
-          newfiles = tiledir+'/'+groupbase1+'.'+tilesuffix+[fext,'.psf','.als','.ap','.opt','.als.opt','.log']
+          newfiles = tiledir+'/'+groupbase1+tilesep+tilesuffix+[fext,'.psf','.als','.ap','.opt','.als.opt','.log']
           ; Make the necessary symbolic links
           needit = where(file_test(newfiles) eq 0,nneedit)
           if nneedit gt 0 then FILE_LINK,'../'+origfiles[needit],newfiles[needit]
           grpalsbase[l] = groupbase1
-          grpalsfiles[l] = tiledir+'/'+groupbase1+'.'+tilesuffix+'.als'
+          grpalsfiles[l] = tiledir+'/'+groupbase1+tilesep+tilesuffix+'.als'
         endfor
          
         ;; Run DAOMATCH_TILE
-        mchbase = refstr.base+'.'+tilesuffix
+        mchbase = refstr.base+tilesep+tilesuffix
         DAOMATCH_TILE,grpalsfiles,tilestr,grouptileinfo,mchbase,error=daoerror
 
         ;; Check the MCH and RAW files for each tile group
@@ -461,8 +461,8 @@ FOR i=0,ndirs-1 do begin
       ;;   F1/F1-00507808_45.als
       ;;   F1/F1-00507809_60.als
       ;;   but my successlist has the tile-specific files
-      ;;   F1/F1-T1/F1-00507807_32.T1.als
-      ;;   F1/F1-T5/F1-00507811_45.T5.als
+      ;;   F1/F1-T1/F1-00507807_32+T1.als
+      ;;   F1/F1-T5/F1-00507811_45+T5.als
       ;; Figure out which original als files we should say "succeeded"
       ;;   only the ones that were succesful in all the groups they
       ;;   are in

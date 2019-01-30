@@ -36,6 +36,8 @@ pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=lo
 ;  scales     The scale for each frame
 ;  medsky     The sky value for each frame
 
+tilesep = '+'
+
 nmch = n_elements(mchfile)
 if nmch eq 0 then begin
   print,'Syntax - allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,silent=silent,stp=stp'
@@ -195,9 +197,9 @@ endfor
 ;; Using TILES
 ;;--------------
 ;; We are using TILES and have multiple chips/amps
-;;   F1-00507800_39.T2.als, '.T' and two dots
+;;   F1-00507800_39+T2.als, '+T' and two dots
 if n_elements(imager) gt 0 then namps=imager.namps else namps=1
-if total(stregex(files,'.T',/boolean)) eq nfiles and $
+if total(stregex(files,'\'+tilesep+'T',/boolean)) eq nfiles and $
    total(long(byte(files[0])) eq 46) ge 2 and namps gt 1 then begin
   usetiles = 1
 
@@ -205,10 +207,10 @@ if total(stregex(files,'.T',/boolean)) eq nfiles and $
   expname = strarr(nfiles)
   chip = strarr(nfiles)
   for i=0,nfiles-1 do begin
-    base1 = file_basename(files[i],'.als')           ; F1-00507800_39.T2
+    base1 = file_basename(files[i],'.als')           ; F1-00507800_39+T2
     field1 = (strsplit(base1,'-',/extract))[0]       ; F1
-    expchptile = (strsplit(base1,'-',/extract))[1]   ; 00507800_39.T2
-    expchp = (strsplit(expchptile,'.',/extract))[0]  ; 00507800_39
+    expchptile = (strsplit(base1,'-',/extract))[1]   ; 00507800_39+T2
+    expchp = (strsplit(expchptile,tilesep,/extract))[0]  ; 00507800_39
     expname[i] = (strsplit(expchp,imager.separator,/extract))[0]
     chip[i] = (strsplit(expchp,imager.separator,/extract))[1]
   endfor
