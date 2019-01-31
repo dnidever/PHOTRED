@@ -173,7 +173,7 @@ tilesep = '+'
 ; Catalog format to use
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
-if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------

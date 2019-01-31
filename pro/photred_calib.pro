@@ -70,6 +70,10 @@ if n_elements(setup) eq 0 then begin
   if count lt 1 then return
 endif
 
+; Catalog format to use
+catformat = READPAR(setup,'catformat')
+if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
+if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
@@ -244,7 +248,7 @@ If keyword_set(ddo51radoffset) and (telescope eq 'BLANCO') and (instrument eq 'M
   ui = uniq(shortfieldarr,sort(shortfieldarr))
   ui = ui[sort(ui)]
   sfields = shortfieldarr[ui]
-  nsfields = n_elements(sfields)
+  nsfields = n_elements(s[5~fields)
   printlog,logfile,strtrim(nsfields,2)+' unique fields found'
 
   fieldcenters = REPLICATE({field:'',ra:999999.0d0,dec:999999.0d0},nsfields)
@@ -606,7 +610,7 @@ FOR i=0,ninputlines-1 do begin
   ;---------------
   printlog,logfile,'Calibrating photometry for ',file
   PHOTCALIB,inpfile,inptransfile,inptrans=inptrans,average=doavgmag,keepinstrumental=dokeepinstr,$
-            onlyaverage=doavgonlymag,logfile=logfile,/header
+            onlyaverage=doavgonlymag,catformat=catformat,logfile=logfile,/header
 
 
   ; Check that the PHOT file exists
