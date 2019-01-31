@@ -99,11 +99,14 @@ if n_elements(cmbposonly) eq 0 then begin
   if cmbposonly eq '0' or cmbposonly eq '' or cmbposonly eq '-1' then cmbposonly=0
   if cmbposonly eq '1' then cmbposonly=1 else cmbposonly=0
 endif
-
 ; Catalog format to use
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
+tilesep = '+'
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
@@ -334,7 +337,36 @@ FOR i=0,nsfields-1 do begin
     endlen = strlen(ending)
     len = strlen(firstname)
     basename = strmid(firstname,0,len-endlen-1)
- 
+
+    ;; Using TILES, get file information and find unique exposures
+    if keyword_set(mchusetiles) then begin
+      undefine,allfiles
+      for j=0,nfieldlines-1 do begin
+        dir1 = file_dirname(fieldlines[j])
+        base1 = file_basename(fieldlines[j],'.phot')
+        LOADMCH,dir1+'/'+base1+'.mch',indivfiles
+        push,allfiles,dir1+'/'+file_basename(indivfiles,'.als')+'.fits'
+      endfor
+      bd = where(file_test(allfiles) eq 0,nbd)
+      if nbd gt 0 then allfiles[bd]+='.fz'
+      ;; Get exposure names
+      arr1 = strsplitter(file_basename(allfiles),'-',/extract)
+      arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
+      allexpnum = reform(arr2[0,*])
+      uiexp = uniq(allexpnum,sort(allexpnum))
+      uexpnum = allexpnum[uiexp]
+      nexp = n_elements(uexpnum)
+      ;; Get exposure information
+      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0},nexp)
+      PHOTRED_GATHERFILEINFO,allfiles[uiexp],filestr
+      struct_assign,filestr,expstr
+      expstr.expnum = uexpnum
+      for j=0,nexp-1 do expstr[j].mjd = date2jd(expstr[j].dateobs,/mjd)
+      si = sort(expstr.mjd)  ; put in chronological order
+      expstr = expstr[si]
+    endif  ; using tiles
+
+
     ;-------------------------------------------------
     ; LOOP through all the PHOT files for this field
     ;-------------------------------------------------
@@ -399,8 +431,10 @@ FOR i=0,nsfields-1 do begin
 
       ; Getting the amplifier number (extension)
       ;-----------------------------------------
-      ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
+      ;ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
+      ext = photred_getchipnum(filebase,thisimager)
       str.ext = ext
+;; THIS WON'T WORK FOR TILES.  F1-00507801+T2, no chip extension
 
       ; Updating the IDs
       ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
@@ -409,58 +443,14 @@ FOR i=0,nsfields-1 do begin
       id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
       str.id = id2
 
+    ;; Use different strategy for tiles
 
-      ; PROBABLY CUT THIS SECTION OUT!!!!
+      ;; Using TILES, need to reformat photometry struc
+      if keyword_set(mchusetiles) then begin
 
-     ; ; Adding Field XB/YB coordinates, MOSAIC only
-     ; ;--------------------------------------------
-     ; if (instrument eq 'MOSAIC') then begin
-     ;
-     ;   ; Add the XB/YB fields
-     ;   xbgd = where(tags eq 'XB',nxbgd)
-     ;   if nxbgd eq 0 then ADD_TAG,str,'XB',0.0,str
-     ;   ybgd = where(tags eq 'YB',nybgd)
-     ;   if nybgd eq 0 then ADD_TAG,str,'YB',0.0,str
-     ;   
-     ;   ; 16 extensions, amplifiers
-     ;   if (nfieldlines gt 10) then begin
-     ;
-     ;     ; X/Y are amplifier coordinates
-     ;
-     ;     ; Adding XCH/YCH fields
-     ;     xchgd = where(tags eq 'XCH',nxchgd)
-     ;     if nxchgd eq 0 then ADD_TAG,str,'XCH',0.0,str
-     ;     ychgd = where(tags eq 'YCH',nychgd)
-     ;     if nychgd eq 0 then ADD_TAG,str,'YCH',0.0,str
-     ;
-     ;     ; The original X/Y are amp coordinates
-     ;     str.xch = str.x
-     ;     str.ych = str.y
-     ;     if (ext mod 2) eq 0 then str.x=str.x+1024L   ; correcting the X values
-     ;
-     ;     ; Correcting the X/Y coordinates
-     ;     xoff = ((ext-1) mod 8)*1024.
-     ;     yoff = ((ext-1)/8)*4096.
-     ;
-     ;     str.xb = str.x + xoff
-     ;     str.yb = str.y + yoff
-     ;
-     ;   endif   ; 16 extensions
-     ;
-     ;   ; 8 extensions, chips
-     ;   if (nfieldlines le 8) then begin
-     ;
-     ;     ; X/Y are chip coordinates
-     ;
-     ;     ; Correcting the X/Y coordinates
-     ;     xoff = ((ext-1) mod 4)*2048.
-     ;     yoff = ((ext-1)/4)*4096.
-     ;
-     ;     str.xb = str.x + xoff
-     ;     str.yb = str.y + yoff
-     ;   endif  ; 8 extensions
-     ;
-     ; endif  ; mosaic, adding XB/YB
+        ;; Put the photometry in exposure columns
+        stop
+      endif
 
 
       ; Check that the structure has RA/DEC
@@ -472,7 +462,6 @@ FOR i=0,nsfields-1 do begin
         printlog,logfile,file+' DOES NOT HAVE RA/DEC FIELDS'
         goto,BOMB2
       endif
-
 
       ; COMBINING
       ;-----------

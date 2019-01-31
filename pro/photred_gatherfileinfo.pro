@@ -31,8 +31,8 @@ endif
 
 nfiles = n_elements(files)
 ; Create structure
-filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',exptime:0.0,dateobs:'',pixscale:0.0,cenra:0.0d0,cendec:0.0d0,$
-                  vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfiles)
+filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',exptime:0.0,dateobs:'',pixscale:0.0,$
+                     cenra:0.0d0,cendec:0.0d0,vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfiles)
 filestr.file = files
 ; File loop
 For i=0,nfiles-1 do begin

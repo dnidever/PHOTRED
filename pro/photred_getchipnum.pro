@@ -54,14 +54,12 @@ shfield = first_el(strsplit(base,'-',/extract))
 
 ; --- Multi AMP imager ---
 if imager.namps gt 1 then begin
-
+  if strpos(base,imager.separator) eq -1 then return,-1  ;; no amp/chip portion
   tmp = first_el(strsplit(base,'-',/extract),/last)
   expnum = first_el(strsplit(tmp,imager.separator,/extract))
   strchip = first_el(strsplit(tmp,imager.separator,/extract),/last)
-
   ;; Deal with TILE suffix
   if stregex(base,'\'+tilesep+'T',/boolean) eq 1 then strchip=(strsplit(strchip,tilesep+'T',/extract))[0]
-
   ; Check that it's an actual number/integer
   isnum = valid_num(strchip,chipnum,/integer)
   if isnum eq 0 then begin
