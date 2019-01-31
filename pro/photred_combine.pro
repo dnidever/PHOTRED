@@ -333,10 +333,12 @@ FOR i=0,nsfields-1 do begin
     basedir = FILE_DIRNAME(fieldlines[0])
 
     ; Getting basename
-    ending = first_el(strsplit(firstname,thisimager.separator,/extract),/last)
-    endlen = strlen(ending)
-    len = strlen(firstname)
-    basename = strmid(firstname,0,len-endlen-1)
+    if not keyword_set(mchusetiles) then begin
+      ending = first_el(strsplit(firstname,thisimager.separator,/extract),/last)
+      endlen = strlen(ending)
+      len = strlen(firstname)
+      basename = strmid(firstname,0,len-endlen-1)
+    endif else basename = (strsplit(firstname,'\'+tilesep+'T',/extract))[0]
 
     ;; Using TILES, get file information and find unique exposures
     if keyword_set(mchusetiles) then begin
@@ -357,17 +359,30 @@ FOR i=0,nsfields-1 do begin
       uexpnum = allexpnum[uiexp]
       nexp = n_elements(uexpnum)
       ;; Get exposure information
-      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0},nexp)
+      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0,exptime:0.0,cenra:0.0d0,cendec:0.0d0},nexp)
       PHOTRED_GATHERFILEINFO,allfiles[uiexp],filestr
       struct_assign,filestr,expstr
       expstr.expnum = uexpnum
       for j=0,nexp-1 do expstr[j].mjd = date2jd(expstr[j].dateobs,/mjd)
       si = sort(expstr.mjd)  ; put in chronological order
       expstr = expstr[si]
-    endif  ; using tiles
 
-;; GET THIS INFORMATION EVEN IF WE AREN'T USING TILES
-print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
+    ;; REGULAR files, the exposures should be the same across all
+    ;;   chip phot files
+    endif else begin                        ; using tiles
+      ;; Get exposure information
+      LOADMCH,repstr(fieldlines[j],'.phot','.mch'),indivfiles,count=nexp
+      allfiles = file_dirname(fieldlines[j])+'/'+repstr(indivfiles,'.als','.fits')
+      bd = where(file_test(allfiles) eq 0,nbd)
+      if nbd gt 0 then allfiles[bd]+='.fz'
+      arr1 = strsplitter(file_basename(allfiles),'-',/extract)
+      arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
+      allexpnum = reform(arr2[0,*])
+      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0,exptime:0.0,cenra:0.0d0,cendec:0.0d0},nexp)
+      PHOTRED_GATHERFILEINFO,allfiles,filestr
+      struct_assign,filestr,expstr
+      expstr.expnum = allexpnum
+    endelse
 
 
     ;-------------------------------------------------
@@ -413,29 +428,6 @@ print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
         undefine,str_orig
       endif
 
-      
-      ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
-      ;  get "type mismatch" errors with double/floats
-      if j eq 0 then begin
-        fieldnames0 = fieldnames
-        fieldtypes0 = fieldtypes
-        file0 = file
-      endif
-      ; Check that the fieldnames are the same
-      if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
-        PUSH,failurelist,file
-        printlog,logfile,''
-        printlog,logfile,file+' format does NOT agree with '+file0
-        goto,BOMB2
-      endif
-      if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
-        PUSH,failurelist,file
-        printlog,logfile,''
-        printlog,logfile,file+' format does NOT agree with '+file0
-        goto,BOMB2
-      endif
-      
-
       ; Print out the file info
       printlog,logfile,''
       printlog,logfile,'ADDING '+filebase+' Nstars='+strtrim(nstr,2)
@@ -446,10 +438,32 @@ print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
       tags = TAG_NAMES(str)
       extgd = where(tags eq 'EXT',nextgd)
       if nextgd eq 0 then ADD_TAG,str,'EXT',0,str
+      
 
       ;; NOT using tiles
       ;------------------
       If not keyword_set(mchusetiles) then begin
+        ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
+        ;  get "type mismatch" errors with double/floats
+        if j eq 0 then begin
+          fieldnames0 = fieldnames
+          fieldtypes0 = fieldtypes
+          file0 = file
+        endif
+        ; Check that the fieldnames are the same
+        if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
+          PUSH,failurelist,file
+          printlog,logfile,''
+          printlog,logfile,file+' format does NOT agree with '+file0
+          goto,BOMB2
+        endif
+        if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
+          PUSH,failurelist,file
+          printlog,logfile,''
+          printlog,logfile,file+' format does NOT agree with '+file0
+          goto,BOMB2
+        endif
+      
         ; Getting the amplifier number (extension)
         ;-----------------------------------------
         ;ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
@@ -491,9 +505,7 @@ print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
         filestr.expnum = reform(arr2[0,*])
         ;; Reformat the photometry structure
         str_orig = str & undefine,str
-        PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,phot
-
-        stop
+        PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,str
       Endelse
 
 
@@ -568,10 +580,11 @@ print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
     printlog,logfile,'OUTPUTTING data to '+outname
     if catformat eq 'ASCII' then begin
       PRINTSTR,all,outname
+      PRINTSTR,expstr,outname+'.meta'
      ;; where to put the exposure information when using tiles??
     endif else begin
       MWRFITS,all,outname,/create
-      if keyword_set(mchusetiles) then MWRFITS,all,expstr,/silent   ;; add meta-data on exposure information 
+      MWRFITS,expstr,outname,/silent   ;; add meta-data on exposure information 
     endelse
 
     ; Make sure that it exists, and add to OUTLIST
