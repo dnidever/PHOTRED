@@ -399,6 +399,8 @@ if (Error_status ne 0) then begin
    return
 endif
 
+tilesep = '+'
+
 ; Logfile
 if keyword_set(logfile) then logf=logfile else logf=-1
 ; Catalog format
@@ -503,7 +505,6 @@ newformat = valid_num(inparr[0].(1),/integer)
 ; added NIGHT and CHIP for each band/exposure
 ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture correction, Band2 ...
 if newformat then begin
-
   numobs = (ntags-1)/6
   dum = {magfile:'',outfile:'',night:lonarr(numobs),chip:lonarr(numobs),band:strarr(numobs),$
          airmass:dblarr(numobs),exptime:dblarr(numobs),apcorr:dblarr(numobs)}
@@ -528,6 +529,8 @@ endif else begin
   input = replicate(dum,ninp)
   input.magfile = strtrim(inparr.(0),2)
   for i=0,numobs-1 do begin
+    
+    input.expnum[i] = expnum
     input.night[i] = 1   ; dummy value
     input.chip[i] = 1  ; dummy value
     input.band[i] = strtrim(inparr.(1+i*4),2)

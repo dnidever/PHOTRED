@@ -1,13 +1,41 @@
-pro photred_combine_reformatphot,phot,filestr,expstr,newphot
+;+
+;
+; PHOTRED_COMBINE_REFORMATPHOT
+;
+; Reformat the photometry structure for tile/groups making
+; sure that there is a column for each unique exposure.
+;
+; INTPUTS:
+;  phot     The photometry structure output by CALIB.
+;  filestr  Structure giving information on all the images
+;             included in PHOT.
+;  expstr   Structure giving information on all the exposures
+;             included in all the tiles/groups for this field.
+;
+; OUTPUTS:
+;  newphot  The new photometr structure with magnitude columns for
+;             each uniqe exposure.
+;  =error   The error message if one occurred.
+;
+; USAGE:
+;  IDL>photred_combine_reformatphot,phot,filestr,expstr,newphot
+;
+; By D. Nidever  Jan 2019
+;-
 
-;; Reformat the photometry structure for tile/groups
-
+pro photred_combine_reformatphot,phot,filestr,expstr,newphot,error=error
 
 ;; Create a structure that has a separate column for each EXPOSURE
 
 nphot = n_elements(phot)
 nfiles = n_elements(filestr)
 nexp = n_elements(expstr)
+; Not enough inputs
+if nphot eq 0 or nfiles eq 0 or nexp eq 0 then begin
+  error = 'Not Enough Inputs'
+  print,'Syntax - photred_combine_reformatphot,phot,filestr,expstr,newphot,error=error'
+  return
+endif
 
 ;; Deal with
 ;;  1) instrumental individual, e.g. I_R1, I_R1ERR, I_I2, I_I2ERR
@@ -237,7 +265,5 @@ for i=lo,hi do begin
   ind = where(ftags eq phtags[i],nind)
   newphot.(ind) = phot.(i)
 endfor
-
-stop
 
 end
