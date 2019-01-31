@@ -499,7 +499,7 @@ if n_elements(magerror) gt 0 then goto,BOMB
 
 ; Prepend the ALF header to the makemag file
 line1='' & line2='' & line3=''
-openr,unit,/get_lun,mchbase+'.alf'
+openr,unit,/get_lun,file_basename(files[0],'.als')+'.alf'
 readf,unit,line1
 readf,unit,line2
 readf,unit,line3
@@ -519,7 +519,7 @@ printlog,logf,systime(0)
 
 ; combfile_allf.sex can be matched to the makemag file using IDs
 ; Load the SExtractor file
-sexfile = mchbase+'_comb_allf.sex'
+sexfile = combbase+'_allf.sex'
 if FILE_TEST(sexfile) eq 1 then begin
 
   fields = ['ID','X','Y','MAG','ERR','FLAG','PROB']
