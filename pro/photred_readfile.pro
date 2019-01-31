@@ -96,8 +96,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'mag': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
          endif else begin
            LOADMAG,filename,phot
@@ -108,8 +109,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'ast': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
          endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
@@ -125,8 +127,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'phot': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
          endif else begin
            ; Get the fieldnames and fieldtypes
@@ -150,8 +153,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'cmb': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
          endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
@@ -162,8 +166,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'dered': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
         endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
@@ -174,8 +179,9 @@ function photred_readfile,filename,meta=meta,count=count,error=error
     'final': begin
          if isfits eq 1 then begin
            phot = MRDFITS(filename,1,/silent)
-           dum = HEADFITS(filename,exten=2,errmsg=errmsg,/silent) 
-           if errmsg ne '' then meta=MRDFITS(filename,2,/silent)
+           count = n_elements(phot)
+           fits_open,filename,fcb & fits_close,fcb
+           if fcb.nextend ge 2 then meta=MRDFITS(filename,2,/silent)
            return,phot
          endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
@@ -190,15 +196,16 @@ function photred_readfile,filename,meta=meta,count=count,error=error
             return,result
          endif else begin
             ;; Figure out whether to read HDU0 or HDU1
-            hd0 = HEADFITS(filename,exten=0,errmsg=errmsg0,/silent)
-            hd1 = HEADFITS(filename,exten=1,errmsg=errmsg1,/silent)            
+            fits_open,filename,fcb & fits_close,fcb
+            hd0 = HEADFITS(filename,exten=0,/silent)
+            if fcb.nextend ge 1 then hd1=HEADFITS(filename,exten=1,/silent)
             ;; Only HDU0 exists
-            if errmsg1 ne '' then begin
+            if fcb.nextend eq 0 then begin
                result = MRDFITS(filename,0,meta,/silent)
                count = n_elements(result)
                return,result
             endif
-            ;; Both exist, HDU0 has not data but HDU1 does
+            ;; Both exist, HDU0 has no data but HDU1 does
             if sxpar(hd0,'NAXIS') eq 0 and sxpar(hd1,'NAXIS') gt 0 then begin
                result = MRDFITS(filename,1,meta,/silent)
                count = n_elements(result)

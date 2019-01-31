@@ -264,7 +264,7 @@ FOR f=0,nfiles-1 do begin
     endif
 
     ; Computing sky level and sigma
-    sky,im,skymode,skysig1,highbad=satlim,/silent
+    photred_sky,im,skymode,skysig1,highbad=satlim,/silent
     if skysig1 lt 0.0 then skysig1 = mad(im[gdpix])
     if skysig1 lt 0.0 then skysig1 = mad(im)
     maxim = max(im)

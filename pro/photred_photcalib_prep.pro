@@ -45,6 +45,8 @@ if nmchfile eq 0 or napcor eq 0 or noutfile eq 0 then begin
   return
 endif
 
+tilesep = '+'
+
 ; Aperture arrays
 apcnames = apcor.name
 apcvalue = apcor.value
@@ -123,6 +125,10 @@ for j=0,nfiles-1 do begin
   ; Getting the aperture correction
   apcorr = 0.0
   gd = where(apcnames eq filebase,ngd)
+  if ngd eq 0 and stregex(filebase,'\'+tilesep+'T',/boolean) eq 1 then begin
+    filebase1 = (strsplit(filebase,tilesep+'T',/extract))[0]
+    gd = where(apcnames eq filebase1,ngd)
+  endif
   if (ngd gt 0) then apcorr = apcvalue[gd[0]]
   if apcorr lt 0.0 then apcorr=0.0        ; don't want negative correction
 

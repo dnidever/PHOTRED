@@ -366,11 +366,10 @@ end
 ;----------------------------------------------------------
 
 
-
-PRO  photcalib,inpfile,transfile,silent=silent,stp=stp,average=average,$
-               onlyaverage=onlyaverage,keepinstrumental=keepinstrumental,$
-               combine=combine,header=header,logfile=logfile,$
-               catformat=catformat,inptrans=inptrans
+PRO photcalib,inpfile,transfile,silent=silent,stp=stp,average=average,$
+              onlyaverage=onlyaverage,keepinstrumental=keepinstrumental,$
+              combine=combine,header=header,logfile=logfile,$
+              catformat=catformat,inptrans=inptrans
 
 ;=====================================================================
 ;
@@ -384,6 +383,20 @@ PRO  photcalib,inpfile,transfile,silent=silent,stp=stp,average=average,$
 if n_params() lt 2 then begin
   print,'Syntax - photcalib,inpfile,transfile'
   return
+endif
+
+; Error Handling
+;------------------
+; Establish error handler. When errors occur, the index of the  
+; error is returned in the variable Error_status:  
+CATCH, Error_status 
+
+;This statement begins the error handler:  
+if (Error_status ne 0) then begin 
+   error = !ERROR_STATE.MSG
+   PHOTRED_ERRORMSG,logfile=logf
+   CATCH, /CANCEL 
+   return
 endif
 
 ; Logfile

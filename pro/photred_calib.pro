@@ -75,6 +75,11 @@ catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
+tilesep = '+'
+
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
@@ -243,12 +248,12 @@ If keyword_set(ddo51radoffset) and (telescope eq 'BLANCO') and (instrument eq 'M
     file = FILE_BASENAME(inputlines[i])
     shortfield = first_el(strsplit(file,sep,/extract))
     shortfieldarr[i] = shortfield
-  End
+  Endfor
 
   ui = uniq(shortfieldarr,sort(shortfieldarr))
   ui = ui[sort(ui)]
   sfields = shortfieldarr[ui]
-  nsfields = n_elements(s[5~fields)
+  nsfields = n_elements(sfields)
   printlog,logfile,strtrim(nsfields,2)+' unique fields found'
 
   fieldcenters = REPLICATE({field:'',ra:999999.0d0,dec:999999.0d0},nsfields)
@@ -431,28 +436,30 @@ FOR i=0,ninputlines-1 do begin
     goto,BOMB
   endif
 
-
   ; Check that the individual FITS files exist
   ; and appear in the apcor.lst
   ; the 'a.del' endings were already removed
   LOADMCH,mchfile,alsfiles
   nalsfiles = n_elements(alsfiles)
   for j=0,nalsfiles-1 do begin
-
     ialsfile = alsfiles[j]
     ibase = FILE_BASENAME(ialsfile,'.als')
     ifitsfile = ibase+'.fits'
     if file_test(ifitsfile) eq 0 then ifitsfile=ibase+'.fits.fz'
-
     ifitstest = FILE_TEST(ifitsfile)
     igd = where(apcor.name eq ibase,nigd)
+    ;; TILES, strip off the tile portion at the end
+    if nigd eq 0 and keyword_set(mchusetiles) and stregex(ibase,'\'+tilesep+'T',/boolean) eq 1 then begin
+      itilebase = (strsplit(ibase,tilesep,/extract))[0]
+      igd = where(apcor.name eq itilebase,nigd)
+    endif
     if (ifitstest eq 0) or (nigd eq 0) then begin
       PUSH,failurelist,longfile
       if ifitstest eq 0 then printlog,logfile,ifitsfile,' NOT FOUND'
       if nigd eq 0 then printlog,logfile,ialsfile,' NOT in apcor.lst'
       goto,BOMB
     endif
-  end
+  endfor
 
 
   ; DDO51 Radial Offset Correction
