@@ -21,12 +21,12 @@ instmag = (total(stregex(phtags,'^I_',/boolean) eq 1) gt 0)
 ;; Do we have calibrated AVERAGE magnitudes?
 avgmag = (total(stregex(phtags,'MAG$',/boolean) eq 1) gt 0)
 
-;; Get the unique filters
-filt = strtrim(expstr.filter,2)
-uifilt = uniq(filt,sort(filt))
-ufilt = filt[uifilt]
-nufilt = n_elements(ufilt)
-
+;; Get the unique EXPOSURE filters
+expfiltindex = create_index(expstr.filter)
+nexpfilt = n_elements(expfiltindex.value)
+;; Unique FILE filters
+filefiltindex = create_index(filestr.filter)
+nfilefilt = n_elements(filefiltindex.value)
 
 ;; Instrumental magnitudes
 ;;------------------------
@@ -38,10 +38,12 @@ if instmag eq 1 then begin
   ;; Loop over filters
   magnames = strarr(nexp)
   errnames = strarr(nexp)
-  for i=0,nufilt-1 do begin
-    ind = where(expstr.filter eq ufilt[i],nind)
-    magnames[ind] = 'I_'+strupcase(ufilt[i])+strtrim(lindgen(nind)+1,2)
-    errnames[ind] = 'I_'+strupcase(ufilt[i])+strtrim(lindgen(nind)+1,2)+'ERR'
+  for i=0,nexpfilt-1 do begin
+    filt = strupcase(expfiltindex.value[i])
+    ind = expfiltindex.index[expfiltindex.lo[i]:expfiltindex.hi[i]]
+    nind = expfiltindex.num[i]
+    magnames[ind] = 'I_'+filt+strtrim(lindgen(nind)+1,2)
+    errnames[ind] = 'I_'+filt+strtrim(lindgen(nind)+1,2)+'ERR'
   endfor
   for i=0,nexp-1 do begin
     if i eq 0 then inst_schema = create_struct(magnames[0],0.0) else $
@@ -94,10 +96,12 @@ endif
 ;; Loop over filters
 magnames = strarr(nexp)
 errnames = strarr(nexp)
-for i=0,nufilt-1 do begin
-  ind = where(expstr.filter eq ufilt[i],nind)
-  magnames[ind] = strupcase(ufilt[i])+'MAG'+strtrim(lindgen(nind)+1,2)
-  errnames[ind] = strupcase(ufilt[i])+strtrim(lindgen(nind)+1,2)+'ERR'
+for i=0,nexpfilt-1 do begin
+  filt = strupcase(expfiltindex.value[i])
+  ind = expfiltindex.index[expfiltindex.lo[i]:expfiltindex.hi[i]]
+  nind = expfiltindex.num[i]
+  magnames[ind] = filt+'MAG'+strtrim(lindgen(nind)+1,2)
+  errnames[ind] = filt+strtrim(lindgen(nind)+1,2)+'ERR'
 endfor
 for i=0,nexp-1 do begin
   if i eq 0 then calib_schema = create_struct(magnames[0],0.0) else $
@@ -105,19 +109,41 @@ for i=0,nexp-1 do begin
   calib_schema = create_struct(calib_schema,errnames[i],0.0)    
 endfor
 calib_phot = replicate(calib_schema,nphot)
-;; All PHOT calibrated MAG/ERR column indices in order
-calibphmagind = where(stregex(phtags,'MAG',/boolean) eq 1 and stregex(phtags,'MAG$',/boolean) eq 0,ncalibphmagind)
-calibpherrind = calibphmagind+1   ;; errors should be right after mags
 
-;; if there is only ONE observation in a band then the name
-;; is XMAG and XERR instead of XMAG1 and X1ERR
-;; EVERY EXPOSURE GETS A CALIBRATED MAGNITUDE COLUMN WITH A NUMBER!!
+;; All PHOT calibrated MAG/ERR column indices in order
+inpmagnames = strarr(nfiles)
+inperrnames = strarr(nfiles)
+for i=0,nfilefilt-1 do begin
+  filt = strupcase(filefiltindex.value[i])
+  ind = filefiltindex.index[filefiltindex.lo[i]:filefiltindex.hi[i]]
+  nind = filefiltindex.num[i]
+  ;; If there is only ONE observation in a band then the name
+  ;; is XMAG and XERR instead of XMAG1 and X1ERR, but it is in
+  ;; the right order with the rest of the calibrated magnitude columns
+  ;; In the output photometry structure, EVERY exposure gets a
+  ;; calibrated magnitude column with a number.
+  if nind eq 1 then begin
+    inpmagnames[ind] = filt+'MAG'
+    inperrnames[ind] = filt+'ERR'
+  endif else begin
+    inpmagnames[ind] = filt+'MAG'+strtrim(lindgen(nind)+1,2)
+    inperrnames[ind] = filt+strtrim(lindgen(nind)+1,2)+'ERR'
+  endelse
+endfor
+calibphmagind = lonarr(nfiles)
+calibpherrind = lonarr(nfiles)
+for i=0,nfiles-1 do begin
+  magind = where(phtags eq inpmagnames[i],nmagind)
+  calibphmagind[i] = magind[0]
+  errind = where(phtags eq inperrnames[i],nerrind)
+  calibpherrind[i] = errind[0]
+endfor
 
 ;; Stuff in the calibrated photometry
 totalfluxwt = dblarr(nphot,nexp)  ; temporary array for calculations
 totalwt = dblarr(nphot,nexp)
 for i=0,nfiles-1 do begin
-  ; Which column are we using
+  ;; Which column are we using
   expind = where(expstr.expnum eq filestr[i].expnum,nexpind)
   magind = calibphmagind[i]  ; input indices
   errind = calibpherrind[i]
@@ -153,9 +179,9 @@ if avgmag eq 1 then begin
   avgphmagind = where(stregex(phtags,'MAG$',/boolean) eq 1,ncalibphmagind)
   avgpherrind = avgphmagind+1   ;; errors should be right after mags
   ;; Make the structure
-  magnames = strupcase(ufilt)+'MAG'
-  errnames = strupcase(ufilt)+'ERR'
-  for i=0,nufilt-1 do begin
+  magnames = strupcase(expfiltindex.value)+'MAG'
+  errnames = strupcase(expfiltindex.value)+'ERR'
+  for i=0,nexpfilt-1 do begin
     if i eq 0 then avg_schema = create_struct(magnames[0],99.99) else $
       avg_schema = create_struct(avg_schema,magnames[i],99.99)
     avg_schema = create_struct(avg_schema,errnames[i],9.99)    
