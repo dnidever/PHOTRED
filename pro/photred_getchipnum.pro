@@ -33,6 +33,8 @@ if nfile eq 0 or n_elements(imager) eq 0 then begin
   return,-1
 endif
 
+tilesep = '+'
+
 ; Check the imager structure
 if size(imager,/type) ne 8 then begin
   error = 'IMAGER must be a structure'
@@ -57,6 +59,9 @@ if imager.namps gt 1 then begin
   expnum = first_el(strsplit(tmp,imager.separator,/extract))
   strchip = first_el(strsplit(tmp,imager.separator,/extract),/last)
 
+  ;; Deal with TILE suffix
+  if stregex(base,'\'+tilesep+'T',/boolean) eq 1 then strchip=(strsplit(strchip,tilesep+'T',/extract))[0]
+
   ; Check that it's an actual number/integer
   isnum = valid_num(strchip,chipnum,/integer)
   if isnum eq 0 then begin
@@ -69,6 +74,8 @@ if imager.namps gt 1 then begin
 endif else begin
   chip = 1L
   expnum = first_el(strsplit(base,'-',/extract),/last)
+  ;; Deal with TILE suffix
+  if stregex(base,'\'+tilesep+'T',/boolean) eq 1 then expnum=(strsplit(expnum,tilesep+'T',/extract))[0]
 endelse
 
 if keyword_set(stp) then stop
