@@ -366,6 +366,9 @@ FOR i=0,nsfields-1 do begin
       expstr = expstr[si]
     endif  ; using tiles
 
+;; GET THIS INFORMATION EVEN IF WE AREN'T USING TILES
+print,'GET THE EXPOSURE INFORMATION EVEN IF WE ARE NOT USING TILES!!!!'
+
 
     ;-------------------------------------------------
     ; LOOP through all the PHOT files for this field
@@ -377,6 +380,7 @@ FOR i=0,nsfields-1 do begin
 
       file = fieldlines[j]
       filebase = FILE_BASENAME(file,'.phot')
+      filedir = FILE_DIRNAME(file)
 
       ; Check that the PHOT file exists
       test = FILE_TEST(file)
@@ -395,6 +399,20 @@ FOR i=0,nsfields-1 do begin
       fieldnames = tag_names(str)
       fieldtypes = lonarr(n_elements(fieldnames))
       for k=0,n_elements(fieldnames)-1 do fieldtypes[k]=size(str[0].(k),/type)
+      ;; ID must be a string
+      idind = where(fieldnames eq 'ID',nidind)
+      if fieldtypes[idind] ne 7 then begin
+        fieldtypes[idind] = 7
+        str0 = str[0] & struct_assign,{dum:''},str0
+        schema = create_struct(fieldnames[0],fix(str0.(0),type=fieldtypes[0]))
+        for k=1,n_elements(fieldnames)-1 do schema=create_struct(schema,fieldnames[k],fix(str0.(k),type=fieldtypes[k]))
+        str_orig = str
+        str = replicate(schema,nstr)
+        struct_assign,str_orig,str
+        str.id = strtrim(str.id,2)
+        undefine,str_orig
+      endif
+
       
       ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
       ;  get "type mismatch" errors with double/floats
@@ -429,28 +447,54 @@ FOR i=0,nsfields-1 do begin
       extgd = where(tags eq 'EXT',nextgd)
       if nextgd eq 0 then ADD_TAG,str,'EXT',0,str
 
-      ; Getting the amplifier number (extension)
-      ;-----------------------------------------
-      ;ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
-      ext = photred_getchipnum(filebase,thisimager)
-      str.ext = ext
-;; THIS WON'T WORK FOR TILES.  F1-00507801+T2, no chip extension
-
-      ; Updating the IDs
-      ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
-      ;---------------------------------------------
-      ;id2 = ifield+thisimager.separator+ext+'.'+strtrim(str.id,2)
-      id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
-      str.id = id2
-
-    ;; Use different strategy for tiles
+      ;; NOT using tiles
+      ;------------------
+      If not keyword_set(mchusetiles) then begin
+        ; Getting the amplifier number (extension)
+        ;-----------------------------------------
+        ;ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
+        ext = photred_getchipnum(filebase,thisimager)
+        str.ext = ext
+        ; Updating the IDs
+        ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
+        ;---------------------------------------------
+        id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
+        str.id = id2
 
       ;; Using TILES, need to reformat photometry struc
-      if keyword_set(mchusetiles) then begin
+      Endif else begin
+        ;; The chip/amp information is not in the name
+        ;; each image could have a different chip
+        ;; F1-00507801+T2, no chip extension
+        ;; Use the TILE Number as the EXT
+        ext = first_el(strsplit(filebase,tilesep+'T',/extract),/last)
+        str.ext = ext
+        ; Updating the IDs
+        ; FIELD_TILE.IDNUMBER, i.e. 190L182a_5.17366
+        ;---------------------------------------------
+        id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
+        str.id = id2
 
+        ;; Reformat the photometry structure
         ;; Put the photometry in exposure columns
+        ;;---------------------------------------
+        ;; Get information on the individual images
+        LOADMCH,filedir+'/'+filebase+'.mch',alsfiles
+        fitsfiles = filedir+'/'+file_basename(alsfiles,'.als')+'.fits'
+        bdfits = where(file_test(fitsfiles) eq 0,nbdfits)
+        if nbdfits gt 0 then fitsfiles[bdfits]+='.fz'
+        PHOTRED_GATHERFILEINFO,fitsfiles,filestr
+        ;; Get exposure names
+        add_tag,filestr,'expnum','',filestr
+        arr1 = strsplitter(file_basename(filestr.file),'-',/extract)
+        arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
+        filestr.expnum = reform(arr2[0,*])
+        ;; Reformat the photometry structure
+        str_orig = str & undefine,str
+        PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,phot
+
         stop
-      endif
+      Endelse
 
 
       ; Check that the structure has RA/DEC
@@ -522,7 +566,13 @@ FOR i=0,nsfields-1 do begin
     ;----------------
     outname = basedir+'/'+basename+'.cmb'
     printlog,logfile,'OUTPUTTING data to '+outname
-    if catformat eq 'ASCII' then PRINTSTR,all,outname else MWRFITS,all,outname,/create
+    if catformat eq 'ASCII' then begin
+      PRINTSTR,all,outname
+     ;; where to put the exposure information when using tiles??
+    endif else begin
+      MWRFITS,all,outname,/create
+      if keyword_set(mchusetiles) then MWRFITS,all,expstr,/silent   ;; add meta-data on exposure information 
+    endelse
 
     ; Make sure that it exists, and add to OUTLIST
     outtest = FILE_TEST(outname)

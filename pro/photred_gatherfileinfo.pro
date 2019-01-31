@@ -31,7 +31,7 @@ endif
 
 nfiles = n_elements(files)
 ; Create structure
-filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',exptime:0.0,dateobs:'',pixscale:0.0,$
+filestr = replicate({file:'',exists:0,nx:0L,ny:0L,filter:'',exptime:0.0,dateobs:'',mjd:0.0d0,pixscale:0.0,$
                      cenra:0.0d0,cendec:0.0d0,vertices_ra:dblarr(4),vertices_dec:dblarr(4)},nfiles)
 filestr.file = files
 ; File loop
@@ -54,6 +54,7 @@ For i=0,nfiles-1 do begin
     if n_elements(filterr) gt 0 then filestr[i].filter=sxpar(head,'filter')
   filestr[i].exptime = sxpar(head,'exptime')
   filestr[i].dateobs = sxpar(head,'date-obs')
+  filestr[i].mjd = date2jd(filestr[i].dateobs,/mjd)
   ;GETPIXSCALE,'',pixscale,head=head
   HEAD_XYAD,head,[0,1]+filestr[i].nx/2,[0,0]+filestr[i].ny/2,ra1,dec1,/deg  ; a little bit faster  
   pixscale = sphdist(ra1[0],dec1[0],ra1[1],dec1[1],/deg)*3600d0
