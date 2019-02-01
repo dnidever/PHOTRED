@@ -72,7 +72,7 @@ if [ -n ${baseworkdir} ]; then
       mkdir ${baseworkdir}
    fi
    # Create temporary directory
-   export workdir=`mktemp -d --tmpdir=${baseworkdir}`
+   export workdir=`mktemp -d --tmpdir=${baseworkdir} dao.XXXXXX`
    echo "Working in temporary directory ${workdir}"
    # Copy the files that we need
    #  fits, photo.opt, apcor.opt, opt, als.opt, goodpsf.pro, lstfilter
