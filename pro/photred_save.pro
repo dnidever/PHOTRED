@@ -174,26 +174,29 @@ FOR i=0,ninputlines-1 do begin
       finalfile = ifield+'.final'
       printlog,logfile,'Copying ',file,' -> ',finalfile
       FILE_COPY,file,finalfile,/overwrite
+      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta'
 
       ; Make the IDL SAVE file
       savefile = ifield+'.dat'
-      final = IMPORTASCII(file,/header,/noprint)
+      final = PHOTRED_READFILE(file,meta=meta,count=count)
       printlog,logfile,'Making IDL SAVE file ',savefile
-      SAVE,final,file=savefile
+      if n_elements(meta) gt 0 then SAVE,final,meta,file=savefile else SAVE,final,file=savefile
 
       ; Make FITS binary file
       fitsfile = ifield+'.fits'
       printlog,logfile,'Making FITS binary file ',fitsfile
       MWRFITS,final,fitsfile,/create
+      if n_elements(meta) gt 0 then MWRFITS,meta,fitsfile,/silent
       printlog,logfile,'Compressing FITS binary file'
       gfitsfile = fitsfile+'.gz'
       if file_test(gfitsfile) then file_delete,gfitsfile    
-      SPAWN,'gzip '+fitsfile
+      SPAWN,['gzip',fitsfile],/noshell
 
       ; Copy final files from FIELD subdirectory to "main" directory
       if filedir ne curdir then begin
         printlog,logfile,'Copying final files to main directory ',curdir
         FILE_COPY,[finalfile,savefile,gfitsfile],curdir+'/'+[finalfile,savefile,gfitsfile],/allow_same,/overwrite
+        if file_test(finalfile+'.meta') eq 1 then FILE_COPY,finalfile+'.meta',curdir,/allow_same,/overwrite
         ; Rename the final output files
         finalfile = curdir+'/'+finalfile
         savefile = curdir+'/'+savefile
@@ -231,7 +234,6 @@ FOR i=0,ninputlines-1 do begin
     PUSH,failurelist,longfile
     printlog,logfile,'File ',file,' NOT FOUND'
   endelse
-
 
   CD,curdir
 

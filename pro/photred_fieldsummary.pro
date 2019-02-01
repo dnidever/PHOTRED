@@ -64,6 +64,11 @@ if scriptsdir eq '' then begin
   return
 endif
 
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
+tilesep = '+'
+
 ; LOAD THE "imagers" FILE
 ;----------------------------
 ;printlog,logfile,'Loading imager information'
@@ -324,9 +329,9 @@ For i=0,nfieldfiles-1 do begin
   endif
      
   ; Load DAOPHOT log file
-  logfile = base+'.log'
-  if file_test(logfile) eq 1 then begin
-    READLINE,logfile,loglines
+  daologfile = base+'.log'
+  if file_test(daologfile) eq 1 then begin
+    READLINE,daologfile,loglines
     ; Sky mode and standard deviation =   48.608    4.110
     ind = where(stregex(loglines,'Sky mode',/boolean,/fold_case) eq 1,nind)
     if nind gt 0 then begin
@@ -515,7 +520,7 @@ For i=0,nchips-1 do begin
 
   ; Loading the calibrated photometry
   if file_test(photfile) eq 1 and file_test(mchfile) eq 1 and file_test(inputfile) eq 1 then begin
-    phot = IMPORTASCII(photfile,/header,/silent)
+    phot = PHOTRED_READFILE(photfile)
     phtags = tag_names(phot)
     LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
     READLINE,inputfile,inputlines
