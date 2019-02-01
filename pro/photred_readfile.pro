@@ -174,6 +174,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
         endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
            count = n_elements(phot)
+           if file_test(filename+'.meta') eq 1 then meta=IMPORTASCII(filename+'.meta',/header,/silent)
            return,phot           
          endelse
        end
@@ -187,6 +188,7 @@ function photred_readfile,filename,meta=meta,count=count,error=error
          endif else begin
            phot = IMPORTASCII(filename,/header,/silent)
            count = n_elements(phot)
+           if file_test(filename+'.meta') eq 1 then meta=IMPORTASCII(filename+'.meta',/header,/silent)
            return,phot
          endelse
        end

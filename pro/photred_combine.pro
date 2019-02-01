@@ -314,6 +314,7 @@ FOR i=0,nsfields-1 do begin
   ;; Getting the main name
   firstname = FILE_BASENAME(fieldlines[0],'.phot')
   basedir = FILE_DIRNAME(fieldlines[0])
+  if keyword_set(mchusetiles) then basedir=FILE_DIRNAME(basedir)  ;; F1/F1-T10/F1-00507801+T10.phot
   ;; Getting basename
   basename = firstname   ;; namps=1 and not using tiles
   if keyword_set(mchusetiles) then basename = (strsplit(firstname,'\'+tilesep+'T',/extract))[0]

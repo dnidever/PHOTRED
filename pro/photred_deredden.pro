@@ -432,7 +432,7 @@ FOR i=0,ninputlines-1 do begin
   ; Load the data file
   ;--------------------
   printlog,logfile,'Loading file'
-  str = PHOTRED_READFILE(file,count=nstr)
+  str = PHOTRED_READFILE(file,meta=meta,count=nstr)
 
   ; Checking that we've got coordinates
   tags = TAG_NAMES(str)
@@ -665,13 +665,18 @@ FOR i=0,ninputlines-1 do begin
 
   endfor
 
-
   ; WRITE new file
   ;------------------
   ; Output the structure to the DERED file
-  deredfile = base+'.dered'
+  deredfile = filedir+'/'+base+'.dered'
   printlog,logfile,'New file with extinctions is: ',deredfile
-  if catformat eq 'ASCII' then PRINTSTR,str,deredfile else MWRFITS,str,deredfile,/create
+  if catformat eq 'ASCII' then begin
+    PRINTSTR,str,deredfile
+    if n_elements(meta) gt 0 then PRINTSTR,meta,deredfile+'.meta'
+  endif else begin
+    MWRFITS,str,deredfile,/create
+    if n_elements(meta) gt 0 then MWRFITS,meta,deredfile,/silent
+  endelse
 
   ; Check that the file DERED file is there
   deredtest = FILE_TEST(deredfile)
