@@ -121,17 +121,9 @@ printlog,logfile
 ;#   Find all files for this field
 ;#########################################
 
-; Search for files in the directory.
-if thisimager.namps gt 1 then begin
-  chstring = '' ; make regular expression for the chip number
-  ndig = ceil(alog10(thisimager.namps))
-  for l=0,ndig-1 do chstring+='[0-9]'
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+['.fits','.fits.fz'],count=nfieldfiles)
-endif else begin
-  fieldfiles = FILE_SEARCH(field+'-*'+['.fits','.fits.fz'],count=nfieldfiles)
-endelse
-
-; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
+;; Get files for this field from the success list
+READLIST,setupdir+'/logs/DAOPHOT.success',fieldfiles,/unique,/fully,setupdir=setupdir,count=nfieldfiles,logfile=logfile,/silent
+;; Get the files for this field
 if nfieldfiles gt 0 then begin
   ; Get base names
   fbases = strarr(nfieldfiles)
@@ -145,24 +137,15 @@ if nfieldfiles gt 0 then begin
       fext[i] = 'fits'
     endelse
   endfor
-  bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
-              stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
-              stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 header file from splitting 
-              stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
-              stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
-              stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
-              stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
-              stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
-              stregex(fbases,'jnk$',/boolean) eq 1,nbad)      ; daophot? temp file
-  if nbad gt 0 then begin
-    if nbad eq nfieldfiles then begin
-      undefine,fieldfiles
-      nfieldfiles = 0
-    endif else begin
-      REMOVE,bad,fieldfiles,fbases,fext
-      nfieldfiles = n_elements(fieldfiles)
-    endelse
-  endif ; some ones to remove
+  ;; Get fields only for this field
+  flen = strlen(field)
+  gd = where(strmid(fbases,0,flen+1) eq field+'-',nfieldfiles)
+  if nfieldfiles gt 0 then begin
+    fieldfiles = fieldfiles[gd]
+    fbases = fbases[gd]
+    fext = fext[gd]
+  endif
+
   ; Make sure they are unique
   ;  sometimes you can accidentally get a fits and fits.fz files
   ;  for the same image
@@ -183,10 +166,12 @@ if nfieldfiles gt 0 then begin
     if nbad gt 0 then REMOVE,bad,fieldfiles,fbases,fext
     nfieldfiles = n_elements(fieldfiles)
   endif
-endif else begin  ; some fieldfiles
+endif
+
+if nfieldfiles eq 0 then begin
   printlog,logfile,'No ',field,' files found in current directory'
   return
-endelse
+endif
 
 printlog,logfile,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
 
@@ -221,6 +206,30 @@ if file_test(apcorfile) eq 1 then begin
   apcor.name = repstr(apcor.name,'a.del','')  ; base names
 endif
 
+;; Load all the ALS files in the MCH files
+;;  this makes a difference if we are using tiles
+if keyword_set(mchusetiles) then begin
+  READLIST,setupdir+'/logs/ASTROM.success',mchfiles,/unique,/fully,setupdir=setupdir,count=nmchfiles,logfile=logfile,/silent
+  ;; Replace any .mag with .mch
+  mchfiles = repstr(mchfiles,'.mag','.mch')
+  ;; Get files for this FIELD
+  flen = strlen(field)
+  gd = where(strmid(file_basename(mchfiles),0,flen+1) eq field+'-',ngd)
+  if ngd gt 0 then begin
+    mchfiles = mchfiles[gd]
+    nmchfiles = n_elements(mchfiles)
+    ;; Load all of the ALS files from the MCH files
+    undefine,alsinfo
+    for i=0,nmchfiles-1 do begin
+      LOADMCH,mchfiles[i],alsfiles,count=nalsfiles
+      alsinfo1 = replicate({dir:'',mchfile:'',alsfile:''},nalsfiles)
+      alsinfo1.dir = file_dirname(mchfiles[i])
+      alsinfo1.mchfile = file_basename(mchfiles[i])
+      alsinfo1.alsfile = alsfiles
+      push,alsinfo,alsinfo1
+    endfor
+ endif else printlog,logfile,'No ALS files in the MCH files for this field'
+endif else printlog,logfile,'No MCH files for this field'
 
 ; Loop through all files for this field
 ;  and gather all of the necessary information
@@ -461,18 +470,31 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Load ALF file
-  alffile = base+'.alf'
-  if file_test(alffile) eq 1 then begin
+  if keyword_set(mchusetiles) eq 0 then begin
+    alffile = base+'.alf'
     LOADALS,alffile,alf,alfhead,count=nalf
-    chipstr[i].alf_nsources = nalf
-    ; Calculate "depth"
-    if nalf gt 1 then begin
-      hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
-      xhist += 0.5*0.2
-      DLN_MAXMIN,hist,minarr,maxarr
-      alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-      chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
-    endif
+  ;; Using TILES
+  endif else begin
+    gd = where(stregex(alsinfo.alsfile,'^'+base,/boolean) eq 1,ngd)
+    undefine,alf
+    for j=0,ngd-1 do begin
+      alffile1 = alsinfo[gd[j]].dir+'/'+repstr(alsinfo[gd[j]].alsfile,'.als','.alf')
+      if file_test(alffile1) eq 1 then begin
+        LOADALS,alffile1,alf1,alfhead1,count=nalf1 
+        if nalf1 gt 0 then PUSH,alf,alf1
+      endif
+    endfor
+    nalf = n_elements(alf)
+  endelse
+  chipstr[i].alf_nsources = nalf
+
+  ; Calculate ALF "depth"
+  if nalf gt 1 then begin
+    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
+    xhist += 0.5*0.2
+    DLN_MAXMIN,hist,minarr,maxarr
+    alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+    chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
   endif
 
   ; Get aperture corretion
@@ -483,7 +505,6 @@ For i=0,nfieldfiles-1 do begin
 
   printlog,logfile,i+1,base,chipstr[i].filter,chipstr[i].exptime,chipstr[i].wcsrms,chipstr[i].fwhm,chipstr[i].skymode,chipstr[i].skysig,chipstr[i].dao_nsources,chipstr[i].dao_depth,$
            chipstr[i].dao_psftype,chipstr[i].dao_npsfstars,chipstr[i].dao_psfchi,chipstr[i].alf_nsources,chipstr[i].apcor,format='(I5,A18,A5,F8.2,2F8.4,F8.2,F8.3,I9,F9.2,A11,I8,F8.3,I8,F8.3)'
-
 Endfor
 
 

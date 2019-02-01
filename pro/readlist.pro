@@ -1,6 +1,3 @@
-pro readlist,filename,lines,exist=exist,unique=unique,count=count,$
-             fully=fully,logfile=logfile,silent=silent,stp=stp
-
 ;+
 ;
 ; READLIST
@@ -12,6 +9,7 @@ pro readlist,filename,lines,exist=exist,unique=unique,count=count,$
 ;  /exist     Test that all of the files exist
 ;  /unique    Only return unique filenames
 ;  /fully     Return fully qualified paths (i.e. full absolute paths).
+;  =setupdir  The main PHOTRED directory.
 ;  =logfile   A logfile to print messages to as well as the screen
 ;  /silent    Don't print anything.
 ;  /stp       Stop at the end of the program
@@ -26,11 +24,14 @@ pro readlist,filename,lines,exist=exist,unique=unique,count=count,$
 ; By D.Nidever  Feb 2008
 ;-
 
+pro readlist,filename,lines,exist=exist,unique=unique,count=count,$
+             fully=fully,setupdir=setupdir,logfile=logfile,silent=silent,stp=stp
+
 ; Not enough inputs
 nfilename = n_elements(filename)
 if nfilename eq 0 then begin
   print,'Syntax - readlist,filename,lines,test=test,unique=unique,fully=fully,'
-  print,'                  logfile=logfile,count=count,stp=stp'
+  print,'                  setupdir=setupdir,logfile=logfile,count=count,stp=stp'
   return
 endif
 
@@ -69,6 +70,13 @@ endif
 if keyword_set(fully) and (nlines gt 0) then begin
   old_lines = lines
 
+  ;; Relative paths are with respect to SETUPDIR
+  if n_elements(setupdir) gt 0 then begin
+    grel = where(strmid(lines,0,1) ne '/',ngrel)
+    if ngrel gt 0 then lines[grel]=setupdir+'/'+lines[grel]
+  endif else print,'SETUPDIR not input'
+
+  ;; This expands wildcards but also checks if files actually exist
   lines = FILE_SEARCH(lines,/fully_qualify)
   gd = where(strtrim(lines,2) ne '',ngd)
 
