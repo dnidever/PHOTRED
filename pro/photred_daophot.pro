@@ -130,6 +130,10 @@ if ndaopsfva eq 0 then undefine,daopsfva
 daofitradfwhm = READPAR(setup,'DAOFITRADFWHM',count=ndaofitradfwhm)
 if ndaofitradfwhm eq 0 then undefine,daofitradfwhm
 
+; Temporary working directory
+workdir = READPAR(setup,'WORKDIR',count=nworkdir)
+if nworkdir eq 0 then undefine,workdir
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -696,6 +700,7 @@ if not keyword_set(fake) then begin
 endif else begin
   cmd = './daophot_fake.sh '+procbaselist
 endelse
+if n_elements(workdir) gt 0 then cmd+=' '+workdir  ; temporary working directory
   
 ; Submit the jobs to the daemon
 PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$

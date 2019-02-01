@@ -34,6 +34,7 @@
 ;  /fake          Run for artificial star tests.
 ;  =catformat     Catalog format to use: FITS or ASCII.  Default is ASCII.
 ;  =imager        Imager structure with basic information.
+;  =workdir       Use a temporary working directory with this as the base.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -52,7 +53,7 @@
 pro allframe,file,tile=tile,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager
+             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir
 
 COMMON photred,setup
 
@@ -64,7 +65,7 @@ if (nfile eq 0) then begin
   print,'Syntax - allframe,file,tile=tile,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
   print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
-  print,'                  imager=imager,stp=stp'
+  print,'                  imager=imager,workdir=workdir,stp=stp'
   return
 endif
 
@@ -134,14 +135,12 @@ nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   info = FILE_INFO(scriptsdir+'/'+scripts[i])
   curinfo = FILE_INFO(scripts[i])
-
   ; No file
   if info.exists eq 0 or info.size eq 0 then begin
     printlog,logf,scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY'
     error = scriptsdir+'/'+scripts[i]+' NOT FOUND or EMPTY'
     return
   endif
-
   ; Check if the two files are the same size, if not copy it
   if info.size ne curinfo.size then begin
     FILE_COPY,info.name,curinfo.name,/overwrite
@@ -150,7 +149,7 @@ endfor ; scripts loop
 
 
 ; Check that the ALLFRAME program exists
-SPAWN,'which allframe',out,errout
+SPAWN,['which','allframe'],out,errout,/noshell
 allframefile = FILE_SEARCH(out,count=nallframefile)
 ;allframefile = FILE_SEARCH('/net/halo/bin/allframe.2008',count=nallframefile)
 ;allframefile = FILE_SEARCH('/net/halo/bin/allframe.2004.fixed',count=nallframefile)
@@ -207,7 +206,6 @@ if rawtest eq 0 then begin
   printlog,logf,mchbase+'.raw NOT FOUND'
   return
 endif
-
 
 ;###########################################
 ; CHECK NECESSARY FILES
@@ -304,6 +302,27 @@ if keyword_set(fake) then begin
     return
   endif
 endif
+
+
+;;------------------------------------
+;; Using a temporary working directory
+;;------------------------------------
+if n_elements(workdir) gt 0 then begin
+  ;; Create a temporary directory in WORKDIR
+  if FILE_TEST(workdir,/directory) eq 0 then FILE_MKDIR,workdir
+  tempdir = MKTEMP('alf',outdir=workdir,/directory)
+  printlog,logf,'Working in temporary directory ',tempdir
+  ;; Copy over the files that we need
+  ;;  this will copy the contents of symlinks
+  FILE_COPY,mchbase+['.mch','.raw','.tfr'],tempdir
+  for i=0,nfiles-1 FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
+  ;; Copy files for FAKE
+  if keyword_set(fake) then FILE_COPY,mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],tempdir
+  ;; Go there
+  CD,tempdir
+endif
+
+
 
 
 ;###########################################
@@ -587,6 +606,27 @@ BOMB:
 ; Delete temporarily funpacked files
 bdfpack = where(fpack eq 1,nbdfpack)
 if nbdfpack gt 0 then FILE_DELETE,file_basename(files[bdfpack],'.als')+'.fits',/allow
+
+;;------------------------------------------------
+;; Working in temporary directory, copy files back
+;;------------------------------------------------
+if n_elements(workdir) gt 0 then begin
+  printlog,logf,'Copying files back to original directory'
+  ;; Delete some files
+  FILE_DELETE,tempdir+'/'+mchbase+['.mch','.raw','.tfr'],/allow
+  for i=0,nfiles-1 FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
+  if keyword_set(fake) then FILE_DELETE,tempdir+'/'+mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],/allow
+  ;; Copy files back
+  files = file_search(workdir+'/*',count=nfiles)  
+  FILE_COPY,files,mchdir,/allow
+  ;; Delete all temporary files
+  FILE_DELETE,files,/allow
+  ;; CD back
+  CD,curdir
+  ;; Delete temporary directory
+  ;;  leave the base working directory
+  FILE_DELETE,tempdirdir
+endif
 
 if keyword_set(stp) then stop
 

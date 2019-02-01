@@ -175,6 +175,10 @@ catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
+; Temporary working directory
+workdir = READPAR(setup,'WORKDIR',count=nworkdir)
+if nworkdir eq 0 then undefine,workdir
+
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------
 irafdir = READPAR(setup,'IRAFDIR')
@@ -649,6 +653,7 @@ if tiletype eq 'TILES' then begin
       if keyword_set(alftrimcomb) then cmd1+=",/trimcomb"
       if keyword_set(alfusecmn) then cmd1+=",/usecmn"
       if keyword_set(fake) then cmd1+=",/fake"
+      if n_elements(workdir) gt 0 then cmd1+=",workdir='"+workdir+"'"
       PUSH,cmd,cmd1
     Endfor  ; mch file loop
   Endfor  ; field loop
@@ -662,6 +667,7 @@ endif else begin
   if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
   if keyword_set(alfusecmn) then cmd+=",/usecmn"
   if keyword_set(fake) then cmd+=",/fake"
+  if n_elements(workdir) gt 0 then cmd+=",workdir='"+workdir+"'"
 endelse
 
 

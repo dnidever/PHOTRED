@@ -324,6 +324,7 @@ trans | The name of the file that contains the photometric transformation equati
 sepfielddir |  Put each field in a separate directory (this is now the default option), otherwise everything will go in the main directory and can slow down processing because a very large (~100,000) number of fileds.
 keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
 catformat | The type of catalog format to use: FITS or ASCII.  The default is ASCII
+workdir | Perform some tasks (e.g. DAOPHOT and ALLFRAME) in a temporary directory with WORKDIR as the base directory.
 redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
 skipwcs | Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
