@@ -137,7 +137,7 @@ if nfieldfiles gt 0 then begin
       fext[i] = 'fits'
     endelse
   endfor
-  ;; Get fields only for this field
+  ;; Get files only for this field
   flen = strlen(field)
   gd = where(strmid(fbases,0,flen+1) eq field+'-',nfieldfiles)
   if nfieldfiles gt 0 then begin
@@ -516,143 +516,126 @@ Endfor
 printlog,logfile,' '
 printlog,logfile,'Getting calibrated photometry from the .phot files'
 
-; Loop through the chips
-ui = uniq(chipstr.chip,sort(chipstr.chip))
-chips = chipstr[ui].chip
-nchips = n_elements(chips)
-For i=0,nchips-1 do begin
-  ichip = chips[i]
-
-  ; Getting the entries for this chip
-  indchip = where(chipstr.chip eq ichip,nindchip)
-
-  ; Load PHOT file
-  if thisimager.namps gt 1 then begin
-    ndig = floor(alog10(thisimager.namps))+1
-    fmt = '(i0'+strtrim(ndig,2)+')'
-    photfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.phot'
-    mchfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.mch'
-    inputfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.input'
+;; Loop over the groups/phot files
+READLIST,setupdir+'/logs/COMBINE.success',photfiles,/unique,/fully,setupdir=setupdir,count=nphotfiles,logfile=logfile,/silent
+flen = strlen(field)
+gd = where(strmid(file_basename(photfiles),0,flen+1) eq field+'-',ngd)
+if ngd gt 0 then begin
+  photfiles = photfiles[gd]
+  nphotfiles = ngd
+endif else begin
+  printlog,logfile,'NO phot files for field '+field
+  undefine,photfiles
+  nphotfiles = 0
+endelse
+For i=0,nphotfiles-1 do begin
+  ;; Load the phot and mch files
+  phot = PHOTRED_READFILE(photfiles[i],meta=meta)
+  phtags = tag_names(phot)
+  mchfile = repstr(photfiles[i],'.phot','.mch')
+  LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
+  inputfile = repstr(photfiles[i],'.phot','.input')
+  READLINE,inputfile,inputlines
+  inputarr = strsplit(inputlines[0],' ',/extract)
+  ;   Old or New format, check if the second value is
+  ;     an integer (new format, NIGHT) or character (old format,
+  ;     band/filter name)
+  ;    All lines need to use the same format (old or new)
+  newformat = valid_num(inputarr[1],/integer)
+  ; -- NEW Format --
+  ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture
+  ;   correction, Band2 ... 
+  if newformat then begin
+    alsfilter = inputarr[3:*:6]  ; filters
+  ; -- OLD Format --
+  ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
+  ;   aperture correction, Band2 ... 
   endif else begin
-    photfile = refbase+'.phot'
-    mchfile = refbase+'.mch'
-    inputfile = refbase+'.input'
+    alsfilter = inputarr[1:*:4]  ; filters
   endelse
 
-  ; Loading the calibrated photometry
-  if file_test(photfile) eq 1 and file_test(mchfile) eq 1 and file_test(inputfile) eq 1 then begin
-    phot = PHOTRED_READFILE(photfile)
-    phtags = tag_names(phot)
-    LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
-    READLINE,inputfile,inputlines
-    inputarr = strsplit(inputlines[0],' ',/extract)
-    ;   Old or New format, check if the second value is
-    ;     an integer (new format, NIGHT) or character (old format,
-    ;     band/filter name)
-    ;    All lines need to use the same format (old or new)
-    newformat = valid_num(inputarr[1],/integer)
-    ; -- NEW Format --
-    ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture
-    ;   correction, Band2 ... 
-    if newformat then begin
-      alsfilter = inputarr[3:*:6]  ; filters
-    ; -- OLD Format --
-    ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
-    ;   aperture correction, Band2 ... 
+  printlog,logfile,i+1,file_basename(photfiles[i]),n_elements(phot),format='(I5,A22,I8)'
+
+  ; Creating the column names (code from photcalib.pro)
+  ui = uniq(alsfilter,sort(alsfilter))
+  ubands = alsfilter[ui]
+  nubands = n_elements(ubands)
+  magname = strarr(n_elements(alsfiles))
+  for j=0,nubands-1 do begin
+    gdbands = where(alsfilter eq ubands[j],ngdbands)
+    ; More than one observation in this band
+    if (ngdbands gt 1) then begin
+      magname[gdbands] = strupcase(ubands[j])+'MAG'+strtrim(indgen(ngdbands)+1,2)
+    ; Only ONE obs in this band
     endif else begin
-      alsfilter = inputarr[1:*:4]  ; filters
+      magname[gdbands[0]] = strupcase(ubands[j])+'MAG'
     endelse
+  endfor
+  ; But these column/mag names are only correct if it
+  ;  saved the individual exposure magnitudes
 
-    printlog,logfile,i+1,photfile,n_elements(phot),format='(I5,A22,I8)'
+  ;; Get the CHIPSTR indices for the als files for this group
+  if keyword_set(mchusetiles) then begin
+    alsbase = reform((strsplitter(alsfiles,tilesep+'T',/extract))[0,*])
+  endif else alsbase=file_basename(alsfiles,'.als')
+  MATCH,chipstr.base,alsbase,indgrp,alsind,/sort,count=nindgrp
 
-    ; Creating the column names (code from photcalib.pro)
-    ui = uniq(alsfilter,sort(alsfilter))
-    ubands = alsfilter[ui]
-    nubands = n_elements(ubands)
-    magname = strarr(n_elements(alsfiles))
-    for j=0,nubands-1 do begin
-      gdbands = where(alsfilter eq ubands[j],ngdbands)
-      ; More than one observation in this band
-      if (ngdbands gt 1) then begin
-        magname[gdbands] = strupcase(ubands[j])+'MAG'+strtrim(indgen(ngdbands)+1,2)
-      ; Only ONE obs in this band
-      endif else begin
-        magname[gdbands[0]] = strupcase(ubands[j])+'MAG'
-      endelse
-    endfor
-    ; But these column/mag names are only correct if it
-    ;  saved the individual exposure magnitudes
+  ; Loop through the matched images for this group
+  for j=0,nindgrp-1 do begin
+    indgrp1 = indgrp[j]
+    alsind1 = alsind[j]
+    imagname = magname[alsind1]
+    phind = where(phtags eq imagname,nphind)
+    if nphind gt 0 then begin
+      ; Calculate "depth"
+      hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
+      xhist += 0.5*0.2
+      DLN_MAXMIN,hist,minarr,maxarr
+      depth = xhist[first_el(maxarr,/last)] ; use last maximum
+      chipstr[indgrp1].calib_depth = depth   ; calibrated "depth"
+      chipstr[indgrp1].calib_magname = imagname  ; keep track of magname
+      ;; CALIB_MAGNAME will not be unique if using TILES!!!
 
-    ; Loop through the exposures for this chip
-    For j=0,nindchip-1 do begin
-      ind = where(alsfiles eq chipstr[indchip[j]].base+'.als',nind)
-      if nind gt 0 then begin
-        imagname = magname[ind[0]]
-        phind = where(phtags eq imagname,nphind)
-        if nphind gt 0 then begin
-          ; Calculate "depth"
-          hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
-          xhist += 0.5*0.2
-          DLN_MAXMIN,hist,minarr,maxarr
-          depth = xhist[first_el(maxarr,/last)] ; use last maximum
-          chipstr[indchip[j]].calib_depth = depth   ; calibrated "depth"
-          chipstr[indchip[j]].calib_magname = imagname  ; keep track of magname
-
-          ; Get EBV for these stars
-          gdmag = where(phot.(phind[0]) lt 50,ngdmag)
-          if ngdmag gt 0 then begin
-            SRCMATCH,final.ra,final.dec,phot[gdmag].ra,phot[gdmag].dec,0.2,ind1,ind2,/sph,count=nmatch
-            if nmatch gt 0 then begin
-              med_ebv = median([final[ind1].ebv],/even)
-              chipstr[indchip[j]].ebv = med_ebv
-            endif
-          endif
-
-        endif ; we have the proper column/tag
-      endif  ; we have a match in the mch file
-    Endfor  ; exposure loop
-       
-  endif else begin ; the phot/mch/input files exist
-    printlog,logfile,i+1,photfile,' Not found',format='(I5,A22,A10)'
-  endelse
+      ; Get EBV for these stars
+      gdmag = where(phot.(phind[0]) lt 50,ngdmag)
+      if ngdmag gt 0 then begin
+        SRCMATCH,final.ra,final.dec,phot[gdmag].ra,phot[gdmag].dec,0.2,ind1,ind2,/sph,count=nmatch
+        if nmatch gt 0 then begin
+          med_ebv = median([final[ind1].ebv],/even)
+          chipstr[indgrp1].ebv = med_ebv
+        endif
+      endif
+    endif ; we have the proper column/tag
+  Endfor  ; images in group loop
 
   ; Fill in transformation equation info
   if n_elements(trans) gt 0 then begin
-    ; CHIP-SPECIFIC transformation equations
-    inptrans = trans  ; global trans eqns by default
-    if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
-      inptransfile = ''
-      ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
-      chip = long(ext)
-      ind = where(trans.chip eq chip,nind)
-      if nind gt 0 then inptrans=trans[ind]
-    endif
-
-    ; We have transformation equations
-    if n_elements(inptrans) gt 0 then begin 
-      ; Loop through the exposures
-      For j=0,nindchip-1 do begin
-        indtrans = where(inptrans.band eq chipstr[indchip[j]].filter,nindtrans)
-        if nindtrans gt 0 then begin
-          inptrans1 = inptrans[indtrans[0]]
-          chipstr[indchip[j]].calib_color = inptrans1.color
-          chipstr[indchip[j]].calib_zpterm = inptrans1.zpterm
-          chipstr[indchip[j]].calib_amterm = inptrans1.amterm
-          chipstr[indchip[j]].calib_colorterm = inptrans1.colterm
-        endif
-      Endfor
-    endif  ; we have transformation equations
+    ; Loop through the images in this group
+    For j=0,nindgrp-1 do begin
+      indgrp1 = indgrp[j]
+      alsind1 = alsind[j]
+      if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
+        indtrans = where(trans.band eq chipstr[indgrp1].filter and $
+                         trans.chip eq chipstr[indgrp1].chip,nindtrans)
+      endif else begin
+        indtrans = where(trans.band eq chipstr[indgrp1].filter,nindtrans)
+      endelse
+      trans1 = trans[indtrans[0]]
+      chipstr[indgrp1].calib_color = trans1.color
+      chipstr[indgrp1].calib_zpterm = trans1.zpterm
+      chipstr[indgrp1].calib_amterm = trans1.amterm
+      chipstr[indgrp1].calib_colorterm = trans1.colterm
+    Endfor
   endif 
 
-
   ; Get EBV another way if necessary
-  bdebv = where(finite(chipstr[indchip].ebv) eq 0,nbdebv)
+  bdebv = where(finite(chipstr[indgrp].ebv) eq 0,nbdebv)
   for j=0,nbdebv-1 do begin
-    fitsfile = chipstr[indchip[bdebv[j]]].file
+    fitsfile = chipstr[indgrp[bdebv[j]]].file
     fitstest = file_test(fitsfile)
-    alsfile = chipstr[indchip[bdebv[j]]].base+'.als'
+    alsfile = chipstr[indgrp[bdebv[j]]].base+'.als'
     alstest = file_test(alsfile)
-    coofile = chipstr[indchip[bdebv[j]]].base+'.coo'
+    coofile = chipstr[indgrp[bdebv[j]]].base+'.coo'
     cootest = file_test(coofile)
     if fitstest eq 1 and (alstest eq 1 or cootest eq 1) then begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
@@ -669,12 +652,11 @@ For i=0,nchips-1 do begin
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch
       if nmatch gt 0 then begin
         med_ebv = median([final[ind1].ebv],/even)
-        chipstr[indchip[bdebv[j]]].ebv = med_ebv
+        chipstr[indgrp[bdebv[j]]].ebv = med_ebv
       endif
     endif
   endfor  ; bad EBV loop
-
-Endfor    ; chip loop
+Endfor  ; group loop
 
 
 ; Create the exposure level information structure
