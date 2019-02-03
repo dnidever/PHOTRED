@@ -1,5 +1,3 @@
-pro readline,file,out,comment=comment,nlineread=nlineread,count=count,noblank=noblank,stp=stp
-
 ;+
 ; This reads in all the lines from a file
 ;
@@ -21,6 +19,8 @@ pro readline,file,out,comment=comment,nlineread=nlineread,count=count,noblank=no
 ;
 ; By D.Nidever  Feb.2007
 ;-
+
+pro readline,file,out,comment=comment,nlineread=nlineread,count=count,noblank=noblank,stp=stp
 
 undefine,out
 count = 0

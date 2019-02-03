@@ -597,24 +597,25 @@ if FILE_TEST(sexfile) eq 1 then begin
   if catformat eq 'FITS' then begin
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
-    ; How many observations are there
-    tags = tag_names(mag)
-    ntags = n_elements(tags)
-    magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
-    ; Copy the structure to a string array, then print it out
-    outarr = strarr(ntags,nmag)
+    PRINTSTR,mag,finafile,/silent
+    ;; THIS IS TE OLD WAY OF SAVING THE INFORMATION WITH THE ALS HEADER
+    ;; How many observations are there
+    ;tags = tag_names(mag)
+    ;ntags = n_elements(tags)
+    ;magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
+    ;; Copy the structure to a string array, then print it out
+    ;outarr = strarr(ntags,nmag)
+    ;;fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
+    ;;outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
     ;fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
     ;outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
-;; ADD FORMATS FOR THE NEW SEXTRACTOR COLUMNS!!
-    fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
-    outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
-    for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
-    openw,unit,/get_lun,finalfile
-    printf,unit,format=outfmt,outarr
-    close,unit
-    free_lun,unit
-    ; Prepend the ALF header
-    WRITELINE,finalfile,[alfhead,' '],/prepend
+    ;for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
+    ;openw,unit,/get_lun,finalfile
+    ;printf,unit,format=outfmt,outarr
+    ;close,unit
+    ;free_lun,unit
+    ;; Prepend the ALF header
+    ;WRITELINE,finalfile,[alfhead,' '],/prepend
   endelse
     
 ; DAOPHOT
