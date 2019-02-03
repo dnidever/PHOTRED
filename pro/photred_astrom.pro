@@ -287,9 +287,9 @@ FOR i=0,ninputlines-1 do begin
   printlog,logfile,'File with RA/DEC coordinates is: ',astfile
 
   if catformat eq 'FITS' then begin
-    MWRFITS,phot,astfile,/create
+    MWRFITS,phot,astfile,/create,/silent
   endif else begin   ; ASCII
-    PRINTSTR,phot,astfile
+    PRINTSTR,phot,astfile,/silent
   endelse
     
   ; Check that the file AST file is there

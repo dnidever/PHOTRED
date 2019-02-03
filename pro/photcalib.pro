@@ -903,7 +903,6 @@ FOR i=0L,ninp-1 do begin
 
   ; Figure out the names for the Extra columns
   endif else begin
-
     ; header
     headline = headline+' CHI      SHARP'
     ; We have FLAG/PROB colums
@@ -927,8 +926,6 @@ FOR i=0L,ninp-1 do begin
     endif
     format = format+')'
   endelse
-
-
 
   ;----------------
   ; WRITE the file
