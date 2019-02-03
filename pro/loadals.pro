@@ -1,5 +1,3 @@
-pro loadals,filename,phot,head,count=count,stp=stp
-
 ;+
 ;
 ; LOADALS
@@ -22,6 +20,8 @@ pro loadals,filename,phot,head,count=count,stp=stp
 ; By D. Nidever   January 2007
 ;-
 
+pro loadals,filename,phot,head,count=count,stp=stp
+
 count=0
 
 ; Not enough inputs
@@ -39,8 +39,8 @@ endif
 
 nlines = file_lines(filename)
 if nlines lt 4 then begin
-  print,'No sources in the file'
-  phot=-1
+  print,'No sources in '+filename
+  phot = -1
   return
 endif
 

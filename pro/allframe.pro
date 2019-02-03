@@ -545,8 +545,18 @@ printlog,logf,systime(0)
 sexfile = combbase+'_allf.sex'
 if FILE_TEST(sexfile) eq 1 then begin
 
-  fields = ['ID','X','Y','MAG','ERR','FLAG','PROB']
-  sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint)
+  ;-------------------------------------
+  ; Load sextractor output file
+  ; default.param specifies the output columns
+  if file_isfits(sexfile) eq 0 then begin
+    READLINE,'default.param',fields
+    gd = where(strmid(fields,0,1) ne '#' and strtrim(fields,2) ne '',ngd)
+    fields = fields[gd]
+    sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint)
+  endif else begin
+    sex = MRDFITS(sexfile,1,/silent)
+    if n_tags(sex) eq 1 then sex=MRDFITS(sexfile,2,/silent)
+  endelse
   nsex = n_elements(sex)
 
   ; Load the MAKEMAG file
@@ -554,13 +564,29 @@ if FILE_TEST(sexfile) eq 1 then begin
   nmag = n_elements(mag)
 
   ; Match them with IDs
-  MATCH,mag.id,sex.id,ind1,ind2,count=nind
+  MATCH,mag.id,sex.number,ind1,ind2,count=nind
 
-  ; Add stellaricity information to mag file
-  add_tag,mag,'flag',0L,mag
-  add_tag,mag,'prob',0.0,mag
-  mag[ind1].flag = sex[ind2].flag
-  mag[ind1].prob = sex[ind2].prob
+  ; Add SExtractor information to mag file
+  sextags = tag_names(sex)
+  ;add_tag,mag,'flag',0L,mag
+  ;add_tag,mag,'prob',0.0,mag
+  ;mag[ind1].flag = sex[ind2].flag
+  ;mag[ind1].prob = sex[ind2].prob
+  ;; New columns
+  newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_IMAGE',$
+             'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM']
+  newname = ['FLAG','PRROB','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA',$
+             'ASEMI','BSEMI','THETA','ELLIPTICITY','FWHM']
+  for k=0,n_elements(newcols)-1 do begin
+    colind = where(sextags eq newcols[k],ncolind)
+    if ncolind gt 0 then begin
+      add_tag,mag,newname[k],fix('',type=size(sex[0].(colind),/type)),mag
+      mag[ind1].(n_tags(mag)-1) = sex[ind2].(colind)
+      ;; convert to arcsec
+      if newcols[k] eq 'A_WORLD' or newcols[k] eq 'B_WORLD' then mag[ind1].(n_tags(mag)-1) *= 3600
+    endif
+  endfor   
+
 
   if nind lt nmag then printlog,logf,'DID NOT MATCH ALL THE STARS!'
 
@@ -577,8 +603,11 @@ if FILE_TEST(sexfile) eq 1 then begin
     magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
     ; Copy the structure to a string array, then print it out
     outarr = strarr(ntags,nmag)
+    ;fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
+    ;outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
+;; ADD FORMATS FOR THE NEW SEXTRACTOR COLUMNS!!
     fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
-    outfmt='(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
+    outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
     for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
     openw,unit,/get_lun,finalfile
     printf,unit,format=outfmt,outarr

@@ -53,6 +53,7 @@ endif
 ;; Apply cuts to get good stars
 sex = MRDFITS(base+'.cat',1,/silent)
 if n_tags(sex) eq 1 then sex = MRDFITS(catfile,2,/silent)
+nsex = n_elements(sex)
 si = sort(sex.fwhm_image)
 fwhm80 = sex[si[floor(nsex*0.80)]].fwhm_image
 bd = where(sex.imaflags_iso gt 0 or sex.class_star lt 0.5 or $
@@ -76,7 +77,7 @@ nsources = ngd
 MWRFITS,sex,base+'.cat',/create
 
 ;; Convert to DAOPHOT coo format
-SEX2DAOPHOT,base+'.cat',base+'.fits',base+'.coo',/starcuts
+SEX2DAOPHOT,base+'.cat',base+'.fits',base+'.coo'
 
 ;; Check that there are enough stars for our VA setting
 ;;   VA=2 quadratic spatial variations, 6 stars minimum

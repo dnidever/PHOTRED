@@ -46,7 +46,7 @@ if file_test(file) eq 0 then begin
   return
 endif
 if file_test(base+'.opt') eq 0 then begin
-  error = bsae+'.opt NOT FOUND'
+  error = base+'.opt NOT FOUND'
   print,error
   return
 endif
