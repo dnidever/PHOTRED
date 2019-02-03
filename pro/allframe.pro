@@ -573,8 +573,8 @@ if FILE_TEST(sexfile) eq 1 then begin
   ;mag[ind1].flag = sex[ind2].flag
   ;mag[ind1].prob = sex[ind2].prob
   ;; New columns
-  newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_IMAGE',$
-             'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM']
+  newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_WORLD',$
+             'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM_WORLD']
   newname = ['FLAG','PRROB','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA',$
              'ASEMI','BSEMI','THETA','ELLIPTICITY','FWHM']
   for k=0,n_elements(newcols)-1 do begin
