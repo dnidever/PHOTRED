@@ -6,9 +6,9 @@
 ; to DAOPHOT format.  Currently only coo.
 ;
 ; INPUTS:
-;  catfile   The SExtractor catalog filename.
-;  fitsfile  The name of the associated FITS file.
-;  daofile   The name of the output DAOPHOT file.
+;  catfile    The SExtractor catalog filename.
+;  fitsfile   The name of the associated FITS file.
+;  daofile    The name of the output DAOPHOT file.
 ;
 ; OUTPUTS:
 ;  The catalog is written to DAOFILE.
@@ -20,7 +20,7 @@
 ; By D. Nidever  Jan 2019
 ;-
 
-pro sex2daophot,catfile,fitsfile,daofile,error=errror
+pro sex2daophot,catfile,fitsfile,daofile,error=error
 
 ;; Not enough inputs
 if n_elements(catfile) eq 0 or n_elements(fitsfile) eq 0 or n_elements(daofile) eq 0 then begin
@@ -45,9 +45,13 @@ endif
 ; Load sextractor output file
 ; default.param specifies the output columns
 if file_isfits(catfile) eq 0 then begin
-  fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
+;  fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
+  fields = ['NUMBER','X_IMAGE','Y_IMAGE','MAG_APER','MAGERR_APER','FLAGS','CLASS_STAR']
   sex = IMPORTASCII(catfile,fieldnames=fields,/noprint)
-endif else sex=MRDFITS(catfile,1,/silent)
+endif else begin
+  sex = MRDFITS(catfile,1,/silent)
+  if n_tags(sex) eq 1 then sex = MRDFITS(catfile,2,/silent)
+endelse
 nsex = n_elements(sex)
 
 ;-------------------------------------
@@ -77,15 +81,16 @@ thresh = 20.0
 ;; Making ALS structure for new SEX sources
 schema = {ID:0L,X:0.0,Y:0.0,MAG:0.0,ERR:0.0,SKY:0.0,ITER:0.0,CHI:0.0,SHARP:0.0}
 dao = replicate(schema,nsex)
-dao.id = sex.id
-dao.x = sex.x
-dao.y = sex.y
-dao.mag = sex.mag
-dao.err = sex.err
-dao.sky = 0.0
+dao.id = sex.number
+dao.x = sex.x_image
+dao.y = sex.y_image
+dao.mag = sex.mag_aper
+dao.err = sex.magerr_aper
+if tag_exist(sex,'BACKGROUND') then dao.sky=sex.background else dao.sky=0.0
 dao.iter = 1
 dao.chi = 1.0
 dao.sharp = 0.0
+ndao = nsex
 
 ;;NL    NX    NY  LOWBAD HIGHBAD  THRESH     AP1  PH/ADU  RNOISE    FRAD
 ;  1  2046  4094  1472.8 38652.0   80.94    0.00    3.91    1.55    3.90
@@ -99,7 +104,7 @@ printf,unit,format='(I3,I6,I6,F8.1,F8.1,F8.2,F8.2,F8.2,F8.2,F8.2)',1,naxis1,naxi
        saturate,thresh,3.0,gain,rdnoise/gain,3.9
 printf,unit,''
 ; Write the data
-for i=0,nsex-1 do $
+for i=0,ndao-1 do $
    printf,unit,format='(I7,2F9.2,4F9.3)',dao[i].id,dao[i].x,dao[i].y,dao[i].mag,0.6,0.0,0.0
 close,unit
 free_lun,unit

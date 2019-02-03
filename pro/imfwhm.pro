@@ -264,7 +264,7 @@ FOR f=0,nfiles-1 do begin
     endif
 
     ; Computing sky level and sigma
-    photred_sky,im,skymode,skysig1,highbad=satlim,/silent
+    photred_sky,im,skymode,skysig1,highbad=satlim*0.95,/silent
     if skysig1 lt 0.0 then skysig1 = mad(im[gdpix])
     if skysig1 lt 0.0 then skysig1 = mad(im)
     maxim = max(im)
@@ -319,7 +319,7 @@ FOR f=0,nfiles-1 do begin
 
     ; Computing sky level and sigma AGAIN with
     ;  background subtracted image
-    sky,im2,skymode2,skysig,highbad=satlim,/silent
+    sky,im2,skymode2,skysig,highbad=satlim*0.95,/silent
     if keyword_set(verbose) then print,'skymode = ',stringize(skymode,ndec=2),' skysig = ',stringize(skysig,ndec=2)
 
     ; Gaussian smooth the image to allow detection of fainter sources

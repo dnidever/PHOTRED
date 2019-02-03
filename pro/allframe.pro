@@ -66,6 +66,7 @@ if (nfile eq 0) then begin
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
   print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
   print,'                  imager=imager,workdir=workdir,stp=stp'
+  error = 'Not enough inputs'
   return
 endif
 
@@ -108,8 +109,8 @@ if n_elements(catformat) eq 0 then catformat='ASCII'
 
 ; No irafdir
 if n_elements(scriptsdir) eq 0 then begin
-  printlog,logf,'SCRIPTSDIR NOT INPUT'
   error = 'SCRIPTSDIR NOT INPUT'
+  printlog,logf,error
   return
 endif
 
@@ -117,14 +118,15 @@ endif
 ;---------------------------------------------------------------
 CHECK_IRAF,iraftest,irafdir=irafdir
 if iraftest eq 0 then begin
-  print,'IRAF TEST FAILED.  EXITING'
+  error = 'IRAF TEST FAILED.  EXITING'
+  print,error
   return
 endif
 
 ; No scriptsdir
 if n_elements(scriptsdir) eq 0 then begin
-  printlog,logf,'SCRIPTSDIR NOT INPUT'
   error = 'SCRIPTSDIR NOT INPUT'
+  printlog,logf,error
   return
 endif
 ; Check if the scripts exist in the current directory
@@ -137,8 +139,8 @@ for i=0,nscripts-1 do begin
   curinfo = FILE_INFO(scripts[i])
   ; No file
   if info.exists eq 0 or info.size eq 0 then begin
-    printlog,logf,scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY'
     error = scriptsdir+'/'+scripts[i]+' NOT FOUND or EMPTY'
+    printlog,logf,error
     return
   endif
   ; Check if the two files are the same size, if not copy it
@@ -156,7 +158,8 @@ allframefile = FILE_SEARCH(out,count=nallframefile)
 if (nallframefile eq 0) then begin
   ;printlog,logf,'/net/halo/bin/allframe.2004.fixed NOT FOUND'
   ;printlog,logf,'/net/halo/bin/allframe.2008 NOT FOUND'
-  printlog,logf,allframefile+'NOT FOUND'
+  error = allframefile+'NOT FOUND'
+  printlog,logf,error
   return
 endif
 
@@ -164,11 +167,13 @@ endif
 if n_elements(tile) eq 0 then cmborig=1
 if n_elements(tile) eq 1 then begin
   if size(tile,/type) ne 8 then begin
-    printlog,logf,'TILE must be a structure'
+    error = 'TILE must be a structure'
+    printlog,logf,error
     return
   endif
   if tag_exist(tile,'TYPE') eq 0then begin
-    printlog,logf,'TILE must have a TYPE column'
+    error = 'TILE must have a TYPE column'
+    printlog,logf,error
     return
   endif
   if tile.type eq 'ORIG' then cmborig=1
@@ -196,14 +201,16 @@ cd,mchdir
 ; Check that the mch, als, and opt files exist
 mchtest = file_test(mchfile)
 if mchtest eq 0 then begin
-  printlog,logf,mchfile,' NOT FOUND'
+  error = mchfile+' NOT FOUND'
+  printlog,logf,error
   return
 endif
 
 ; Checking RAW file
 rawtest = file_test(mchbase+'.raw')
 if rawtest eq 0 then begin
-  printlog,logf,mchbase+'.raw NOT FOUND'
+  error = mchbase+'.raw NOT FOUND'
+  printlog,logf,error
   return
 endif
 
@@ -223,7 +230,8 @@ for i=0,nfiles-1 do begin
   ; Checking FITS file
   fitstest = file_test(base+'.fits') or file_test(base+'.fits.fz')
   if fitstest eq 0 then begin
-    printlog,logf,base+'.fits/.fits.fz NOT FOUND'
+    error = base+'.fits/.fits.fz NOT FOUND'
+    printlog,logf,error
     return
   endif
 
@@ -237,42 +245,48 @@ for i=0,nfiles-1 do begin
   ; Checking OPT file
   opttest = file_test(base+'.opt')
   if opttest eq 0 then begin
-    printlog,logf,base+'.opt NOT FOUND'
+    error = base+'.opt NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking ALS.OPT file
   alsopttest = file_test(base+'.als.opt')
   if alsopttest eq 0 then begin
-    printlog,logf,base+'.als.opt NOT FOUND'
+    error = base+'.als.opt NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking AP file
   aptest = file_test(base+'.ap')
   if aptest eq 0 then begin
-    printlog,logf,base+'.ap NOT FOUND'
+    error = base+'.ap NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking ALS file
   alstest = file_test(base+'.als')
   if alstest eq 0 then begin
-    printlog,logf,base+'.als NOT FOUND'
+    error = base+'.als NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking LOG file
   logtest = file_test(base+'.log')
   if logtest eq 0 then begin
-    printlog,logf,base+'.log NOT FOUND'
+    error = base+'.log NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking PSF file
   psftest = file_test(base+'.psf')
   if psftest eq 0 then begin
-    printlog,logf,base+'.psf NOT FOUND'
+    error = base+'.psf NOT FOUND'
+    printlog,logf,error
     return
   endif
 
@@ -315,7 +329,7 @@ if n_elements(workdir) gt 0 then begin
   ;; Copy over the files that we need
   ;;  this will copy the contents of symlinks
   FILE_COPY,mchbase+['.mch','.raw','.tfr'],tempdir
-  for i=0,nfiles-1 FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
+  for i=0,nfiles-1 do FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
   ;; Copy files for FAKE
   if keyword_set(fake) then FILE_COPY,mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],tempdir
   ;; Go there
@@ -366,30 +380,20 @@ printlog,logf,systime(0)
 combbase = file_basename(combfile,'.fits')
 if not keyword_set(fake) then begin
   ; Make .opt files, set saturation just below the mask data level
-  MKOPT,combfile,satlevel=maskdatalevel-1000
+  PHOTRED_MKOPT,combfile,va=1,hilimit=maskdatalevel-1000,error=opterror
+  if n_elements(opterror) gt 0 then begin
+    printlog,logf,opterror
+    return
+  endif
+  ;MKOPT,combfile,satlevel=maskdatalevel-1000
   ; THIS IS NOW DONE IN ALLFRAME_COMBINE/ALLFRAME_COMBINE_ORIG.PRO ABOVE
   ;; Using CMN.LST of reference frame if it exists
   ;if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
   ;  print,'Using reference image COMMON SOURCE file'
   ;  file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
   ;endif
-  ;; Create the SExtractor config file
-  PHOTRED_MKSEXCONFIG,combfile,combbase+'.sex',combbase+'.cat'
-  ;; Run SExtractor for detection
-  SPAWN,['sex',combfile,'-c',combbase+'.sex'],out,errout,/noshell
-  ;; Convert to DAOPHOT coo format
-  SEX2DAOPHOT,combbase+'.cat',combfile,combbase+'.coo'
-  ; Get the PSF of the combined image
-  SPAWN,['./getpsfnofind.sh',combbase],/noshell
-  ;SPAWN,'./getpsfnofind.sh '+file_basename(combfile,'.fits')
-
-  ; If getpsf failed, lower the spatial PSF variations to linear
-  if file_test(combbase+'.psf') eq 0 then begin
-    printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
-    MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
-    SPAWN,'./getpsfnofind.sh '+combbase
-  stop
-  endif
+  PHOTRED_GETPSF,combbase,error=error
+  if n_elements(error) gt 0 then return
 
 ; FAKE, use existing comb.psf file
 endif else begin
@@ -614,7 +618,7 @@ if n_elements(workdir) gt 0 then begin
   printlog,logf,'Copying files back to original directory'
   ;; Delete some files
   FILE_DELETE,tempdir+'/'+mchbase+['.mch','.raw','.tfr'],/allow
-  for i=0,nfiles-1 FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
+  for i=0,nfiles-1 do FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
   if keyword_set(fake) then FILE_DELETE,tempdir+'/'+mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],/allow
   ;; Copy files back
   files = file_search(workdir+'/*',count=nfiles)  
