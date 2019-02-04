@@ -298,16 +298,14 @@ endif
 ;---------------
 ; Some input files
 if (ninputlines gt 0) then begin
-
   WRITELINE,inputfile,inputlines
   printlog,logfile,strtrim(ninputlines,2),' input files'
 
 ; No input files, empty it
 endif else begin
-
   printlog,logfile,'NO input files'
   FILE_DELETE,inputfile
-  SPAWN,'touch '+inputfile,out
+  TOUCHZERO,inputfile
 endelse
 
 

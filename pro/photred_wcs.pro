@@ -185,7 +185,7 @@ if keyword_set(skipwcs) then begin
   ; All files are put into the outlist
   outlist = inputlines
   ; UPDATE the Lists
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,/silent
+  PHOTRED_UPDATELISTS,lists,outlist=outlist,setupdir=curdir,/silent
 
   goto,FINISH
 
@@ -489,7 +489,7 @@ FINISH:
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_WCS Finished  ',systime(0)

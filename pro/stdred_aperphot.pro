@@ -234,7 +234,7 @@ endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 ; There were HEADER problems
 if (headerproblem eq 1) then begin
@@ -452,7 +452,7 @@ if ngd eq 0 then begin
 
   ; UPDATE the Lists
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
   return
 endif
 
@@ -532,7 +532,7 @@ Endfor
 ; UPDATE the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 
 printlog,logfile,'STDRED_APERPHOT Finished  ',systime(0)

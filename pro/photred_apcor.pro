@@ -535,7 +535,7 @@ if (nbd gt 0) then begin
 endif else UNDEFINE,failurelist
 
 PHOTRED_UPDATELISTS,lists2,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_APCOR Finished  ',systime(0)

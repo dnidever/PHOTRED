@@ -779,7 +779,7 @@ FOR i=0,ndirs-1 do begin
           ;#####################
           CD,curdir
           PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                              failurelist=failurelist,/silent
+                              failurelist=failurelist,setupdir=curdir,/silent
           CD,dirs[i]
 
         Endfor ; amp loop
@@ -986,7 +986,7 @@ FOR i=0,ndirs-1 do begin
     ;#####################
     CD,curdir
     PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,/silent
+                        failurelist=failurelist,setupdir=curdir,/silent
     CD,dirs[i]
 
 
@@ -1000,7 +1000,7 @@ FOR i=0,ndirs-1 do begin
   ; UPDATE the Lists
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 
 ENDFOR  ; directoryloop
@@ -1011,7 +1011,7 @@ ENDFOR  ; directoryloop
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_MATCH Finished  ',systime(0)

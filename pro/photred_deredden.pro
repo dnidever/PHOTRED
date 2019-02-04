@@ -700,7 +700,7 @@ FOR i=0,ninputlines-1 do begin
   ; UPDATE the Lists
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 ENDFOR
 
@@ -709,7 +709,7 @@ ENDFOR
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_DEREDDEN Finished  ',systime(0)

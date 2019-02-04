@@ -252,7 +252,7 @@ Endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 printlog,logfile,'FAKERED_CLEAN Finished  ',systime(0)
 

@@ -134,6 +134,10 @@ if ndaofitradfwhm eq 0 then undefine,daofitradfwhm
 workdir = READPAR(setup,'WORKDIR',count=nworkdir)
 if nworkdir eq 0 then undefine,workdir
 
+; Clean intermediate files at the end
+clean = READPAR(setup,'CLEAN',count=nclean)
+if nclean eq 0 then undefine,clean
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -297,7 +301,7 @@ endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 ; There were HEADER problems
 if (headerproblem eq 1) then begin
@@ -615,7 +619,7 @@ if ngd eq 0 then begin
 
   ; UPDATE the Lists
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
   return
 endif
@@ -662,7 +666,7 @@ If not keyword_set(redo) then begin
     PUSH,successlist,procdirlist[bd]+'/'+procbaselist[bd]+procextlist[bd]
     PUSH,outlist,procdirlist[bd]+'/'+procbaselist[bd]+'.als'
     PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,/silent
+                        failurelist=failurelist,setupdir=curdir,/silent
 
     ; Remove them from the arrays
     if nbd lt nprocbaselist then REMOVE,bd,procbaselist,procdirlist
@@ -773,7 +777,27 @@ if (nbd gt 0) then begin
 endif else UNDEFINE,failurelist
 
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
+
+;;######################
+;;  CLEANING UP
+;;######################
+if keyword_set(clean) then begin
+  printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
+
+  ;; Only clean up for successful files
+  nsuccess = n_elements(successlist)
+  for i=0,nsuccess-1 do begin
+    dir1 = file_dirname(successlist[i]))
+    base = file_basename(successlist[i])
+    ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi,
+    ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst
+    FILE_DELETE,dir1+'/'+base1+'.'+['lst','lst1','lst2','lst1.chi','lst2.chi','grp','nst','plst.chi',$
+                                    'nei','als.inp','cmn.log','cmn.coo','cmn.ap','cmn.lst','a.fits','a.fits.fz'],/allow
+    ;; If CLEAN=2, then also remove coo, ap, s.fits as well
+    FILE_DELETE,dir1+'/'+base1+'.'+['coo','ap','s.fits','s.fits.fz'],/allow
+  endfor
+endif
 
 
 printlog,logfile,'PHOTRED_DAOPHOT Finished  ',systime(0)

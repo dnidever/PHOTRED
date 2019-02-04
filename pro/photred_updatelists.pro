@@ -1,6 +1,3 @@
-pro photred_updatelists,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,silent=silent,stp=stp
-
 ;+
 ;
 ; PHOTRED_UPDATELISTS
@@ -13,6 +10,7 @@ pro photred_updatelists,lists,outlist=outlist,successlist=successlist,$
 ;  =outlist       The list of new output files.
 ;  =successlist   The list of new successfully processed files.
 ;  =failurelist   The list of new failed files.
+;  =setupdir      The main directory where photred.setup exists.
 ;  /silent        Don't print anything
 ;
 ; OUTPUTS:
@@ -20,16 +18,19 @@ pro photred_updatelists,lists,outlist=outlist,successlist=successlist,$
 ;
 ; USAGE:
 ;  IDL>photred_updatelists,lists,outlist=outlist,successlist=successlist,$
-;                          failurelist=failurelist,silent=silent,stp=stp
+;                          failurelist=failurelist,setupdir=setupdir,silent=silent,stp=stp
 ;
 ; By D.Nidever  March 2008
 ;-
 
+pro photred_updatelists,lists,outlist=outlist,successlist=successlist,$
+                        failurelist=failurelist,setupdir=setupdir,silent=silent,stp=stp
+
 ; Not enough inputs
 nlists = n_elements(lists)
-if (nlists) eq 0 then begin
+if (nlists eq 0) or (n_elements(setupdir) eq 0) then begin
   print,'Syntax - photred_updatelists,lists,outlist=outlist,successlist=successlist,'
-  print,'                             failurelist=failurelist,silent=silent,stp=stp'
+  print,'                             failurelist=failurelist,setupdir=setupdir,silent=silent,stp=stp'
   return
 endif
 
@@ -61,7 +62,6 @@ if (ngdthisprog eq 0) then begin
   print,'LISTS IS MISSING THE "NSUCCESSLINES" TAG'
   return
 endif
-
 
 
 ; Is "thisprog" a valid stage?
@@ -124,6 +124,12 @@ if (nsuccesslist gt 0) then begin
   newsuccesslines = newsuccesslines[ui]
   nnewsuccesslines = n_elements(newsuccesslines)
 
+  ;; Make the paths relative to SETUPDIR
+  flen = strlen(setupdir)
+  if strmid(setupdir,0,1,/reverse) ne '/' then flen+=1
+  gd = where(stregex(newsuccesslines,'^'+setupdir,/boolean) eq 1,ngd)
+  if ngd gt 0 then newsuccesslines[gd] = strmid(newsuccesslines[gd],flen)
+
   ; Write the success file
   WRITELINE,successfile,newsuccesslines
 
@@ -150,12 +156,17 @@ if (noutlist gt 0) then begin
   newoutputlines = newoutputlines[ui]
   nnewoutputlines = n_elements(newoutputlines)
 
-
   nnew = nnewoutputlines - lists.noutputlines
   if not keyword_set(silent) then begin
     printlog,logfile,strtrim(nnewoutputlines,2),' files in '+thisprog+'.outlist'
     printlog,logfile,strtrim(nnew,2),' files were ADDED to '+thisprog+'.outlist'
   endif
+
+  ;; Make the paths relative to SETUPDIR
+  flen = strlen(setupdir)
+  if strmid(setupdir,0,1,/reverse) ne '/' then flen+=1
+  gd = where(stregex(newoutputlines,'^'+setupdir,/boolean) eq 1,ngd)
+  if ngd gt 0 then newoutputlines[gd] = strmid(newoutputlines[gd],flen)
 
   ; Write the output file
   WRITELINE,outputfile,newoutputlines
@@ -181,6 +192,13 @@ if (nsuccesslist gt 0) then begin
     if (nmatch gt 0) then begin
       newinputlines = inputlines
       REMOVE,ind1,newinputlines
+
+      ;; Make the paths relative to SETUPDIR
+      flen = strlen(setupdir)
+      if strmid(setupdir,0,1,/reverse) ne '/' then flen+=1
+      gd = where(stregex(newinputlines,'^'+setupdir,/boolean) eq 1,ngd)
+      if ngd gt 0 then newinputlines[gd] = strmid(newinputlines[gd],flen)
+
       WRITELINE,inputfile,newinputlines
     endif else begin
       printlog,logfile,'NO MATCH BETWEEN INPUTLINES AND NEW SUCCESSLIST'
@@ -188,10 +206,9 @@ if (nsuccesslist gt 0) then begin
 
   ; All succeeded, "empty" inlist
   endif else begin
-
     ; Make a zero length file
     FILE_DELETE,inputfile,/allow
-    SPAWN,'touch '+inputfile,out,errout
+    TOUCHZERO,inputfile
   endelse
 endif
 
@@ -204,7 +221,7 @@ if not keyword_set(silent) then $
   printlog,logfile,strtrim(nfailurelist,2),' files FAILED'
 
 ; Checking to see if any past failures were successful this time
-remnewsuccess=0
+remnewsuccess = 0
 if (lists.nfailurelines gt 0 and nsuccesslist gt 0) then begin
   MATCH,lists.failurelines,successlist,ind1,ind2,count=nind1
   if nind1 gt 0 then remnewsuccess=1
@@ -234,6 +251,14 @@ if (nfailurelist gt 0) or (remnewsuccess eq 1) then begin
       nnewfailurelines = n_elements(newfailurelines)
     endif
   endif ; some successful files
+
+  ;; Make the paths relative to SETUPDIR
+  if n_elements(newfailurelines) gt 0 then begin
+    flen = strlen(setupdir)
+    if strmid(setupdir,0,1,/reverse) ne '/' then flen+=1
+    gd = where(stregex(newfailurelines,'^'+setupdir,/boolean) eq 1,ngd)
+    if ngd gt 0 then newfailurelines[gd] = strmid(newfailurelines[gd],flen)
+  endif
 
   ; Write the failure file, should be okay even if no lines
   WRITELINE,failurefile,newfailurelines
