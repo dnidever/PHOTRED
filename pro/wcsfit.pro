@@ -2045,7 +2045,8 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='GAIA/GAIA'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and $
+     refcatname ne 'GAIA/GAIA' and refcatname ne 'GAIADR2' then refcatname='GAIADR2'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
@@ -2124,6 +2125,16 @@ if n_elements(refcat) eq 0 then begin
     refcat.dej2000 = refcat.de_icrs
   endif
 
+  ; GAIADR2
+  if (refcatname eq 'GAIADR2') then begin
+    if tag_exist(refcat,'RAJ2000') eq 0 then begin
+      ADD_TAG,refcat,'RAJ2000',0.0d0,refcat
+      ADD_TAG,refcat,'DEJ2000',0.0d0,refcat
+      refcat.raj2000 = refcat.ra_icrs
+      refcat.dej2000 = refcat.de_icrs      
+    endif
+  endif
+
   ; UCAC4 ??
 
   nrefcat = n_elements(refcat)
@@ -2144,7 +2155,36 @@ if n_elements(refname) eq 0 then begin
   if tag_exist(refcat,'USNO_B1_0') then refname='USNO-B1'
   ; UCAC4 has UCAC4 tag
   if tag_exist(refcat,'UCAC4') then refname='UCAC4'
+  ; GAIADR2
+  if tag_exist(refcat,'RA_ICRS') and tag_exist(refcat,'PLX') and tag_exist(refcat,'PMRA') then refname='GAIADR2'
   if n_elements(refname) gt 0 then print,'Reference catalog type is ',refname else print,'Reference catalog type UNKNOWN'
+endif
+
+;; Shift the Gaia DR2 coordinates to the epoch of the observation using PMs
+if refname eq 'GAIADR2' then begin
+  ;; Precess the Gaia coordinates to the epoch of the observation
+  ;; The reference epoch for Gaia DR2 is J2015.5 (compared to the
+  ;; J2015.0 epoch for Gaia DR1).
+  print,'Shifting the Gaia DR2 coordinates to the epoch of the observation using PMs'
+  dateobs = sxpar(head,'DATE-OBS',count=ndateobs)
+  if ndateobs eq 0 then begin
+    uttime = photred_getuttime(filename)
+    utdate = photred_getdate(filename)
+    dateobs = utdate+'T'+uttime
+  endif
+  mjd = date2jd(dateobs,/mjd)
+  gaiamjd = 57206.0d0
+  delt = (mjd-gaiamjd)/365.242170d0   ; convert to years
+  ;; convert from mas/yr->deg/yr and convert to angle in RA
+  d2r = !dpi / 180.0d0
+  if tag_exist(refcat,'PMDE') then pmdec=refcat.pmde else pmdec=refcat.pmdec
+  gd = where(finite(refcat.pmra) eq 1 and finite(pmdec) eq 1,ngd)
+  if ngd gt 0 then begin
+    gra_epoch = refcat[gd].raj2000 + delt*refcat[gd].pmra/3600.0d0/1000.0d0/cos(refcat[gd].dej2000*d2r)
+    gdec_epoch = refcat[gd].dej2000 + delt*pmdec[gd]/3600.0d0/1000.0d0
+    refcat[gd].raj2000 = gra_epoch
+    refcat[gd].dej2000 = gdec_epoch
+  endif
 endif
 
 
@@ -2352,7 +2392,6 @@ if (nastr gt 0) then begin
   ;    print,'Robust RMS = ',strtrim(initrms,2),' arcsec'
   ;  endif else initrms=999999.
   ;endif ; no match
-
 
   ; No good matches, try MATCHSTARS_XCORR.PRO
   ;if (initrms ge 1.0) then begin
