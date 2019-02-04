@@ -806,7 +806,7 @@ if keyword_set(clean) then begin
   ;; Only clean up for successful files
   nsuccess = n_elements(successlist)
   for i=0,nsuccess-1 do begin
-    dir1 = file_dirname(successlist[i]))
+    dir1 = file_dirname(successlist[i])
     base = file_basename(successlist[i])
     ;; _comb
     ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi, psfini.ap
