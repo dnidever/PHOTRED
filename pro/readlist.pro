@@ -74,7 +74,7 @@ if keyword_set(fully) and (nlines gt 0) then begin
   if n_elements(setupdir) gt 0 then begin
     grel = where(strmid(lines,0,1) ne '/',ngrel)
     if ngrel gt 0 then lines[grel]=setupdir+'/'+lines[grel]
-  endif else print,'SETUPDIR not input'
+  endif ;else print,'SETUPDIR not input'
 
   ;; This expands wildcards but also checks if files actually exist
   lines = FILE_SEARCH(lines,/fully_qualify)
