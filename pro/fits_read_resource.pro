@@ -78,7 +78,7 @@ endif
 ;;=======================================================
 
 ;; Create lock file
-TOUCHZERO,file+'.lock'
+if not keyword_set(header) then TOUCHZERO,file+'.lock'
 
 ;; Load the resource file
 READLINE,rfile,rlines,count=nlines,/noblank,comment='#'
@@ -89,18 +89,10 @@ rstr = create_struct(names[0],vals[0])
 if nlines gt 1 then for k=1,nlines-1 do rstr=create_struct(rstr,names[k],vals[k])
 
 
-;; Only the header
+;; Only the header, local
 ;; get it from the resource file or a stand-alone file
-if keyword_set(header) then begin
-  if tag_exist(rstr,'HEADER') then begin
-    READLINE,rstr.header,meta
-    return,meta
-  endif
-  lo = strpos(rstr.fluxfile,'[')
-  hi = strpos(rstr.fluxfile,']')
-  fluxfile = strmid(rstr.fluxfile,0,lo)
-  fext = strmid(rstr.fluxfile,lo+1,hi-lo-1)
-  meta = HEADFITS(fluxfile,exten=fext)
+if keyword_set(header) and tag_exist(rstr,'HEADER') then begin
+  READLINE,rstr.header,meta
   return,meta
 endif
 
@@ -127,7 +119,7 @@ SPAWN,['funpack','-E',mext,'-O',tmaskfile,maskfile],/noshell
 
 ;; Create the DAOPHOT file
 ;;   taken from smashred_imprep_single.pro
-DAOPHOT_IMPREP,tfluxfile,tmaskfile,im,meta,error=error
+DAOPHOT_IMPREP,tfluxfile,tmaskfile,im,meta,header=header,error=error
 if n_elements(error) gt 0 then return,-1
 
 ;; Use the local header
@@ -148,7 +140,7 @@ endif
 ;endif
 
 ;; Write new image
-if not keyword_set(nowrite) then $
+if not keyword_set(nowrite) and not keyword_set(header) then $
   MWRFITS,im,file,meta,/create
 
 ;; Delete the lock file
@@ -170,7 +162,10 @@ FILE_DELETE,tfluxfile,tmaskfile,/allow
 FILE_DELETE,tmpdir
 
 dt = systime(1)-t0
-print,dt
+;print,dt
+
+;; Return header only
+if keyword_set(header) then return,meta
 
 return,im
 

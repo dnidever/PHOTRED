@@ -8,24 +8,28 @@
 ; INPUTS:
 ;  fluxfile  The filename for the CP Instcal flux file.
 ;  maskfile  The filename for the CP Instcal mask file.
+;  /header   Return the header only.
 ;
 ; OUTPUTS:
 ;  im      The DAOPHOT-prepared image array
-;  head    The header for IM.
+;  meta    The header/metadata for IM.
 ;  =error  The error if one occurred.
 ;
 ; USAGE:
-;  IDL>daophot_imprep,fluxfile,maskfile,im,head
+;  IDL>daophot_imprep,fluxfile,maskfile,im,meta
 ;
 ; By D. Nidever  Feb 2019
 ;-
 
-pro daophot_imprep,fluxfile,maskfile,im,head,error=error
+pro daophot_imprep,fluxfile,maskfile,im,meta,header=header,error=error
+
+undefine,meta
+im = 0
 
 ; Not enough inputs
 if n_elements(fluxfile) eq 0 or n_elements(maskfile) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - daophot_imprep,fluxfile,maskfile,im,head,error=error'
+  print,'Syntax - daophot_imprep,fluxfile,maskfile,im,meta,header=header,error=error'
   return
 endif
 
@@ -40,26 +44,62 @@ if (Error_status ne 0) then begin
    error = !ERROR_STATE.MSG
    PHOTRED_ERRORMSG,logfile=logf
    CATCH, /CANCEL 
-   return,-1
+   return
 endif
 
 ;; Create the DAOPHOT file
 ;;   taken from smashred_imprep_single.pro
-FITS_READ,fluxfile,fim,fhead
-FITS_READ,maskfile,mim,mhead
+if not keyword_set(header) then begin
+  FITS_READ,fluxfile,fim,fhead
+  FITS_READ,maskfile,mim,mhead
+endif else fhead=HEADFITS(fluxfile)
 ccdnum = sxpar(fhead,'CCDNUM')
 
-; Need to add gain, rdnoise, saturation
+;; --- Prepare the header ---
+
+;; add gain, rdnoise, saturation
+meta = fhead
+if strmid(meta[0],0,5) eq 'XTENS' then meta[0]='SIMPLE  =                    T / Fits standard'
+
+;gain = (arr[ccd-1].gaina+arr[ccd-1].gainb)*0.5
+;rdnoise = (arr[ccd-1].rdnoisea+arr[ccd-1].rdnoiseb)*0.5
+;gain = sxpar(fhead,'ARAWGAIN')
+gainA = sxpar(fhead,'GAINA')
+gainB = sxpar(fhead,'GAINB')
+gain = (gainA+gainB)*0.5
+rdnoiseA = sxpar(fhead,'RDNOISEA')
+rdnoiseB = sxpar(fhead,'RDNOISEB')
+rdnoise = (rdnoiseA+rdnoiseB)*0.5
+sxaddpar,meta,'GAIN',gain
+sxaddpar,meta,'RDNOISE',rdnoise
+
+; REMOVE DUPLICATE KEYWORDS!!  They cause lots of annoying errors
+; EXTVER, CHECKSUM, DATASUM
+bd = where(strmid(meta,0,6) eq 'EXTVER',nbd)
+if nbd gt 1 then remove,bd[1:*],meta
+bd = where(strmid(meta,0,8) eq 'CHECKSUM',nbd)
+if nbd gt 1 then remove,bd[1:*],meta
+bd = where(strmid(meta,0,7) eq 'DATASUM',nbd)
+if nbd gt 1 then remove,bd[1:*],meta
+
+;; Add "COMMENT " before "BEGIN EXTENSION HEADER ---", it causes problems in daophot
+bd = where(strmid(meta,0,5) eq 'BEGIN',nbd)
+if nbd gt 0 then meta[bd]='COMMENT '+meta[bd]
+
+if keyword_set(header) then return
+
+;; --- Prepare the image ---
+
 med1 = median(fim,dim=1)
 med1slp = slope(med1)
 
-newim = fim
+im = fim
 
 ; Check for differences in amp background levels
-med1 = median(newim[800:1023,*])
-med2 = median(newim[1024:1200,*])
-err1 = mad(newim[800:1023,*])/sqrt(n_elements(newim[800:1023,*]))
-err2 = mad(newim[1024:1200,*])/sqrt(n_elements(newim[1024:1200,*]))
+med1 = median(im[800:1023,*])
+med2 = median(im[1024:1200,*])
+err1 = mad(im[800:1023,*])/sqrt(n_elements(im[800:1023,*]))
+err2 = mad(im[1024:1200,*])/sqrt(n_elements(im[1024:1200,*]))
 err = sqrt(err1^2 + err2^2)
 
 ;; Set bad pixels to saturation value
@@ -124,46 +164,6 @@ if keyword_set(nodiffmaskflag) then begin
 endif
 
 bdpix = where(mim gt 0.0,nbdpix)
-if nbdpix gt 0 then newim[bdpix]=6e4
-
-;; add gain, rdnoise, saturation
-newhead = fhead
-if strmid(newhead[0],0,5) eq 'XTENS' then newhead[0]='SIMPLE  =                    T / Fits standard'
-
-;gain = (arr[ccd-1].gaina+arr[ccd-1].gainb)*0.5
-;rdnoise = (arr[ccd-1].rdnoisea+arr[ccd-1].rdnoiseb)*0.5
-;gain = sxpar(fhead,'ARAWGAIN')
-gainA = sxpar(fhead,'GAINA')
-gainB = sxpar(fhead,'GAINB')
-gain = (gainA+gainB)*0.5
-rdnoiseA = sxpar(fhead,'RDNOISEA')
-rdnoiseB = sxpar(fhead,'RDNOISEB')
-rdnoise = (rdnoiseA+rdnoiseB)*0.5
-sxaddpar,newhead,'GAIN',gain
-sxaddpar,newhead,'RDNOISE',rdnoise
-
-; REMOVE DUPLICATE KEYWORDS!!  They cause lots of annoying errors
-; EXTVER, CHECKSUM, DATASUM
-bd = where(strmid(newhead,0,6) eq 'EXTVER',nbd)
-if nbd gt 1 then remove,bd[1:*],newhead
-bd = where(strmid(newhead,0,8) eq 'CHECKSUM',nbd)
-if nbd gt 1 then remove,bd[1:*],newhead
-bd = where(strmid(newhead,0,7) eq 'DATASUM',nbd)
-if nbd gt 1 then remove,bd[1:*],newhead
-
-;; Add "COMMENT " before "BEGIN EXTENSION HEADER ---", it causes problems in daophot
-bd = where(strmid(newhead,0,5) eq 'BEGIN',nbd)
-if nbd gt 0 then newhead[bd]='COMMENT '+newhead[bd]
-
-;;; Put in FPACK parameters
-;if keyword_set(fpack) then begin
-;  ; Remove all past FZ parameters
-;  bd = where(strmid(newhead,0,2) eq 'FZ',nbd)
-;  if nbd gt 0 then REMOVE,bd,newhead
-;  sxaddpar,newhead,'FZALGOR','RICE_1'
-;  sxaddpar,newhead,'FZQMETHD','SUBTRACTIVE_DITHER_1'
-;  sxaddpar,newhead,'FZQVALUE',8
-;  sxaddpar,newhead,'FZDTHRSD','CHECKSUM'
-;endif
+if nbdpix gt 0 then im[bdpix]=6e4
 
 end
