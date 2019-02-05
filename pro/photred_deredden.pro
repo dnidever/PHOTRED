@@ -432,7 +432,7 @@ FOR i=0,ninputlines-1 do begin
   ; Load the data file
   ;--------------------
   printlog,logfile,'Loading file'
-  str = PHOTRED_READFILE(file,meta=meta,count=nstr)
+  str = PHOTRED_READFILE(file,meta,count=nstr)
 
   ; Checking that we've got coordinates
   tags = TAG_NAMES(str)

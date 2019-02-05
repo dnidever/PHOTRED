@@ -530,7 +530,7 @@ endif else begin
 endelse
 For i=0,nphotfiles-1 do begin
   ;; Load the phot and mch files
-  phot = PHOTRED_READFILE(photfiles[i],meta=meta)
+  phot = PHOTRED_READFILE(photfiles[i],meta)
   phtags = tag_names(phot)
   mchfile = repstr(photfiles[i],'.phot','.mch')
   LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles

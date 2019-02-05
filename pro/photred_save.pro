@@ -178,7 +178,7 @@ FOR i=0,ninputlines-1 do begin
 
       ; Make the IDL SAVE file
       savefile = ifield+'.dat'
-      final = PHOTRED_READFILE(file,meta=meta,count=count)
+      final = PHOTRED_READFILE(file,meta,count=count)
       printlog,logfile,'Making IDL SAVE file ',savefile
       if n_elements(meta) gt 0 then SAVE,final,meta,file=savefile else SAVE,final,file=savefile
 

@@ -13,7 +13,7 @@
 ;
 ; OUTPUTS:
 ;  im        The 2D FITS image.
-;  =meta     The header array for IM.
+;  meta     The header array for IM.
 ;  =error    The error message if one occurred.
 ;
 ; USAGE:
@@ -22,14 +22,14 @@
 ; By D. Nidever  Feb 2019
 ;-
 
-function fits_read_resource,file,meta=meta,header=header,nowrite=nowrite,error=error
+function fits_read_resource,file,meta,header=header,nowrite=nowrite,error=error
 
 undefine,im,meta,error
 
 ;; Not enough inputs
 if n_elements(file) eq 0 then begin
   error = 'Not enough inputs'
-  print,'Syntax - im=fits_read_resource(file,meta=meta,header=header,nowrite=nowrite)'
+  print,'Syntax - im=fits_read_resource(file,meta,header=header,nowrite=nowrite)'
   return,-1
 endif
 
