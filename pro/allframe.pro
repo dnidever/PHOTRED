@@ -597,7 +597,7 @@ if FILE_TEST(sexfile) eq 1 then begin
   if catformat eq 'FITS' then begin
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
-    PRINTSTR,mag,finafile,/silent
+    PRINTSTR,mag,finalfile,/silent
     ;; THIS IS TE OLD WAY OF SAVING THE INFORMATION WITH THE ALS HEADER
     ;; How many observations are there
     ;tags = tag_names(mag)
