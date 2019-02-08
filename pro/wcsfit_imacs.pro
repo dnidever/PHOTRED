@@ -105,7 +105,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
   endif
 
   ; Get the image header
-  head = HEADFITS(ifile)
+  head = PHOTRED_READFILE(ifile,/header)
 
   ; Make sure this is an IMACS image
   chip = strtrim(sxpar(head,'CHIP',/silent),2)
@@ -133,14 +133,14 @@ filebase = FILE_BASENAME(ifile,'.fits')
     printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
     ; Read in the image
-    FITS_READ,ifile,im,head,/no_abort,message=message
+    im = PHOTRED_READFILE(ifile,head,error=error)
 
     ; Write the FLOAT image
-    if (message[0] eq '') then $
-    FITS_WRITE,ifile,float(im),head
+    if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+      FITS_WRITE_RESOURCE,ifile,float(im),head
 
     ; There was a problem reading the image
-    if (message[0] ne '') then begin
+    if n_elements(error) gt 0 then begin
       printlog,logf,'PROBLEM READING IN ',file
       error = 'PROBLEM READING IN '+file
       return
@@ -163,7 +163,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
     printlog,logf,'Getting star coordinates for ',ifile
 
     ; Load the file
-    FITS_READ,ifile,im,head
+    im = PHOTRED_READFILE(ifile,head)
     im = float(im)
 
     ; Get the IMACS mask
@@ -230,7 +230,7 @@ filebase = FILE_BASENAME(ifile,'.fits')
 
   
   ; Get the FITS header
-  head = HEADFITS(ifile)
+  head = PHOTRED_READFILE(ifile,/header)
 
 
   ; Transform to intermediate X/Y coordinate system

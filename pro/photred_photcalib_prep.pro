@@ -86,9 +86,10 @@ for j=0,nfiles-1 do begin
   
   ; Reading header of FITS file
   undefine,errmsg
-  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(fitsfile,exten=1,errmsg=errmsg) else $
-    head = HEADFITS(fitsfile,errmsg=errmsg)
-  if (errmsg ne '') then begin
+  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then $
+    head = PHOTRED_READFILE(fitsfile,exten=1,error=error,/header) else $
+    head = PHOTRED_READFILE(fitsfile,error=error,/header)
+  if n_elements(error) gt 0 then begin
     print,'ERROR in getting header'
     error = errmsg
     goto,BOMB

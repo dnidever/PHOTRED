@@ -292,12 +292,12 @@ For i=0,nfieldfiles-1 do begin
   ; From FITS header
   ;  nx, ny, ctype, scale, ra, dec
   if fpack eq 1 then begin
-    head = headfits(fitsfile,exten=1)
+    head = PHOTRED_READFILE(fitsfile,exten=1,/header)
     ; Fix the NAXIS1/NAXIS2 in the header
     sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
     sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin
-    head = headfits(fitsfile)
+    head = PHOTRED_READFILE(fitsfile,/header)
   endelse
   nx = sxpar(head,'NAXIS1',count=n_nx)
   if n_nx gt 0 then chipstr[i].nx = nx
@@ -353,7 +353,7 @@ For i=0,nfieldfiles-1 do begin
     endif
   endif
   if n_elements(skymode) eq 0 then begin 
-    FITS_READ,fitsfile,im,head
+    im = PHOTRED_READFILE(fitsfile,head)
     SKY,im,skymode,skysig,/silent
     chipstr[i].skymode = skymode
     chipstr[i].skysig = skysig
@@ -641,12 +641,12 @@ For i=0,nphotfiles-1 do begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
         LOADCOO,coofile,cat
       if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
-        head = headfits(fitsfile,exten=1)
+        head = PHOTRED_READFILE(fitsfile,exten=1,/header)
         ; Fix the NAXIS1/NAXIS2 in the header
         sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
         sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
       endif else begin
-        head = headfits(fitsfile)
+        head = PHOTRED_READFILE(fitsfile,/header)
       endelse
       HEAD_XYAD,head,cat.x-1,cat.y-1,ra,dec,/deg
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch

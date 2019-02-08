@@ -227,7 +227,7 @@ FOR i=0,ninputlines-1 do begin
   base = FILE_BASENAME(file,'.fits')
 
   ; Load the header
-  head = HEADFITS(longfile)
+  head = PHOTRED_READFILE(longfile,/header)
 
   object = SXPAR(head,'OBJECT',/silent)
   exptime = PHOTRED_GETEXPTIME(longfile)

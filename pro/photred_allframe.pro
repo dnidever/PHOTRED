@@ -441,28 +441,29 @@ For i=0,ninputlines-1 do begin
     ; Make sure that BITPIX = -32 otherwise this can cause problems
     if file_test(base+'.fits') eq 0 and file_test(base+'.fits.fz') eq 1 then begin
       fpack = 1
-      head = HEADFITS(base+'.fits.fz',exten=1)
+      head = PHOTRED_READFILE(base+'.fits.fz',exten=1,/header)
     endif else begin
       fpack = 0
-      head = HEADFITS(base+'.fits')
+      head = PHOTRED_READFILE(base+'.fits',/header)
     endelse
     bitpix = long(SXPAR(head,'BITPIX',/silent))
     if (bitpix eq 8 or bitpix eq 16 or bitpix eq 32) and (fpack eq 0) then begin
       printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
       ; Read in the image
-      FITS_READ,base+'.fits',im,head,/no_abort,message=message
+      im = PHOTRED_READFILE(base+'.fits',head,error=error)
 
       ; Make sure BZERO=0
       bzero = sxpar(head,'BZERO',count=nbzero,/silent)
       if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
       ; Write the FLOAT image
-      if (message[0] eq '') then $
-      FITS_WRITE,base+'.fits',float(im),head
+      ; Write the FLOAT image
+      if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+        FITS_WRITE_RESOURCE,base+'.fits',float(im),head
 
       ; There was a problem reading the image
-      if (message[0] ne '') then begin
+      if n_elements(error) gt 0 then begin
         printlog,logfile,'PROBLEM READING IN ',base+'.fits'
         successarr[i] = 0
       endif

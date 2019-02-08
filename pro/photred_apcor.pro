@@ -319,17 +319,17 @@ FOR n=0,nnights-1 do begin
       fitsfile = inputlines[indnight[i]]
       if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
         base = FILE_BASENAME(fitsfile,'.fits.fz')
-        head = HEADFITS(fitsfile,exten=1)  ; get the header
+        head = PHOTRED_READFILE(fitsfile,exten=1,/header)  ; get the header
       endif else begin
         base = FILE_BASENAME(fitsfile,'.fits')
-        head = HEADFITS(fitsfile)  ; get the header
+        head = PHOTRED_READFILE(fitsfile,/header)  ; get the header
       endelse
 
       ; Getting FILTER
-      filt = PHOTRED_GETFILTER(fitsfile,/numeric)
+      filt = PHOTRED_GETFILTER(fitsfile,head=head,/numeric)
 
       ; Getting UT
-      time = PHOTRED_GETUTTIME(fitsfile)
+      time = PHOTRED_GETUTTIME(fitsfile,head=head)
       if (time eq '') then begin
         successarr[i] = 0
         printlog,logfile,'NO UT-TIME'
@@ -340,7 +340,7 @@ FOR n=0,nnights-1 do begin
       utmin = timarr[1]
 
       ; Getting AIRMASS
-      am = PHOTRED_GETAIRMASS(fitsfile,obs=observatory,/update)
+      am = PHOTRED_GETAIRMASS(fitsfile,head=head,obs=observatory,/update)
       ;am = sxpar(head,'AIRMASS')
       ; no airmass, get from UT and RA/DEC
       if am lt 0.9 then begin
@@ -350,7 +350,7 @@ FOR n=0,nnights-1 do begin
       endif
 
       ; Getting EXPTIME
-      exp = PHOTRED_GETEXPTIME(fitsfile)
+      exp = PHOTRED_GETEXPTIME(fitsfile,head=head)
       if strtrim(exp,2) eq '-1' then begin
         successarr[i] = 0
         printlog,logfile,'NO EXPTIME'

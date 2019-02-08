@@ -213,7 +213,7 @@ filestr.magoff = magoff
 filestr.resampfile = outfiles
 filestr.resampmask = outmaskfiles
 for i=0,nfiles-1 do begin
-  FITS_READ,filestr[i].fitsfile,im1,head1,/no_abort
+  im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1)
   filestr[i].head = ptr_new(head1)
   filestr[i].nx = sxpar(head1,'NAXIS1')
   filestr[i].ny = sxpar(head1,'NAXIS2')
@@ -394,7 +394,7 @@ CASE tile.type of
 
   ; Loop through the files
   For i=0,nfiles-1 do begin
-    FITS_READ,filestr[i].fitsfile,im1,head1
+    im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1)
 
     ; Make the mask
     mask = bytarr(filestr[i].nx,filestr[i].ny)+1
@@ -455,7 +455,7 @@ end
 'PIXEL': begin
 
   ; Expand the images to sizes that will allow all of the shifts
-  hd1 = headfits(fitsfiles[0])
+  hd1 = PHOTRED_READFILE(fitsfiles[0],/header)
   nx = sxpar(hd1,'NAXIS1')
   ny = sxpar(hd1,'NAXIS2')
   ;  left, down, right, up
@@ -470,7 +470,7 @@ end
   yy1 = replicate(1,nx)#lindgen(ny)
   for i=0,nfiles-1 do begin
     ; Image
-    FITS_READ,tempfits[i],tim,thead
+    tim = PHOTRED_READFILE(tempfits[i],thead)
     background = median(tim)
     out = trans_coo(xx1[*],yy1[*],reform(trans[i,*]))
     xx2 = xx1*0.
@@ -491,7 +491,7 @@ end
     MWRFITS,tim2,outfiles[i],thead2,/create
     ; Mask
     mfile = file_basename(tempfits[i],'.fits')+'.mask.fits'
-    FITS_READ,mfile,mim,mhead
+    mim = PHOTRED_READFILE(mfile,mhead)
     mim2 = TRIGRID(xx2,yy2,mim, tr, XOUT = xout, YOUT = yout, missing=background)
     ;mim2 = fltarr(nxf,nyf)   ; out of bounds pixels set to 0=bad
     ;mim2[pix_expand[0]:pix_expand[0]+nx-1,pix_expand[1]:pix_expand[1]+ny-1]=mim
@@ -663,8 +663,8 @@ if not keyword_set(nocmbimscale) then begin
   ; when averaging/summing frames. in observing/mosaic/.
 
   ; Load the IMCOMBINE output combined file and BPM
-  FITS_READ,combfile,combim,combhead
-  FITS_READ,mchbase+'_comb.bpm.fits',badmask,maskhead  ; 0-good, 1-bad
+  combim = PHOTRED_READFILE(combfile,combhead)
+  badmask = PHOTRED_READFILE(mchbase+'_comb.bpm.fits',maskhead) ; 0-good, 1-bad
 
   ; Fix the gain
   ; For N averaged frames gain(N)=N*gain(1)
@@ -748,8 +748,8 @@ Endif else begin
   ; See the explanations for all these steps above!!
 
   ; Load the IMCOMBINE output combined file and BPM
-  FITS_READ,combfile,combim,combhead
-  FITS_READ,mchbase+'_comb.bpm.fits',badmask,maskhead  ; 0-good, 1-bad
+  combim = PHOTRED_READFILE(combfile,combhead)
+  badmask = PHOTRED_READFILE(mchbase+'_comb.bpm.fits',maskhead) ; 0-good, 1-bad
 
   ; Fix the rdnoise
   ; The final RDNOISE is essentially: comb_rdnoise = sqrt(total((weights*rdnoise)^2))
@@ -813,7 +813,7 @@ Endif else begin
 Endelse ; no scaling of images for combining
 
 ; Add TILETYPE to the combined image
-combhead = headfits(combfile)
+combhead = PHOTRED_READFILE(combfile,/header)
 sxaddpar,combhead,'AFTILTYP',tile.type
 MODFITS,combfile,0,combhead
 

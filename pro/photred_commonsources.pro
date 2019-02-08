@@ -495,13 +495,13 @@ if (coolines ge 4 and aplines ge 4) then begin
   ; Get the header
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     fitsfile = base+'.fits.fz'
-    head = headfits(fitsfile,exten=1)
+    head = PHOTRED_READFILE(fitsfile,exten=1,/header)
     ; Fix the NAXIS1/2 in header
     sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
     sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin  
     fitsfile = base+'.fits'
-    head = headfits(fitsfile)
+    head = PHOTRED_READFILE(fitsfile,/header)
   endelse
 
   ; Load the coordinates file
@@ -584,13 +584,13 @@ For i=0,nfieldfiles-1 do begin
     ; Get the header
     if fpack eq 1 then begin
       fitsfile = ibase+'.fits.fz'
-      head1 = headfits(fitsfile,exten=1)
+      head1 = PHOTRED_READFILE(fitsfile,exten=1,/header)
       ; Fix the NAXIS1/2 in header
       sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
       sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
     endif else begin
       fitsfile = ibase+'.fits'
-      head1 = headfits(fitsfile)
+      head1 = PHOTRED_READFILE(fitsfile,/header)
     endelse
 
     ; Load the coordinates file
@@ -760,7 +760,7 @@ endif
 ; Fit Gaussians to the sources
 if keyword_set(gaussfit) then begin
   print,'Fitting Gaussians to common sources'
-  FITS_READ,file,im,head
+  im = PHOTRED_READFILE(file,head)
   sz = size(im)
   x = lindgen(sz[1])
   y = lindgen(sz[2])

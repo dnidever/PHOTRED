@@ -67,8 +67,8 @@ endif
 
 ; Load file
 if ndateobs eq 0 then begin
-  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
-    head = HEADFITS(file)
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(file,exten=1,/header) else $
+    head = PHOTRED_READFILE(file,/header)
 endif
 
 ; --- Get the DATE ---

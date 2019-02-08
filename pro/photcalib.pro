@@ -592,7 +592,7 @@ FOR i=0L,ninp-1 do begin
     ; Not DAOPHOT file, Header line
     if keyword_set(header) then numstar = file_lines(magfile)-1L
   endif else begin
-    hd1 = headfits(magfile,exten=1,/silent)
+    hd1 = PHOTRED_READFILE(magfile,exten=1,/header)
     numstar = sxpar(hd1,'NAXIS1') 
   endelse
     

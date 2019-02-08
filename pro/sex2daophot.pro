@@ -56,7 +56,7 @@ nsex = n_elements(sex)
 
 ;-------------------------------------
 ; Get meta-data from the FITS file
-head = headfits(fitsfile)
+head = PHOTRED_READFILE(fitsfile,/header)
 naxis1 = sxpar(head,'NAXIS1')
 naxis2 = sxpar(head,'NAXIS2')
 saturate = sxpar(head,'SATURATE')

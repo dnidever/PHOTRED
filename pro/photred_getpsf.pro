@@ -42,7 +42,7 @@ PHOTRED_MKSEXCONFIG,base+'.fits',base+'.sex',base+'.cat',flagfile=base+'.bpm.fit
 
 ;; Run SExtractor for detection
 SPAWN,['sex',base+'.fits','-c',base+'.sex'],out,errout,/noshell
-hd = headfits(base+'.cat',exten=1)
+hd = PHOTRED_READFILE(base+'.cat',exten=1,/header)
 nsources = sxpar(hd,'NAXIS',1)
 if nsources lt 1 then begin
   error = 'Only '+strtrim(nsources,2)+' sources. Need at least 1 to create a PSF'

@@ -559,7 +559,7 @@ FOR i=0,ninputlines-1 do begin
 
       ; Load FITS file
       fitsfile = ialsbase+'.fits'
-      FITS_READ,fitsfile,im,head
+      im = PHOTRED_READFILE(fitsfile,head)
       sz = size(im)
       nx = sz[1] & ny = sz[2]
 
@@ -867,7 +867,7 @@ FOR i=0,ninputlines-1 do begin
     ;----------------------------
     combfits = ampbase+'_comb.fits'
     if FILE_TEST(combfits) eq 1 then begin
-      FITS_READ,combfits,combim,combhead
+      combim = PHOTRED_READFILE(combfits,combhead)
       sz2 = size(combim)
       nx2 = sz2[1]
       ny2 = sz2[2]
