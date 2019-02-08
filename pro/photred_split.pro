@@ -163,10 +163,13 @@ FOR i=0,ninputlines-1 do begin
   endif
 
   ; Does this have multiple extensions
-  FITS_OPEN,file,fcb,message=message0
-  next = fcb.nextend
-  FITS_CLOSE,fcb
-  if next gt 0 then mef=1 else mef=0
+  rfile = filedir+'/.'+file
+  if file_test(rfile) eq 0 then begin
+    FITS_OPEN,file,fcb,message=message0
+    next = fcb.nextend
+    FITS_CLOSE,fcb
+    if next gt 0 then mef=1 else mef=0
+  endif else mef=0   ; resource files are not MEF
 
   ;----------------------
   ; MULTI-EXTENSION FILE

@@ -73,6 +73,9 @@ if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1
 ; Try DATE-OBS
 date = sxpar(head,'DATE-OBS',count=ndate,/silent)
 if ndate eq 0 then $
+; Try DATE
+date = sxpar(head,'DATE',count=ndate,/silent)
+if ndate eq 0 then $
 ; Try DATENEW
 if ndate eq 0 then $
 date = sxpar(head,'DATENEW',count=ndate,/silent)

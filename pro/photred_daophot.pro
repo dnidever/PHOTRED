@@ -274,10 +274,10 @@ for i=0,ninputlines-1 do begin
   file = inputlines[i]
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     base = FILE_BASENAME(file,'.fits.fz')
-    head = HEADFITS(file,exten=1)
+    head = PHOTRED_READFILE(file,exten=1,/header)
   endif else begin
     base = FILE_BASENAME(file,'.fits')
-    head = HEADFITS(file)
+    head = PHOTRED_READFILE(file,/header)
   endelse
   com=''
 
@@ -363,24 +363,24 @@ for i=0,ndirs-1 do begin
       ; Make sure that the FITS files are FLOAT
       ;----------------------------------------
       ; Make sure that |BITPIX| > 16
-      head = HEADFITS(fil)
+      head = PHOTRED_READFILE(fil,/header)
       bitpix = long(SXPAR(head,'BITPIX',/silent))
       if (bitpix eq 8 or bitpix eq 16) and (fpack eq 0) then begin
         printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
         ; Read in the image
-        FITS_READ,fil,im,head,/no_abort,message=message
+        im = PHOTRED_READFILE(fil,head,error=error)
 
         ; Make sure BZERO=0
         bzero = sxpar(head,'BZERO',count=nbzero,/silent)
         if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
         ; Write the FLOAT image
-        if (message[0] eq '') then $
-        FITS_WRITE,fil,float(im),head
+        if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+          FITS_WRITE_RESOURCE,fil,float(im),head
 
         ; There was a problem reading the image
-        if (message[0] ne '') then begin
+        if n_elements(error) gt 0 then begin
           printlog,logfile,'PROBLEM READING IN ',fil
           successarr[ind] = 0
         endif

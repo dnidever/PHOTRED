@@ -92,7 +92,14 @@ if nlines gt 1 then for k=1,nlines-1 do rstr=create_struct(rstr,names[k],vals[k]
 ;; Only the header, local
 ;; get it from the resource file or a stand-alone file
 if keyword_set(header) and tag_exist(rstr,'HEADER') then begin
-  READLINE,rstr.header,meta
+  if strmid(rstr.header,0,1) eq '/' then hfile=rstr.header else hfile = dir+'/'+rstr.header
+  if file_test(hfile) eq 0 then begin
+    error = 'Local header file '+hfile+' NOT FOUND'
+    print,error
+    undefine,meta,im
+    return,-1
+  endif
+  READLINE,hfile,meta
   return,meta
 endif
 
@@ -123,7 +130,16 @@ DAOPHOT_IMPREP,tfluxfile,tmaskfile,im,meta,header=header,error=error
 if n_elements(error) gt 0 then return,-1
 
 ;; Use the local header
+;;   to write to the file and return
 if tag_exist(rstr,'HEADER') then begin
+  if strmid(rstr.header,0,1) eq '/' then hfile=rstr.header else hfile = dir+'/'+rstr.header
+  if file_test(hfile) eq 0 then begin
+    error = 'Local header file '+hfile+' NOT FOUND'
+    print,error
+    undefine,meta,im
+    return,-1
+  endif
+  READLINE,hfile,meta
   meta0 = meta
   READLINE,rstr.header,meta
 endif

@@ -24,7 +24,7 @@
 ; By D. Nidever, Jan 2019
 ;-
 
-function photred_readfile,filename,meta,count=count,header=header,nowrite=nowrite,error=error
+function photred_readfile,filename,meta,exten=exten,count=count,header=header,nowrite=nowrite,error=error
 
   undefine,error
   undefine,meta
@@ -269,6 +269,7 @@ function photred_readfile,filename,meta,count=count,header=header,nowrite=nowrit
          ;; Load using resource file
          rfilename = dir+'/.'+base
          rinfo = file_info(rfilename)
+         ;;  only use if FITS file does not exist
          if info.size le 1 and rinfo.exists eq 1 then begin
            result = FITS_READ_RESOURCE(filename,meta,header=header,nowrite=nowrite)
            count = 1

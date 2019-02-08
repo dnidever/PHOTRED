@@ -199,11 +199,9 @@ FOR f=0,nfiles-1 do begin
       goto,SKIP
     endif
 
-    message=''
-    FITS_READ,files[f],im,head,/no_abort,exten=exten,message=message
-
-    ; Fits_read error
-    if (message ne '') then begin
+    im = PHOTRED_READFILE(files[f],head,exten=exten,error=message)
+    ; Reading error
+    if n_elements(message) gt 0 then begin
       error[f] = files[f]+' ERROR: '+message
       if not keyword_set(silent) then print,error[f]
       goto,SKIP

@@ -154,9 +154,9 @@ endif
 
 ; Load the image
 if n_elements(inpim) eq 0 then begin
-  FITS_READ,filename,im,head,exten=exten,/no_abort,message=message
-  if message ne '' then begin
-    error = 'Problem loading '+filename
+  im = PHOTRED_READFILE(filename,head,error=message)
+  if n_elements(message) gt 0 then begin
+    error = 'Problem loading '+filename+'  '+message
     print,error
     return    
   endif
@@ -1420,14 +1420,14 @@ print,'========================================='
 
 
 ; Getting image header
-FITS_READ,filename,im,head,/no_abort,message=message
-if message ne '' then begin
+im = PHOTRED_READFILE(filename,head,error=message)
+if n_elements(message) gt 0 then begin
   error = 'Problem loading '+filename
   print,error
   return    
 endif
 if fpack eq 1 then begin
-  head = headfits(filename,exten=1)  ; fits_read will modify the header improperly
+  head = PHOTRED_READFILE(filename,exten=1,/header)  ; fits_read will modify the header improperly 
   ; NAXIS1/NAXIS2 get modified by fpack, need to temporarily
   ;  put back the originals which are saved in ZNAXIS1/2
   ;  But save the fpack header so we can put things back
@@ -2684,22 +2684,34 @@ if not keyword_set(noupdate) then begin
 
   ; The final RMS is low enough
   if (rms le rmslim) then begin
+    ;; Remove blank lines in header
+    bd = where(strtrim(head,2) eq '',nbd)
+    if nbd gt 0 then REMOVE,bd,head
 
     print,'Updating WCS in ',filename
-    if fpack eq 0 then begin
-      MWRFITS,im,filename,head,/create
-      ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
-    endif else begin
-      ; Put the original NAXIS1/2 values back
-      sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
-      sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
-      ; Create temporary symbolic link to make modfits.pro think
-      ; this is an ordinary FITS file
-      tempfile = MAKETEMP('temp')
-      FILE_LINK,filename,tempfile+'.fits'
-      MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
-      FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files
-    endelse
+    ;; Resource file exists
+    dir = file_dirname(filename)
+    rfile = dir+'/.'+filename
+    if file_test(rfile) eq 1 then begin
+      info = file_info(filename)
+      FITS_WRITE_RESOURCE,filename,im,head
+    ;; No resource file
+    endif else begin  
+      if fpack eq 0 then begin
+        MWRFITS,im,filename,head,/create
+        ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
+      endif else begin
+        ; Put the original NAXIS1/2 values back
+        sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
+        sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
+        ; Create temporary symbolic link to make modfits.pro think
+        ; this is an ordinary FITS file
+        tempfile = MAKETEMP('temp')
+        FILE_LINK,filename,tempfile+'.fits'
+        MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
+        FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files
+      endelse
+    endelse ; no resource file
 
   ; RMS too high
   endif else begin
