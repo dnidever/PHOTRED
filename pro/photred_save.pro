@@ -264,7 +264,7 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
 if keyword_set(clean) then begin
   printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
 
-  ;; Remove FITS files for those that have resource files
+  ;; Remove FITS files that have resource files
   ;;  only successful ones
   READLIST,setupdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=setupdir,count=nfitsfiles,logfile=logfile,/silent
   for i=0,nfitsfiles-1 do begin

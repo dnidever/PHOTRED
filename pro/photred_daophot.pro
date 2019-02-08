@@ -800,7 +800,6 @@ if keyword_set(clean) then begin
     if clean ge 2 then FILE_DELETE,dir1+'/'+base1+['.coo','.ap','s.fits','s.fits.fz'],/allow
   endfor
 endif
-stop
 
 printlog,logfile,'PHOTRED_DAOPHOT Finished  ',systime(0)
 
