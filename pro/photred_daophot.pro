@@ -786,19 +786,21 @@ if keyword_set(clean) then begin
   printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
 
   ;; Only clean up for successful files
-  nsuccess = n_elements(successlist)
-  for i=0,nsuccess-1 do begin
-    dir1 = file_dirname(successlist[i])
-    base1 = file_basename(successlist[i])
+  READLIST,curdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=curdir,count=nfitsfiles,logfile=logfile,/silent
+  for i=0,nfitsfiles-1 do begin
+    dir1 = file_dirname(fitsfiles[i])
+    base1 = file_basename(fitsfiles[i])
+    if strmid(base1,6,7,/reverse_offset) eq 'fits.fz' then base1 = FILE_BASENAME(base1,'.fits.fz') else $
+      base1 = FILE_BASENAME(base1,'.fits')
     ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi,
     ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst
-    FILE_DELETE,dir1+'/'+base1+'.'+['lst','lst1','lst2','lst1.chi','lst2.chi','grp','nst','plst.chi',$
-                                    'nei','als.inp','cmn.log','cmn.coo','cmn.ap','cmn.lst','a.fits','a.fits.fz'],/allow
+    FILE_DELETE,dir1+'/'+base1+['.lst','.lst1','.lst2','.lst1.chi','.lst2.chi','.grp','.nst','.plst.chi',$
+                                '.nei','.als.inp','.cmn.log','.cmn.coo','.cmn.ap','.cmn.lst','a.fits','a.fits.fz'],/allow
     ;; If CLEAN=2, then also remove coo, ap, s.fits as well
-    FILE_DELETE,dir1+'/'+base1+'.'+['coo','ap','s.fits','s.fits.fz'],/allow
+    if clean ge 2 then FILE_DELETE,dir1+'/'+base1+['.coo','.ap','s.fits','s.fits.fz'],/allow
   endfor
 endif
-
+stop
 
 printlog,logfile,'PHOTRED_DAOPHOT Finished  ',systime(0)
 

@@ -805,19 +805,19 @@ if keyword_set(clean) then begin
   printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
 
   ;; Only clean up for successful files
-  nsuccess = n_elements(successlist)
-  for i=0,nsuccess-1 do begin
-    dir1 = file_dirname(successlist[i])
-    base1 = file_basename(successlist[i])
+  READLIST,curdir+'/logs/ALLFRAME.success',mchfiles,/unique,/fully,setupdir=curdir,count=nmchfiles,logfile=logfile,/silent
+  for i=0,mchfiles-1 do begin
+    dir1 = file_dirname(mchlist[i])
+    base1 = file_basename(mchlist[i])
     ;; _comb
     ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi, psfini.ap
     ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst,
     ;; _sub.fits, _sub.cat, _sub.als, _all.coo, makemag
-    FILE_DELETE,dir1+'/'+base1+'_comb.'+['lst','lst1','lst2','lst1.chi','lst2.chi','grp','nst','plst.chi',$
-                                         'nei','als.inp','cmn.log','cmn.coo','cmn.ap','cmn.lst','a.fits',$
-                                         'a.fits.fz','_sub.fits','_sub.cat','_sub.als','_all.coo','makemag'],/allow
+    FILE_DELETE,dir1+'/'+base1+'_comb'+['.lst','.lst1','.lst2','.lst1.chi','.lst2.chi','.grp','.nst','.plst.chi',$
+                                         '.nei','.als.inp','.cmn.log','.cmn.coo','.cmn.ap','.cmn.lst','a.fits',$
+                                         'a.fits.fz','_sub.fits','_sub.cat','_sub.als','_all.coo','.makemag'],/allow
     ;; If CLEAN=2, then also remove coo, ap, cat, s.fits, mask.fits as well
-    FILE_DELETE,dir1+'/'+base1+'.'+['coo','ap','cat','s.fits','s.fits.fz','mask.fits'],/allow
+    if clean ge 2 then FILE_DELETE,dir1+'/'+base1+['.coo','.ap','.cat','s.fits','s.fits.fz','.mask.fits'],/allow
   endfor
 endif
 
