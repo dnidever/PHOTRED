@@ -27,6 +27,7 @@
 ;  /combtrim      Trim the combined images to the overlapping region.
 ;                   This used to be the default, but now the default
 ;                   is to keep the entire original region.
+;  =setupdir      The original base directory which contains photred.setup.
 ;  =scriptsdir    The directory that contains all of the necessary scripts.
 ;  =irafdir       The IRAF home directory.
 ;  =logfile       A logfile to print to output to.
@@ -50,10 +51,10 @@
 ;-
 
 
-pro allframe,file,tile=tile,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
+pro allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir
+             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir,stp=stp
 
 COMMON photred,setup
 
@@ -61,8 +62,8 @@ undefine,error
 
 ; Not enough inputs
 nfile = n_elements(file)
-if (nfile eq 0) then begin
-  print,'Syntax - allframe,file,tile=tile,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
+if (nfile eq 0) or n_elements(setupdir) eq 0 then begin
+  print,'Syntax - allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
   print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
   print,'                  imager=imager,workdir=workdir,stp=stp'
@@ -87,6 +88,13 @@ if (Error_status ne 0) then begin
    return
 endif
 
+;; Get the setup information
+nsetup = n_elements(setup)
+if nsetup eq 0 then begin
+  PHOTRED_LOADSETUP,setup,setupdir=setupdir,count=count
+  if count lt 1 then return
+endif
+
 ; How many FIND iterations
 if n_elements(finditer0) eq 0 then finditer=2 else finditer=finditer0
 finditer = finditer < 10  ; maximum 10.
@@ -98,11 +106,8 @@ if n_elements(satlevel) eq 0 then satlevel=6e4
 if n_elements(nocmbimscale) eq 0 then nocmbimscale=0
 
 ; Getting scripts directory and iraf directory
-nsetup = n_elements(setup)
-if nsetup gt 0 then begin
-  scriptsdir = READPAR(setup,'SCRIPTSDIR')
-  irafdir = READPAR(setup,'IRAFDIR')
-endif
+scriptsdir = READPAR(setup,'SCRIPTSDIR')
+irafdir = READPAR(setup,'IRAFDIR')
 
 ; Catalog format
 if n_elements(catformat) eq 0 then catformat='ASCII'
@@ -324,7 +329,8 @@ endif
 if n_elements(workdir) gt 0 then begin
   ;; Create a temporary directory in WORKDIR
   if FILE_TEST(workdir,/directory) eq 0 then FILE_MKDIR,workdir
-  tempdir = MKTEMP('alf',outdir=workdir,/directory)
+  tempdir = first_el(MKTEMP('alf',outdir=workdir,/directory))
+  FILE_CHMOD,tempdir,/a_execute
   printlog,logf,'Working in temporary directory ',tempdir
   ;; Copy over the files that we need
   ;;  this will copy the contents of symlinks
@@ -332,6 +338,8 @@ if n_elements(workdir) gt 0 then begin
   for i=0,nfiles-1 do FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
   ;; Copy files for FAKE
   if keyword_set(fake) then FILE_COPY,mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],tempdir
+  ;; Copy the scripts
+  FILE_COPY,scripts,tempdir
   ;; Go there
   CD,tempdir
 endif

@@ -57,6 +57,7 @@ function photred_readfile,filename,meta,exten=exten,count=count,header=header,no
   ext = first_el(strsplit(base,'.',/extract),/last)
   if isfits eq 1 and ext eq 'gz' then ext='fits'  ; gzipped FITS file
   if isfits eq 1 and ext eq 'fz' then ext='fits'  ; fpacked FITS file  
+  if isfits eq 1 then ext='fits'      ; fits file with different extension
   
   ;; Go through the various options
   CASE ext of

@@ -648,7 +648,7 @@ if tiletype eq 'TILES' then begin
                 "observatory:'"+thisimager.observatory+"',namps:"+strtrim(thisimager.namps,2)+","+$
                 "separator:'"+thisimager.separator+"'}"
       ; Make commands for allframe
-      cmd1 = "allframe,'"+mchfile+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+      cmd1 = "allframe,'"+mchfile+"'"+',setupdir="'+curdir+'",scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
             ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile="+stile+",imager="+simager
       if keyword_set(alfnocmbimscale) then cmd1+=",/nocmbimscale"
       if keyword_set(alftrimcomb) then cmd1+=",/trimcomb"
@@ -662,7 +662,7 @@ if tiletype eq 'TILES' then begin
 ;; WCS or ORIG
 endif else begin
   ; Make commands for allframe
-  cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+  cmd = "allframe,'"+procbaselist+"'"+',setupdir="'+curdir+'",scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
         ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile={type:'"+strupcase(tiletype)+"'}"
   if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
   if keyword_set(alftrimcomb) then cmd+=",/trimcomb"

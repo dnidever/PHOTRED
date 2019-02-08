@@ -31,6 +31,8 @@
 
 pro allframe_getweights,mchfile,actweight,scales,medsky,imager=imager,logfile=logfile,raw=raw,silent=silent,stp=stp
 
+COMMON photred,setupOA
+
 ; OUTPUTS:
 ;  actweight  The weight for each frame
 ;  scales     The scale for each frame
