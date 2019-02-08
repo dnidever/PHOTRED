@@ -268,7 +268,7 @@ if keyword_set(clean) then begin
   ;;  only successful ones
   READLIST,setupdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=setupdir,count=nfitsfiles,logfile=logfile,/silent
   for i=0,nfitsfiles-1 do begin
-    dir1 = file_dirname(fitsfiles[i]))
+    dir1 = file_dirname(fitsfiles[i])
     base1 = file_basename(fitsfiles[i])
     rfile = dir1+'/.'+base1
     info = file_info(fitsfiles[i])    

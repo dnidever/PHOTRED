@@ -404,7 +404,7 @@ endif
 if keyword_set(trimcomb) then begin
 
   ; Calculate the trim section
-  hd = PHOTRED_READFILE((reffile,/header)
+  hd = PHOTRED_READFILE(reffile,/header)
   xsize = lonarr(nfiles)+sxpar(hd,'NAXIS1',/silent)
   ysize = lonarr(nfiles)+sxpar(hd,'NAXIS2',/silent)
   IA_TRIM,xshift,yshift,xsize,ysize,trimsection
@@ -422,13 +422,13 @@ if keyword_set(trimcomb) then begin
     im = PHOTRED_READFILE(outfiles[i],head)
     newim = im[xstart:xstop,ystart:ystop]
     MWRFITS,newim,outfiles[i],head,/create,/silent
-  end
+  endfor
   ; could also use IRAF_IMCOPY here instead
 
 
 ; Don't trim the images
 endif else begin
-  hd = PHOTRED_READFILE((reffile,/header)
+  hd = PHOTRED_READFILE(reffile,/header)
   xsize = sxpar(hd,'NAXIS1',/silent)
   ysize = sxpar(hd,'NAXIS2',/silent)
   trimsection = [1,xsize,1,ysize]

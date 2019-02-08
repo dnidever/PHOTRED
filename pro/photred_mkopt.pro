@@ -108,7 +108,7 @@ dir = FILE_DIRNAME(file)
 
 ; Get the FITS header
 if fpack eq 1 then head=PHOTRED_READFILE(file,exten=1,error=error,/header) else $
-  head = PHOTRED_READFILE(file,error=error,/header
+  head = PHOTRED_READFILE(file,error=error,/header)
 if n_elements(error) gt 0 then begin
   print,'Error reading header for ',file
   print,error

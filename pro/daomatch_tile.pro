@@ -146,7 +146,7 @@ for i=0,nfiles-1 do begin
     sxaddpar,fhead,'NAXIS1',sxpar(fhead,'ZNAXIS1')
     sxaddpar,fhead,'NAXIS2',sxpar(fhead,'ZNAXIS2')
   endif else begin
-    fhead = PHOTRED_READFILE((filestr[i].file,/header)
+    fhead = PHOTRED_READFILE(filestr[i].file,/header)
   endelse
 
   ; Convert X/Y of this system into the combined reference frame
@@ -250,12 +250,12 @@ For i=0,nfiles-1 do begin
 
   ; Get the header
   if strmid(filestr[i].file,6,7,/reverse_offset) eq 'fits.fz' then begin
-    fhead = PHOTRED_READFILE((filestr[i].file,exten=1,/header)
+    fhead = PHOTRED_READFILE(filestr[i].file,exten=1,/header)
     ; Fix the NAXIS1/2 in the header
     sxaddpar,fhead,'NAXIS1',sxpar(fhead,'ZNAXIS1')
     sxaddpar,fhead,'NAXIS2',sxpar(fhead,'ZNAXIS2')
   endif else begin
-    fhead = PHOTRED_READFILE((filestr[i].file,/header)
+    fhead = PHOTRED_READFILE(filestr[i].file,/header)
   endelse
 
   ; Load the ALS file

@@ -1,4 +1,4 @@
-OB;+
+;+
 ;
 ; PHOTRED_GETCHIPNUM
 ;
