@@ -2693,7 +2693,6 @@ if not keyword_set(noupdate) then begin
     dir = file_dirname(filename)
     rfile = dir+'/.'+filename
     if file_test(rfile) eq 1 then begin
-      info = file_info(filename)
       FITS_WRITE_RESOURCE,filename,im,head
     ;; No resource file
     endif else begin  
