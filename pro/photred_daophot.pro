@@ -789,7 +789,7 @@ if keyword_set(clean) then begin
   nsuccess = n_elements(successlist)
   for i=0,nsuccess-1 do begin
     dir1 = file_dirname(successlist[i]))
-    base = file_basename(successlist[i])
+    base1 = file_basename(successlist[i])
     ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi,
     ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst
     FILE_DELETE,dir1+'/'+base1+'.'+['lst','lst1','lst2','lst1.chi','lst2.chi','grp','nst','plst.chi',$

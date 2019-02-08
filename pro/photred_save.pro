@@ -81,6 +81,10 @@ catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
+; Clean intermediate files at the end
+clean = READPAR(setup,'CLEAN',count=nclean)
+if nclean eq 0 then undefine,clean
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -253,6 +257,28 @@ ENDFOR
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
                     failurelist=failurelist,setupdir=curdir
 
+
+;;######################
+;;  CLEANING UP
+;;######################
+if keyword_set(clean) then begin
+  printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
+
+  ;; Remove FITS files for those that have resource files
+  ;;  only successful ones
+  READLIST,setupdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=setupdir,count=nfitsfiles,logfile=logfile,/silent
+  for i=0,nfitsfiles-1 do begin
+    dir1 = file_dirname(fitsfiles[i]))
+    base1 = file_basename(fitsfiles[i])
+    rfile = dir1+'/.'+base1
+    info = file_info(fitsfiles[i])    
+    rinfo = file_info(rfile)
+    if info.exists eq 1 and info.size gt 1 and rinfo.exists eq 1 then begin
+      FILE_DELETE,fitsfiles[i],/allow
+      WRITELINE,fitsfiles[i],''   ;; create size=1 file
+    endif
+  endfor
+endif
 
 printlog,logfile,'PHOTRED_SAVE Finished  ',systime(0)
 

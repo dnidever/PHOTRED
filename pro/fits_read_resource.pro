@@ -116,6 +116,81 @@ fext = strmid(rstr.fluxfile,lo+1,hi-lo-1)
 tfluxfile = tmpdir+'/flux.fits'
 SPAWN,['funpack','-E',fext,'-O',tfluxfile,fluxfile],/noshell
 
+;; Construct the header from the extension and the main headers:
+;;                       <required keywords for the extension:
+;;                       XTENSION, BITPIX,
+;;                               NAXIS, ...>
+;;                       BEGIN MAIN HEADER
+;;                       --------------------------------
+;;                       <PDU header keyword and history less required
+;;                       keywords:
+;;                               SIMPLE, BITPIX, NAXIS, ...>
+;;                       BEGIN EXTENSION HEADER
+;;                       ---------------------------
+;;                       <extension header less required keywords that
+;;                       were
+;;                               placed at the beginning of the header.
+;;                       END
+;; Need PDU header with exposure information
+mhead0 = HEADFITS(fluxfile,exten=0,errmsg=errmsg0)
+ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
+;; Required keywords
+;XTENSION= 'IMAGE   '           /extension type                                  
+;   SIMPE = T
+;BITPIX  =                  -32 /bits per data value                             
+;NAXIS   =                    2 /number of axes                                  
+;NAXIS1  =                 2046 /                                                
+;NAXIS2  =                 4094 /                                                
+;PCOUNT  =                    0 /Number of group parameters                      
+;GCOUNT  =                    1 /Number of groups  
+;; Start the final header
+undefine,head
+head = ['SIMPLE  =                    T / file does conform to FITS standard']
+sxaddpar,head,'BITPIX',sxpar(ehead0,'BITPIX'),'bits per data value'
+sxaddpar,head,'NAXIS',sxpar(ehead0,'NAXIS'),'number of data axes'
+sxaddpar,head,'NAXIS1',sxpar(ehead0,'NAXIS1'),'length of data axis 1'
+sxaddpar,head,'NAXIS2',sxpar(ehead0,'NAXIS2'),'length of data axis 2'
+sxaddpar,head,'PCOUNT',0,'Number of group parameters'
+sxaddpar,head,'GCOUNT',1,'Number of groups'
+sxdelpar,head,'END'  ;; sxaddpar adds an "END" line automatically
+;; Remove required keywords from the main header
+mhead = mhead0
+sxdelpar,mhead,'SIMPLE'
+sxdelpar,mhead,'BITPIX'
+sxdelpar,mhead,'NAXIS'
+sxdelpar,mhead,'NAXIS1'
+sxdelpar,mhead,'NAXIS2'
+sxdelpar,mhead,'PCOUNT'
+sxdelpar,mhead,'GCOUNT'
+sxdelpar,mhead,'EXTEND'
+sxdelpar,mhead,'DATASUM'
+sxdelpar,mhead,'CHECKSUM'
+sxdelpar,mhead,'END'
+;; Remove required keywords from the extension header
+ehead = ehead0
+sxdelpar,ehead,'SIMPLE'
+sxdelpar,ehead,'XTENSION'
+sxdelpar,ehead,'BITPIX'
+sxdelpar,ehead,'NAXIS'
+sxdelpar,ehead,'NAXIS1'
+sxdelpar,ehead,'NAXIS2'
+sxdelpar,ehead,'PCOUNT'
+sxdelpar,ehead,'GCOUNT'
+sxdelpar,ehead,'DATASUM'
+sxdelpar,ehead,'CHECKSUM'
+sxdelpar,ehead,'END'
+;; Combine them all
+PUSH,head,'BEGIN MAIN HEADER ---------------------------------'
+PUSH,head,mhead
+PUSH,head,'BEGIN EXTENSION HEADER ----------------------------'
+PUSH,head,ehead
+PUSH,head,'END                                                                             '
+;; Remove any blank lines
+bd = where(strtrim(head,2) eq '',nbd)
+if nbd gt 0 then REMOVE,bd,head
+;; Now update the fluxfile with this new header
+MODFITS,tfluxfile,0,head
+
 ;; Get the mask file
 lo = strpos(rstr.maskfile,'[')
 hi = strpos(rstr.maskfile,']')
