@@ -659,15 +659,15 @@ if n_elements(workdir) gt 0 then begin
   for i=0,nfiles-1 do FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
   if keyword_set(fake) then FILE_DELETE,tempdir+'/'+mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],/allow
   ;; Copy files back
-  files = file_search(workdir+'/*',count=nfiles)  
-  FILE_COPY,files,mchdir,/allow
+  files = file_search(tempdir+'/*',count=nfiles)  
+  FILE_COPY,files,mchdir,/allow,/over
   ;; Delete all temporary files
   FILE_DELETE,files,/allow
   ;; CD back
   CD,curdir
   ;; Delete temporary directory
   ;;  leave the base working directory
-  FILE_DELETE,tempdirdir
+  FILE_DELETE,tempdir
 endif
 
 if keyword_set(stp) then stop
