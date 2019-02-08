@@ -6,12 +6,14 @@
 ; 
 ; INPUTS:
 ;  file      FITS filename
+;  =head     Use this header array instead of reading FITS file.
 ;  /stp      Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The UT DATE is output in the format YYYY-MM-DD,
 ;  i.e. 2007-12-29.  If there is an error then
 ;  and empty string '' is output.
+;  =error    The error message if one occurred.
 ;
 ; USAGE:
 ;  IDL>ut = photred_getdate(file)
@@ -19,16 +21,22 @@
 ; By D.Nidever  May 2008
 ;-
 
-function photred_getdate,file,head=head,stp=stp
+function photred_getdate,file,head=head,error=error,stp=stp
 
 COMMON photred,setup
+
+undefine,error
 
 nfile = n_elements(file)
 ; Not enough inputs
 if nfile eq 0 then begin
-  print,'Syntax - uttime = photred_getdate(file,stp=stp)'
+  error = 'Not enough inputs'
+  print,'Syntax - uttime = photred_getdate(file,head=head,stp=stp)'
   return,''
 endif
+
+;; Can't use input HEAD if multiple fits files input
+if nfile gt 1 then undefine,head
 
 ; More than one name input
 if nfile gt 1 then begin
@@ -37,14 +45,20 @@ if nfile gt 1 then begin
   return,date
 endif
 
-test = file_test(file)
-if test eq 0 then begin
-  print,file,' NOT FOUND'
-  return,''
-endif
 
-if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
-  head = HEADFITS(file)
+;; Header not input, read from FITS file
+if n_elements(head) eq 0 then begin
+  ;; Check that the file exists
+  test = file_test(file)
+  if test eq 0 then begin
+    error = file+' NOT FOUND'
+    print,error
+    return,''
+  endif
+
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(file,exten=1,/header) else $
+    head = PHOTRED_READFILE(file,/header)
+endif
 
 ; Getting UT DATE
 ;----------------
@@ -231,7 +245,8 @@ endif
 
 ; NO date found
 if date_out eq '' then begin
-  print,'NO DATE IN HEADER'
+  error = 'NO DATE IN HEADER'
+  print,error
 endif
 
 

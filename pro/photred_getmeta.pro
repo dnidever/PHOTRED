@@ -37,7 +37,7 @@ naxis1 = sxpar(head,'NAXIS1')
 naxis2 = sxpar(head,'NAXIS2')
 
 ;; Get chipnum
-head = PHOTRED_READFILE(file,/header,error=error)
+chipnum = PHOTRED_GETCHIPNUM(file,error=error)
 if n_elements(error) ne 0 then return,-1
 
 ;; Get the AST structure
@@ -68,17 +68,17 @@ endif else begin
 endelse
 
 ;; Get the filter
-filter = PHOTRED_GETFILTER(file,/header,error=error)
+filter = PHOTRED_GETFILTER(file,head=head,error=error)
 if n_elements(error) ne 0 then return,-1
 
 ;; Get the exposure time
-exptime = PHOTRED_GETEXPTIME(file,/header,error=error)
+exptime = PHOTRED_GETEXPTIME(file,head=head,error=error)
 if n_elements(error) ne 0 then return,-1
 
 ;; Get data, uttime, date-obs
-date = PHOTRED_GETDATE(file,/header,error=error)
+date = PHOTRED_GETDATE(file,head=head,error=error)
 if n_elements(error) ne 0 then return,-1
-uttime = PHOTRED_UTTIME(file,/header,error=error)
+uttime = PHOTRED_UTTIME(file,head=head,,error=error)
 if n_elements(error) ne 0 then return,-1
 dateobs = date+'T'+uttime
 
@@ -86,15 +86,15 @@ dateobs = date+'T'+uttime
 mjd = date2jd(dateobs,/mjd)
 
 ;; Get the gain
-gain = PHOTRED_GETGAIN(file,/header,error=error)
+gain = PHOTRED_GETGAIN(file,head=head,,error=error)
 if n_elements(error) ne 0 then return,-1
 
 ;; Get the rdnoise
-rdnoise = PHOTRED_GETRDNOISE(file,/header,error=error)
+rdnoise = PHOTRED_GETRDNOISE(file,head=head,error=error)
 if n_elements(error) ne 0 then return,-1
 
 ;; Get the airmass
-airmass = PHOTRED_GETAIRMASS(file,obs=observatory)
+airmass = PHOTRED_GETAIRMASS(file,head=head,obs=observatory)
 if n_elements(error) ne 0 then return,-1
 
 ;; Make the structure

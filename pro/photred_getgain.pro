@@ -6,6 +6,7 @@
 ; 
 ; INPUTS:
 ;  file      FITS filename
+;  =head     Use this header array instead of reading FITS file.
 ;  =keyword  The actual header keyword used.
 ;  /stp      Stop at the end of the program.
 ;
@@ -13,6 +14,7 @@
 ;  The gain in e/ADU
 ;  If the gain is not found in the header then -1.0
 ;    is returned.
+;  =error    The error message if one occurred.  
 ;
 ; USAGE:
 ;  IDL>gain = photred_getgain(file,keyword=keyword)
@@ -20,18 +22,22 @@
 ; By D.Nidever  May 2008
 ;-
 
-function photred_getgain,file,keyword=keyword,stp=stp
+function photred_getgain,file,head=head,keyword=keyword,error=error,stp=stp
 
 COMMON photred,setup
 
-undefine,gain,keyword
+undefine,gain,keyword,error
 
 nfile = n_elements(file)
 ; Not enough inputs
 if nfile eq 0 then begin
+  error = 'Not enough inputs'
   print,'Syntax - gain = photred_getgain(file,keyword=keywordstp=stp)'
   return,-1.0
 endif
+
+;; Can't use input HEAD if multiple fits files input
+if nfile gt 1 then undefine,head
 
 ; More than one name input
 if nfile gt 1 then begin
@@ -44,14 +50,20 @@ if nfile gt 1 then begin
   return,gain
 endif
 
-test = file_test(file)
-if test eq 0 then begin
-  print,file,' NOT FOUND'
-  return,-1.0
+;; No header input, read from fits file
+if n_elements(head) eq 0 then begin
+  ;; Check that the file exists 
+  test = file_test(file)
+  if test eq 0 then begin
+    error = file+' NOT FOUND'
+    print,error
+    return,-1.0
+  endif
+
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(file,exten=1,/header) else $
+    head = PHOTRED_READFILE(file,/header)
 endif
 
-if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
-  head = HEADFITS(file)
 gain = SXPAR(head,'GAIN',count=ngain,/silent)
 egain = SXPAR(head,'EGAIN',count=negain,/silent)          ; imacs
 
@@ -68,7 +80,8 @@ endif
 
 ; No GAIN
 if (ngain eq 0 and negain eq 0) then begin
-  print,'NO GAIN'
+  error = 'NO GAIN'
+  print,error
   gain = -1.0
 endif
 

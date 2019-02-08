@@ -15,6 +15,7 @@
 ; 
 ; INPUTS:
 ;  file      FITS filename
+;  =head     Use this header array instead of reading FITS file.
 ;  /numeric  Return a numeric value instead of letter.
 ;  =filtname Input the filter name explicitly instead of giving the
 ;              FITS filename.
@@ -26,7 +27,7 @@
 ;
 ; OUTPUTS:
 ;  The short filter name is output.
-;  =error    The error message if an error occured.
+;  =error    The error message if an error occurred.
 ;
 ; USAGE:
 ;  IDL>filter = photred_getfilter(fitsfile,numeric=numeric,noupdate=noupdate,
@@ -35,7 +36,7 @@
 ; By D.Nidever  February 2008
 ;-
 
-function photred_getfilter,file,stp=stp,numeric=numeric,noupdate=noupdate,$
+function photred_getfilter,file,head=head,stp=stp,numeric=numeric,noupdate=noupdate,$
              silent=silent,filtname=filtname0,error=error,fold_case=fold_case
 
 COMMON photred,setup
@@ -46,11 +47,14 @@ nfile = n_elements(file)
 nfiltname = n_elements(filtname0)
 ; Not enough inputs
 if nfile eq 0 and nfiltname eq 0 then begin
-  print,'Syntax - filter = photred_getfilter(fitsfile,numeric=numeric,noupdate=noupdate,'
+  print,'Syntax - filter = photred_getfilter(fitsfile,head=head,numeric=numeric,noupdate=noupdate,'
   print,'                                    filtname=filtname,silent=silent,stp=stp,error=error,fold_case=fold_case)'
   error = 'Not enough inputs'
   return,''
 endif
+
+;; Can't use input HEAD if multiple fits files or filter names input
+if (nfile gt 1 or nfiltname gt 1) then undefine,head
 
 ; More than one FITS filename input
 if (nfile gt 1) then begin
@@ -102,27 +106,32 @@ shortnames = reform(arr[1,*])
 ; Get the filter information from the header
 if (nfile gt 0) then begin
 
-  ; Does it have the ".fits" of ".fits.fz" ending
-  ext = first_el(strsplit(file,'.',/extract),/last)
-  if ext ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz' then begin
-    if not keyword_set(silent) then print,file,' IS NOT A FITS FILE'
-    error = file+' IS NOT A FITS FILE'
-    return,''
-  endif
+  ;; Header NOT input, read FITS files
+  if n_elements(head) eq 0 then begin
 
-  ; Make sure the file exists
-  test = file_test(file)
-  if test eq 0 then begin
-    if not keyword_set(silent) then print,file,' NOT FOUND'
-    error = file+' NOT FOUND'
-    return,''
-  endif
+    ; Does it have the ".fits" of ".fits.fz" ending
+    ext = first_el(strsplit(file,'.',/extract),/last)
+    if ext ne 'fits' and strmid(file,6,7,/reverse_offset) ne 'fits.fz' then begin
+      if not keyword_set(silent) then print,file,' IS NOT A FITS FILE'
+      error = file+' IS NOT A FITS FILE'
+      return,''
+    endif
 
-  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(file,exten=1) else $
-    head = HEADFITS(file)
+    ; Make sure the file exists
+    test = file_test(file)
+    if test eq 0 then begin
+      if not keyword_set(silent) then print,file,' NOT FOUND'
+      error = file+' NOT FOUND'
+      return,''
+    endif
+
+    ;; Read the header
+    if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(file,exten=1,/header,error=error) else $
+      head = PHOTRED_READFILE(file,/header,error=error)
+  endif
 
   ; Problem with header
-  if n_elements(head) eq 1 and strtrim(head[0],2) eq '-1' then begin
+  if (n_elements(head) eq 1 and strtrim(head[0],2) eq '-1') or n_elements(error) gt 0 then begin
     if not keyword_set(silent) then print,file,' - Problem loading FITS header'
     error = file+' - Problem loading FITS header'
     return,''
