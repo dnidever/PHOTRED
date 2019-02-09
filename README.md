@@ -265,6 +265,9 @@ trans       nocalib.trans
 sepfielddir  1
 keepmef      0
 catformat    FITS
+workdir      /home/tempdir/
+clean        1
+skipcheck    1
 redo         0
 #skipwcs     0
 #wcsup       N
@@ -325,6 +328,8 @@ sepfielddir |  Put each field in a separate directory (this is now the default o
 keepmef | OPTIONAL. Multi-extension files (MEF) are split by PHOTRED. Do you want PHOTRED to keep the MEF files: YES=1, NO=0 (i.e. erase them).
 catformat | The type of catalog format to use: FITS or ASCII.  The default is ASCII
 workdir | Perform some tasks (e.g. DAOPHOT and ALLFRAME) in a temporary directory with WORKDIR as the base directory.
+clean | Delete some intermediate data products at the end of the stage for successful file.
+skipcheck | Skip detailed file checking at the beginning of a stage.
 redo | PHOTRED will NOT reprocess files that have already been processed unless "redo" is set. This can also be set as a keyword on the command line (i.e. IDL>photred,/redo).
 skipwcs | Set this if your images already have correct WCS in their headers and you don't want the WCS to be refit in the WCS stage.
 wcsup | What cardinal direction (i.e. N, S, E or W) is "up" in the image? This is only used for non-standard setups.
