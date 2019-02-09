@@ -883,7 +883,7 @@ End ; TNX
       cdarr[i,*,*] = cd
       crvalarr[i,*] = wcs2.ast.crval
 
-    end
+    endfor
 
     ; Getting best CD solution
     bestind = first_el(minloc(rmsarr))
@@ -2000,11 +2000,15 @@ if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
       
   ; Check if there is already a reference file for this file
   refcatfile = filebase+'_refcat.dat'
-  test = file_test(refcatfile)
+  if file_test(refcatfile) eq 0 then if file_test(filebase+'_refcat.fits') eq 1 then refcatfile=filebase+'_refcat.fits'
+  if file_test(refcatfile) eq 0 then if file_test(filebase+'_refcat.fits.gz') eq 1 then refcatfile=filebase+'_refcat.fits.gz'
+  test = file_test(refcatfile)  
 
   ; There IS a reference file
   if (test eq 1) then begin
-    RESTORE,refcatfile
+    if stregex(refcatfile,'_refcat.fits.gz$',/boolean) eq 1 or $
+       stregex(refcatfile,'_refcat.fits$',/boolean) then refcat=MRDFITS(refcatfile,1,/silent) else $
+       RESTORE,refcatfile
 
     ; Check structure
     nrefcat = n_elements(refcat)

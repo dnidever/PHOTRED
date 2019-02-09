@@ -2,7 +2,7 @@
 ;
 ; PHOTRED_GETFITSEXT
 ;
-; Gets the fits extension (.fits or .fits.fz) and optionall
+; Gets the fits extension (.fits or .fits.fz) and optionaly
 ; the base name.
 ;
 ; INPUTS:
