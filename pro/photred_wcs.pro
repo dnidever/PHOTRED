@@ -143,6 +143,10 @@ nmultiwcs = READPAR(setup,'NMULTI_WCS')
 if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
 nmulti = nmulti > 1  ; must be >=1
 
+; SKIPCHECK, skip all of the detailed file checking
+skipcheck = READPAR(setup,'SKIPCHECK',count=nskipcheck)
+if nskipcheck eq 0 then undefine,skipcheck
+
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
 if scriptsdir eq '' then begin
@@ -230,54 +234,56 @@ FOR i=0,ninputlines-1 do begin
 
   CD,filedir
 
-  ; Load the header
-  head = PHOTRED_READFILE(longfile,/header)
-  object = SXPAR(head,'OBJECT',/silent)
+  ;; Check on the files
+  if not keyword_set(skipcheck) then begin
 
-  ; Does this have multiple extensions
-  rfile = filedir+'/.'+file
-  if file_test(rfile) eq 0 then begin
-    FITS_OPEN,file,fcb,message=message0
-    nextend = fcb.nextend
-    FITS_CLOSE,fcb
-    if nextend gt 0 then mef=1 else mef=0
-  endif else mef=0   ; resource files are not MEF
+    ; Load the header
+    head = PHOTRED_READFILE(longfile,/header)
+    object = SXPAR(head,'OBJECT',/silent)
 
-  ; We only do SPLIT files, NOT MEF files
-  if (mef eq 1) then begin
-    printlog,'This is a MEF file.  Need SPLIT files'
-    PUSH,failurelist,longfile
-    goto,BOMB
-  endif
+    ; Does this have multiple extensions
+    rfile = filedir+'/.'+file
+    if file_test(rfile) eq 0 then begin
+      FITS_OPEN,file,fcb,message=message0
+      nextend = fcb.nextend
+      FITS_CLOSE,fcb
+      if nextend gt 0 then mef=1 else mef=0
+    endif else mef=0   ; resource files are not MEF
 
-
-  ; Make sure that |BITPIX| > 16
-  ; Only works for single chip images
-  bitpix = long(SXPAR(head,'BITPIX',/silent))
-  if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) and (fpack eq 0) then begin
-    printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
-
-    ; Read in the image
-    ;FITS_READ,file,im,head,/no_abort,message=message
-    ;im = MRDFITS(file,0,head,status=status,/silent)
-    im = PHOTRED_READFILE(file,head,error=error)
-
-    ; Make sure BZERO=0
-    bzero = sxpar(head,'BZERO',count=nbzero,/silent)
-    if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
-
-    ; Write the FLOAT image
-    if n_elements(error) eq 0 and size(im,/type) lt 4 then $
-      FITS_WRITE_RESOURCE,file,float(im),head
-
-    ; There was a problem reading the image
-    if n_elements(error) gt 0 then begin
-      printlog,logfile,'PROBLEM READING IN ',file,' ',error
+    ; We only do SPLIT files, NOT MEF files
+    if (mef eq 1) then begin
+      printlog,'This is a MEF file.  Need SPLIT files'
       PUSH,failurelist,longfile
       goto,BOMB
     endif
 
-  endif
+    ; Make sure that |BITPIX| > 16
+    ; Only works for single chip images
+    bitpix = long(SXPAR(head,'BITPIX',/silent))
+    if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) and (fpack eq 0) then begin
+      printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
+
+      ; Read in the image
+      ; FITS_READ,file,im,head,/no_abort,message=message
+      ;im = MRDFITS(file,0,head,status=status,/silent)
+      im = PHOTRED_READFILE(file,head,error=error)
+
+      ; Make sure BZERO=0
+      bzero = sxpar(head,'BZERO',count=nbzero,/silent)
+      if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
+
+      ; Write the FLOAT image
+      if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+        FITS_WRITE_RESOURCE,file,float(im),head
+
+      ; There was a problem reading the image
+      if n_elements(error) gt 0 then begin
+        printlog,logfile,'PROBLEM READING IN ',file,' ',error
+        PUSH,failurelist,longfile
+        goto,BOMB
+      endif
+    endif
+  endif  ; not skipcheck
 
 
   ;---------------------------------------------------------------
