@@ -2018,6 +2018,20 @@ if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
       reftags = tag_names(refcat)
       ra2000tag = first_el(where(strpos(reftags,'RAJ2000') ne -1,nra2000tag))
       de2000tag = first_el(where(strpos(reftags,'DEJ2000') ne -1,nde2000tag))
+      ;; RAJ2000 not found but RA was
+      if nra2000tag eq 0 and tag_exist(refcat,'RA') then begin
+        add_tag,refcat,'RAJ2000',0.0d0,refcat
+        refcat.raj2000 = refcat.ra
+        reftags = tag_names(refcat)
+        ra2000tag = first_el(where(strpos(reftags,'RAJ2000') ne -1,nra2000tag))
+      endif
+      ;; DEJ2000 not found but DEC was
+      if nde2000tag eq 0 and tag_exist(refcat,'DEC') then begin
+        add_tag,refcat,'DEJ2000',0.0d0,refcat
+        refcat.dej2000 = refcat.dec
+        reftags = tag_names(refcat)
+        de2000tag = first_el(where(strpos(reftags,'DEJ2000') ne -1,nde2000tag))
+      endif
     endif
   
     ; Catalog OKAY
