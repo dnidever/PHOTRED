@@ -366,7 +366,7 @@ For i=0,nfieldfiles-1 do begin
     chipstr[i].dao_nsources = nals
     ; Calculate "depth"
     if nals gt 0 then begin
-      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=50)
+      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
       xhist += 0.5*0.2
       DLN_MAXMIN,hist,minarr,maxarr
       alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
@@ -470,9 +470,10 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Load ALF file
+  nalf = -1
   if keyword_set(mchusetiles) eq 0 then begin
     alffile = base+'.alf'
-    LOADALS,alffile,alf,alfhead,count=nalf
+    if file_test(alffile) eq 1 then LOADALS,alffile,alf,alfhead,count=nalf
   ;; Using TILES
   endif else begin
     gd = where(stregex(alsinfo.alsfile,'^'+base,/boolean) eq 1,ngd)
@@ -486,11 +487,11 @@ For i=0,nfieldfiles-1 do begin
     endfor
     nalf = n_elements(alf)
   endelse
-  chipstr[i].alf_nsources = nalf
+  if nalf gt 0 then chipstr[i].alf_nsources = nalf
 
   ; Calculate ALF "depth"
   if nalf gt 1 then begin
-    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
+    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=30)
     xhist += 0.5*0.2
     DLN_MAXMIN,hist,minarr,maxarr
     alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
