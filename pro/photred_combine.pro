@@ -451,7 +451,7 @@ FOR i=0,nsfields-1 do begin
       ; Updating the IDs
       ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
       ;---------------------------------------------
-      id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
+      id2 = ifield+'_'+strtrim(ext,2)+'.'+strtrim(str.id,2)
       str.id = id2
     Endif
       
@@ -466,7 +466,7 @@ FOR i=0,nsfields-1 do begin
       ; Updating the IDs
       ; FIELD_TILE.IDNUMBER, i.e. 190L182a_5.17366
       ;---------------------------------------------
-      id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
+      id2 = ifield+'_'+strtrim(ext,2)+'.'+strtrim(str.id,2)
       str.id = id2
     Endif
       
