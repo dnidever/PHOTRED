@@ -695,7 +695,7 @@ FOR i=0,ninputlines-1 do begin
 
 
   ; Add to outlist/successlist
-  PUSH,outlist,filedir+'/'+deredfile
+  PUSH,outlist,deredfile
   PUSH,successlist,longfile
 
 
