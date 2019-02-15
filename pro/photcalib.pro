@@ -653,8 +653,13 @@ FOR i=0L,ninp-1 do begin
 
     nmatch = 0
     ; Try filename + band
-    if transfileinfo eq 1 then $
-       MATCH,trans.file+':'+trans.band,obsfile+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+    ;;  allow for FILE to be in FIELD-EXPOSURE format and match to all
+    ;;  chips of this exposure
+    if transfileinfo eq 1 then begin
+       match = bytarr(n_elements(trans))
+       for k=0,n_elements(trans)-1 do match[k]=(stregex(obsfile,trans[k].file,/boolean) eq 1 and trans[k].band eq inp.band[j])
+       ind1 = where(match eq 1,nmatch)
+    endif
     ; Try night+chip + band
     ;  only want to match lines with file=''
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
