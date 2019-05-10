@@ -154,9 +154,9 @@ endif
 
 ; Load the image
 if n_elements(inpim) eq 0 then begin
-  FITS_READ,filename,im,head,exten=exten,/no_abort,message=message
-  if message ne '' then begin
-    error = 'Problem loading '+filename
+  im = PHOTRED_READFILE(filename,head,error=message)
+  if n_elements(message) gt 0 then begin
+    error = 'Problem loading '+filename+'  '+message
     print,error
     return    
   endif
@@ -883,7 +883,7 @@ End ; TNX
       cdarr[i,*,*] = cd
       crvalarr[i,*] = wcs2.ast.crval
 
-    end
+    endfor
 
     ; Getting best CD solution
     bestind = first_el(minloc(rmsarr))
@@ -1420,14 +1420,14 @@ print,'========================================='
 
 
 ; Getting image header
-FITS_READ,filename,im,head,/no_abort,message=message
-if message ne '' then begin
+im = PHOTRED_READFILE(filename,head,error=message)
+if n_elements(message) gt 0 then begin
   error = 'Problem loading '+filename
   print,error
   return    
 endif
 if fpack eq 1 then begin
-  head = headfits(filename,exten=1)  ; fits_read will modify the header improperly
+  head = PHOTRED_READFILE(filename,exten=1,/header)  ; fits_read will modify the header improperly 
   ; NAXIS1/NAXIS2 get modified by fpack, need to temporarily
   ;  put back the originals which are saved in ZNAXIS1/2
   ;  But save the fpack header so we can put things back
@@ -2000,11 +2000,15 @@ if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
       
   ; Check if there is already a reference file for this file
   refcatfile = filebase+'_refcat.dat'
-  test = file_test(refcatfile)
+  if file_test(refcatfile) eq 0 then if file_test(filebase+'_refcat.fits') eq 1 then refcatfile=filebase+'_refcat.fits'
+  if file_test(refcatfile) eq 0 then if file_test(filebase+'_refcat.fits.gz') eq 1 then refcatfile=filebase+'_refcat.fits.gz'
+  test = file_test(refcatfile)  
 
   ; There IS a reference file
   if (test eq 1) then begin
-    RESTORE,refcatfile
+    if stregex(refcatfile,'_refcat.fits.gz$',/boolean) eq 1 or $
+       stregex(refcatfile,'_refcat.fits$',/boolean) then refcat=MRDFITS(refcatfile,1,/silent) else $
+       RESTORE,refcatfile
 
     ; Check structure
     nrefcat = n_elements(refcat)
@@ -2014,6 +2018,25 @@ if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
       reftags = tag_names(refcat)
       ra2000tag = first_el(where(strpos(reftags,'RAJ2000') ne -1,nra2000tag))
       de2000tag = first_el(where(strpos(reftags,'DEJ2000') ne -1,nde2000tag))
+      ;; RAJ2000 not found but RA was
+      if nra2000tag eq 0 and tag_exist(refcat,'RA') then begin
+        add_tag,refcat,'RAJ2000',0.0d0,refcat
+        refcat.raj2000 = refcat.ra
+        reftags = tag_names(refcat)
+        ra2000tag = first_el(where(strpos(reftags,'RAJ2000') ne -1,nra2000tag))
+      endif
+      ;; DEJ2000 not found but DEC was
+      if nde2000tag eq 0 and tag_exist(refcat,'DEC') then begin
+        add_tag,refcat,'DEJ2000',0.0d0,refcat
+        refcat.dej2000 = refcat.dec
+        reftags = tag_names(refcat)
+        de2000tag = first_el(where(strpos(reftags,'DEJ2000') ne -1,nde2000tag))
+      endif
+      ;; PMDE not found but PMDEC was
+      if tag_exist(refcat,'PMDE') eq 0 and tag_exist(refcat,'PMDEC') eq 1 then begin
+        add_tag,refcat,'PMDE',0.0d0,refcat
+        refcat.pmde = refcat.pmdec
+      endif
     endif
   
     ; Catalog OKAY
@@ -2045,7 +2068,8 @@ if n_elements(refcat) eq 0 then begin
   ; Querying the catalog
   refcatname = 'USNO-B1'    ; the default  
   if keyword_set(refname) then refcatname=refname
-  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and refcatname ne 'GAIA/GAIA' then refcatname='GAIA/GAIA'
+  if refcatname ne 'USNO-B1' and refcatname ne '2MASS-PSC' and refcatname ne 'UCAC4' and $
+     refcatname ne 'GAIA/GAIA' and refcatname ne 'GAIADR2' then refcatname='GAIADR2'
 
   print,'NO Reference Catalog Input: QUERYING ',refcatname,' Catalog',$
        '  Area:',strtrim(long(dist),2),'x',strtrim(long(dist),2),' arcmin'
@@ -2124,6 +2148,16 @@ if n_elements(refcat) eq 0 then begin
     refcat.dej2000 = refcat.de_icrs
   endif
 
+  ; GAIADR2
+  if (refcatname eq 'GAIADR2') then begin
+    if tag_exist(refcat,'RAJ2000') eq 0 then begin
+      ADD_TAG,refcat,'RAJ2000',0.0d0,refcat
+      ADD_TAG,refcat,'DEJ2000',0.0d0,refcat
+      refcat.raj2000 = refcat.ra_icrs
+      refcat.dej2000 = refcat.de_icrs      
+    endif
+  endif
+
   ; UCAC4 ??
 
   nrefcat = n_elements(refcat)
@@ -2137,14 +2171,44 @@ if n_elements(refcat) eq 0 then begin
 endif
 
 ; Reference catalog type
-if n_elements(refname) eq 0 then begin
+if n_elements(refname) eq 0 or n_elements(refcatfile) eq 1 then begin
   ; 2MASS-PSC has _2MASS tag
   if tag_exist(refcat,'_2MASS') then refname='2MASS-PSC'
   ; USNO-B1 has USNO_B1_0 tag
   if tag_exist(refcat,'USNO_B1_0') then refname='USNO-B1'
   ; UCAC4 has UCAC4 tag
   if tag_exist(refcat,'UCAC4') then refname='UCAC4'
+  ; GAIADR2
+  if tag_exist(refcat,'RA_ICRS') and tag_exist(refcat,'PLX') and tag_exist(refcat,'PMRA') then refname='GAIADR2'
+  if tag_exist(refcat,'FG') and tag_exist(refcat,'PMRA') and tag_exist(refcat,'BP') then refname='GAIADR2'
   if n_elements(refname) gt 0 then print,'Reference catalog type is ',refname else print,'Reference catalog type UNKNOWN'
+endif
+
+;; Shift the Gaia DR2 coordinates to the epoch of the observation using PMs
+if refname eq 'GAIADR2' then begin
+  ;; Precess the Gaia coordinates to the epoch of the observation
+  ;; The reference epoch for Gaia DR2 is J2015.5 (compared to the
+  ;; J2015.0 epoch for Gaia DR1).
+  print,'Shifting the Gaia DR2 coordinates to the epoch of the observation using PMs'
+  dateobs = sxpar(head,'DATE-OBS',count=ndateobs)
+  if ndateobs eq 0 then begin
+    uttime = photred_getuttime(filename)
+    utdate = photred_getdate(filename)
+    dateobs = utdate+'T'+uttime
+  endif
+  mjd = date2jd(dateobs,/mjd)
+  gaiamjd = 57206.0d0
+  delt = (mjd-gaiamjd)/365.242170d0   ; convert to years
+  ;; convert from mas/yr->deg/yr and convert to angle in RA
+  d2r = !dpi / 180.0d0
+  if tag_exist(refcat,'PMDE') then pmdec=refcat.pmde else pmdec=refcat.pmdec
+  gd = where(finite(refcat.pmra) eq 1 and finite(pmdec) eq 1,ngd)
+  if ngd gt 0 then begin
+    gra_epoch = refcat[gd].raj2000 + delt*refcat[gd].pmra/3600.0d0/1000.0d0/cos(refcat[gd].dej2000*d2r)
+    gdec_epoch = refcat[gd].dej2000 + delt*pmdec[gd]/3600.0d0/1000.0d0
+    refcat[gd].raj2000 = gra_epoch
+    refcat[gd].dej2000 = gdec_epoch
+  endif
 endif
 
 
@@ -2352,7 +2416,6 @@ if (nastr gt 0) then begin
   ;    print,'Robust RMS = ',strtrim(initrms,2),' arcsec'
   ;  endif else initrms=999999.
   ;endif ; no match
-
 
   ; No good matches, try MATCHSTARS_XCORR.PRO
   ;if (initrms ge 1.0) then begin
@@ -2645,22 +2708,33 @@ if not keyword_set(noupdate) then begin
 
   ; The final RMS is low enough
   if (rms le rmslim) then begin
+    ;; Remove blank lines in header
+    bd = where(strtrim(head,2) eq '',nbd)
+    if nbd gt 0 then REMOVE,bd,head
 
     print,'Updating WCS in ',filename
-    if fpack eq 0 then begin
-      MWRFITS,im,filename,head,/create
-      ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
-    endif else begin
-      ; Put the original NAXIS1/2 values back
-      sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
-      sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
-      ; Create temporary symbolic link to make modfits.pro think
-      ; this is an ordinary FITS file
-      tempfile = MAKETEMP('temp')
-      FILE_LINK,filename,tempfile+'.fits'
-      MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
-      FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files
-    endelse
+    ;; Resource file exists
+    dir = file_dirname(filename)
+    rfile = dir+'/.'+filename
+    if file_test(rfile) eq 1 then begin
+      FITS_WRITE_RESOURCE,filename,im,head
+    ;; No resource file
+    endif else begin  
+      if fpack eq 0 then begin
+        MWRFITS,im,filename,head,/create
+        ;FITS_WRITE,filename,im,head    ; this sometimes puts in the 2nd extension
+      endif else begin
+        ; Put the original NAXIS1/2 values back
+        sxaddpar,head,'NAXIS1',sxpar(orig_head,'NAXIS1')
+        sxaddpar,head,'NAXIS2',sxpar(orig_head,'NAXIS2')
+        ; Create temporary symbolic link to make modfits.pro think
+        ; this is an ordinary FITS file
+        tempfile = MAKETEMP('temp')
+        FILE_LINK,filename,tempfile+'.fits'
+        MODFITS,tempfile+'.fits',0,head,exten_no=1,errmsg=errmsg
+        FILE_DELETE,[tempfile,tempfile+'.fits'],/allow  ; delete temporary files
+      endelse
+    endelse ; no resource file
 
   ; RMS too high
   endif else begin

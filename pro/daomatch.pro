@@ -196,12 +196,12 @@ if keyword_set(usewcs) then begin
     print,fitsfile1,' NOT FOUND. Cannot use WCS for matching'
   endif else begin
     if strmid(fitsfile1,6,7,/reverse_offset) eq 'fits.fz' then begin
-      head1 = headfits(fitsfile1,exten=1)
+      head1 = PHOTRED_READFILE(fitsfile1,exten=1,/header)
       ; Fix the NAXIS1/2 in the header
       sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
       sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
     endif else begin
-      head1 = headfits(fitsfile1)
+      head1 = PHOTRED_READFILE(fitsfile1,/header)
     endelse
     EXTAST,head1,astr1,noparams1
     if noparams1 lt 1 then print,fitsfile1,' has NO WCS.  Cannot use WCS for matching'
@@ -296,12 +296,12 @@ for i=1,nfiles-1 do begin
       goto,BOMB1
     endif
     if strmid(fitsfile2,6,7,/reverse_offset) eq 'fits.fz' then begin
-      head2 = headfits(fitsfile2,exten=1)
+      head2 = PHOTRED_READFILE(fitsfile2,exten=1,/header)
       ; Fix the NAXIS1/2 in the header
       sxaddpar,head2,'NAXIS1',sxpar(head2,'ZNAXIS1')
       sxaddpar,head2,'NAXIS2',sxpar(head2,'ZNAXIS2')      
     endif else begin
-      head2 = headfits(fitsfile2)
+      head2 = PHOTRED_READFILE(fitsfile2,/header)
     endelse
     EXTAST,head2,astr2,noparams2
     if noparams2 lt 1 then begin

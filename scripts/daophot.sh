@@ -31,6 +31,7 @@ allstar="/net/astro/bin/allstar"
 #goodpsf="/net/halo/bin/goodpsf"
 #lstfilter="/net/halo/bin/lstfilter"
 export image=${1}
+export baseworkdir=${2}
 #
 #  If required files do not exist, don't run this script.
 #
@@ -62,6 +63,34 @@ if [ ! -s lstfilter ]; then
    echo "ERROR: LSTFILTER program required to filter bad PSF stars."
    exit 1
 fi
+###################################################
+# Working in temporary directory, copy files there
+if [ -n ${baseworkdir} ]; then
+   export curdir=`pwd`
+   # Create base working directory 
+   if [ ! -s ${baseworkdir} ] && [ ! -d ${baseworkdir} ]; then
+      mkdir ${baseworkdir}
+   fi
+   # Create temporary directory
+   export workdir=`mktemp -d --tmpdir=${baseworkdir} dao.XXXXXX`
+   echo "Working in temporary directory ${workdir}"
+   # Copy the files that we need
+   #  fits, photo.opt, apcor.opt, opt, als.opt, goodpsf.pro, lstfilter
+   cp -f photo.opt apcor.opt goodpsf.pro lstfilter ${workdir} >& /dev/null
+   cp -f ${image}.opt ${image}.als.opt ${workdir} >& /dev/null
+   if [ -s ${image}.fits ]; then
+     cp -f ${image}.fits ${workdir} >& /dev/null
+   else
+     cp -f ${image}.fits.fz ${workdir} >& /dev/null
+   fi
+   # Copy the cmn files
+   if [ -s ${image}.cmn.lst ]; then
+     cp -f ${image}.cmn.ap ${image}.cmn.coo ${image}.cmn.log ${image}.lst ${workdir} >& /dev/null
+   fi
+   # Go there
+   cd ${workdir}
+fi
+#
 # Using fpack compressed file
 export fpackfile=0
 export fullfile=${image}.fits
@@ -505,6 +534,25 @@ rm ${image}as.fits >& /dev/null
 if [ ${fpackfile} == 1 ]; then
    echo "Removing temporarily uncompressed ${image}.fits file"
    rm ${image}.fits >& /dev/null
+fi
+###################################################
+# Working in temporary directory, copy files back
+if [ -n ${workdir} ]; then
+   echo "Copying files back to original directory"
+   # Delete some files
+   rm photo.opt apcor.opt goodpsf.pro lstfilter  >& /dev/null
+   rm ${image}.fits ${image}.fits.fz daophot.opt allstar.opt >& /dev/null
+   rm ${image}.opt ${image}.als.opt >& /dev/null
+   rm ${image}.cmn.coo ${image}.cmn.ap ${image}.cmn.lst ${image}.cmn.log >& /dev/null
+   # Copy files back
+   cp -f * ${curdir} >& /dev/null
+   # Delete all temporary files
+   rm -f * >& /dev/null
+   # cd back
+   cd ${curdir}
+   # Delete temporary directory
+   #  leave the base working directory
+   rmdir ${workdir}
 fi
 echo ""
 

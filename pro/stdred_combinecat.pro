@@ -801,7 +801,7 @@ FOR i=0,nfilters-1 do begin
       ;#  UPDATING LIST FILES
       ;##########################################
       PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,/silent
+                        failurelist=failurelist,setupdir=curdir,/silent
 
 
     Endfor ; files loop
@@ -857,7 +857,7 @@ FOR i=0,nfilters-1 do begin
   ;#  UPDATING LIST FILES
   ;##########################################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 
 ENDFOR ; filter loop
@@ -868,7 +868,7 @@ ENDFOR ; filter loop
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'STDRED_COMBINECAT Finished  ',systime(0)

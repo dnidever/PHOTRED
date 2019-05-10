@@ -112,14 +112,13 @@ for i=0,nscripts-1 do begin
   endif
 
   ; Check if the two files are the same size, if not copy it
-  if info.size ne curinfo.size then begin
+  if info.size ne curinfo.size then $
     FILE_COPY,info.name,curinfo.name,/overwrite
-  endif
-end ; scripts loop
+endfor ; scripts loop
 
 
 ; Check that the SEXTRACTOR program exists
-SPAWN,'which sex',out,errout
+SPAWN,['which','sex'],out,errout,/noshell
 sexfile = FILE_SEARCH(out,count=nsexfile)
 if (nsexfile eq 0) then begin
   printlog,logf,'SEXTRACTOR PROGRAM NOT AVAILABLE'
@@ -127,7 +126,7 @@ if (nsexfile eq 0) then begin
 endif
 
 ; Check that the ALLSTAR program exists
-SPAWN,'which allstar',out,errout
+SPAWN,['which','allstar'],out,errout,/noshell
 alsfile = FILE_SEARCH(out,count=nalsfile)
 if (nalsfile eq 0) then begin
   printlog,logf,'ALLSTAR PROGRAM NOT AVAILABLE'
@@ -135,7 +134,7 @@ if (nalsfile eq 0) then begin
 endif
 
 ; Check that the DAOPHOT program exists
-SPAWN,'which daophot',out,errout
+SPAWN,['which','daophot'],out,errout,/noshell
 daofile = FILE_SEARCH(out,count=ndaofile)
 if (ndaofile eq 0) then begin
   printlog,logf,'DAOPHOT PROGRAM NOT AVAILABLE'
@@ -214,6 +213,7 @@ printlog,logf,'Using '+strupcase(detectprog)+' for Source Detection'
 flag = 0
 nals = 0
 count = 1
+undefine,allsex
 WHILE (flag eq 0) do begin
 
   ;print,''
@@ -241,23 +241,30 @@ WHILE (flag eq 0) do begin
     ; Run sextractor on star subtracted file
     printlog,logf,'Running SExtractor'
     FILE_DELETE,catfile,/allow               ; delete sextractor catalog file
-    SPAWN,'sex '+subfile+' -c '+sexconfigfile,out,errout
-    if file_test(catfile) eq 0 then begin  ; not output file
+    SPAWN,['sex',subfile,'-c',sexconfigfile],out,errout,/noshell
+    info = file_info(catfile)
+    if info.exists eq 0 or info.size eq 0 then begin  ; no output file
       error = 'Error when running SExtractor'
       printlog,logf,error
       return
     endif
-    num = file_lines(catfile)
-    printlog,logf,'SExtractor found '+strtrim(num,2)+' sources'
-
-    ;stop
 
     ;-------------------------------------
     ; Load sextractor output file
     ; default.param specifies the output columns
-    fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
-    sex = IMPORTASCII(catfile,fieldnames=fields,/noprint)
+    if file_isfits(catfile) eq 0 then begin
+      READLINE,'default.param',fields
+      gd = where(strmid(fields,0,1) ne '#' and strtrim(fields,2) ne '',ngd)
+      fields = fields[gd]
+      fields = repstr(fields,'(1)','')
+      ;fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
+      sex = IMPORTASCII(catfile,fieldnames=fields,/noprint)
+    endif else begin
+      sex = MRDFITS(catfile,1,/silent)
+      if n_tags(sex) eq 1 then sex=MRDFITS(catfile,2,/silent)
+    endelse
     nsex = n_elements(sex)
+    printlog,logf,'SExtractor found '+strtrim(nsex,2)+' sources'
 
     ;-------------------------------------
     ; Make coordinate input file for ALLSTAR
@@ -276,6 +283,7 @@ WHILE (flag eq 0) do begin
     coofile = base+'_all.coo'
     FILE_DELETE,coofile,/allow    ; delete final coordinate file
     nals = n_elements(als) 
+
     ; ALS file exists, concatenate
     if nals gt 0 then begin
 
@@ -285,11 +293,11 @@ WHILE (flag eq 0) do begin
       ; Making ALS structure for new SEX sources
       dum = {ID:0L,X:0.0,Y:0.0,MAG:0.0,ERR:0.0,SKY:0.0,ITER:0.0,CHI:0.0,SHARP:0.0}
       sex2 = replicate(dum,nsex)
-      sex2.id = sex.id + maxid    ; offset the IDs, sex IDs start at 1
-      sex2.x = sex.x
-      sex2.y = sex.y
-      sex2.mag = sex.mag
-      sex2.err = sex.err
+      sex2.id = sex.number + maxid    ; offset the IDs, sex IDs start at 1
+      sex2.x = sex.x_image
+      sex2.y = sex.y_image
+      sex2.mag = sex.mag_aper
+      sex2.err = sex.magerr_aper
       sex2.sky = median(als.sky)
       sex2.iter = 1
       sex2.chi = 1.0
@@ -299,14 +307,13 @@ WHILE (flag eq 0) do begin
       ; This will be a file that has all sources SExtractor found
       ; with their IDs properly offset so they can be matched to the
       ; final ALS file
-      sex.id = sex.id + maxid     ; offse the IDs
-      ;tempfile = maketemp('temp','txt')
-      tempfile = MKTEMP('temp')
-      WRITECOL,tempfile,sex.id,sex.x,sex.y,sex.mag,sex.err,sex.flags,sex.star,$
-               fmt='(I10,F11.3,F11.3,F9.4,F9.4,I4,F6.2)'
-      SPAWN,'cat '+tempfile+' >> '+sexfile,out,errout
-      FILE_DELETE,tempfile,/allow
-
+      sex.number += maxid     ; offset the IDs
+      ;tempfile = MKTEMP('temp')
+      ;WRITECOL,tempfile,sex.number,sex.x_image,sex.y_image,sex.mag_aper,sex.magerr_aper,$
+      ;         sex.flags,sex.class_star,fmt='(I10,F11.3,F11.3,F9.4,F9.4,I4,F6.2)'
+      ;SPAWN,'cat '+tempfile+' >> '+sexfile,out,errout
+      ;FILE_DELETE,tempfile,/allow
+      PUSH,allsex,sex
 
       ; Concatenate
       all = [als,sex2]
@@ -315,18 +322,35 @@ WHILE (flag eq 0) do begin
       ; Write to file
       WRITEALS,coofile,all,alshead
 
-      ;print,'Iter ',strtrim(count,2),':  ',strtrim(nall,2),' stars so far'
-
     ; First time, no ALS file yet
     endif else begin
 
-      ; Copy SExtractor output to file of all SExtractor sources
-      FILE_COPY,catfile,sexfile,/overwrite
+      ; Making ALS structure for new SEX sources
+      dum = {ID:0L,X:0.0,Y:0.0,MAG:0.0,ERR:0.0,SKY:0.0,ITER:0.0,CHI:0.0,SHARP:0.0}
+      sex2 = replicate(dum,nsex)
+      sex2.id = sex.number
+      sex2.x = sex.x_image
+      sex2.y = sex.y_image
+      sex2.mag = sex.mag_aper
+      sex2.err = sex.magerr_aper
+      sex2.sky = 0.0
+      sex2.iter = 1
+      sex2.chi = 1.0
+      sex2.sharp = 0.0
 
-      ; Use the sextractor output file
-      FILE_COPY,catfile,coofile,/overwrite
-      ; Prepend ALS header
-      WRITELINE,coofile,head,/prepend
+      ; Write to file
+      WRITEALS,coofile,sex2,head
+
+      ;; Initialize the structure of all SExtractor detections
+      allsex = sex
+
+      ; Copy SExtractor output to file of all SExtractor sources
+      ;FILE_COPY,catfile,sexfile,/overwrite
+
+      ;; Use the sextractor output file
+      ;FILE_COPY,catfile,coofile,/overwrite
+      ;; Prepend ALS header
+      ;WRITELINE,coofile,head,/prepend
 
       ;print,'Iter ',strtrim(count,2),':  ',strtrim(nsex,2),' stars so far'
 
@@ -527,6 +551,9 @@ WHILE (flag eq 0) do begin
   count++
 
 ENDWHILE
+
+;; Write out the SExtractor catalog
+MWRFITS,allsex,sexfile,/create
 
 ; The X/Y pixel coordinates should already be in the reference image
 ; coordinate system

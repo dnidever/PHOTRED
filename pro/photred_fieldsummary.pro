@@ -64,6 +64,11 @@ if scriptsdir eq '' then begin
   return
 endif
 
+; MCHUSETILES
+mchusetiles = READPAR(setup,'MCHUSETILES')
+if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
+tilesep = '+'
+
 ; LOAD THE "imagers" FILE
 ;----------------------------
 ;printlog,logfile,'Loading imager information'
@@ -116,17 +121,9 @@ printlog,logfile
 ;#   Find all files for this field
 ;#########################################
 
-; Search for files in the directory.
-if thisimager.namps gt 1 then begin
-  chstring = '' ; make regular expression for the chip number
-  ndig = ceil(alog10(thisimager.namps))
-  for l=0,ndig-1 do chstring+='[0-9]'
-  fieldfiles = FILE_SEARCH(field+'-*'+thisimager.separator+chstring+['.fits','.fits.fz'],count=nfieldfiles)
-endif else begin
-  fieldfiles = FILE_SEARCH(field+'-*'+['.fits','.fits.fz'],count=nfieldfiles)
-endelse
-
-; Remove a.fits, s.fits, _comb.fits and other "temporary" files.
+;; Get files for this field from the success list
+READLIST,setupdir+'/logs/DAOPHOT.success',fieldfiles,/unique,/fully,setupdir=setupdir,count=nfieldfiles,logfile=logfile,/silent
+;; Get the files for this field
 if nfieldfiles gt 0 then begin
   ; Get base names
   fbases = strarr(nfieldfiles)
@@ -140,24 +137,15 @@ if nfieldfiles gt 0 then begin
       fext[i] = 'fits'
     endelse
   endfor
-  bad = where(stregex(fbases,'a$',/boolean) eq 1 or $         ; psf stars image
-              stregex(fbases,'s$',/boolean) eq 1 or $         ; allstar subtracted file
-              stregex(fbases,'_0$',/boolean) eq 1 or $        ; _0 header file from splitting 
-              stregex(fbases,'_comb$',/boolean) eq 1 or $     ; stacked field image
-              stregex(fbases,'_comb.bpm$',/boolean) eq 1 or $     ; stacked field image
-              stregex(fbases,'_comb_sub$',/boolean) eq 1 or $ ; allstar subtracted stacked image
-              stregex(fbases,'j$',/boolean) eq 1 or $         ; allframe temp file
-              stregex(fbases,'k$',/boolean) eq 1 or $         ; allframe temp file
-              stregex(fbases,'jnk$',/boolean) eq 1,nbad)      ; daophot? temp file
-  if nbad gt 0 then begin
-    if nbad eq nfieldfiles then begin
-      undefine,fieldfiles
-      nfieldfiles = 0
-    endif else begin
-      REMOVE,bad,fieldfiles,fbases,fext
-      nfieldfiles = n_elements(fieldfiles)
-    endelse
-  endif ; some ones to remove
+  ;; Get files only for this field
+  flen = strlen(field)
+  gd = where(strmid(fbases,0,flen+1) eq field+'-',nfieldfiles)
+  if nfieldfiles gt 0 then begin
+    fieldfiles = fieldfiles[gd]
+    fbases = fbases[gd]
+    fext = fext[gd]
+  endif
+
   ; Make sure they are unique
   ;  sometimes you can accidentally get a fits and fits.fz files
   ;  for the same image
@@ -178,10 +166,12 @@ if nfieldfiles gt 0 then begin
     if nbad gt 0 then REMOVE,bad,fieldfiles,fbases,fext
     nfieldfiles = n_elements(fieldfiles)
   endif
-endif else begin  ; some fieldfiles
+endif
+
+if nfieldfiles eq 0 then begin
   printlog,logfile,'No ',field,' files found in current directory'
   return
-endelse
+endif
 
 printlog,logfile,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
 
@@ -216,6 +206,30 @@ if file_test(apcorfile) eq 1 then begin
   apcor.name = repstr(apcor.name,'a.del','')  ; base names
 endif
 
+;; Load all the ALS files in the MCH files
+;;  this makes a difference if we are using tiles
+if keyword_set(mchusetiles) then begin
+  READLIST,setupdir+'/logs/ASTROM.success',mchfiles,/unique,/fully,setupdir=setupdir,count=nmchfiles,logfile=logfile,/silent
+  ;; Replace any .mag with .mch
+  mchfiles = repstr(mchfiles,'.mag','.mch')
+  ;; Get files for this FIELD
+  flen = strlen(field)
+  gd = where(strmid(file_basename(mchfiles),0,flen+1) eq field+'-',ngd)
+  if ngd gt 0 then begin
+    mchfiles = mchfiles[gd]
+    nmchfiles = n_elements(mchfiles)
+    ;; Load all of the ALS files from the MCH files
+    undefine,alsinfo
+    for i=0,nmchfiles-1 do begin
+      LOADMCH,mchfiles[i],alsfiles,count=nalsfiles
+      alsinfo1 = replicate({dir:'',mchfile:'',alsfile:''},nalsfiles)
+      alsinfo1.dir = file_dirname(mchfiles[i])
+      alsinfo1.mchfile = file_basename(mchfiles[i])
+      alsinfo1.alsfile = alsfiles
+      push,alsinfo,alsinfo1
+    endfor
+ endif else printlog,logfile,'No ALS files in the MCH files for this field'
+endif else printlog,logfile,'No MCH files for this field'
 
 ; Loop through all files for this field
 ;  and gather all of the necessary information
@@ -278,12 +292,12 @@ For i=0,nfieldfiles-1 do begin
   ; From FITS header
   ;  nx, ny, ctype, scale, ra, dec
   if fpack eq 1 then begin
-    head = headfits(fitsfile,exten=1)
+    head = PHOTRED_READFILE(fitsfile,exten=1,/header)
     ; Fix the NAXIS1/NAXIS2 in the header
     sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
     sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin
-    head = headfits(fitsfile)
+    head = PHOTRED_READFILE(fitsfile,/header)
   endelse
   nx = sxpar(head,'NAXIS1',count=n_nx)
   if n_nx gt 0 then chipstr[i].nx = nx
@@ -324,9 +338,9 @@ For i=0,nfieldfiles-1 do begin
   endif
      
   ; Load DAOPHOT log file
-  logfile = base+'.log'
-  if file_test(logfile) eq 1 then begin
-    READLINE,logfile,loglines
+  daologfile = base+'.log'
+  if file_test(daologfile) eq 1 then begin
+    READLINE,daologfile,loglines
     ; Sky mode and standard deviation =   48.608    4.110
     ind = where(stregex(loglines,'Sky mode',/boolean,/fold_case) eq 1,nind)
     if nind gt 0 then begin
@@ -339,7 +353,7 @@ For i=0,nfieldfiles-1 do begin
     endif
   endif
   if n_elements(skymode) eq 0 then begin 
-    FITS_READ,fitsfile,im,head
+    im = PHOTRED_READFILE(fitsfile,head)
     SKY,im,skymode,skysig,/silent
     chipstr[i].skymode = skymode
     chipstr[i].skysig = skysig
@@ -352,7 +366,7 @@ For i=0,nfieldfiles-1 do begin
     chipstr[i].dao_nsources = nals
     ; Calculate "depth"
     if nals gt 0 then begin
-      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=50)
+      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
       xhist += 0.5*0.2
       DLN_MAXMIN,hist,minarr,maxarr
       alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
@@ -456,18 +470,32 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Load ALF file
-  alffile = base+'.alf'
-  if file_test(alffile) eq 1 then begin
-    LOADALS,alffile,alf,alfhead,count=nalf
-    chipstr[i].alf_nsources = nalf
-    ; Calculate "depth"
-    if nalf gt 1 then begin
-      hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=50)
-      xhist += 0.5*0.2
-      DLN_MAXMIN,hist,minarr,maxarr
-      alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-      chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
-    endif
+  nalf = -1
+  if keyword_set(mchusetiles) eq 0 then begin
+    alffile = base+'.alf'
+    if file_test(alffile) eq 1 then LOADALS,alffile,alf,alfhead,count=nalf
+  ;; Using TILES
+  endif else begin
+    gd = where(stregex(alsinfo.alsfile,'^'+base,/boolean) eq 1,ngd)
+    undefine,alf
+    for j=0,ngd-1 do begin
+      alffile1 = alsinfo[gd[j]].dir+'/'+repstr(alsinfo[gd[j]].alsfile,'.als','.alf')
+      if file_test(alffile1) eq 1 then begin
+        LOADALS,alffile1,alf1,alfhead1,count=nalf1 
+        if nalf1 gt 0 then PUSH,alf,alf1
+      endif
+    endfor
+    nalf = n_elements(alf)
+  endelse
+  if nalf gt 0 then chipstr[i].alf_nsources = nalf
+
+  ; Calculate ALF "depth"
+  if nalf gt 1 then begin
+    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=30)
+    xhist += 0.5*0.2
+    DLN_MAXMIN,hist,minarr,maxarr
+    alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+    chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
   endif
 
   ; Get aperture corretion
@@ -478,7 +506,6 @@ For i=0,nfieldfiles-1 do begin
 
   printlog,logfile,i+1,base,chipstr[i].filter,chipstr[i].exptime,chipstr[i].wcsrms,chipstr[i].fwhm,chipstr[i].skymode,chipstr[i].skysig,chipstr[i].dao_nsources,chipstr[i].dao_depth,$
            chipstr[i].dao_psftype,chipstr[i].dao_npsfstars,chipstr[i].dao_psfchi,chipstr[i].alf_nsources,chipstr[i].apcor,format='(I5,A18,A5,F8.2,2F8.4,F8.2,F8.3,I9,F9.2,A11,I8,F8.3,I8,F8.3)'
-
 Endfor
 
 
@@ -490,165 +517,147 @@ Endfor
 printlog,logfile,' '
 printlog,logfile,'Getting calibrated photometry from the .phot files'
 
-; Loop through the chips
-ui = uniq(chipstr.chip,sort(chipstr.chip))
-chips = chipstr[ui].chip
-nchips = n_elements(chips)
-For i=0,nchips-1 do begin
-  ichip = chips[i]
-
-  ; Getting the entries for this chip
-  indchip = where(chipstr.chip eq ichip,nindchip)
-
-  ; Load PHOT file
-  if thisimager.namps gt 1 then begin
-    ndig = floor(alog10(thisimager.namps))+1
-    fmt = '(i0'+strtrim(ndig,2)+')'
-    photfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.phot'
-    mchfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.mch'
-    inputfile = refbase+thisimager.separator+string(ichip,format=fmt)+'.input'
+;; Loop over the groups/phot files
+READLIST,setupdir+'/logs/COMBINE.success',photfiles,/unique,/fully,setupdir=setupdir,count=nphotfiles,logfile=logfile,/silent
+flen = strlen(field)
+gd = where(strmid(file_basename(photfiles),0,flen+1) eq field+'-',ngd)
+if ngd gt 0 then begin
+  photfiles = photfiles[gd]
+  nphotfiles = ngd
+endif else begin
+  printlog,logfile,'NO phot files for field '+field
+  undefine,photfiles
+  nphotfiles = 0
+endelse
+For i=0,nphotfiles-1 do begin
+  ;; Load the phot and mch files
+  phot = PHOTRED_READFILE(photfiles[i],meta)
+  phtags = tag_names(phot)
+  mchfile = repstr(photfiles[i],'.phot','.mch')
+  LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
+  inputfile = repstr(photfiles[i],'.phot','.input')
+  READLINE,inputfile,inputlines
+  inputarr = strsplit(inputlines[0],' ',/extract)
+  ;   Old or New format, check if the second value is
+  ;     an integer (new format, NIGHT) or character (old format,
+  ;     band/filter name)
+  ;    All lines need to use the same format (old or new)
+  newformat = valid_num(inputarr[1],/integer)
+  ; -- NEW Format --
+  ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture
+  ;   correction, Band2 ... 
+  if newformat then begin
+    alsfilter = inputarr[3:*:6]  ; filters
+  ; -- OLD Format --
+  ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
+  ;   aperture correction, Band2 ... 
   endif else begin
-    photfile = refbase+'.phot'
-    mchfile = refbase+'.mch'
-    inputfile = refbase+'.input'
+    alsfilter = inputarr[1:*:4]  ; filters
   endelse
 
-  ; Loading the calibrated photometry
-  if file_test(photfile) eq 1 and file_test(mchfile) eq 1 and file_test(inputfile) eq 1 then begin
-    phot = IMPORTASCII(photfile,/header,/silent)
-    phtags = tag_names(phot)
-    LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
-    READLINE,inputfile,inputlines
-    inputarr = strsplit(inputlines[0],' ',/extract)
-    ;   Old or New format, check if the second value is
-    ;     an integer (new format, NIGHT) or character (old format,
-    ;     band/filter name)
-    ;    All lines need to use the same format (old or new)
-    newformat = valid_num(inputarr[1],/integer)
-    ; -- NEW Format --
-    ; photometry filename, NIGHT, CHIP, filter, airmass, exptime, aperture
-    ;   correction, Band2 ... 
-    if newformat then begin
-      alsfilter = inputarr[3:*:6]  ; filters
-    ; -- OLD Format --
-    ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
-    ;   aperture correction, Band2 ... 
+  printlog,logfile,i+1,file_basename(photfiles[i]),n_elements(phot),format='(I5,A22,I8)'
+
+  ; Creating the column names (code from photcalib.pro)
+  ui = uniq(alsfilter,sort(alsfilter))
+  ubands = alsfilter[ui]
+  nubands = n_elements(ubands)
+  magname = strarr(n_elements(alsfiles))
+  for j=0,nubands-1 do begin
+    gdbands = where(alsfilter eq ubands[j],ngdbands)
+    ; More than one observation in this band
+    if (ngdbands gt 1) then begin
+      magname[gdbands] = strupcase(ubands[j])+'MAG'+strtrim(indgen(ngdbands)+1,2)
+    ; Only ONE obs in this band
     endif else begin
-      alsfilter = inputarr[1:*:4]  ; filters
+      magname[gdbands[0]] = strupcase(ubands[j])+'MAG'
     endelse
+  endfor
+  ; But these column/mag names are only correct if it
+  ;  saved the individual exposure magnitudes
 
-    printlog,logfile,i+1,photfile,n_elements(phot),format='(I5,A22,I8)'
+  ;; Get the CHIPSTR indices for the als files for this group
+  if keyword_set(mchusetiles) then begin
+    alsbase = reform((strsplitter(alsfiles,tilesep+'T',/extract))[0,*])
+  endif else alsbase=file_basename(alsfiles,'.als')
+  MATCH,chipstr.base,alsbase,indgrp,alsind,/sort,count=nindgrp
 
-    ; Creating the column names (code from photcalib.pro)
-    ui = uniq(alsfilter,sort(alsfilter))
-    ubands = alsfilter[ui]
-    nubands = n_elements(ubands)
-    magname = strarr(n_elements(alsfiles))
-    for j=0,nubands-1 do begin
-      gdbands = where(alsfilter eq ubands[j],ngdbands)
-      ; More than one observation in this band
-      if (ngdbands gt 1) then begin
-        magname[gdbands] = strupcase(ubands[j])+'MAG'+strtrim(indgen(ngdbands)+1,2)
-      ; Only ONE obs in this band
-      endif else begin
-        magname[gdbands[0]] = strupcase(ubands[j])+'MAG'
-      endelse
-    endfor
-    ; But these column/mag names are only correct if it
-    ;  saved the individual exposure magnitudes
+  ; Loop through the matched images for this group
+  for j=0,nindgrp-1 do begin
+    indgrp1 = indgrp[j]
+    alsind1 = alsind[j]
+    imagname = magname[alsind1]
+    phind = where(phtags eq imagname,nphind)
+    if nphind gt 0 then begin
+      ; Calculate "depth"
+      hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
+      xhist += 0.5*0.2
+      DLN_MAXMIN,hist,minarr,maxarr
+      depth = xhist[first_el(maxarr,/last)] ; use last maximum
+      chipstr[indgrp1].calib_depth = depth   ; calibrated "depth"
+      chipstr[indgrp1].calib_magname = imagname  ; keep track of magname
+      ;; CALIB_MAGNAME will not be unique if using TILES!!!
 
-    ; Loop through the exposures for this chip
-    For j=0,nindchip-1 do begin
-      ind = where(alsfiles eq chipstr[indchip[j]].base+'.als',nind)
-      if nind gt 0 then begin
-        imagname = magname[ind[0]]
-        phind = where(phtags eq imagname,nphind)
-        if nphind gt 0 then begin
-          ; Calculate "depth"
-          hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
-          xhist += 0.5*0.2
-          DLN_MAXMIN,hist,minarr,maxarr
-          depth = xhist[first_el(maxarr,/last)] ; use last maximum
-          chipstr[indchip[j]].calib_depth = depth   ; calibrated "depth"
-          chipstr[indchip[j]].calib_magname = imagname  ; keep track of magname
-
-          ; Get EBV for these stars
-          gdmag = where(phot.(phind[0]) lt 50,ngdmag)
-          if ngdmag gt 0 then begin
-            SRCMATCH,final.ra,final.dec,phot[gdmag].ra,phot[gdmag].dec,0.2,ind1,ind2,/sph,count=nmatch
-            if nmatch gt 0 then begin
-              med_ebv = median([final[ind1].ebv],/even)
-              chipstr[indchip[j]].ebv = med_ebv
-            endif
-          endif
-
-        endif ; we have the proper column/tag
-      endif  ; we have a match in the mch file
-    Endfor  ; exposure loop
-       
-  endif else begin ; the phot/mch/input files exist
-    printlog,logfile,i+1,photfile,' Not found',format='(I5,A22,A10)'
-  endelse
+      ; Get EBV for these stars
+      gdmag = where(phot.(phind[0]) lt 50,ngdmag)
+      if ngdmag gt 0 then begin
+        SRCMATCH,final.ra,final.dec,phot[gdmag].ra,phot[gdmag].dec,0.2,ind1,ind2,/sph,count=nmatch
+        if nmatch gt 0 then begin
+          med_ebv = median([final[ind1].ebv],/even)
+          chipstr[indgrp1].ebv = med_ebv
+        endif
+      endif
+    endif ; we have the proper column/tag
+  Endfor  ; images in group loop
 
   ; Fill in transformation equation info
   if n_elements(trans) gt 0 then begin
-    ; CHIP-SPECIFIC transformation equations
-    inptrans = trans  ; global trans eqns by default
-    if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
-      inptransfile = ''
-      ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
-      chip = long(ext)
-      ind = where(trans.chip eq chip,nind)
-      if nind gt 0 then inptrans=trans[ind]
-    endif
-
-    ; We have transformation equations
-    if n_elements(inptrans) gt 0 then begin 
-      ; Loop through the exposures
-      For j=0,nindchip-1 do begin
-        indtrans = where(inptrans.band eq chipstr[indchip[j]].filter,nindtrans)
-        if nindtrans gt 0 then begin
-          inptrans1 = inptrans[indtrans[0]]
-          chipstr[indchip[j]].calib_color = inptrans1.color
-          chipstr[indchip[j]].calib_zpterm = inptrans1.zpterm
-          chipstr[indchip[j]].calib_amterm = inptrans1.amterm
-          chipstr[indchip[j]].calib_colorterm = inptrans1.colterm
-        endif
-      Endfor
-    endif  ; we have transformation equations
+    ; Loop through the images in this group
+    For j=0,nindgrp-1 do begin
+      indgrp1 = indgrp[j]
+      alsind1 = alsind[j]
+      if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
+        indtrans = where(trans.band eq chipstr[indgrp1].filter and $
+                         trans.chip eq chipstr[indgrp1].chip,nindtrans)
+      endif else begin
+        indtrans = where(trans.band eq chipstr[indgrp1].filter,nindtrans)
+      endelse
+      trans1 = trans[indtrans[0]]
+      chipstr[indgrp1].calib_color = trans1.color
+      chipstr[indgrp1].calib_zpterm = trans1.zpterm
+      chipstr[indgrp1].calib_amterm = trans1.amterm
+      chipstr[indgrp1].calib_colorterm = trans1.colterm
+    Endfor
   endif 
 
-
   ; Get EBV another way if necessary
-  bdebv = where(finite(chipstr[indchip].ebv) eq 0,nbdebv)
+  bdebv = where(finite(chipstr[indgrp].ebv) eq 0,nbdebv)
   for j=0,nbdebv-1 do begin
-    fitsfile = chipstr[indchip[bdebv[j]]].file
+    fitsfile = chipstr[indgrp[bdebv[j]]].file
     fitstest = file_test(fitsfile)
-    alsfile = chipstr[indchip[bdebv[j]]].base+'.als'
+    alsfile = chipstr[indgrp[bdebv[j]]].base+'.als'
     alstest = file_test(alsfile)
-    coofile = chipstr[indchip[bdebv[j]]].base+'.coo'
+    coofile = chipstr[indgrp[bdebv[j]]].base+'.coo'
     cootest = file_test(coofile)
     if fitstest eq 1 and (alstest eq 1 or cootest eq 1) then begin
       if alstest eq 1 then LOADALS,alsfile,cat else $
         LOADCOO,coofile,cat
       if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
-        head = headfits(fitsfile,exten=1)
+        head = PHOTRED_READFILE(fitsfile,exten=1,/header)
         ; Fix the NAXIS1/NAXIS2 in the header
         sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
         sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
       endif else begin
-        head = headfits(fitsfile)
+        head = PHOTRED_READFILE(fitsfile,/header)
       endelse
       HEAD_XYAD,head,cat.x-1,cat.y-1,ra,dec,/deg
       SRCMATCH,final.ra,final.dec,ra,dec,0.2,ind1,ind2,/sph,count=nmatch
       if nmatch gt 0 then begin
         med_ebv = median([final[ind1].ebv],/even)
-        chipstr[indchip[bdebv[j]]].ebv = med_ebv
+        chipstr[indgrp[bdebv[j]]].ebv = med_ebv
       endif
     endif
   endfor  ; bad EBV loop
-
-Endfor    ; chip loop
+Endfor  ; group loop
 
 
 ; Create the exposure level information structure

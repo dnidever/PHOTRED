@@ -1,5 +1,3 @@
-pro wcscopy,file1,file2,stp=stp,distortion=distortion
-
 ;+
 ;
 ; WCSCOPY
@@ -20,6 +18,8 @@ pro wcscopy,file1,file2,stp=stp,distortion=distortion
 ;
 ; By D. Nidever   Jun 2008
 ;-
+
+pro wcscopy,file1,file2,stp=stp,distortion=distortion
 
 nfile1 = n_elements(file1)
 nfile2 = n_elements(file2)
@@ -51,9 +51,9 @@ endif
 
 
 ; Loading FILE1
-FITS_READ,file1,im1,head1,message=error1
+im1 = PHOTRED_READFILE(file1,head1,error=error1)
 
-if (error1 ne '') then begin
+if n_elements(error1) gt 0 then begin
   print,'ERROR reading in ',file1
   print,error1
   return
@@ -80,9 +80,9 @@ if (n_elements(astr1) eq 0) then begin
 endif
 
 ; Loading FILE2
-FITS_READ,file2,im2,head2,message=error2
+im2 = PHOTRED_READFILE(file2,head2,error=error2)
 
-if (error2 ne '') then begin
+if n_elements(error2) gt 0 then begin
   print,'ERROR reading in ',file2
   print,error2
   return
@@ -102,9 +102,9 @@ endelse
 
 ; Updating FILE2
 print,'Updating ',file2
-MODFITS,file2,0,head2,errmsg=errmsg
+FITS_WRITE_RESOURCE,file2,0,head2,error=error
 
-if (n_elements(errmsg) ne 0) then begin
+if n_elements(error) gt 0 then begin
   print,'ERROR updating ',file2
   print,errmsg
 endif

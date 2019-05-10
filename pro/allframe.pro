@@ -27,6 +27,7 @@
 ;  /combtrim      Trim the combined images to the overlapping region.
 ;                   This used to be the default, but now the default
 ;                   is to keep the entire original region.
+;  =setupdir      The original base directory which contains photred.setup.
 ;  =scriptsdir    The directory that contains all of the necessary scripts.
 ;  =irafdir       The IRAF home directory.
 ;  =logfile       A logfile to print to output to.
@@ -34,6 +35,7 @@
 ;  /fake          Run for artificial star tests.
 ;  =catformat     Catalog format to use: FITS or ASCII.  Default is ASCII.
 ;  =imager        Imager structure with basic information.
+;  =workdir       Use a temporary working directory with this as the base.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -49,10 +51,10 @@
 ;-
 
 
-pro allframe,file,tile=tile,stp=stp,scriptsdir=scriptsdir,detectprog=detectprog,$
+pro allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager
+             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir,stp=stp
 
 COMMON photred,setup
 
@@ -60,11 +62,12 @@ undefine,error
 
 ; Not enough inputs
 nfile = n_elements(file)
-if (nfile eq 0) then begin
-  print,'Syntax - allframe,file,tile=tile,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
+if (nfile eq 0) or n_elements(setupdir) eq 0 then begin
+  print,'Syntax - allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
   print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
-  print,'                  imager=imager,stp=stp'
+  print,'                  imager=imager,workdir=workdir,stp=stp'
+  error = 'Not enough inputs'
   return
 endif
 
@@ -85,6 +88,13 @@ if (Error_status ne 0) then begin
    return
 endif
 
+;; Get the setup information
+nsetup = n_elements(setup)
+if nsetup eq 0 then begin
+  PHOTRED_LOADSETUP,setup,setupdir=setupdir,count=count
+  if count lt 1 then return
+endif
+
 ; How many FIND iterations
 if n_elements(finditer0) eq 0 then finditer=2 else finditer=finditer0
 finditer = finditer < 10  ; maximum 10.
@@ -96,19 +106,16 @@ if n_elements(satlevel) eq 0 then satlevel=6e4
 if n_elements(nocmbimscale) eq 0 then nocmbimscale=0
 
 ; Getting scripts directory and iraf directory
-nsetup = n_elements(setup)
-if nsetup gt 0 then begin
-  scriptsdir = READPAR(setup,'SCRIPTSDIR')
-  irafdir = READPAR(setup,'IRAFDIR')
-endif
+scriptsdir = READPAR(setup,'SCRIPTSDIR')
+irafdir = READPAR(setup,'IRAFDIR')
 
 ; Catalog format
 if n_elements(catformat) eq 0 then catformat='ASCII'
 
 ; No irafdir
 if n_elements(scriptsdir) eq 0 then begin
-  printlog,logf,'SCRIPTSDIR NOT INPUT'
   error = 'SCRIPTSDIR NOT INPUT'
+  printlog,logf,error
   return
 endif
 
@@ -116,14 +123,15 @@ endif
 ;---------------------------------------------------------------
 CHECK_IRAF,iraftest,irafdir=irafdir
 if iraftest eq 0 then begin
-  print,'IRAF TEST FAILED.  EXITING'
+  error = 'IRAF TEST FAILED.  EXITING'
+  print,error
   return
 endif
 
 ; No scriptsdir
 if n_elements(scriptsdir) eq 0 then begin
-  printlog,logf,'SCRIPTSDIR NOT INPUT'
   error = 'SCRIPTSDIR NOT INPUT'
+  printlog,logf,error
   return
 endif
 ; Check if the scripts exist in the current directory
@@ -134,14 +142,12 @@ nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   info = FILE_INFO(scriptsdir+'/'+scripts[i])
   curinfo = FILE_INFO(scripts[i])
-
   ; No file
   if info.exists eq 0 or info.size eq 0 then begin
-    printlog,logf,scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY'
     error = scriptsdir+'/'+scripts[i]+' NOT FOUND or EMPTY'
+    printlog,logf,error
     return
   endif
-
   ; Check if the two files are the same size, if not copy it
   if info.size ne curinfo.size then begin
     FILE_COPY,info.name,curinfo.name,/overwrite
@@ -150,14 +156,15 @@ endfor ; scripts loop
 
 
 ; Check that the ALLFRAME program exists
-SPAWN,'which allframe',out,errout
+SPAWN,['which','allframe'],out,errout,/noshell
 allframefile = FILE_SEARCH(out,count=nallframefile)
 ;allframefile = FILE_SEARCH('/net/halo/bin/allframe.2008',count=nallframefile)
 ;allframefile = FILE_SEARCH('/net/halo/bin/allframe.2004.fixed',count=nallframefile)
 if (nallframefile eq 0) then begin
   ;printlog,logf,'/net/halo/bin/allframe.2004.fixed NOT FOUND'
   ;printlog,logf,'/net/halo/bin/allframe.2008 NOT FOUND'
-  printlog,logf,allframefile+'NOT FOUND'
+  error = allframefile+'NOT FOUND'
+  printlog,logf,error
   return
 endif
 
@@ -165,11 +172,13 @@ endif
 if n_elements(tile) eq 0 then cmborig=1
 if n_elements(tile) eq 1 then begin
   if size(tile,/type) ne 8 then begin
-    printlog,logf,'TILE must be a structure'
+    error = 'TILE must be a structure'
+    printlog,logf,error
     return
   endif
   if tag_exist(tile,'TYPE') eq 0then begin
-    printlog,logf,'TILE must have a TYPE column'
+    error = 'TILE must have a TYPE column'
+    printlog,logf,error
     return
   endif
   if tile.type eq 'ORIG' then cmborig=1
@@ -197,17 +206,18 @@ cd,mchdir
 ; Check that the mch, als, and opt files exist
 mchtest = file_test(mchfile)
 if mchtest eq 0 then begin
-  printlog,logf,mchfile,' NOT FOUND'
+  error = mchfile+' NOT FOUND'
+  printlog,logf,error
   return
 endif
 
 ; Checking RAW file
 rawtest = file_test(mchbase+'.raw')
 if rawtest eq 0 then begin
-  printlog,logf,mchbase+'.raw NOT FOUND'
+  error = mchbase+'.raw NOT FOUND'
+  printlog,logf,error
   return
 endif
-
 
 ;###########################################
 ; CHECK NECESSARY FILES
@@ -225,7 +235,8 @@ for i=0,nfiles-1 do begin
   ; Checking FITS file
   fitstest = file_test(base+'.fits') or file_test(base+'.fits.fz')
   if fitstest eq 0 then begin
-    printlog,logf,base+'.fits/.fits.fz NOT FOUND'
+    error = base+'.fits/.fits.fz NOT FOUND'
+    printlog,logf,error
     return
   endif
 
@@ -239,42 +250,48 @@ for i=0,nfiles-1 do begin
   ; Checking OPT file
   opttest = file_test(base+'.opt')
   if opttest eq 0 then begin
-    printlog,logf,base+'.opt NOT FOUND'
+    error = base+'.opt NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking ALS.OPT file
   alsopttest = file_test(base+'.als.opt')
   if alsopttest eq 0 then begin
-    printlog,logf,base+'.als.opt NOT FOUND'
+    error = base+'.als.opt NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking AP file
   aptest = file_test(base+'.ap')
   if aptest eq 0 then begin
-    printlog,logf,base+'.ap NOT FOUND'
+    error = base+'.ap NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking ALS file
   alstest = file_test(base+'.als')
   if alstest eq 0 then begin
-    printlog,logf,base+'.als NOT FOUND'
+    error = base+'.als NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking LOG file
   logtest = file_test(base+'.log')
   if logtest eq 0 then begin
-    printlog,logf,base+'.log NOT FOUND'
+    error = base+'.log NOT FOUND'
+    printlog,logf,error
     return
   endif
 
   ; Checking PSF file
   psftest = file_test(base+'.psf')
   if psftest eq 0 then begin
-    printlog,logf,base+'.psf NOT FOUND'
+    error = base+'.psf NOT FOUND'
+    printlog,logf,error
     return
   endif
 
@@ -304,6 +321,30 @@ if keyword_set(fake) then begin
     return
   endif
 endif
+
+
+;;------------------------------------
+;; Using a temporary working directory
+;;------------------------------------
+if n_elements(workdir) gt 0 then begin
+  ;; Create a temporary directory in WORKDIR
+  if FILE_TEST(workdir,/directory) eq 0 then FILE_MKDIR,workdir
+  tempdir = first_el(MKTEMP('alf',outdir=workdir,/directory))
+  FILE_CHMOD,tempdir,/a_execute
+  printlog,logf,'Working in temporary directory ',tempdir
+  ;; Copy over the files that we need
+  ;;  this will copy the contents of symlinks
+  FILE_COPY,mchbase+['.mch','.raw','.tfr'],tempdir
+  for i=0,nfiles-1 do FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
+  ;; Copy files for FAKE
+  if keyword_set(fake) then FILE_COPY,mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],tempdir
+  ;; Copy the scripts
+  FILE_COPY,scripts,tempdir
+  ;; Go there
+  CD,tempdir
+endif
+
+
 
 
 ;###########################################
@@ -347,30 +388,20 @@ printlog,logf,systime(0)
 combbase = file_basename(combfile,'.fits')
 if not keyword_set(fake) then begin
   ; Make .opt files, set saturation just below the mask data level
-  MKOPT,combfile,satlevel=maskdatalevel-1000
+  PHOTRED_MKOPT,combfile,va=1,hilimit=maskdatalevel-1000,error=opterror
+  if n_elements(opterror) gt 0 then begin
+    printlog,logf,opterror
+    return
+  endif
+  ;MKOPT,combfile,satlevel=maskdatalevel-1000
   ; THIS IS NOW DONE IN ALLFRAME_COMBINE/ALLFRAME_COMBINE_ORIG.PRO ABOVE
   ;; Using CMN.LST of reference frame if it exists
   ;if file_test(mchbase+'.cmn.lst') and keyword_set(usecmn) then begin
   ;  print,'Using reference image COMMON SOURCE file'
   ;  file_copy,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow
   ;endif
-  ;; Create the SExtractor config file
-  PHOTRED_MKSEXCONFIG,combfile,combbase+'.sex',combbase+'.cat'
-  ;; Run SExtractor for detection
-  SPAWN,['sex',combfile,'-c',combbase+'.sex'],out,errout,/noshell
-  ;; Convert to DAOPHOT coo format
-  SEX2DAOPHOT,combbase+'.cat',combfile,combbase+'.coo'
-  ; Get the PSF of the combined image
-  SPAWN,['./getpsfnofind.sh',combbase],/noshell
-  ;SPAWN,'./getpsfnofind.sh '+file_basename(combfile,'.fits')
-
-  ; If getpsf failed, lower the spatial PSF variations to linear
-  if file_test(combbase+'.psf') eq 0 then begin
-    printlog,logf,'getpsf.sh failed.  Lowering spatial PSF variations to linear.  Trying again.'
-    MKOPT,combfile,satlevel=maskdatalevel-1000,va=1
-    SPAWN,'./getpsfnofind.sh '+combbase
-  stop
-  endif
+  PHOTRED_GETPSF,combbase,error=error
+  if n_elements(error) gt 0 then return
 
 ; FAKE, use existing comb.psf file
 endif else begin
@@ -522,8 +553,18 @@ printlog,logf,systime(0)
 sexfile = combbase+'_allf.sex'
 if FILE_TEST(sexfile) eq 1 then begin
 
-  fields = ['ID','X','Y','MAG','ERR','FLAG','PROB']
-  sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint)
+  ;-------------------------------------
+  ; Load sextractor output file
+  ; default.param specifies the output columns
+  if file_isfits(sexfile) eq 0 then begin
+    READLINE,'default.param',fields
+    gd = where(strmid(fields,0,1) ne '#' and strtrim(fields,2) ne '',ngd)
+    fields = fields[gd]
+    sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint)
+  endif else begin
+    sex = MRDFITS(sexfile,1,/silent)
+    if n_tags(sex) eq 1 then sex=MRDFITS(sexfile,2,/silent)
+  endelse
   nsex = n_elements(sex)
 
   ; Load the MAKEMAG file
@@ -531,13 +572,29 @@ if FILE_TEST(sexfile) eq 1 then begin
   nmag = n_elements(mag)
 
   ; Match them with IDs
-  MATCH,mag.id,sex.id,ind1,ind2,count=nind
+  MATCH,mag.id,sex.number,ind1,ind2,count=nind
 
-  ; Add stellaricity information to mag file
-  add_tag,mag,'flag',0L,mag
-  add_tag,mag,'prob',0.0,mag
-  mag[ind1].flag = sex[ind2].flag
-  mag[ind1].prob = sex[ind2].prob
+  ; Add SExtractor information to mag file
+  sextags = tag_names(sex)
+  ;add_tag,mag,'flag',0L,mag
+  ;add_tag,mag,'prob',0.0,mag
+  ;mag[ind1].flag = sex[ind2].flag
+  ;mag[ind1].prob = sex[ind2].prob
+  ;; New columns
+  newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_WORLD',$
+             'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM_WORLD']
+  newname = ['FLAG','PRROB','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA',$
+             'ASEMI','BSEMI','THETA','ELLIPTICITY','FWHM']
+  for k=0,n_elements(newcols)-1 do begin
+    colind = where(sextags eq newcols[k],ncolind)
+    if ncolind gt 0 then begin
+      add_tag,mag,newname[k],fix('',type=size(sex[0].(colind),/type)),mag
+      mag[ind1].(n_tags(mag)-1) = sex[ind2].(colind)
+      ;; convert to arcsec
+      if newcols[k] eq 'A_WORLD' or newcols[k] eq 'B_WORLD' then mag[ind1].(n_tags(mag)-1) *= 3600
+    endif
+  endfor   
+
 
   if nind lt nmag then printlog,logf,'DID NOT MATCH ALL THE STARS!'
 
@@ -548,21 +605,25 @@ if FILE_TEST(sexfile) eq 1 then begin
   if catformat eq 'FITS' then begin
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
-    ; How many observations are there
-    tags = tag_names(mag)
-    ntags = n_elements(tags)
-    magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
-    ; Copy the structure to a string array, then print it out
-    outarr = strarr(ntags,nmag)
-    fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
-    outfmt='(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
-    for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
-    openw,unit,/get_lun,finalfile
-    printf,unit,format=outfmt,outarr
-    close,unit
-    free_lun,unit
-    ; Prepend the ALF header
-    WRITELINE,finalfile,[alfhead,' '],/prepend
+    PRINTSTR,mag,finalfile,/silent
+    ;; THIS IS TE OLD WAY OF SAVING THE INFORMATION WITH THE ALS HEADER
+    ;; How many observations are there
+    ;tags = tag_names(mag)
+    ;ntags = n_elements(tags)
+    ;magind = where(stregex(tags,'^MAG',/boolean) eq 1,nmagind)
+    ;; Copy the structure to a string array, then print it out
+    ;outarr = strarr(ntags,nmag)
+    ;;fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
+    ;;outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
+    ;fmtarr = '('+['I9','F9.3','F9.3',replicate('F9.4',nmagind*2),'F9.4','F9.4','I5','F7.2']+')'
+    ;outfmt = '(A9,2A9,'+strtrim(nmagind*2,2)+'A9,2A9,A5,A7)'
+    ;for i=0,ntags-1 do outarr[i,*] = STRING(mag.(i),format=fmtarr[i])
+    ;openw,unit,/get_lun,finalfile
+    ;printf,unit,format=outfmt,outarr
+    ;close,unit
+    ;free_lun,unit
+    ;; Prepend the ALF header
+    ;WRITELINE,finalfile,[alfhead,' '],/prepend
   endelse
     
 ; DAOPHOT
@@ -587,6 +648,27 @@ BOMB:
 ; Delete temporarily funpacked files
 bdfpack = where(fpack eq 1,nbdfpack)
 if nbdfpack gt 0 then FILE_DELETE,file_basename(files[bdfpack],'.als')+'.fits',/allow
+
+;;------------------------------------------------
+;; Working in temporary directory, copy files back
+;;------------------------------------------------
+if n_elements(workdir) gt 0 then begin
+  printlog,logf,'Copying files back to original directory'
+  ;; Delete some files
+  FILE_DELETE,tempdir+'/'+mchbase+['.mch','.raw','.tfr'],/allow
+  for i=0,nfiles-1 do FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
+  if keyword_set(fake) then FILE_DELETE,tempdir+'/'+mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],/allow
+  ;; Copy files back
+  files = file_search(tempdir+'/*',count=nfiles)  
+  FILE_COPY,files,mchdir,/allow,/over
+  ;; Delete all temporary files
+  FILE_DELETE,files,/allow
+  ;; CD back
+  CD,curdir
+  ;; Delete temporary directory
+  ;;  leave the base working directory
+  FILE_DELETE,tempdir
+endif
 
 if keyword_set(stp) then stop
 

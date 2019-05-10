@@ -364,7 +364,7 @@ FIXIMAGES,'@'+infile,satlevel=satlevel  ;6e4
 satlevelarr = fltarr(nfiles)
 for i=0,nfiles-1 do begin
   ;head = headfits(base[i]+'.fits')
-  FITS_READ,base[i]+'.fits',im,head,/no_abort
+  im = PHOTRED_READFILE(base[i]+'.fits',head)
   saturate = sxpar(head,'SATURATE',count=nsaturate,/silent)
   if nsaturate eq 0 then saturate=max(im)-1000.
   satlevelarr[i] = saturate
@@ -404,7 +404,7 @@ endif
 if keyword_set(trimcomb) then begin
 
   ; Calculate the trim section
-  hd = headfits(reffile)
+  hd = PHOTRED_READFILE(reffile,/header)
   xsize = lonarr(nfiles)+sxpar(hd,'NAXIS1',/silent)
   ysize = lonarr(nfiles)+sxpar(hd,'NAXIS2',/silent)
   IA_TRIM,xshift,yshift,xsize,ysize,trimsection
@@ -419,16 +419,16 @@ if keyword_set(trimcomb) then begin
   ystop = trimsection[3]-1
 
   for i=0,nfiles-1 do begin
-    FITS_READ,outfiles[i],im,head
+    im = PHOTRED_READFILE(outfiles[i],head)
     newim = im[xstart:xstop,ystart:ystop]
     MWRFITS,newim,outfiles[i],head,/create,/silent
-  end
+  endfor
   ; could also use IRAF_IMCOPY here instead
 
 
 ; Don't trim the images
 endif else begin
-  hd = headfits(reffile)
+  hd = PHOTRED_READFILE(reffile,/header)
   xsize = sxpar(hd,'NAXIS1',/silent)
   ysize = sxpar(hd,'NAXIS2',/silent)
   trimsection = [1,xsize,1,ysize]
@@ -495,7 +495,7 @@ if keyword_set(trimcomb) then begin
   ystop = trimsection[3]-1
 
   for i=0,nfiles-1 do begin
-    FITS_READ,outmaskfiles[i],im,head
+    im = PHOTRED_READFILE(outmaskfiles[i],head)
     sz = size(im)
     newim = im[xstart:xstop,ystart:ystop]
     ; Add LTV1/LTV2 to the header
@@ -512,7 +512,7 @@ endif
 printlog,logf,'Combining masks'
 undefine,bpm
 for i=0,nfiles-1 do begin
-  FITS_READ,outmaskfiles[i],im,head
+  im = PHOTRED_READFILE(outmaskfiles[i],head)
   if i eq 0 then begin
     bpm = im
     whead = head
@@ -546,9 +546,9 @@ if not keyword_set(nocmbimscale) then begin
   ; Put BPM mask names in file headers
   ;  these will be used by IMCOMBINE
   for i=0,nfiles-1 do begin
-    head = headfits(outfiles[i])
+    head = PHOTRED_READFILE(outfiles[i],/header)
     sxaddpar,head,'BPM',outmaskfiles[i]
-    modfits,outfiles[i],0,head
+    MODFITS,outfiles[i],0,head
   endfor
 
   ; Combine the frames WITH scaling/offset/masking, for the bright stars
@@ -608,8 +608,8 @@ if not keyword_set(nocmbimscale) then begin
   ; when averaging/summing frames. in observing/mosaic/.
 
   ; Load the IMCOMBINE output combined file and BPM
-  FITS_READ,combfile,combim,combhead
-  FITS_READ,mchbase+'_comb.bpm.fits',badmask,maskhead  ; 0-good, 1-bad
+  combim = PHOTRED_READFILE(combfile,combhead)
+  badmask = PHOTRED_READFILE(mchbase+'_comb.bpm.fits',maskhead)  ; 0-good, 1-bad
 
 
   ; Fix the gain
@@ -693,8 +693,8 @@ Endif else begin
   ; See the explanations for all these steps above!!
 
   ; Load the IMCOMBINE output combined file and BPM
-  FITS_READ,combfile,combim,combhead
-  FITS_READ,mchbase+'_comb.bpm.fits',badmask,maskhead  ; 0-good, 1-bad
+  combim = PHOTRED_READFILE(combfile,combhead)
+  badmask = PHOTRED_READFILE(mchbase+'_comb.bpm.fits',maskhead)  ; 0-good, 1-bad
 
   ; Fix the rdnoise
   ; The final RDNOISE is essentially: comb_rdnoise = sqrt(total((weights*rdnoise)^2))
@@ -757,7 +757,7 @@ Endif else begin
 Endelse ; no scaling of images for combining
 
 ; Add TILETYPE to the combined image
-combhead = headfits(combfile)
+combhead = PHOTRED_READFILE(combfile,/header)
 sxaddpar,combhead,'AFTILTYP','ORIG'
 MODFITS,combfile,0,combhead
 

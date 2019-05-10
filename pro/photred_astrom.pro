@@ -214,12 +214,12 @@ FOR i=0,ninputlines-1 do begin
 
   ; Load the FITS header
   if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
-    head = HEADFITS(fitsfile,exten=1)
+    head = PHOTRED_READFILE(fitsfile,exten=1,/header)
     ; Fix the NAXIS1/2 values in the header
     sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
     sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin
-    head = HEADFITS(fitsfile)
+    head = PHOTRED_READFILE(fitsfile,/header)
   endelse
 
   ; Checking that the header has a WCS
@@ -287,9 +287,9 @@ FOR i=0,ninputlines-1 do begin
   printlog,logfile,'File with RA/DEC coordinates is: ',astfile
 
   if catformat eq 'FITS' then begin
-    MWRFITS,phot,astfile,/create
+    MWRFITS,phot,astfile,/create,/silent
   endif else begin   ; ASCII
-    PRINTSTR,phot,astfile
+    PRINTSTR,phot,astfile,/silent
   endelse
     
   ; Check that the file AST file is there
@@ -311,7 +311,7 @@ FOR i=0,ninputlines-1 do begin
   ;#  UPDATING LIST FILES
   ;##########################################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
   ;stop
 
@@ -322,7 +322,7 @@ ENDFOR
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_ASTROM Finished  ',systime(0)

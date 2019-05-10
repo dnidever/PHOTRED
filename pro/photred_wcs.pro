@@ -143,6 +143,10 @@ nmultiwcs = READPAR(setup,'NMULTI_WCS')
 if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
 nmulti = nmulti > 1  ; must be >=1
 
+; SKIPCHECK, skip all of the detailed file checking
+skipcheck = READPAR(setup,'SKIPCHECK',count=nskipcheck)
+if nskipcheck eq 0 then undefine,skipcheck
+
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
 if scriptsdir eq '' then begin
@@ -185,7 +189,7 @@ if keyword_set(skipwcs) then begin
   ; All files are put into the outlist
   outlist = inputlines
   ; UPDATE the Lists
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,/silent
+  PHOTRED_UPDATELISTS,lists,outlist=outlist,setupdir=curdir,/silent
 
   goto,FINISH
 
@@ -230,51 +234,56 @@ FOR i=0,ninputlines-1 do begin
 
   CD,filedir
 
-  ; Load the header
-  head = HEADFITS(longfile)
-  object = SXPAR(head,'OBJECT',/silent)
+  ;; Check on the files
+  if not keyword_set(skipcheck) then begin
 
-  ; Does this have multiple extensions
-  FITS_OPEN,file,fcb,message=message0
-  nextend = fcb.nextend
-  FITS_CLOSE,fcb
-  if nextend gt 0 then mef=1 else mef=0
+    ; Load the header
+    head = PHOTRED_READFILE(longfile,/header)
+    object = SXPAR(head,'OBJECT',/silent)
 
-  ; We only do SPLIT files, NOT MEF files
-  if (mef eq 1) then begin
-    printlog,'This is a MEF file.  Need SPLIT files'
-    PUSH,failurelist,longfile
-    goto,BOMB
-  endif
+    ; Does this have multiple extensions
+    rfile = filedir+'/.'+file
+    if file_test(rfile) eq 0 then begin
+      FITS_OPEN,file,fcb,message=message0
+      nextend = fcb.nextend
+      FITS_CLOSE,fcb
+      if nextend gt 0 then mef=1 else mef=0
+    endif else mef=0   ; resource files are not MEF
 
-
-  ; Make sure that |BITPIX| > 16
-  ; Only works for single chip images
-  bitpix = long(SXPAR(head,'BITPIX',/silent))
-  if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) and (fpack eq 0) then begin
-    printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
-
-    ; Read in the image
-    ;FITS_READ,file,im,head,/no_abort,message=message
-    im = MRDFITS(file,0,head,status=status,/silent)
-
-    ; Make sure BZERO=0
-    bzero = sxpar(head,'BZERO',count=nbzero,/silent)
-    if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
-
-    ; Write the FLOAT image
-    ;if (message[0] eq '') then $
-    if (status eq 0) then $
-    FITS_WRITE,file,float(im),head
-
-    ; There was a problem reading the image
-    if (message[0] ne '') then begin
-      printlog,logfile,'PROBLEM READING IN ',file
+    ; We only do SPLIT files, NOT MEF files
+    if (mef eq 1) then begin
+      printlog,'This is a MEF file.  Need SPLIT files'
       PUSH,failurelist,longfile
       goto,BOMB
     endif
 
-  endif
+    ; Make sure that |BITPIX| > 16
+    ; Only works for single chip images
+    bitpix = long(SXPAR(head,'BITPIX',/silent))
+    if (bitpix eq 8 or bitpix eq 16) and (mef eq 0) and (fpack eq 0) then begin
+      printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
+
+      ; Read in the image
+      ; FITS_READ,file,im,head,/no_abort,message=message
+      ;im = MRDFITS(file,0,head,status=status,/silent)
+      im = PHOTRED_READFILE(file,head,error=error)
+
+      ; Make sure BZERO=0
+      bzero = sxpar(head,'BZERO',count=nbzero,/silent)
+      if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
+
+      ; Write the FLOAT image
+      if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+        FITS_WRITE_RESOURCE,file,float(im),head
+
+      ; There was a problem reading the image
+      if n_elements(error) gt 0 then begin
+        printlog,logfile,'PROBLEM READING IN ',file,' ',error
+        PUSH,failurelist,longfile
+        goto,BOMB
+      endif
+    endif
+  endif  ; not skipcheck
 
 
   ;---------------------------------------------------------------
@@ -343,10 +352,15 @@ FOR i=0,ninputlines-1 do begin
     chip = long(chip)
 
     ; CHIP 4 files are missing CDELT1/CDELT2
-    head = headfits(file)
+    head = PHOTRED_READFILE(file,/header)
     SXADDPAR,head,'CDELT1',6.2220000e-05
     SXADDPAR,head,'CDELT2',-6.2220000e-05
-    MODFITS,file,0,head
+    if file_test(rfile) eq 1 then begin
+      info = file_info(file)
+      FITS_WRITE_RESOURCE,file,0,head
+    endif else begin
+      MODFITS,file,0,head
+    endelse
     printlog,logfile,'Adding CDELT1/CDELT2 parameters for ',file
 
     ; LBC images
@@ -468,8 +482,8 @@ endif
 ; Check for success/failures
 for i=0,ncmd-1 do begin
   ; Successful
-  if strmid(cmdlongfile[i],6,7,/reverse_offset) eq 'fits.fz' then head=HEADFITS(cmdlongfile[i],exten=1) else $
-     head = HEADFITS(cmdlongfile[i],exten=0)
+  if strmid(cmdlongfile[i],6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(cmdlongfile[i],exten=1,/header) else $
+     head = PHOTRED_READFILE(cmdlongfile[i],exten=0)
   ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1,/silent),2)
   dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
   if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then begin
@@ -489,7 +503,7 @@ FINISH:
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_WCS Finished  ',systime(0)

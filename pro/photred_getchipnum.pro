@@ -6,7 +6,7 @@
 ; 
 ; INPUTS:
 ;  file      The FITS filename
-;  obs       The observatory name.
+;  imager    The imager structure with the chip number separation character.
 ;  /stp      Stop at the end of the program.
 ;
 ; OUTPUTS:

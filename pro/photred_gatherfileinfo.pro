@@ -40,12 +40,12 @@ For i=0,nfiles-1 do begin
   filestr[i].exists = info.exists
   if filestr[i].exists eq 0 then goto,BOMB
   if strmid(files[i],6,7,/reverse_offset) eq 'fits.fz' then begin
-    head = HEADFITS(files[i],exten=1)
+    head = PHOTRED_READFILE(files[i],exten=1,/header)
     ; Fix the NAXIS1/NAXIS2 in the header
     sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
     sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
   endif else begin
-    head = HEADFITS(files[i])
+    head = PHOTRED_READFILE(files[i],/header)
   endelse
   filestr[i].nx = sxpar(head,'NAXIS1')
   filestr[i].ny = sxpar(head,'NAXIS2')

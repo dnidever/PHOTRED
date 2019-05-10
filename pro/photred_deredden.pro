@@ -279,7 +279,6 @@ if (ntoextadd gt 0) then begin
   ; Structure type
   dum = {type:0,input:'',mag1:'',mag2:'',extratio1:0.0,extratio2:0.0}
 
-
   ; Loop through the mags/colors to deredden
   for i=0,ntoextaddarr-1 do begin
 
@@ -432,7 +431,7 @@ FOR i=0,ninputlines-1 do begin
   ; Load the data file
   ;--------------------
   printlog,logfile,'Loading file'
-  str = PHOTRED_READFILE(file,count=nstr)
+  str = PHOTRED_READFILE(file,meta,count=nstr)
 
   ; Checking that we've got coordinates
   tags = TAG_NAMES(str)
@@ -445,23 +444,82 @@ FOR i=0,ninputlines-1 do begin
     goto,BOMB
   endif
 
-  ; Add an EBV tag to the structure
-  gdebv = where(tags eq 'EBV',ngdebv)
-  if ngdebv eq 0 then $
-    ADD_TAG,str,'EBV',0.0,str
+  ;; Make new structure schema
+  ;;---------------------------
+  schema = str[0]
+  struct_assign,{dum:''},schema
+  schema = create_struct(schema,'EBV',0.0)
+  ; ADDING Dereddened Magnitudes/Colors
+  for j=0,ntoderedstr-1 do begin
+    tstr = toderedstr[j]
+    ; Magnitude
+    if (tstr.type eq 1) then begin
+      ; Check that the magnitude exists
+      magind = where(tags eq strupcase(tstr.mag1)+'MAG',nmagind)
+      ; Adding the tag to the structure
+      if nmagind gt 0 then begin
+        newtagname = strupcase(tstr.mag1)+'0'
+        newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
+        gdnewtagname = where(tags eq newtagname,ngdnewtagname)
+        if (ngdnewtagname eq 0) then schema = create_struct(schema,newtagname,0.0)
+      endif
+    ; Color
+    endif else begin
+      ; Check that magnitude1 exists
+      mag1ind = where(tags eq strupcase(tstr.mag1)+'MAG',nmag1ind)
+      ; Check that magnitude2 exists
+      mag2ind = where(tags eq strupcase(tstr.mag2)+'MAG',nmag2ind)
+      ; Adding the tag to the structure
+      if nmag1ind gt 0 and nmag2ind gt 0 then begin
+        newtagname = strupcase(tstr.mag1)+strupcase(tstr.mag2)+'0'
+        newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
+        gdnewtagname = where(tags eq newtagname,ngdnewtagname)
+        if (ngdnewtagname eq 0) then schema = create_struct(schema,newtagname,0.0)
+      endif
+    endelse
+  endfor  ; dereddened mag loop
+  ; ADDING EXTINCTIONS
+  for j=0,ntoextaddstr-1 do begin
+    tstr = toextaddstr[j]
+    ; Magnitude
+    if (tstr.type eq 1) then begin
+      ; Check that the magnitude exists
+      magind = where(tags eq strupcase(tstr.mag1)+'MAG',nmagind)
+      if (nmagind gt 0) then begin
+        ; Adding the tag to the structure
+        newtagname = 'A'+strupcase(tstr.mag1)
+        newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
+        gdnewtagname = where(tags eq newtagname,ngdnewtagname)
+        if (ngdnewtagname eq 0) then schema = create_struct(schema,newtagname,0.0)
+      endif
+    ; Color
+    endif else begin
+      ; Check that magnitude1 exists
+      mag1ind = where(tags eq strupcase(tstr.mag1)+'MAG',nmag1ind)
+      ; Check that magnitude2 exists
+      mag2ind = where(tags eq strupcase(tstr.mag2)+'MAG',nmag2ind)
+      if nmag1ind gt 0 and nmag2ind gt 0 then begin
+        ; Adding the tag to the structure
+        newtagname = 'E'+strupcase(tstr.mag1)+strupcase(tstr.mag2)
+        newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
+        gdnewtagname = where(tags eq newtagname,ngdnewtagname)
+        if (ngdnewtagname eq 0) then schema = create_struct(schema,newtagname,0.0)
+      endif
+    endelse
+  endfor  ; extinction loop
 
-  nstars = n_elements(str)
-  print,'Dereddening ',strtrim(nstars,2),' sources'
+  ;; Creating new structure and copying over existing data
+  orig = str
+  str = REPLICATE(schema,nstr)
+  STRUCT_ASSIGN,orig,str,/nozero
+  undefine,orig
+  tags = TAG_NAMES(str)
 
 
   ; Getting E(B-V) from the Schlegel maps
   ;----------------------------------------
-  ra = str.ra
-  dec = str.dec
-
   ; Convert to galactic coordinates
-  GLACTC,ra,dec,2000.,glon,glat,1,/degree
-
+  GLACTC,str.ra,str.dec,2000.,glon,glat,1,/degree
   ; Get the E(B-V) reddening from the Schlegel maps
   ebv = DUST_GETVAL(glon,glat,/interp,/noloop)
   str.EBV = EBV
@@ -495,18 +553,9 @@ FOR i=0,ninputlines-1 do begin
       ; Getting the magnitude
       mag = str.(magind[0])
 
-      ; Adding the tag to the structure
+      ; Getting tag name
       newtagname = strupcase(tstr.mag1)+'0'
       newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
-      gdnewtagname = where(tags eq newtagname,ngdnewtagname)
-      if (ngdnewtagname eq 0) then begin
-        ADD_TAG,str,newtagname,0.0,str
-
-      ; Tag already exists, may be overwriting something
-      endif else begin
-        printlog,logfile,'TAG ',newtagname,' ALREADY EXISTS.  MAY BE OVERWRITTING SOME DATA'
-      endelse
-      tags = TAG_NAMES(str)
       deredmagind = where(tags eq newtagname,nderedmagind)
 
       ; Dereddening
@@ -517,7 +566,6 @@ FOR i=0,ninputlines-1 do begin
       if (nbdmag gt 0) then deredmag[bdmag] = 99.99
       ; Adding to the structure
       str.(deredmagind) = deredmag
-      
 
     ; Color
     ;------
@@ -543,22 +591,11 @@ FOR i=0,ninputlines-1 do begin
       mag1 = str.(mag1ind[0])
       mag2 = str.(mag2ind[0])
 
-
   ; If it is E(B-V) then DO NOT redo it.!!
 
-
-      ; Adding the tag to the structure
+      ; Getting tag name
       newtagname = strupcase(tstr.mag1)+strupcase(tstr.mag2)+'0'
       newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
-      gdnewtagname = where(tags eq newtagname,ngdnewtagname)
-      if (ngdnewtagname eq 0) then begin
-        ADD_TAG,str,newtagname,0.0,str
-
-      ; Tag already exists, may be overwriting something
-      endif else begin
-        printlog,logfile,'TAG ',newtagname,' ALREADY EXISTS.  MAY BE OVERWRITTING SOME DATA'
-      endelse
-      tags = TAG_NAMES(str)
       deredcolind = where(tags eq newtagname,nderedmagind)
 
       ; Dereddening
@@ -570,11 +607,9 @@ FOR i=0,ninputlines-1 do begin
       if (nbdmag gt 0) then deredcol[bdmag] = 99.99
       ; Adding to the structure
       str.(deredcolind) = deredcol
-
     endelse
 
     TODERED_BOMB:
-
   endfor
 
 
@@ -583,7 +618,6 @@ FOR i=0,ninputlines-1 do begin
   ;---------------------------------------
   ; Loop through the toderedstr structure
   for j=0,ntoextaddstr-1 do begin
-
     tstr = toextaddstr[j]
 
     ; Magnitude
@@ -598,25 +632,13 @@ FOR i=0,ninputlines-1 do begin
         goto,TODERED_BOMB2
       endif
 
-      ; Adding the tag to the structure
+      ; Getting tag name
       newtagname = 'A'+strupcase(tstr.mag1)
       newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
-      gdnewtagname = where(tags eq newtagname,ngdnewtagname)
-      if (ngdnewtagname eq 0) then begin
-        ADD_TAG,str,newtagname,0.0,str
-
-      ; Tag already exists, may be overwriting something
-      endif else begin
-        printlog,logfile,'TAG ',newtagname,' ALREADY EXISTS.  MAY BE OVERWRITTING SOME DATA'
-      endelse
-      tags = TAG_NAMES(str)
       extind = where(tags eq newtagname,nextind)
 
       ; Extinction
-      red = tstr.extratio1 * str.ebv
-      ; Adding to the structure
-      str.(extind) = red
- 
+      str.(extind) = tstr.extratio1 * str.ebv
 
     ; Color
     ;------
@@ -638,40 +660,31 @@ FOR i=0,ninputlines-1 do begin
         goto,TODERED_BOMB2
       endif
 
-      ; Adding the tag to the structure
+      ; Getting tag name
       newtagname = 'E'+strupcase(tstr.mag1)+strupcase(tstr.mag2)
       newtagname = IDL_VALIDNAME(newtagname,/convert_all)    ; make sure it's a valid IDL name
-      gdnewtagname = where(tags eq newtagname,ngdnewtagname)
-      if (ngdnewtagname eq 0) then begin
-        ADD_TAG,str,newtagname,0.0,str
-
-      ; Tag already exists, may be overwriting something
-      endif else begin
-        printlog,logfile,'TAG ',newtagname,' ALREADY EXISTS.  MAY BE OVERWRITTING SOME DATA'
-      endelse      
-      tags = TAG_NAMES(str)
       extind = where(tags eq newtagname,nextind)
 
       ; Dereddening
-      red1 = tstr.extratio1 * str.ebv
-      red2 = tstr.extratio2 * str.ebv
-      red = (red1 - red2)
-      ; Adding to the structure
-      str.(extind) = red
-
+      str.(extind) = tstr.extratio1*str.ebv - tstr.extratio2*str.ebv
     endelse
 
     TODERED_BOMB2:
 
   endfor
 
-
   ; WRITE new file
   ;------------------
   ; Output the structure to the DERED file
-  deredfile = base+'.dered'
+  deredfile = filedir+'/'+base+'.dered'
   printlog,logfile,'New file with extinctions is: ',deredfile
-  if catformat eq 'ASCII' then PRINTSTR,str,deredfile else MWRFITS,str,deredfile,/create
+  if catformat eq 'ASCII' then begin
+    PRINTSTR,str,deredfile
+    if n_elements(meta) gt 0 then PRINTSTR,meta,deredfile+'.meta'
+  endif else begin
+    MWRFITS,str,deredfile,/create
+    if n_elements(meta) gt 0 then MWRFITS,meta,deredfile,/silent
+  endelse
 
   ; Check that the file DERED file is there
   deredtest = FILE_TEST(deredfile)
@@ -682,7 +695,7 @@ FOR i=0,ninputlines-1 do begin
 
 
   ; Add to outlist/successlist
-  PUSH,outlist,filedir+'/'+deredfile
+  PUSH,outlist,deredfile
   PUSH,successlist,longfile
 
 
@@ -695,7 +708,7 @@ FOR i=0,ninputlines-1 do begin
   ; UPDATE the Lists
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 ENDFOR
 
@@ -704,7 +717,7 @@ ENDFOR
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_DEREDDEN Finished  ',systime(0)

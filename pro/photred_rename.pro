@@ -151,7 +151,7 @@ if nbad gt 0 then begin
   ; Update the lists
   PUSH,failurelist,inputlines[bad]   ; add to failurelist
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 endif
 
 nleft = ninputlines - nbad
@@ -190,10 +190,10 @@ for i=0,ninputlines-1 do begin
   file = inputlines[i]
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     base = FILE_BASENAME(file,'.fits.fz')
-    head = HEADFITS(file,exten=1)
+    head = PHOTRED_READFILE(file,exten=1,/header)
   endif else begin
     base = FILE_BASENAME(file,'.fits')
-    head = HEADFITS(file)
+    head = PHOTRED_READFILE(file,/header)
   endelse
   com=''
 
@@ -247,7 +247,7 @@ endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 
 ; There were HEADER problems
@@ -269,10 +269,10 @@ FOR i=0,ninputlines-1 do begin
   file = inputlines[i]
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     base = FILE_BASENAME(file,'.fits.fz')
-    head = HEADFITS(file,exten=1)
+    head = PHOTRED_READFILE(file,exten=1,/header)
   endif else begin
     base = FILE_BASENAME(file,'.fits')
-    head = HEADFITS(file)
+    head = PHOTRED_READFILE(file,/header)
   endelse
 
   object = SXPAR(head,'OBJECT',/silent)
@@ -415,10 +415,10 @@ FOR i=0,ninputlines-1 do begin
 
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     base = FILE_BASENAME(file,'.fits.fz')
-    head = HEADFITS(file,exten=1)
+    head = PHOTRED_READFILE(file,exten=1,/header)
   endif else begin
     base = FILE_BASENAME(file,'.fits')
-    head = HEADFITS(file)
+    head = PHOTRED_READFILE(file,/header)
   endelse
 
   object = SXPAR(head,'OBJECT',/silent)
@@ -445,6 +445,12 @@ FOR i=0,ninputlines-1 do begin
     ; Moving files
     if not keyword_set(testing) then begin
       FILE_MOVE,file,newfile,/over
+      ;; Move the resource file
+      rfile = filedir+'/.'+file
+      if file_test(rfile) eq 1 then begin
+        newrfile = filedir+'calib/.'+file
+        FILE_MOVE,rfile,newrfile,/over
+      endif
 
       ; Did we have success
       test = FILE_TEST(newfile)
@@ -483,6 +489,13 @@ FOR i=0,ninputlines-1 do begin
     ; Moving
     if not keyword_set(testing) then begin
       FILE_MOVE,file,newfile,/over
+      ;; Move the resource file
+      rfile = filedir+'/.'+file
+      if file_test(rfile) eq 1 then begin
+        newrfile = filedir+'/.'+shfield+sep+file
+        if keyword_set(sepfielddir) then newrfile=filedir+'/'+shfield+'/.'+newfile
+        FILE_MOVE,rfile,newrfile,/over
+      endif
 
       ; Did we have success
       test = FILE_TEST(newfile)
@@ -505,7 +518,7 @@ FOR i=0,ninputlines-1 do begin
   ; UPDATE the Lists
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
   ;stop
 
 ENDFOR
@@ -516,7 +529,7 @@ printlog,logfile,'--------------------------------------------------------------
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile

@@ -358,7 +358,7 @@ outlist = file_search("", "F*M*-*_??.mch", /FULLY)
 ; CREATE LISTS
 lists = photred_getinput(thisprog)
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,  $
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 ; ---------------------------------------
 ;  GATHER AND MERGE PARTIAL FILES

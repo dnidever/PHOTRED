@@ -175,6 +175,10 @@ catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
+; Temporary working directory
+workdir = READPAR(setup,'WORKDIR',count=nworkdir)
+if nworkdir eq 0 then undefine,workdir
+
 ; Get the IRAF directory from the setup file
 ;-------------------------------------------
 irafdir = READPAR(setup,'IRAFDIR')
@@ -437,28 +441,29 @@ For i=0,ninputlines-1 do begin
     ; Make sure that BITPIX = -32 otherwise this can cause problems
     if file_test(base+'.fits') eq 0 and file_test(base+'.fits.fz') eq 1 then begin
       fpack = 1
-      head = HEADFITS(base+'.fits.fz',exten=1)
+      head = PHOTRED_READFILE(base+'.fits.fz',exten=1,/header)
     endif else begin
       fpack = 0
-      head = HEADFITS(base+'.fits')
+      head = PHOTRED_READFILE(base+'.fits',/header)
     endelse
     bitpix = long(SXPAR(head,'BITPIX',/silent))
     if (bitpix eq 8 or bitpix eq 16 or bitpix eq 32) and (fpack eq 0) then begin
       printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
       ; Read in the image
-      FITS_READ,base+'.fits',im,head,/no_abort,message=message
+      im = PHOTRED_READFILE(base+'.fits',head,error=error)
 
       ; Make sure BZERO=0
       bzero = sxpar(head,'BZERO',count=nbzero,/silent)
       if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
       ; Write the FLOAT image
-      if (message[0] eq '') then $
-      FITS_WRITE,base+'.fits',float(im),head
+      ; Write the FLOAT image
+      if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+        FITS_WRITE_RESOURCE,base+'.fits',float(im),head
 
       ; There was a problem reading the image
-      if (message[0] ne '') then begin
+      if n_elements(error) gt 0 then begin
         printlog,logfile,'PROBLEM READING IN ',base+'.fits'
         successarr[i] = 0
       endif
@@ -518,7 +523,7 @@ if (ngd eq 0) then begin
 
   ; UPDATE the Lists
   PUSH,failurelist,inputlines
-  PHOTRED_UPDATELISTS,lists,failurelist=failurelist,/silent
+  PHOTRED_UPDATELISTS,lists,failurelist=failurelist,setupdir=curdir,/silent
 
   return
 endif
@@ -563,7 +568,7 @@ If not keyword_set(redo) then begin
     PUSH,successlist,procdirlist[bd]+'/'+procbaselist[bd]
     PUSH,outlist,procdirlist[bd]+'/'+procbaselist[bd]+'.als'
     PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,/silent
+                        failurelist=failurelist,setupdir=curdir,/silent
 
     ; Remove them from the arrays
     if nbd lt nprocbaselist then REMOVE,bd,procbaselist,procdirlist
@@ -643,12 +648,13 @@ if tiletype eq 'TILES' then begin
                 "observatory:'"+thisimager.observatory+"',namps:"+strtrim(thisimager.namps,2)+","+$
                 "separator:'"+thisimager.separator+"'}"
       ; Make commands for allframe
-      cmd1 = "allframe,'"+mchfile+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+      cmd1 = "allframe,'"+mchfile+"'"+',setupdir="'+curdir+'",scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
             ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile="+stile+",imager="+simager
       if keyword_set(alfnocmbimscale) then cmd1+=",/nocmbimscale"
       if keyword_set(alftrimcomb) then cmd1+=",/trimcomb"
       if keyword_set(alfusecmn) then cmd1+=",/usecmn"
       if keyword_set(fake) then cmd1+=",/fake"
+      if n_elements(workdir) gt 0 then cmd1+=",workdir='"+workdir+"'"
       PUSH,cmd,cmd1
     Endfor  ; mch file loop
   Endfor  ; field loop
@@ -656,12 +662,13 @@ if tiletype eq 'TILES' then begin
 ;; WCS or ORIG
 endif else begin
   ; Make commands for allframe
-  cmd = "allframe,'"+procbaselist+"'"+',scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
+  cmd = "allframe,'"+procbaselist+"'"+',setupdir="'+curdir+'",scriptsdir="'+scriptsdir+'",irafdir="'+irafdir+'",finditer='+finditer+$
         ",detectprog='"+alfdetprog+"',catformat='"+catformat+"',tile={type:'"+strupcase(tiletype)+"'}"
   if keyword_set(alfnocmbimscale) then cmd+=",/nocmbimscale"
   if keyword_set(alftrimcomb) then cmd+=",/trimcomb"
   if keyword_set(alfusecmn) then cmd+=",/usecmn"
   if keyword_set(fake) then cmd+=",/fake"
+  if n_elements(workdir) gt 0 then cmd+=",workdir='"+workdir+"'"
 endelse
 
 
@@ -788,8 +795,31 @@ if (nbd gt 0) then begin
 endif else UNDEFINE,failurelist
 
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
+
+;;######################
+;;  CLEANING UP
+;;######################
+if keyword_set(clean) then begin
+  printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
+
+  ;; Only clean up for successful files
+  READLIST,curdir+'/logs/ALLFRAME.success',mchfiles,/unique,/fully,setupdir=curdir,count=nmchfiles,logfile=logfile,/silent
+  for i=0,mchfiles-1 do begin
+    dir1 = file_dirname(mchlist[i])
+    base1 = file_basename(mchlist[i])
+    ;; _comb
+    ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi, psfini.ap
+    ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst,
+    ;; _sub.fits, _sub.cat, _sub.als, _all.coo, makemag
+    FILE_DELETE,dir1+'/'+base1+'_comb'+['.lst','.lst1','.lst2','.lst1.chi','.lst2.chi','.grp','.nst','.plst.chi',$
+                                         '.nei','.als.inp','.cmn.log','.cmn.coo','.cmn.ap','.cmn.lst','a.fits',$
+                                         'a.fits.fz','_sub.fits','_sub.cat','_sub.als','_all.coo','.makemag'],/allow
+    ;; If CLEAN=2, then also remove coo, ap, cat, s.fits, mask.fits as well
+    if clean ge 2 then FILE_DELETE,dir1+'/'+base1+['.coo','.ap','.cat','s.fits','s.fits.fz','.mask.fits'],/allow
+  endfor
+endif
 
 
 printlog,logfile,'PHOTRED_ALLFRAME Finished  ',systime(0)

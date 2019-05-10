@@ -107,12 +107,11 @@ dir = FILE_DIRNAME(file)
 
 
 ; Get the FITS header
-if fpack eq 1 then head=HEADFITS(file,exten=1,errmsg=errmsg) else $
-  head = HEADFITS(file,errmsg=errmsg)
-if errmsg ne '' then begin
+if fpack eq 1 then head=PHOTRED_READFILE(file,exten=1,error=error,/header) else $
+  head = PHOTRED_READFILE(file,error=error,/header)
+if n_elements(error) gt 0 then begin
   print,'Error reading header for ',file
-  print,errmsg
-  error = errmsg
+  print,error
   return
 endif
 
@@ -151,10 +150,10 @@ endif else fwhm=inp_fwhm
 
 ; Load the image
 message=''
-FITS_READ,file,im,head,/no_abort,message=message
+im = PHOTRED_READFILE(file,head,error=error)
   
 ; Fits_read error   
-if (message ne '') then begin
+if n_elements(error) gt 0 then begin
   error = 'ERROR reading '+file
   print,error
   return

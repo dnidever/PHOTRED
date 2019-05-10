@@ -2,15 +2,16 @@
 ;
 ; GETPIXSCALE
 ;
-; Get the pixel scale for an image
+; Get the pixel scale for an image.
 ;
 ; INPUTS:
-;  file   FITS filename
-;  =head  The image header for which to determine the pixel scale.
-;  /stp   Stop at the end of the program.
+;  file    FITS filename
+;  =head   The image header for which to determine the pixel scale.
+;  /stp    Stop at the end of the program.
 ;
 ; OUTPUTS:
-;  scale  The pixel scale of the image in arcsec/pix.
+;  scale   The pixel scale of the image in arcsec/pix.
+;  =error  The error if one occurred.
 ;
 ; USAGE:
 ;  IDL>getpixscale,'ccd1001.fits',scale
@@ -18,52 +19,61 @@
 ; BY D. Nidever   February 2008
 ;-
 
-pro getpixscale,file,scale,head=head,stp=stp
+pro getpixscale,file,scale,head=head,error=error,stp=stp
 
+undefine,error
 scale = -1         ; bad until proven good
 
 ; Not enough inputs
 nfile = n_elements(file)
 if nfile eq 0 and n_elements(head) eq 0 then begin
+  error = 'Not enougn inputs'
   print,'Syntax - getpixscale,file,scale,head=head'
   return
 endif
 
-test = file_test(file)
-if test eq 0 and n_elements(head) eq 0 then begin
-  print,file,' NOT FOUND'
-  return
-endif
+;; No header input, read from fits file
+fpack = 0
+if n_elements(head) eq 0 then begin
+  ;; Check that the file exists
+  test = file_test(file)
+  if test eq 0 and n_elements(head) eq 0 then begin
+    error = file+' NOT FOUND'
+    print,error
+    return
+  endif
 
-; Fpack or regular fits
-if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
-  fpack = 1
-  exten = 1
-endif else begin
-  fpack = 0
-  exten = 0
-endelse
+  ; Fpack or regular fits
+  if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
+    fpack = 1
+    exten = 1
+  endif else begin
+    fpack = 0
+    exten = 0
+  endelse
 
-; Read the header
-if n_elements(head) eq 0 then head = headfits(file,exten=exten)
-; Fix NAXIS1/2 in header
-if fpack eq 1 then begin
-  sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
-  sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  ; Read the header
+  if n_elements(head) eq 0 then head = PHOTRED_READFILE(file,exten=exten,/header)
+
+  ; Fix NAXIS1/2 in header
+  if fpack eq 1 then begin
+    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  endif
 endif
 
 ; Does the image have a SCALE parameter
-hscale = sxpar(head,'SCALE',/silent)
-if strtrim(hscale,2) ne '0' then scale=hscale
+hscale = sxpar(head,'SCALE',count=nhscale,/silent)
+if nhscale ne 0 then scale=hscale
 ; Does the image have a PIXSCALE parameter
 if scale eq -1 then begin
-  pixscale = sxpar(head,'PIXSCALE',/silent)
-  if strtrim(pixscale,2) ne '0' then scale=pixscale
+  pixscale = sxpar(head,'PIXSCALE',count=npixscale,/silent)
+  if npixscale ne 0 then scale=pixscale
 endif
 ; Does the image have a PIXSCALE1 parameter
 if scale eq -1 then begin
-  pixscale1 = sxpar(head,'PIXSCALE1',/silent)
-  if strtrim(pixscale1,2) ne '0' then scale=pixscale1
+  pixscale1 = sxpar(head,'PIXSCALE1',count=npixscale1,/silent)
+  if npixscale1 ne 0 then scale=pixscale1
 endif
 
 ; Try the WCS
@@ -94,7 +104,8 @@ endif
 
 ; Couldn't determine the pixel scale
 if scale eq -1 then begin
-  print,'WARNING! COULD NOT DETERMINE THE PIXEL SCALE'
+  error = 'WARNING! COULD NOT DETERMINE THE PIXEL SCALE'
+  print,error
 endif
 
 ;; Are there any other "scale"-like values in the header

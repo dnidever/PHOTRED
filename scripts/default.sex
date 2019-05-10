@@ -5,7 +5,7 @@
 #-------------------------------- Catalog ------------------------------------
 
 CATALOG_NAME	sex.cat	# name of the output catalog
-CATALOG_TYPE	ASCII	# "NONE","ASCII_HEAD","ASCII","FITS_1.0"
+CATALOG_TYPE	FITS_1.0	# "NONE","ASCII_HEAD","ASCII","FITS_1.0"
 				# or "FITS_LDAC"
 
 PARAMETERS_NAME	default.param	# name of the file containing catalog contents

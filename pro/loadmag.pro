@@ -29,8 +29,27 @@ if n_elements(file) eq 0 then begin
   return
 endif
 
-; Load the photometry file
-;-------------------------
+;; There are three versions of .mag file formats
+;; 1) FITS binary table
+;; 2) ASCII catalog with header line
+;; 3) DAOPHOT ALS-like format (old way)
+
+;; FITS binary table
+if file_isfits(file) eq 1 then begin
+  phot = MRDFITS(file,1,/silent)
+  return
+endif
+
+;; ASCII catalog with header line
+READLINE,file,head,nlineread=3
+if strmid(head[0],0,1) eq '#' and strmid(head[0],0,3) ne ' NL' then begin
+  phot = IMPORTASCII(file,/header,/silent)
+  return
+endif
+
+
+;; OLD WAY, DAOPHOT ALS-like format
+;----------------------------------
 ; This is copied from LOADRAW.PRO
 
 ; Figure out the number of columns

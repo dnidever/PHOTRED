@@ -102,7 +102,7 @@ endif
 ; Catalog format to use
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
-if catformat ne 'ASCII' or catformat ne 'FITS' then catformat='ASCII'
+if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 ; MCHUSETILES
 mchusetiles = READPAR(setup,'MCHUSETILES')
 if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
@@ -260,364 +260,113 @@ FOR i=0,nsfields-1 do begin
     goto,BOMB1
   endelse
 
+  
 
-
-  ;###########################
-  ; MULTI-AMP IMAGERS
-  ;###########################
-  If (thisimager.namps gt 1) then begin
-
-
-    ; Check that we get ALL files for this GROUP
-    ;-------------------------------------------
-    ; Some previous successes to check
-    nsuccess = lists.nsuccesslines
-    if (nsuccess gt 0) then begin
-      printlog,logfile,''
-      printlog,logfile,'Some previous successes.  Making sure we have all files for this field'
-
-      successbase = FILE_BASENAME(lists.successlines,'.phot')
-      matchind = where(stregex(successbase,'^'+ishortfield+'-',/boolean),nmatchind)
-
-      ; Found some matches
-      if (nmatchind gt 0) then begin
-
-        ; Check if these are already in the INLIST
-        undefine,ind1,ind2,num_alreadyinlist
-        MATCH,successbase[matchind],base,ind1,ind2,count=num_alreadyinlist
-        num_notinlist = nmatchind - num_alreadyinlist
-
-        ; Some not in INLIST yet
-        if (num_notinlist gt 0) then begin      
-      
-          printlog,logfile,'Found '+strtrim(num_notinlist,2)+' previously successful file(s) for this group NOT YET in the '+$
-                           'INLIST.  Adding.'
-          indtoadd = matchind
-          if num_alreadyinlist gt 0 then REMOVE,ind1,indtoadd
-          PUSH,base,successbase[indtoadd]
-          PUSH,fieldlines,lists.successlines[indtoadd]
-
-          ; Setting REDO=1 so the files in the success list will be redone.
-          if not keyword_set(redo) then begin
-            printlog,logfile,'Setting REDO=1'
-            redo = 1
-          endif
-
-        end  ; some not in inlist yet
-      end  ; some files from this group in success file
-
-      ; Make sure they are unique
-      ui = uniq(fieldlines,sort(fieldlines))
-      ui = ui[sort(ui)]
-      fieldlines = fieldlines[ui]
-      base = base[ui]
-      nfieldlines = n_elements(fieldlines)
-
-      printlog,logfile,''
-
-    endif ; some successes
-
-    ; Not enough files for this imager
-    if (nfieldlines ne thisimager.namps) and not keyword_set(force) then begin
-      printlog,logfile,'Only '+strtrim(nfieldlines,2)+' for '+ifield+'.  Need '+strtrim(thisimager.namps,2)+' for '+$
-                       thisimager.telescope+'+'+thisimager.instrument
-      PUSH,failurelist,fieldlines
-      goto,BOMB1
-    endif
-
-
-    printlog,logfile,'COMBINING '+strtrim(nfieldlines,2)+' files for '+ifield
-
-    ; Getting the main name
-    firstname = FILE_BASENAME(fieldlines[0],'.phot')
-    basedir = FILE_DIRNAME(fieldlines[0])
-
-    ; Getting basename
-    if not keyword_set(mchusetiles) then begin
-      ending = first_el(strsplit(firstname,thisimager.separator,/extract),/last)
-      endlen = strlen(ending)
-      len = strlen(firstname)
-      basename = strmid(firstname,0,len-endlen-1)
-    endif else basename = (strsplit(firstname,'\'+tilesep+'T',/extract))[0]
-
-    ;; Using TILES, get file information and find unique exposures
-    if keyword_set(mchusetiles) then begin
-      undefine,allfiles
-      for j=0,nfieldlines-1 do begin
-        dir1 = file_dirname(fieldlines[j])
-        base1 = file_basename(fieldlines[j],'.phot')
-        LOADMCH,dir1+'/'+base1+'.mch',indivfiles
-        push,allfiles,dir1+'/'+file_basename(indivfiles,'.als')+'.fits'
-      endfor
-      bd = where(file_test(allfiles) eq 0,nbd)
-      if nbd gt 0 then allfiles[bd]+='.fz'
-      ;; Get exposure names
-      arr1 = strsplitter(file_basename(allfiles),'-',/extract)
-      arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
-      allexpnum = reform(arr2[0,*])
-      uiexp = uniq(allexpnum,sort(allexpnum))
-      uexpnum = allexpnum[uiexp]
-      nexp = n_elements(uexpnum)
-      ;; Get exposure information
-      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0,exptime:0.0,cenra:0.0d0,cendec:0.0d0},nexp)
-      PHOTRED_GATHERFILEINFO,allfiles[uiexp],filestr
-      struct_assign,filestr,expstr
-      expstr.expnum = uexpnum
-      for j=0,nexp-1 do expstr[j].mjd = date2jd(expstr[j].dateobs,/mjd)
-      si = sort(expstr.mjd)  ; put in chronological order
-      expstr = expstr[si]
-
-    ;; REGULAR files, the exposures should be the same across all
-    ;;   chip phot files
-    endif else begin                        ; using tiles
-      ;; Get exposure information
-      LOADMCH,repstr(fieldlines[j],'.phot','.mch'),indivfiles,count=nexp
-      allfiles = file_dirname(fieldlines[j])+'/'+repstr(indivfiles,'.als','.fits')
-      bd = where(file_test(allfiles) eq 0,nbd)
-      if nbd gt 0 then allfiles[bd]+='.fz'
-      arr1 = strsplitter(file_basename(allfiles),'-',/extract)
-      arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
-      allexpnum = reform(arr2[0,*])
-      expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0,exptime:0.0,cenra:0.0d0,cendec:0.0d0},nexp)
-      PHOTRED_GATHERFILEINFO,allfiles,filestr
-      struct_assign,filestr,expstr
-      expstr.expnum = allexpnum
-    endelse
-
-
-    ;-------------------------------------------------
-    ; LOOP through all the PHOT files for this field
-    ;-------------------------------------------------
-    ncombined = 0
-    undefine,str,all
-    undefine,fieldnames0,fieldtypes0
-    For j=0,nfieldlines-1 do begin
-
-      file = fieldlines[j]
-      filebase = FILE_BASENAME(file,'.phot')
-      filedir = FILE_DIRNAME(file)
-
-      ; Check that the PHOT file exists
-      test = FILE_TEST(file)
-      if test eq 1 then photlines = FILE_LINES(file) else photlines=0
-      if (photlines eq 0) then begin
-        PUSH,failurelist,file
-        if test eq 0 then printlog,logfile,file+' NOT FOUND'
-        if test eq 1 and nlines eq 0 then printlog,logfile,file+' HAS 0 LINES'
-        goto,BOMB2
-      endif
-
-      ; Load the PHOT file
-      str = PHOTRED_READFILE(file,count=nstr)
-
-      ;; Get the column names and types
-      fieldnames = tag_names(str)
-      fieldtypes = lonarr(n_elements(fieldnames))
-      for k=0,n_elements(fieldnames)-1 do fieldtypes[k]=size(str[0].(k),/type)
-      ;; ID must be a string
-      idind = where(fieldnames eq 'ID',nidind)
-      if fieldtypes[idind] ne 7 then begin
-        fieldtypes[idind] = 7
-        str0 = str[0] & struct_assign,{dum:''},str0
-        schema = create_struct(fieldnames[0],fix(str0.(0),type=fieldtypes[0]))
-        for k=1,n_elements(fieldnames)-1 do schema=create_struct(schema,fieldnames[k],fix(str0.(k),type=fieldtypes[k]))
-        str_orig = str
-        str = replicate(schema,nstr)
-        struct_assign,str_orig,str
-        str.id = strtrim(str.id,2)
-        undefine,str_orig
-      endif
-
-      ; Print out the file info
-      printlog,logfile,''
-      printlog,logfile,'ADDING '+filebase+' Nstars='+strtrim(nstr,2)
-      printlog,logfile,''
-
-
-      ; Adding EXT tag for amp number
-      tags = TAG_NAMES(str)
-      extgd = where(tags eq 'EXT',nextgd)
-      if nextgd eq 0 then ADD_TAG,str,'EXT',0,str
-      
-
-      ;; NOT using tiles
-      ;------------------
-      If not keyword_set(mchusetiles) then begin
-        ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
-        ;  get "type mismatch" errors with double/floats
-        if j eq 0 then begin
-          fieldnames0 = fieldnames
-          fieldtypes0 = fieldtypes
-          file0 = file
-        endif
-        ; Check that the fieldnames are the same
-        if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
-          PUSH,failurelist,file
-          printlog,logfile,''
-          printlog,logfile,file+' format does NOT agree with '+file0
-          goto,BOMB2
-        endif
-        if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
-          PUSH,failurelist,file
-          printlog,logfile,''
-          printlog,logfile,file+' format does NOT agree with '+file0
-          goto,BOMB2
-        endif
-      
-        ; Getting the amplifier number (extension)
-        ;-----------------------------------------
-        ;ext = first_el(strsplit(filebase,thisimager.separator,/extract),/last)
-        ext = photred_getchipnum(filebase,thisimager)
-        str.ext = ext
-        ; Updating the IDs
-        ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
-        ;---------------------------------------------
-        id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
-        str.id = id2
-
-      ;; Using TILES, need to reformat photometry struc
-      Endif else begin
-        ;; The chip/amp information is not in the name
-        ;; each image could have a different chip
-        ;; F1-00507801+T2, no chip extension
-        ;; Use the TILE Number as the EXT
-        ext = first_el(strsplit(filebase,tilesep+'T',/extract),/last)
-        str.ext = ext
-        ; Updating the IDs
-        ; FIELD_TILE.IDNUMBER, i.e. 190L182a_5.17366
-        ;---------------------------------------------
-        id2 = ifield+'_'+ext+'.'+strtrim(str.id,2)
-        str.id = id2
-
-        ;; Reformat the photometry structure
-        ;; Put the photometry in exposure columns
-        ;;---------------------------------------
-        ;; Get information on the individual images
-        LOADMCH,filedir+'/'+filebase+'.mch',alsfiles
-        fitsfiles = filedir+'/'+file_basename(alsfiles,'.als')+'.fits'
-        bdfits = where(file_test(fitsfiles) eq 0,nbdfits)
-        if nbdfits gt 0 then fitsfiles[bdfits]+='.fz'
-        PHOTRED_GATHERFILEINFO,fitsfiles,filestr
-        ;; Get exposure names
-        add_tag,filestr,'expnum','',filestr
-        arr1 = strsplitter(file_basename(filestr.file),'-',/extract)
-        arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
-        filestr.expnum = reform(arr2[0,*])
-        ;; Reformat the photometry structure
-        str_orig = str & undefine,str
-        PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,str
-      Endelse
-
-
-      ; Check that the structure has RA/DEC
-      ;------------------------------------
-      gdra = where(tags eq 'RA',ngdra)
-      gddec = where(tags eq 'DEC',ngddec)
-      if (ngdra eq 0) or (ngddec eq 0) then begin
-        PUSH,failurelist,file
-        printlog,logfile,file+' DOES NOT HAVE RA/DEC FIELDS'
-        goto,BOMB2
-      endif
-
-      ; COMBINING
-      ;-----------
-      ; Adding together with PHOT_OVERLAP.PRO to deal with overlaps
-      ; at the edges of chips/amplifiers
-      ; This uses RA/DEC so if these aren't in the structures it won't
-      ; "combine" stars properly.
-      if (n_elements(all) gt 0) then begin
-
-        PHOT_OVERLAP,all,str,outstr,silent=silent,posonly=cmbposonly
-        noutstr = n_elements(outstr)
-
-        ; There was a problem
-        if (noutstr eq 0) then begin
-          printlog,logfile,'Problem in PHOT_OVERLAP for '+file
-          PUSH,failurelist,file
-          goto,BOMB2
-        endif        
-
-        all = outstr
-        ncombined++
-
-      ; First time, initialize the "all" structure
-      endif else begin
-        all = str
-        ncombined++
-      endelse
-
-      BOMB2:
-
-    Endfor  ; loop through the individual PHOT files
-
-    ; At least one file failed
-    ; Field and files are successful only if *ALL* succeeded
-    ;--------------------------------------------------------
-    if (ncombined ne nfieldlines) then begin
-      printlog,logfile,ifield,' FAILED because ',strtrim(ngd-ncombined,2),' Files FAILED'
-      PUSH,failurelist,fieldlines
-      goto,BOMB1
-    endif
-
-    ; Are there any stars?
-    ;----------------------
-    nall = n_elements(all)
-    if (nall eq 0) then begin
-      printlog,logfile,'NO STARS for FIELD='+ifield
-      PUSH,failurelist,fieldlines
-      goto,BOMB1
-    endif
-
-    ; We were successful!
-    ;-----------------------
+  ; Check that we get ALL files for this GROUP
+  ;-------------------------------------------
+  ; Some previous successes to check
+  nsuccess = lists.nsuccesslines
+  if (nsuccess gt 0) then begin
     printlog,logfile,''
-    printlog,logfile,'Combined '+strtrim(ncombined,2)+' files'
-    printlog,logfile,'Nstars = '+strtrim(nall,2)+' for FIELD='+ifield
+    printlog,logfile,'Some previous successes.  Making sure we have all files for this field'
+    successbase = FILE_BASENAME(lists.successlines,'.phot')
+    matchind = where(stregex(successbase,'^'+ishortfield+'-',/boolean),nmatchind)
+    ; Found some matches
+    if (nmatchind gt 0) then begin
+      ; Check if these are already in the INLIST
+      undefine,ind1,ind2,num_alreadyinlist
+      MATCH,successbase[matchind],base,ind1,ind2,count=num_alreadyinlist
+      num_notinlist = nmatchind - num_alreadyinlist
+      ; Some not in INLIST yet
+      if (num_notinlist gt 0) then begin      
+        printlog,logfile,'Found '+strtrim(num_notinlist,2)+' previously successful file(s) for this group NOT YET in the '+$
+                         'INLIST.  Adding.'
+        indtoadd = matchind
+        if num_alreadyinlist gt 0 then REMOVE,ind1,indtoadd
+        PUSH,base,successbase[indtoadd]
+        PUSH,fieldlines,lists.successlines[indtoadd]
+        ; Setting REDO=1 so the files in the success list will be redone.
+        if not keyword_set(redo) then begin
+          printlog,logfile,'Setting REDO=1'
+          redo = 1
+        endif
+      endif  ; some not in inlist yet
+    endif  ; some files from this group in success file
+    ; Make sure they are unique
+    ui = uniq(fieldlines,sort(fieldlines))
+    ui = ui[sort(ui)]
+    fieldlines = fieldlines[ui]
+    base = base[ui]
+    nfieldlines = n_elements(fieldlines)
+    printlog,logfile,''
+  endif         ; some successes
+  
+  ;; Not enough files for this imager
+  if (thisimager.namps gt 1) and (nfieldlines ne thisimager.namps) and not keyword_set(force) then begin
+    printlog,logfile,'Only '+strtrim(nfieldlines,2)+' for '+ifield+'.  Need '+strtrim(thisimager.namps,2)+' for '+$
+                     thisimager.telescope+'+'+thisimager.instrument
+    PUSH,failurelist,fieldlines
+    goto,BOMB1
+  endif
 
-    ; Output the data
-    ;----------------
-    outname = basedir+'/'+basename+'.cmb'
-    printlog,logfile,'OUTPUTTING data to '+outname
-    if catformat eq 'ASCII' then begin
-      PRINTSTR,all,outname
-      PRINTSTR,expstr,outname+'.meta'
-     ;; where to put the exposure information when using tiles??
-    endif else begin
-      MWRFITS,all,outname,/create
-      MWRFITS,expstr,outname,/silent   ;; add meta-data on exposure information 
-    endelse
+  printlog,logfile,'COMBINING '+strtrim(nfieldlines,2)+' files for '+ifield
 
-    ; Make sure that it exists, and add to OUTLIST
-    outtest = FILE_TEST(outname)
-    if outtest eq 1 then outlines = FILE_LINES(outname) else outlines=0
-    if (outlines gt 0) then begin
-      PUSH,outlist,outname                           ; add final file to outlist
-      PUSH,successlist,fieldlines                ; add all individual files to successlist
-    endif else begin
-      if outtest eq 0 then printlog,logfile,outname+' NOT FOUND'
-      if outtest eq 1 and outlines eq 0 then printlog,logfile,outname+' HAS 0 LINES'
-      PUSH,failurelist,fieldlines
-    endelse
+  ;; Getting the main name
+  firstname = FILE_BASENAME(fieldlines[0],'.phot')
+  basedir = FILE_DIRNAME(fieldlines[0])
+  if keyword_set(mchusetiles) then basedir=FILE_DIRNAME(basedir)  ;; F1/F1-T10/F1-00507801+T10.phot
+  ;; Getting basename
+  basename = firstname   ;; namps=1 and not using tiles
+  if keyword_set(mchusetiles) then basename = (strsplit(firstname,'\'+tilesep+'T',/extract))[0]
+  if not keyword_set(mchusetiles) and (thisimager.namps gt 1) then begin
+    ending = first_el(strsplit(firstname,thisimager.separator,/extract),/last)
+    endlen = strlen(ending)
+    len = strlen(firstname)
+    basename = strmid(firstname,0,len-endlen-1)
+  endif
 
-
-  ;###########################
-  ; SINGLE AMP IMAGERS
-  ;###########################
-  Endif else begin
-
-    ; More than one file
-    if nfieldlines gt 1 then begin
-      printlog,logfile,strtrim(nfieldlines,2)+' files found.  Only ONE possible with this imager'
-      PUSH,failurelist,fieldlines
-      goto,BOMB1
-    endif
-
-    printlog,logfile,'Updating IDs for '+ifield
-
-    ; Change the IDs
-    ;---------------
-    file = fieldlines[0]
+  ;; Get file information and find unique exposures
+  undefine,allfiles
+  for j=0,nfieldlines-1 do begin
+    dir1 = file_dirname(fieldlines[j])
+    base1 = file_basename(fieldlines[j],'.phot')
+    LOADMCH,dir1+'/'+base1+'.mch',indivfiles
+    push,allfiles,dir1+'/'+file_basename(indivfiles,'.als')+'.fits'
+  endfor
+  bd = where(file_test(allfiles) eq 0,nbd)
+  if nbd gt 0 then allfiles[bd]+='.fz'
+  ;; Get exposure names
+  ;; single-amp F1-12340044.als
+  ;; multi-amp  F1-12340044_10.als
+  arr1 = strsplitter(file_basename(allfiles),'-',/extract)
+  allexpnum = reform(arr1[1,*])         ;; single-amp
+  if thisimager.namps gt 1 then begin   ;; multi-amp
+    arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
+    allexpnum = reform(arr2[0,*])
+  endif
+  uiexp = uniq(allexpnum,sort(allexpnum))
+  uexpnum = allexpnum[uiexp]
+  nexp = n_elements(uexpnum)
+  ;; Get exposure information
+  expstr = replicate({expnum:'',filter:'',dateobs:'',mjd:0.0d0,exptime:0.0,cenra:0.0d0,cendec:0.0d0},nexp)
+  PHOTRED_GATHERFILEINFO,allfiles[uiexp],filestr
+  struct_assign,filestr,expstr
+  expstr.expnum = uexpnum
+  for j=0,nexp-1 do expstr[j].mjd = date2jd(expstr[j].dateobs,/mjd)
+  si = sort(expstr.mjd)  ; put in chronological order
+  expstr = expstr[si]
+  printlog,logfile,strtrim(nexp,2)+' exposures'
+  
+  ;-------------------------------------------------
+  ; LOOP through all the PHOT files for this field
+  ;-------------------------------------------------
+  ncombined = 0
+  undefine,str,all
+  undefine,fieldnames0,fieldtypes0
+  For j=0,nfieldlines-1 do begin
+    file = fieldlines[j]
     filebase = FILE_BASENAME(file,'.phot')
+    filedir = FILE_DIRNAME(file)
 
     ; Check that the PHOT file exists
     test = FILE_TEST(file)
@@ -625,58 +374,216 @@ FOR i=0,nsfields-1 do begin
     if (photlines eq 0) then begin
       PUSH,failurelist,file
       if test eq 0 then printlog,logfile,file+' NOT FOUND'
-      if test eq 1 and photlines eq 0 then printlog,logfile,file+' HAS 0 LINES'
-      goto,BOMB1
+      if test eq 1 and nlines eq 0 then printlog,logfile,file+' HAS 0 LINES'
+      goto,BOMB2
     endif
 
-    ; Load the PHOT file
+    ;; Load the PHOT file
     str = PHOTRED_READFILE(file,count=nstr)
 
-    ; Print out the file info
-    printlog,logfile,filebase,' Nstars='+strtrim(nstr,2)
+    ;; Get the column names and types
+    fieldnames = tag_names(str)
+    fieldtypes = lonarr(n_elements(fieldnames))
+    for k=0,n_elements(fieldnames)-1 do fieldtypes[k]=size(str[0].(k),/type)
+    ;; ID must be a string
+    idind = where(fieldnames eq 'ID',nidind)
+    if fieldtypes[idind] ne 7 then begin
+      fieldtypes[idind] = 7
+      str0 = str[0] & struct_assign,{dum:''},str0
+      schema = create_struct(fieldnames[0],fix(str0.(0),type=fieldtypes[0]))
+      for k=1,n_elements(fieldnames)-1 do schema=create_struct(schema,fieldnames[k],fix(str0.(k),type=fieldtypes[k]))
+      str_orig = str
+      str = replicate(schema,nstr)
+      struct_assign,str_orig,str
+      str.id = strtrim(str.id,2)
+      undefine,str_orig
+    endif
 
-    ; Updating the IDs
-    ; FIELD.IDNUMBER, i.e. 190L182a.17366
-    ;---------------------------------------------
-    id2 = ifield+'.'+strtrim(str.id,2)
-    str.id = id2
+    ;; Print out the file info
+    printlog,logfile,''
+    printlog,logfile,'ADDING '+filebase+' Nstars='+strtrim(nstr,2)
+    printlog,logfile,''
 
-    ; Output the data
-    ; We will update the original file.
-    ;-----------------------------------
-    ;printlog,logfile,'Moving original file to '+file+'.orig'
-    ;FILE_MOVE,file,file+'.orig',/overwrite,/allow_same       ; save the original
-    outname = basedir+'/'+base+'.cmb'
-    printlog,logfile,'OUTPUTTING data to '+outname
-    if catformat eq 'ASCII' then PRINTSTR,all,outname else MWRFITS,all,outname,/create
+    ;; Adding EXT tag for amp number
+    tags = TAG_NAMES(str)
+    if (thisimager.namps gt 1) or keyword_set(mchusetiles) then begin
+      extgd = where(tags eq 'EXT',nextgd)
+      if nextgd eq 0 then ADD_TAG,str,'EXT',0,str
+    endif
 
-    ; Make sure that it exists, and add to OUTLIST
-    outtest = FILE_TEST(outname)
-    if outtest eq 1 then outlines = FILE_LINES(outname) else outlines=0
-    if (outlines gt 0) then begin
-      PUSH,outlist,outname
-      PUSH,successlist,file
-    endif else begin
-      if outtest eq 0 then printlog,logfile,outname+' NOT FOUND'
-      if outtest eq 1 and outlines eq 0 then printlog,logfile,outname+' HAS 0 LINES'
-      ;printlog,logfile,'Moving original file back to '+file
-      ;FILE_MOVE,file+'.orig',file,/overwrite,/allow_same
+    ;; Single-amp and NOT using tiles
+    ;;-------------------------------
+    If (not keyword_set(mchusetiles)) and (thisimager.namps eq 1) then begin
+      ;; Updating the IDs
+      ;; FIELD.IDNUMBER, i.e. 190L182a.17366
+      ;;---------------------------------------------
+      id2 = ifield+'.'+strtrim(str.id,2)
+      str.id = id2
+    Endif
+       
+    ;; Multi-amps and NOT using tiles
+    ;;-------------------------------
+    If (not keyword_set(mchusetiles)) and (thisimager.namps gt 1) then begin
+      ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
+      ;  get "type mismatch" errors with double/floats
+      if j eq 0 then begin
+        fieldnames0 = fieldnames
+        fieldtypes0 = fieldtypes
+        file0 = file
+      endif
+      ; Check that the fieldnames are the same
+      if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
+        PUSH,failurelist,file
+        printlog,logfile,''
+        printlog,logfile,file+' format does NOT agree with '+file0
+        goto,BOMB2
+      endif
+      if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
+        PUSH,failurelist,file
+        printlog,logfile,''
+        printlog,logfile,file+' format does NOT agree with '+file0
+        goto,BOMB2
+      endif      
+      ; Getting the amplifier number (extension)
+      ;-----------------------------------------
+      ext = photred_getchipnum(filebase,thisimager)
+      str.ext = ext
+      ; Updating the IDs
+      ; FIELD_EXT.IDNUMBER, i.e. 190L182a_5.17366
+      ;---------------------------------------------
+      id2 = ifield+'_'+strtrim(ext,2)+'.'+strtrim(str.id,2)
+      str.id = id2
+    Endif
+      
+    ;; Using TILES, need to reformat photometry structure
+    If keyword_set(mchusetiles) then begin
+      ;; The chip/amp information is not in the name
+      ;; each image could have a different chip
+      ;; F1-00507801+T2, no chip extension
+      ;; Use the TILE Number as the EXT
+      ext = first_el(strsplit(filebase,tilesep+'T',/extract),/last)
+      str.ext = ext
+      ; Updating the IDs
+      ; FIELD_TILE.IDNUMBER, i.e. 190L182a_5.17366
+      ;---------------------------------------------
+      id2 = ifield+'_'+strtrim(ext,2)+'.'+strtrim(str.id,2)
+      str.id = id2
+    Endif
+      
+    ;; Reformat the photometry structure
+    ;; Put the photometry in exposure columns
+    ;;---------------------------------------
+    ;; Get information on the individual images
+    LOADMCH,filedir+'/'+filebase+'.mch',alsfiles
+    fitsfiles = filedir+'/'+file_basename(alsfiles,'.als')+'.fits'
+    bdfits = where(file_test(fitsfiles) eq 0,nbdfits)
+    if nbdfits gt 0 then fitsfiles[bdfits]+='.fz'
+    PHOTRED_GATHERFILEINFO,fitsfiles,filestr
+    ;; Get exposure names
+    add_tag,filestr,'expnum','',filestr
+    arr1 = strsplitter(file_basename(filestr.file),'-',/extract)
+    allexpnum = reform(arr1[1,*])         ;; single-amp
+    if thisimager.namps gt 1 then begin   ;; multi-amp
+      arr2 = strsplitter(reform(arr1[1,*]),thisimager.separator,/extract)
+      allexpnum = reform(arr2[0,*])
+    endif
+    filestr.expnum = allexpnum
+    ;; Reformat the photometry structure
+    str_orig = str & undefine,str
+    PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,str
+
+      ; Check that the structure has RA/DEC
+    ;------------------------------------
+    gdra = where(tags eq 'RA',ngdra)
+    gddec = where(tags eq 'DEC',ngddec)
+    if (ngdra eq 0) or (ngddec eq 0) then begin
       PUSH,failurelist,file
+      printlog,logfile,file+' DOES NOT HAVE RA/DEC FIELDS'
+      goto,BOMB2
+    endif
+
+    ; COMBINING
+    ;-----------
+    ; Adding together with PHOT_OVERLAP.PRO to deal with overlaps
+    ; at the edges of chips/amplifiers
+    ; This uses RA/DEC so if these aren't in the structures it won't
+    ; "combine" stars properly.
+    if (n_elements(all) gt 0) then begin
+      PHOT_OVERLAP,all,str,outstr,silent=silent,posonly=cmbposonly
+      noutstr = n_elements(outstr)
+      ;; There was a problem
+      if (noutstr eq 0) then begin
+        printlog,logfile,'Problem in PHOT_OVERLAP for '+file
+        PUSH,failurelist,file
+        goto,BOMB2
+      endif        
+      all = outstr
+      ncombined++
+
+    ; First time, initialize the "all" structure
+    endif else begin
+      all = str
+      ncombined++
     endelse
 
+    BOMB2:
+  Endfor  ; loop through the individual PHOT files
 
-  Endelse  ; single file
+  ;; At least one file failed
+  ;; Field and files are successful only if *ALL* succeeded
+  ;;--------------------------------------------------------
+  if (ncombined ne nfieldlines) then begin
+    printlog,logfile,ifield,' FAILED because ',strtrim(ngd-ncombined,2),' Files FAILED'
+    PUSH,failurelist,fieldlines
+    goto,BOMB1
+  endif
+
+  ;; Are there any stars?
+  ;;----------------------
+  nall = n_elements(all)
+  if (nall eq 0) then begin
+    printlog,logfile,'NO STARS for FIELD='+ifield
+    PUSH,failurelist,fieldlines
+    goto,BOMB1
+  endif
+  
+  ;; We were successful!
+  ;;-----------------------
+  printlog,logfile,''
+  printlog,logfile,'Combined '+strtrim(ncombined,2)+' files'
+  printlog,logfile,'Nstars = '+strtrim(nall,2)+' for FIELD='+ifield
+
+  ;; Output the data
+  ;;----------------
+  outname = basedir+'/'+basename+'.cmb'
+  printlog,logfile,'OUTPUTTING data to '+outname
+  if catformat eq 'ASCII' then begin
+    PRINTSTR,all,outname
+    PRINTSTR,expstr,outname+'.meta'
+  endif else begin
+    MWRFITS,all,outname,/create
+    MWRFITS,expstr,outname,/silent   ;; add meta-data on exposure information 
+  endelse
+
+  ;; Make sure that it exists, and add to OUTLIST
+  outtest = FILE_TEST(outname)
+  if outtest eq 1 then outlines = FILE_LINES(outname) else outlines=0
+  if (outlines gt 0) then begin
+    PUSH,outlist,outname                           ; add final file to outlist
+    PUSH,successlist,fieldlines                ; add all individual files to successlist
+  endif else begin
+    if outtest eq 0 then printlog,logfile,outname+' NOT FOUND'
+    if outtest eq 1 and outlines eq 0 then printlog,logfile,outname+' HAS 0 LINES'
+    PUSH,failurelist,fieldlines
+  endelse
 
   BOMB1:
-
-
 
   ;##########################################
   ;#  UPDATING LIST FILES
   ;##########################################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
-
+                      failurelist=failurelist,setupdir=curdir,/silent
 ENDFOR
 
 
@@ -684,12 +591,11 @@ ENDFOR
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'PHOTRED_COMBINE Finished  '+systime(0)
 
 if keyword_set(stp) then stop
 
-
- end
+end

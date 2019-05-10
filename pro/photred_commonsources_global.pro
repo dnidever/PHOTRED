@@ -256,12 +256,12 @@ if file_test(allcat_outfile) eq 0 or (n_elements(cmd) gt 0) or keyword_set(redo)
    
       ; Get the header
       if fpack eq 1 then begin
-        head = headfits(ifile,exten=1)
+        head = PHOTRED_READFILE(ifile,exten=1,/header)
         ; Fix the NAXIS1/2 in the header
         sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
         sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
       endif else begin
-        head = headfits(ifile)
+        head = PHOTRED_READFILE(ifile,/header)
       endelse
 
       ; Load the coordinates file
@@ -391,12 +391,12 @@ For i=0,nfieldfiles-1 do begin
 
     ; Get the header
     if fpack eq 1 then begin
-      head1 = headfits(ifile,exten=1)
+      head1 = PHOTRED_READFILE(ifile,exten=1,/header)
       ; Fix the NAXIS1/2 in the header
       sxaddpar,head1,'NAXIS1',sxpar(head1,'ZNAXIS1')
       sxaddpar,head1,'NAXIS2',sxpar(head1,'ZNAXIS2')
     endif else begin
-      head1 = headfits(ifile)
+      head1 = PHOTRED_READFILE(ifile,/header)
     endelse
 
     ; Load the coordinates file
@@ -475,7 +475,7 @@ For i=0,nfieldfiles-1 do begin
     ; Fit Gaussians to the sources
     if keyword_set(gaussfit) then begin
       print,'Fitting Gaussians to common sources'
-      FITS_READ,ifile,im,head
+      im = PHOTRED_READFILE(ifile,head)
       sz = size(im)
       x = lindgen(sz[1])
       y = lindgen(sz[2])

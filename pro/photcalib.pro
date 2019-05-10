@@ -592,7 +592,7 @@ FOR i=0L,ninp-1 do begin
     ; Not DAOPHOT file, Header line
     if keyword_set(header) then numstar = file_lines(magfile)-1L
   endif else begin
-    hd1 = headfits(magfile,exten=1,/silent)
+    hd1 = PHOTRED_READFILE(magfile,exten=1,/header)
     numstar = sxpar(hd1,'NAXIS1') 
   endelse
     
@@ -653,8 +653,19 @@ FOR i=0L,ninp-1 do begin
 
     nmatch = 0
     ; Try filename + band
-    if transfileinfo eq 1 then $
+    if transfileinfo eq 1 then begin
+       ;; First check for an exact match
        MATCH,trans.file+':'+trans.band,obsfile+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+       ;; Check if FILE is in FIELD-EXPOSURE format and match to all chips of this exposure
+       if nmatch eq 0 then begin
+         ;len = strlen(trans.file)
+         ;MATCH,strmid(trans.file,0,strlen(obsfile))+':'+trans.band,obsfile+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
+         match = bytarr(n_elements(trans))
+         for k=0,n_elements(trans)-1 do $
+           match[k] = (stregex(obsfile,trans[k].file,/boolean) eq 1 and trans[k].file ne '' and trans[k].band eq inp.band[j])
+         ind1 = where(match eq 1,nmatch)
+       endif
+    endif
     ; Try night+chip + band
     ;  only want to match lines with file=''
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
@@ -903,7 +914,6 @@ FOR i=0L,ninp-1 do begin
 
   ; Figure out the names for the Extra columns
   endif else begin
-
     ; header
     headline = headline+' CHI      SHARP'
     ; We have FLAG/PROB colums
@@ -927,8 +937,6 @@ FOR i=0L,ninp-1 do begin
     endif
     format = format+')'
   endelse
-
-
 
   ;----------------
   ; WRITE the file

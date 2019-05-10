@@ -312,7 +312,7 @@ FOR i=0,nnights-1 do begin
 
   ; UPDATE the Lists
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 
 
@@ -409,7 +409,7 @@ FOR i=0,nnights-1 do begin
 
   ; UPDATE the Lists
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 
   ;-----------------------
@@ -569,7 +569,7 @@ FOR i=0,nnights-1 do begin
   ; UPDATE the Lists
   ;#####################
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
 ENDFOR   ; night loop
 
@@ -578,7 +578,7 @@ ENDFOR   ; night loop
 ; SUMMARY of the Lists
 ;#####################
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
 
 printlog,logfile,'STDRED_DAOGROW Finished  ',systime(0)

@@ -199,11 +199,9 @@ FOR f=0,nfiles-1 do begin
       goto,SKIP
     endif
 
-    message=''
-    FITS_READ,files[f],im,head,/no_abort,exten=exten,message=message
-
-    ; Fits_read error
-    if (message ne '') then begin
+    im = PHOTRED_READFILE(files[f],head,exten=exten,error=message)
+    ; Reading error
+    if n_elements(message) gt 0 then begin
       error[f] = files[f]+' ERROR: '+message
       if not keyword_set(silent) then print,error[f]
       goto,SKIP
@@ -264,7 +262,7 @@ FOR f=0,nfiles-1 do begin
     endif
 
     ; Computing sky level and sigma
-    photred_sky,im,skymode,skysig1,highbad=satlim,/silent
+    photred_sky,im,skymode,skysig1,highbad=satlim*0.95,/silent
     if skysig1 lt 0.0 then skysig1 = mad(im[gdpix])
     if skysig1 lt 0.0 then skysig1 = mad(im)
     maxim = max(im)
@@ -319,7 +317,7 @@ FOR f=0,nfiles-1 do begin
 
     ; Computing sky level and sigma AGAIN with
     ;  background subtracted image
-    sky,im2,skymode2,skysig,highbad=satlim,/silent
+    sky,im2,skymode2,skysig,highbad=satlim*0.95,/silent
     if keyword_set(verbose) then print,'skymode = ',stringize(skymode,ndec=2),' skysig = ',stringize(skysig,ndec=2)
 
     ; Gaussian smooth the image to allow detection of fainter sources

@@ -130,6 +130,14 @@ if ndaopsfva eq 0 then undefine,daopsfva
 daofitradfwhm = READPAR(setup,'DAOFITRADFWHM',count=ndaofitradfwhm)
 if ndaofitradfwhm eq 0 then undefine,daofitradfwhm
 
+; Temporary working directory
+workdir = READPAR(setup,'WORKDIR',count=nworkdir)
+if nworkdir eq 0 then undefine,workdir
+
+; Clean intermediate files at the end
+clean = READPAR(setup,'CLEAN',count=nclean)
+if nclean eq 0 then undefine,clean
+
 
 ;###################
 ; GETTING INPUTLIST
@@ -266,10 +274,10 @@ for i=0,ninputlines-1 do begin
   file = inputlines[i]
   if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then begin
     base = FILE_BASENAME(file,'.fits.fz')
-    head = HEADFITS(file,exten=1)
+    head = PHOTRED_READFILE(file,exten=1,/header)
   endif else begin
     base = FILE_BASENAME(file,'.fits')
-    head = HEADFITS(file)
+    head = PHOTRED_READFILE(file,/header)
   endelse
   com=''
 
@@ -293,7 +301,7 @@ endfor
 
 ; UPDATE the Lists
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,/silent
+                    failurelist=failurelist,setupdir=curdir,/silent
 
 ; There were HEADER problems
 if (headerproblem eq 1) then begin
@@ -355,24 +363,24 @@ for i=0,ndirs-1 do begin
       ; Make sure that the FITS files are FLOAT
       ;----------------------------------------
       ; Make sure that |BITPIX| > 16
-      head = HEADFITS(fil)
+      head = PHOTRED_READFILE(fil,/header)
       bitpix = long(SXPAR(head,'BITPIX',/silent))
       if (bitpix eq 8 or bitpix eq 16) and (fpack eq 0) then begin
         printlog,logfile,'BIXPIX = ',strtrim(bitpix,2),'.  Making image FLOAT'
 
         ; Read in the image
-        FITS_READ,fil,im,head,/no_abort,message=message
+        im = PHOTRED_READFILE(fil,head,error=error)
 
         ; Make sure BZERO=0
         bzero = sxpar(head,'BZERO',count=nbzero,/silent)
         if nbzero gt 0 then sxaddpar,head,'BZERO',0.0
 
         ; Write the FLOAT image
-        if (message[0] eq '') then $
-        FITS_WRITE,fil,float(im),head
+        if n_elements(error) eq 0 and size(im,/type) lt 4 then $
+          FITS_WRITE_RESOURCE,fil,float(im),head
 
         ; There was a problem reading the image
-        if (message[0] ne '') then begin
+        if n_elements(error) gt 0 then begin
           printlog,logfile,'PROBLEM READING IN ',fil
           successarr[ind] = 0
         endif
@@ -611,7 +619,7 @@ if ngd eq 0 then begin
 
   ; UPDATE the Lists
   PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,/silent
+                      failurelist=failurelist,setupdir=curdir,/silent
 
   return
 endif
@@ -658,7 +666,7 @@ If not keyword_set(redo) then begin
     PUSH,successlist,procdirlist[bd]+'/'+procbaselist[bd]+procextlist[bd]
     PUSH,outlist,procdirlist[bd]+'/'+procbaselist[bd]+'.als'
     PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                        failurelist=failurelist,/silent
+                        failurelist=failurelist,setupdir=curdir,/silent
 
     ; Remove them from the arrays
     if nbd lt nprocbaselist then REMOVE,bd,procbaselist,procdirlist
@@ -696,6 +704,7 @@ if not keyword_set(fake) then begin
 endif else begin
   cmd = './daophot_fake.sh '+procbaselist
 endelse
+if n_elements(workdir) gt 0 then cmd+=' '+workdir  ; temporary working directory
   
 ; Submit the jobs to the daemon
 PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$
@@ -768,8 +777,29 @@ if (nbd gt 0) then begin
 endif else UNDEFINE,failurelist
 
 PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist
+                    failurelist=failurelist,setupdir=curdir
 
+;;######################
+;;  CLEANING UP
+;;######################
+if keyword_set(clean) then begin
+  printlog,logfile,'CLEANING UP.  CLEAN='+strtrim(clean,2)
+
+  ;; Only clean up for successful files
+  READLIST,curdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=curdir,count=nfitsfiles,logfile=logfile,/silent
+  for i=0,nfitsfiles-1 do begin
+    dir1 = file_dirname(fitsfiles[i])
+    base1 = file_basename(fitsfiles[i])
+    if strmid(base1,6,7,/reverse_offset) eq 'fits.fz' then base1 = FILE_BASENAME(base1,'.fits.fz') else $
+      base1 = FILE_BASENAME(base1,'.fits')
+    ;; lst, lst1, lst2, lst1.chi, grp, nst, lst2.chi, plst.chi,
+    ;; nei, als.inp, a.fits, cmn.log, cmn.coo, cmn.ap, cmn.lst
+    FILE_DELETE,dir1+'/'+base1+['.lst','.lst1','.lst2','.lst1.chi','.lst2.chi','.grp','.nst','.plst.chi',$
+                                '.nei','.als.inp','.cmn.log','.cmn.coo','.cmn.ap','.cmn.lst','a.fits','a.fits.fz'],/allow
+    ;; If CLEAN=2, then also remove coo, ap, s.fits as well
+    if clean ge 2 then FILE_DELETE,dir1+'/'+base1+['.coo','.ap','s.fits','s.fits.fz'],/allow
+  endfor
+endif
 
 printlog,logfile,'PHOTRED_DAOPHOT Finished  ',systime(0)
 
