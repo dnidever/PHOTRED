@@ -2032,6 +2032,11 @@ if n_elements(refcat) eq 0 and not keyword_set(redo) then begin
         reftags = tag_names(refcat)
         de2000tag = first_el(where(strpos(reftags,'DEJ2000') ne -1,nde2000tag))
       endif
+      ;; PMDE not found but PMDEC was
+      if tag_exist(refcat,'PMDE') eq 0 and tag_exist(refcat,'PMDEC') eq 1 then begin
+        add_tag,refcat,'PMDE',0.0d0,refcat
+        refcat.pmde = refcat.pmdec
+      endif
     endif
   
     ; Catalog OKAY
@@ -2166,7 +2171,7 @@ if n_elements(refcat) eq 0 then begin
 endif
 
 ; Reference catalog type
-if n_elements(refname) eq 0 then begin
+if n_elements(refname) eq 0 or n_elements(refcatfile) eq 1 then begin
   ; 2MASS-PSC has _2MASS tag
   if tag_exist(refcat,'_2MASS') then refname='2MASS-PSC'
   ; USNO-B1 has USNO_B1_0 tag
@@ -2175,6 +2180,7 @@ if n_elements(refname) eq 0 then begin
   if tag_exist(refcat,'UCAC4') then refname='UCAC4'
   ; GAIADR2
   if tag_exist(refcat,'RA_ICRS') and tag_exist(refcat,'PLX') and tag_exist(refcat,'PMRA') then refname='GAIADR2'
+  if tag_exist(refcat,'FG') and tag_exist(refcat,'PMRA') and tag_exist(refcat,'BP') then refname='GAIADR2'
   if n_elements(refname) gt 0 then print,'Reference catalog type is ',refname else print,'Reference catalog type UNKNOWN'
 endif
 

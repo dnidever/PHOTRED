@@ -107,7 +107,8 @@ for j=0,nfiles-1 do begin
   endif
   
   ; Getting the airmass
-  am = PHOTRED_GETAIRMASS(fitsfile,obs=observatory,/update,/recalculate)
+  ;am = PHOTRED_GETAIRMASS(fitsfile,obs=observatory,/update,/recalculate)
+  am = PHOTRED_GETAIRMASS(fitsfile,obs=observatory,/recalculate)
   ;am = sxpar(head,'AIRMASS')
   if (am lt 0.9) then begin
     error = 'ERROR NO AIRMASS'
