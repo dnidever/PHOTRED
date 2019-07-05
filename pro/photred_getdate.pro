@@ -87,6 +87,9 @@ endif
 ; Try DATE-OBS
 date = sxpar(head,'DATE-OBS',count=ndate,/silent)
 if ndate eq 0 then $
+; Try DATE_OBS
+date = sxpar(head,'DATE_OBS',count=ndate,/silent)
+if ndate eq 0 then $
 ; Try DATE
 date = sxpar(head,'DATE',count=ndate,/silent)
 if ndate eq 0 then $
