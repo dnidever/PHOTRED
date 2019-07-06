@@ -671,7 +671,6 @@ endif else begin
   if n_elements(workdir) gt 0 then cmd+=",workdir='"+workdir+"'"
 endelse
 
-
 ; Getting NMULTI from setup file if not input
 if n_elements(nmulti) eq 0 then begin
   nmulti = READPAR(setup,'NMULTI')
@@ -691,7 +690,7 @@ hyades = stregex(host,'hyades',/boolean,/fold_case)
 
 
 ; Running on multiple machines
-if (nmulti gt 1) and (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread) or (htcondor ne 0))  then begin
+if (((pleione eq 1) or (hyades eq 1)) or keyword_set(hyperthread) or (htcondor ne 0))  then begin
 
   if htcondor ne 0 then begin
     ; Get SETUP to see if we are using IDL VM and/or we have some submit commands
