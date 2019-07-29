@@ -81,18 +81,18 @@ if strtrim(ut,2) eq '0' then begin
   if strpos(ut,'T') ne -1 then ut = first_el(strsplit(ut,'T',/extract),/last)
 endif
 
-; Try DATE
+; Try DATE_OBS (LBC data)
 if strtrim(ut,2) eq '0' then begin
-  ut = sxpar(head,'DATE',/silent)
+  ut = sxpar(head,'DATE_OBS',/silent)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
   ; Is this in the format YYYY-MM-DDTHH:MM:SS.SSS ?
   if strpos(ut,'T') ne -1 then ut = first_el(strsplit(ut,'T',/extract),/last)
 endif
 
-; Try DATE_OBS (LBC data)
+; Try DATE
 if strtrim(ut,2) eq '0' then begin
-  ut = sxpar(head,'DATE_OBS',/silent)
+  ut = sxpar(head,'DATE',/silent)
   ind = strpos(ut,':')
   if ind[0] eq -1 then ut='0'
   ; Is this in the format YYYY-MM-DDTHH:MM:SS.SSS ?

@@ -214,7 +214,7 @@ FOR i=0,ninputlines-1 do begin
 
       ; We were successful
       if (finaltest eq 1) and (savetest eq 1) and (fitstest eq 1) then begin
-        PUSH,outlist,filedir+'/'+[finalfile,savefile,gfitsfile]   ; add all files to outputarr
+        PUSH,outlist,[finalfile,savefile,gfitsfile]   ; add all files to outputarr
         PUSH,successlist,longfile
       end else begin
         PUSH,failurelist,longfile

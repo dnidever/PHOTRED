@@ -54,6 +54,8 @@ if file_test(mchfile) eq 0 then begin
   return
 endif
 
+if n_elements(logfile) eq 0 then logfile=-1
+
 ; Load the MCH file
 LOADMCH,mchfile,files,trans
 nfiles = n_elements(files)
