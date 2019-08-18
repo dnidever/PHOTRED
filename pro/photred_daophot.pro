@@ -457,7 +457,7 @@ if ntomakeoptlist gt 0 then begin
   ;cmd = "cd,'"+tomakeoptlist_dir+"' & PHOTRED_MKOPT,'"+tomakeoptlist_base+"'"
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,tomakeoptlist_dir,nmulti=nmulti,prefix='dopt',hyperthread=hyperthread,$
-             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
+             /idle,waittime=1,/cdtodir,scriptsdir=scriptsdir
 endif
 
 ; Check all OPT files
@@ -629,7 +629,7 @@ if (psfcomsrc eq 1) and not keyword_set(psfcomglobal) then begin
 
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,cmnprocdirs,nmulti=nmulti,prefix='dcmn',hyperthread=hyperthread,$
-             /idle,waittime=5,/cdtodir,scriptsdir=scriptsdir
+             /idle,waittime=1,/cdtodir,scriptsdir=scriptsdir
 endif
 
 
@@ -735,7 +735,7 @@ if n_elements(workdir) gt 0 then cmd+=' '+workdir  ; temporary working directory
   
 ; Submit the jobs to the daemon
 PBS_DAEMON,cmd,procdirlist,nmulti=nmulti,prefix='dao',hyperthread=hyperthread,$
-           waittime=5,/cdtodir,scriptsdir=scriptsdir
+           waittime=1,/cdtodir,scriptsdir=scriptsdir
 
 ; IT WOULD BE BETTER TO UPDATE THE LISTS
 ; AFTER EACH FILE IS PROCESSED!!!!!
