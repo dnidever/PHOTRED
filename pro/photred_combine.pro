@@ -490,6 +490,7 @@ FOR i=0,nsfields-1 do begin
     filestr.expnum = allexpnum
     ;; Reformat the photometry structure
     str_orig = str & undefine,str
+
     PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,str
 
       ; Check that the structure has RA/DEC

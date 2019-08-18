@@ -70,7 +70,8 @@ thisprog = strupcase(lists.thisprog)
 stages = ['RENAME','WCS','SPLIT','DAOPHOT','MATCH','ALLFRAME','APCOR',$
           'CALIB','ASTROM','COMBINE','DEREDDEN','SAVE','HTML',        $
           'APERPHOT','DAOGROW','MATCHCAT','COMBINECAT','FITDATA',     $ ; STDRED  stages
-          'COMPLETE','ADDSTAR','CLEAN']                                 ; FAKERED stages
+          'COMPLETE','ADDSTAR','CLEAN',$                                ; FAKERED stages
+          'ZEROPOINT']                                                  ; delvered stages
 ; NOT a valid stage
 stageind = where(stages eq thisprog,nstageind)
 if (nstageind eq 0) then begin

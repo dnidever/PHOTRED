@@ -178,7 +178,7 @@ FOR i=0,ninputlines-1 do begin
       finalfile = ifield+'.final'
       printlog,logfile,'Copying ',file,' -> ',finalfile
       FILE_COPY,file,finalfile,/overwrite
-      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta'
+      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta',/overwrite
 
       ; Make the IDL SAVE file
       savefile = ifield+'.dat'
