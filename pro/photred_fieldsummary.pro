@@ -255,6 +255,7 @@ For i=0,nfieldfiles-1 do begin
   undefine,chilines,chilinesarr,chiarr,psfan,minpsftype,maxpsftype,psfchi
   
   fitsfile = fieldfiles[i]
+  fitsdir = file_dirname(fitsfile)+'/'
   if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
   if fpack eq 1 then base=file_basename(fitsfile,'.fits.fz') else $
     base = file_basename(fitsfile,'.fits')   
@@ -329,7 +330,7 @@ For i=0,nfieldfiles-1 do begin
   endif
     
   ; Load DAOPHOT option file
-  optfile = base+'.opt'
+  optfile = fitsdir+base+'.opt'
   if file_test(optfile) eq 1 then begin
     READLINE,optfile,optlines
     optarr = strsplitter(optlines,'=',/extract)
@@ -338,7 +339,7 @@ For i=0,nfieldfiles-1 do begin
   endif
      
   ; Load DAOPHOT log file
-  daologfile = base+'.log'
+  daologfile = fitsdir+base+'.log'
   if file_test(daologfile) eq 1 then begin
     READLINE,daologfile,loglines
     ; Sky mode and standard deviation =   48.608    4.110
@@ -360,7 +361,7 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Load ALS file
-  alsfile = base+'.als'
+  alsfile = fitsdir+base+'.als'
   if file_test(alsfile) eq 1 then begin
     LOADALS,alsfile,als,alshead,count=nals
     chipstr[i].dao_nsources = nals
@@ -375,14 +376,14 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Check list of DAOPHOT PSF stars
-  lstfile = base+'.plst'
+  lstfile = fitsdir+base+'.plst'
   if file_test(lstfile) eq 1 then begin
     READLINE,lstfile,lstlines
     chipstr[i].dao_npsfstars = n_elements(lstlines)-3
   endif
 
   ; Load DAOPHOT PSF file
-  psffile = base+'.psf'
+  psffile = fitsdir+base+'.psf'
   if file_test(psffile) eq 1 then begin
     READLINE,psffile,psflines
     ; PENNY1     69    4    6    0   14.048       1091.621   1022.5   2046.5
@@ -404,7 +405,7 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; PSF chi-value
-  psflogfile = base+'.psf.log'
+  psflogfile = fitsdir+base+'.psf.log'
   if file_test(psflogfile) eq 1 then begin
     READLINE,psflogfile,psfloglines
     ;
@@ -472,7 +473,7 @@ For i=0,nfieldfiles-1 do begin
   ; Load ALF file
   nalf = -1
   if keyword_set(mchusetiles) eq 0 then begin
-    alffile = base+'.alf'
+    alffile = fitsdir+base+'.alf'
     if file_test(alffile) eq 1 then LOADALS,alffile,alf,alfhead,count=nalf
   ;; Using TILES
   endif else begin
