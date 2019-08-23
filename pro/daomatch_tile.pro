@@ -216,6 +216,7 @@ for i=0,nfiles-1 do begin
 endfor
 
 ; Write to the new MCH file
+mchbase = bases[0]
 mchfile = mchbase+'.mch'
 WRITELINE,mchfile,mchfinal
 
