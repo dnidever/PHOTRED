@@ -135,7 +135,7 @@ if n_elements(scriptsdir) eq 0 then begin
   return
 endif
 ; Check if the scripts exist in the current directory
-scripts = ['getpsfnofind.sh','allstar.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
+scripts = ['getpsfnofind.sh','allstar.sh','photo.opt','apcor.opt','lstfilter.f','goodpsf.pro','allframe.opt',$
            'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 ; Loop through the scripts
@@ -153,6 +153,29 @@ for i=0,nscripts-1 do begin
     FILE_COPY,info.name,curinfo.name,/overwrite
   endif
 endfor ; scripts loop
+;; Compile lstfilter.f it it wasn't already compiled
+;;   compiling it locally allows for different architectures/machines
+;;   using the same repository
+if file_test('lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
+  printlog,logfile,'Compiling lstfilter.f'
+  file_copy,scriptsdir+'/lstfilter.f','.'
+  ;; Check which fortran compiler we have
+  compiler = ''
+  spawn,['which','gfortran'],out,errout,/noshell
+  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
+  spawn,['which','g77'],out,errout,/noshell
+  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
+  if compiler eq '' then begin
+    printlog,logfile,'NO fortran compiler found'
+    return
+  endif
+  ;; Compile
+  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
+  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
+    printlog,logfile,'ERROR in compiling lstfilter.f'
+    return
+  endif
+endif
 
 
 ; Check that the ALLFRAME program exists
@@ -336,6 +359,12 @@ if n_elements(workdir) gt 0 then begin
   ;;  this will copy the contents of symlinks
   FILE_COPY,mchbase+['.mch','.raw','.tfr'],tempdir
   for i=0,nfiles-1 do FILE_COPY,file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],tempdir
+  ;; Copy resources files and headers if they exist
+  for i=0,nfiles-1 do begin
+    base1 = file_basename(files[i],'.als')
+    if file_test('.'+base1+'.fits') then FILE_COPY,'.'+base1+'.fits',tempdir
+    if file_test(base1+'.fits.head') then FILE_COPY,base1+'.fits.head',tempdir
+  endfor
   ;; Copy files for FAKE
   if keyword_set(fake) then FILE_COPY,mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],tempdir
   ;; Copy the scripts

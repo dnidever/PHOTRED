@@ -266,7 +266,7 @@ if keyword_set(clean) then begin
 
   ;; Remove FITS files that have resource files
   ;;  only successful ones
-  READLIST,setupdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=setupdir,count=nfitsfiles,logfile=logfile,/silent
+  READLIST,curdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=curdir,count=nfitsfiles,logfile=logfile,/silent
   for i=0,nfitsfiles-1 do begin
     dir1 = file_dirname(fitsfiles[i])
     base1 = file_basename(fitsfiles[i])
