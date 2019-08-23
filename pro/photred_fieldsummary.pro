@@ -626,11 +626,11 @@ For i=0,nphotfiles-1 do begin
       trans1 = trans[indtrans[0]]
       chipstr[indgrp1].calib_color = trans1.color
       chipstr[indgrp1].calib_zpterm = trans1.zpterm
-      chipstr[indgrp1].calib_zptermerr = trans1.zptermerr
+      chipstr[indgrp1].calib_zptermsig = trans1.zptermsig
       chipstr[indgrp1].calib_amterm = trans1.amterm
-      chipstr[indgrp1].calib_amtermerr = trans1.amtermerr
+      chipstr[indgrp1].calib_amtermsig = trans1.amtermsig
       chipstr[indgrp1].calib_colorterm = trans1.colterm
-      chipstr[indgrp1].calib_colortermerr = trans1.coltermerr
+      chipstr[indgrp1].calib_colortermsig = trans1.coltermsig
     Endfor
   endif 
 
