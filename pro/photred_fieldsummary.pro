@@ -239,7 +239,8 @@ chipstr = replicate({field:'NAN',file:'NAN',expnum:'NAN',chip:-1L,base:'NAN',fil
                      airmass:nan,gain:nan,rdnoise:nan,nx:-1L,ny:-1L,wcstype:'NAN',pixscale:nan,ra:dnan,dec:dnan,wcsrms:nan,fwhm:nan,$
                      skymode:nan,skysig:nan,dao_nsources:-1L,dao_depth:nan,dao_npsfstars:-1L,dao_psftype:'NAN',dao_psfboxsize:-1L,$
                      dao_psfvarorder:-1L,dao_psfchi:nan,alf_nsources:-1L,alf_depth:nan,calib_depth:nan,calib_color:'NAN',calib_zpterm:nan,$
-                     calib_amterm:nan,calib_colorterm:nan,calib_magname:'NAN',apcor:nan,ebv:nan},nfieldfiles)
+                     calib_zptermerr:nan,calib_amterm:nan,calib_amtermerr:nan,calib_colorterm:nan,calib_colortermerr:nan,$
+                     calib_magname:'NAN',apcor:nan,ebv:nan},nfieldfiles)
 printlog,logfile,''
 printlog,logfile,'Chip-level information'
 printlog,logfile,''
@@ -625,8 +626,11 @@ For i=0,nphotfiles-1 do begin
       trans1 = trans[indtrans[0]]
       chipstr[indgrp1].calib_color = trans1.color
       chipstr[indgrp1].calib_zpterm = trans1.zpterm
+      chipstr[indgrp1].calib_zptermerr = trans1.zptermerr
       chipstr[indgrp1].calib_amterm = trans1.amterm
+      chipstr[indgrp1].calib_amtermerr = trans1.amtermerr
       chipstr[indgrp1].calib_colorterm = trans1.colterm
+      chipstr[indgrp1].calib_colortermerr = trans1.coltermerr
     Endfor
   endif 
 
