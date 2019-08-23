@@ -683,12 +683,16 @@ if nbdfpack gt 0 then FILE_DELETE,file_basename(files[bdfpack],'.als')+'.fits',/
 ;;------------------------------------------------
 if n_elements(workdir) gt 0 then begin
   printlog,logf,'Copying files back to original directory'
+  ;; Make sure all files are writeable
+  files0 = file_search(tempdir+'/*',count=nfiles0,/match_initial_dot)
+  if nfiles0 gt 0 then FILE_CHMOD,files0,'755'o
   ;; Delete some files
   FILE_DELETE,tempdir+'/'+mchbase+['.mch','.raw','.tfr'],/allow
-  for i=0,nfiles-1 do FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','opt','als.opt','ap','als','log','psf'],/allow
+  for i=0,nfiles-1 do FILE_DELETE,tempdir+'/'+file_basename(files[i],'.als')+'.'+['fits','fits.head','opt','als.opt','ap','als','log','psf'],/allow
+  for i=0,nfiles-1 do FILE_DELETE,tempdir+'/.'+file_basename(files[i],'.als')+'.fits',/allow
   if keyword_set(fake) then FILE_DELETE,tempdir+'/'+mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'],/allow
   ;; Copy files back
-  files = file_search(tempdir+'/*',count=nfiles)  
+  files = file_search(tempdir+'/*',count=nfiles,/match_initial_dot)  
   FILE_COPY,files,mchdir,/allow,/over
   ;; Delete all temporary files
   FILE_DELETE,files,/allow
