@@ -116,9 +116,9 @@ endif
 
 printlog,logfile
 printlog,logfile,'--- Making summary file for Field = '+field+' ---'
+if keyword_set(quick) then printlog,logfile,'QUICK SUMMARY'
 printlog,logfile
 
-if keyword_set(quick) then printlog,logfile,'QUICK SUMMARY'
 
 ;#########################################
 ;#   Find all files for this field
