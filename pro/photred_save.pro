@@ -6,8 +6,9 @@
 ; see post_processingsmc.pro
 ;
 ; INPUTS:
-;  /redo Redo files that were already done.
-;  /stp  Stop at the end of the program.
+;  /redo      Redo files that were already done.
+;  /sumquick  Create the summary file quickly.
+;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The final calibrated photometry and astrometry files.
@@ -15,7 +16,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_save,redo=redo,stp=stp
+pro photred_save,redo=redo,sumquick=sumquick,stp=stp
 
 COMMON photred,setup
 
@@ -224,7 +225,7 @@ FOR i=0,ninputlines-1 do begin
       endelse
 
       ; Make Field Summary file
-      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo
+      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo,quick=sumquick
 
     ; No field match
     endif else begin
