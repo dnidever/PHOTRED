@@ -118,6 +118,7 @@ printlog,logfile
 printlog,logfile,'--- Making summary file for Field = '+field+' ---'
 printlog,logfile
 
+if keyword_set(quick) then printlog,logfile,'QUICK SUMMARY'
 
 ;#########################################
 ;#   Find all files for this field
@@ -191,11 +192,12 @@ if file_test(outfile) eq 1 and not keyword_set(redo) then begin
   return
 endif
 
-
 ; Load the FINAL structure for this field
 printlog,logfile,'Loading Final structure'
-if file_test(datfile) eq 1 then restore,datfile else $
-  final=importascii(finalfile,/header)
+if not keyword_set(quick) then begin
+  if file_test(datfile) eq 1 then restore,datfile else $
+    final=importascii(finalfile,/header)
+endif
 
 ; Load the aperture correction "apcor.lst" file
 undefine,apcor
@@ -683,6 +685,12 @@ For i=0,nphotfiles-1 do begin
         endif
       endif
     endif ; we have the proper column/tag
+    ;; Get rough E(B-V) quickly
+    if keyword_set(quick) then begin
+      glactc,chipstr[indgrp1].ra,chipstr[indgrp1].dec,2000.0,glon,glat,1,/deg
+      ebv = dust_getval(glon,glat,/noloop,/interp)
+      chipstr[indgrp1].ebv = median([ebv])
+    endif
   Endfor  ; images in group loop
 
   ; Fill in transformation equation info
