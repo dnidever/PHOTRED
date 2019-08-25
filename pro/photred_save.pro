@@ -82,6 +82,10 @@ catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
+; Quick summary
+sumquick = READPAR(setup,'sumquick')
+if sumquick eq '0' or sumquick eq '' or sumquick eq '-1' then sumquick=0
+
 ; Clean intermediate files at the end
 clean = READPAR(setup,'CLEAN',count=nclean)
 if nclean eq 0 then undefine,clean
