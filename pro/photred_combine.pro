@@ -107,6 +107,9 @@ if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 mchusetiles = READPAR(setup,'MCHUSETILES')
 if mchusetiles eq '0' or mchusetiles eq '' or mchusetiles eq '-1' then undefine,mchusetiles
 tilesep = '+'
+; SEPCHIPDIR
+sepchipdir = READPAR(setup,'sepchipdir')
+if sepchipdir eq '0' or sepchipdir eq '' or sepchipdir eq '-1' then sepchipdir=0
 
 ; Get the scripts directory from setup
 scriptsdir = READPAR(setup,'SCRIPTSDIR')
@@ -315,6 +318,7 @@ FOR i=0,nsfields-1 do begin
   firstname = FILE_BASENAME(fieldlines[0],'.phot')
   basedir = FILE_DIRNAME(fieldlines[0])
   if keyword_set(mchusetiles) then basedir=FILE_DIRNAME(basedir)  ;; F1/F1-T10/F1-00507801+T10.phot
+  if not keyword_set(mchusetiles) and keyword_set(sepchipdir) then basedir=FILE_DIRNAME(basedir)  ;; F1/chip01/
   ;; Getting basename
   basename = firstname   ;; namps=1 and not using tiles
   if keyword_set(mchusetiles) then basename = (strsplit(firstname,'\'+tilesep+'T',/extract))[0]
