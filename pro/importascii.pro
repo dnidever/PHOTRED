@@ -29,6 +29,7 @@
 ;                dbformat file.
 ;  /preserve_null  Allow for null values separated by the delimiters.
 ;                    This is set by default for non-space delimiters.
+;  =nlineread  Read this many lines.  The default is to read them all.
 ;
 ; OUTPUTS:
 ;  arr         The data in an IDL structure
@@ -206,14 +207,15 @@ Function importascii,fname,indef=indef,allstr=allstr,$
          comment=comment,noprint=noprint,fieldnames=fieldnames0,$
          allfloat=allfloat,skipline=skipline,stp=stp,fieldtypes=fieldtypes,$
          header=header,delimit=delimit,dbformat=dbformat,silent=silent,count=count,$
-         preserve_null=preserve_null
+         preserve_null=preserve_null,nlineread=nlineread
 
 ; No parameters input
 if n_params() eq 0 then begin
   print,'Syntax - arr=importascii(filename,indef=indef,allstr=allstr,comment=comment,noprint=noprint,'
   print,'                         fieldnames=fieldnames,fieldtypes=fieldtypes,allfloat=allfloat,'
   print,'                         skipline=skipline,stp=stp,header=header,delimit=delimit,'
-  print,'                         dbformat=dbformat,count=count,preserve_null=preserve_null'
+  print,'                         dbformat=dbformat,count=count,preserve_null=preserve_null,'
+  print,'                         nlineread=nlineread)'
   return,-1
 endif
 
@@ -415,7 +417,7 @@ IF not keyword_set(allfloat) THEN BEGIN
               fieldlocations:fieldlocations,fieldgroups:fieldgroups}
 
   ; Reading the Data
-  arr = READ_ASCII(fname,template=template,data_start=data_start)
+  arr = READ_ASCII(fname,template=template,data_start=data_start,num_records=nlineread)
 
   nrow = n_elements(arr.(0))
 
