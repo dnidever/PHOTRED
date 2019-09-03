@@ -182,8 +182,8 @@ pro photred_sky,image,skymode,skysig, SILENT=silent, CIRCLERAD = circlerad, $
   
   ;; Use histogram around median to get mode
   if keyword_set(histback) then begin 
-    gd = where(abs(im-skymode) lt 4*skysig,ngd)
-    hist = histogram(im[gd],bin=skysig1/40,locations=xhist)
+    gd = where(abs(image-skymode) lt 4*skysig,ngd)
+    hist = histogram(image[gd],bin=skysig/40,locations=xhist)
     xhist2 = scale_vector(findgen(1000),min(xhist),max(xhist))
     interp,xhist,hist,xhist2,hist2
     bestind = first_el(maxloc(hist2))
