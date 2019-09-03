@@ -1,5 +1,6 @@
 pro photred_sky,image,skymode,skysig, SILENT=silent, CIRCLERAD = circlerad, $
-      _EXTRA = _EXTRA, NAN = nan, MEANBACK = meanback, HIGHBAD = highbad
+      _EXTRA = _EXTRA, NAN = nan, MEANBACK = meanback, HIGHBAD = highbad,$
+      histback=histback
 ;+
 ; NAME:
 ;       PHOTRED_SKY
@@ -37,6 +38,7 @@ pro photred_sky,image,skymode,skysig, SILENT=silent, CIRCLERAD = circlerad, $
 ;             clipped mean (using meanclip.pro) rather than using the mode 
 ;             computed with mmm.pro.    This keyword is useful for the Poisson 
 ;             count regime or where contamination is known  to be minimal.
+;       /HISTBACK - use mode from histogram to find background value.
 ;       /NAN - This keyword must be set to  ignore NaN values when computing 
 ;              the sky.
 ;       /SILENT - If this keyword is supplied and non-zero, then SKY will not
@@ -177,6 +179,18 @@ pro photred_sky,image,skymode,skysig, SILENT=silent, CIRCLERAD = circlerad, $
    nsky = N_elements(sub)
  endif else $ 
  MMM, skyvec, skymode, skysig, _EXTRA = _extra, nsky = nsky
+  
+  ;; Use histogram around median to get mode
+  if keyword_set(histback) then begin 
+    gd = where(abs(im-skymode) lt 4*skysig,ngd)
+    hist = histogram(im[gd],bin=skysig1/40,locations=xhist)
+    xhist2 = scale_vector(findgen(1000),min(xhist),max(xhist))
+    interp,xhist,hist,xhist2,hist2
+    bestind = first_el(maxloc(hist2))
+    skymode1 = skymode  ; save original one
+    skymode = xhist2[bestind]
+ endif
+
 
  skymode = float(skymode)  &  skysig = float(skysig)
  if ~keyword_set(SILENT) then begin
