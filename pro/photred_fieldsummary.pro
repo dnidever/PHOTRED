@@ -18,9 +18,11 @@
 ; By D.Nidever  May 2015
 ;-
 
-pro photred_fieldsummary,field,setupdir=setupdir,redo=redo
+pro photred_fieldsummary,field,setupdir=setupdir,redo=redo,quick=quick
   
 COMMON photred,setup
+
+resolve_routine,'mrdfits',/compile_full_file,/either
 
 undefine,error
 
@@ -114,6 +116,7 @@ endif
 
 printlog,logfile
 printlog,logfile,'--- Making summary file for Field = '+field+' ---'
+if keyword_set(quick) then printlog,logfile,'QUICK SUMMARY'
 printlog,logfile
 
 
@@ -189,11 +192,12 @@ if file_test(outfile) eq 1 and not keyword_set(redo) then begin
   return
 endif
 
-
 ; Load the FINAL structure for this field
 printlog,logfile,'Loading Final structure'
-if file_test(datfile) eq 1 then restore,datfile else $
-  final=importascii(finalfile,/header)
+if not keyword_set(quick) then begin
+  if file_test(datfile) eq 1 then restore,datfile else $
+    final=importascii(finalfile,/header)
+endif
 
 ; Load the aperture correction "apcor.lst" file
 undefine,apcor
@@ -239,7 +243,8 @@ chipstr = replicate({field:'NAN',file:'NAN',expnum:'NAN',chip:-1L,base:'NAN',fil
                      airmass:nan,gain:nan,rdnoise:nan,nx:-1L,ny:-1L,wcstype:'NAN',pixscale:nan,ra:dnan,dec:dnan,wcsrms:nan,fwhm:nan,$
                      skymode:nan,skysig:nan,dao_nsources:-1L,dao_depth:nan,dao_npsfstars:-1L,dao_psftype:'NAN',dao_psfboxsize:-1L,$
                      dao_psfvarorder:-1L,dao_psfchi:nan,alf_nsources:-1L,alf_depth:nan,calib_depth:nan,calib_color:'NAN',calib_zpterm:nan,$
-                     calib_amterm:nan,calib_colorterm:nan,calib_magname:'NAN',apcor:nan,ebv:nan},nfieldfiles)
+                     calib_zptermsig:nan,calib_amterm:nan,calib_amtermsig:nan,calib_colorterm:nan,calib_colortermsig:nan,$
+                     calib_magname:'NAN',apcor:nan,ebv:nan},nfieldfiles)
 printlog,logfile,''
 printlog,logfile,'Chip-level information'
 printlog,logfile,''
@@ -255,6 +260,7 @@ For i=0,nfieldfiles-1 do begin
   undefine,chilines,chilinesarr,chiarr,psfan,minpsftype,maxpsftype,psfchi
   
   fitsfile = fieldfiles[i]
+  fitsdir = file_dirname(fitsfile)+'/'
   if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
   if fpack eq 1 then base=file_basename(fitsfile,'.fits.fz') else $
     base = file_basename(fitsfile,'.fits')   
@@ -329,7 +335,7 @@ For i=0,nfieldfiles-1 do begin
   endif
     
   ; Load DAOPHOT option file
-  optfile = base+'.opt'
+  optfile = fitsdir+base+'.opt'
   if file_test(optfile) eq 1 then begin
     READLINE,optfile,optlines
     optarr = strsplitter(optlines,'=',/extract)
@@ -338,7 +344,7 @@ For i=0,nfieldfiles-1 do begin
   endif
      
   ; Load DAOPHOT log file
-  daologfile = base+'.log'
+  daologfile = fitsdir+base+'.log'
   if file_test(daologfile) eq 1 then begin
     READLINE,daologfile,loglines
     ; Sky mode and standard deviation =   48.608    4.110
@@ -360,29 +366,31 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; Load ALS file
-  alsfile = base+'.als'
+  alsfile = fitsdir+base+'.als'
   if file_test(alsfile) eq 1 then begin
-    LOADALS,alsfile,als,alshead,count=nals
-    chipstr[i].dao_nsources = nals
-    ; Calculate "depth"
-    if nals gt 0 then begin
-      hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
-      xhist += 0.5*0.2
-      DLN_MAXMIN,hist,minarr,maxarr
-      alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-      chipstr[i].dao_depth = alsdepth   ; instrumental "depth"    
-    endif
+    if not keyword_set(quick) then begin
+      LOADALS,alsfile,als,alshead,count=nals
+      chipstr[i].dao_nsources = nals
+      ; Calculate "depth"
+      if nals gt 0 then begin
+        hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
+        xhist += 0.5*0.2
+        DLN_MAXMIN,hist,minarr,maxarr
+        alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+        chipstr[i].dao_depth = alsdepth   ; instrumental "depth"    
+      endif
+    endif else chipstr[i].dao_nsources = file_lines(alsfile)-3
   endif
 
   ; Check list of DAOPHOT PSF stars
-  lstfile = base+'.plst'
+  lstfile = fitsdir+base+'.plst'
   if file_test(lstfile) eq 1 then begin
     READLINE,lstfile,lstlines
     chipstr[i].dao_npsfstars = n_elements(lstlines)-3
   endif
 
   ; Load DAOPHOT PSF file
-  psffile = base+'.psf'
+  psffile = fitsdir+base+'.psf'
   if file_test(psffile) eq 1 then begin
     READLINE,psffile,psflines
     ; PENNY1     69    4    6    0   14.048       1091.621   1022.5   2046.5
@@ -404,7 +412,7 @@ For i=0,nfieldfiles-1 do begin
   endif
 
   ; PSF chi-value
-  psflogfile = base+'.psf.log'
+  psflogfile = fitsdir+base+'.psf.log'
   if file_test(psflogfile) eq 1 then begin
     READLINE,psflogfile,psfloglines
     ;
@@ -472,7 +480,75 @@ For i=0,nfieldfiles-1 do begin
   ; Load ALF file
   nalf = -1
   if keyword_set(mchusetiles) eq 0 then begin
-    alffile = base+'.alf'
+    alffile = fitsdir+base+'.alf'
+    if file_test(alffile) eq 1 then begin
+      if not keyword_set(quick) then LOADALS,alffile,alf,alfhead,count=nalf else nalf=file_lines(alffile)-3
+    endif
+  ;; Using TILES
+  endif else begin
+    gd = where(stregex(alsinfo.alsfile,'^'+base,/boolean) eq 1,ngd)
+    undefine,alf
+    if keyword_set(quick) then nalf=0
+    for j=0,ngd-1 do begin
+      alffile1 = alsinfo[gd[j]].dir+'/'+repstr(alsinfo[gd[j]].alsfile,'.als','.alf')
+      if file_test(alffile1) eq 1 then begin
+        if not keyword_set(quick) then begin
+          LOADALS,alffile1,alf1,alfhead1,count=nalf1 
+          if nalf1 gt 0 then PUSH,alf,alf1
+        endif else nalf+=file_lines(alffile1)-3
+      endif
+    endfor
+    if not keyword_set(quick) then nalf = n_elements(alf)
+  endelse
+  if nalf ge 0 then chipstr[i].alf_nsources = nalf
+
+  ; Calculate ALF "depth"
+  if nalf gt 1 and not keyword_set(quick) then begin
+    hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=30)
+    xhist += 0.5*0.2
+    DLN_MAXMIN,hist,minarr,maxarr
+    alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+    chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
+  endif
+
+  ; Get aperture correction
+  if n_elements(apcor) gt 0 then begin
+    indapcor = where(apcor.name eq base,nindapcor)    
+    if nindapcor gt 0 then chipstr[i].apcor=apcor[indapcor[0]].value
+  endif
+
+  printlog,logfile,i+1,base,chipstr[i].filter,chipstr[i].exptime,chipstr[i].wcsrms,chipstr[i].fwhm,chipstr[i].skymode,chipstr[i].skysig,chipstr[i].dao_nsources,chipstr[i].dao_depth,$
+           chipstr[i].dao_psftype,chipstr[i].dao_npsfstars,chipstr[i].dao_psfchi,chipstr[i].alf_nsources,chipstr[i].apcor,format='(I5,A18,A5,F8.2,2F8.4,F8.2,F8.3,I9,F9.2,A11,I8,F8.3,I8,F8.3)'
+Endfor
+
+;; QUICK, get median ALS depth
+g = where(chipstr.dao_nsources gt 0,ng)
+if ng gt 0 then begin
+  ;; Get the median chip file in DAO_NSOURCES
+  ind = where(chipstr[g].dao_nsources eq median(chipstr[g].dao_nsources))
+  bestind = g[ind[0]]
+  LOADALS,file_dirname(chipstr[bestind].file)+'/'+chipstr[bestind].base+'.als',als,alshead,count=nals
+  ; Calculate "depth"
+  if nals gt 0 then begin
+    hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
+    xhist += 0.5*0.2
+    DLN_MAXMIN,hist,minarr,maxarr
+    alsdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
+    chipstr[g].dao_depth = alsdepth   ; instrumental "depth"    
+    printlog,logfile,'Median DAO depth = '+stringize(alsdepth,ndec=3)+' mag'
+  endif  
+endif
+;; QUICK, get median ALF depth
+g = where(chipstr.alf_nsources gt 0,ng)
+if ng gt 0 then begin
+  ;; Get the median chip file in DAO_NSOURCES
+  ind = where(chipstr[g].alf_nsources eq median(chipstr[g].alf_nsources))
+  bestind = g[ind[0]]
+  fitsdir = file_dirname(chipstr[bestind].file)
+  base = chipstr[bestind].base
+  nalf = -1
+  if keyword_set(mchusetiles) eq 0 then begin
+    alffile = fitsdir+base+'.alf'
     if file_test(alffile) eq 1 then LOADALS,alffile,alf,alfhead,count=nalf
   ;; Using TILES
   endif else begin
@@ -487,26 +563,16 @@ For i=0,nfieldfiles-1 do begin
     endfor
     nalf = n_elements(alf)
   endelse
-  if nalf gt 0 then chipstr[i].alf_nsources = nalf
-
-  ; Calculate ALF "depth"
-  if nalf gt 1 then begin
+  ; Calculate "depth"
+  if nalf gt 0 then begin
     hist = histogram(alf.mag,bin=0.2,locations=xhist,min=0,max=30)
     xhist += 0.5*0.2
     DLN_MAXMIN,hist,minarr,maxarr
     alfdepth = xhist[first_el(maxarr,/last)]  ; use last maximum
-    chipstr[i].alf_depth = alfdepth   ; instrumental "depth"    
-  endif
-
-  ; Get aperture corretion
-  if n_elements(apcor) gt 0 then begin
-    indapcor = where(apcor.name eq base,nindapcor)    
-    if nindapcor gt 0 then chipstr[i].apcor=apcor[indapcor[0]].value
-  endif
-
-  printlog,logfile,i+1,base,chipstr[i].filter,chipstr[i].exptime,chipstr[i].wcsrms,chipstr[i].fwhm,chipstr[i].skymode,chipstr[i].skysig,chipstr[i].dao_nsources,chipstr[i].dao_depth,$
-           chipstr[i].dao_psftype,chipstr[i].dao_npsfstars,chipstr[i].dao_psfchi,chipstr[i].alf_nsources,chipstr[i].apcor,format='(I5,A18,A5,F8.2,2F8.4,F8.2,F8.3,I9,F9.2,A11,I8,F8.3,I8,F8.3)'
-Endfor
+    chipstr[g].alf_depth = alfdepth   ; instrumental "depth"    
+    printlog,logfile,'Median ALF depth = '+stringize(alfdepth,ndec=3)+' mag'
+  endif  
+endif
 
 
 ; Get calibrated depth and transformation equation on a chip-basis
@@ -531,7 +597,19 @@ endif else begin
 endelse
 For i=0,nphotfiles-1 do begin
   ;; Load the phot and mch files
-  phot = PHOTRED_READFILE(photfiles[i],meta)
+  if not keyword_set(quick) then begin
+    phot = PHOTRED_READFILE(photfiles[i],meta,count=nphot)
+  endif else begin
+    if file_isfits(photfiles[i]) eq 1 then begin
+      meta = PHOTRED_READFILE(photfiles[i],/header)
+      ;; use mrd_table.pro to load a blank table
+      mrd_table,meta,structyp,0,[0,9],rsize,phot,nrows,nfld,typarr,fnames,$
+                fvalues,vcls, vtpes, scales, offsets, 0, status,/silent
+      nphot = sxpar(meta,'naxis2')
+    endif else begin
+      phot = importascii(photfiles[i],/header,nlineread=10,count=nphot,/silent)
+    endelse
+  endelse
   phtags = tag_names(phot)
   mchfile = repstr(photfiles[i],'.phot','.mch')
   LOADMCH,mchfile,alsfiles,transmch,count=nalsfiles
@@ -555,7 +633,7 @@ For i=0,nphotfiles-1 do begin
     alsfilter = inputarr[1:*:4]  ; filters
   endelse
 
-  printlog,logfile,i+1,file_basename(photfiles[i]),n_elements(phot),format='(I5,A22,I8)'
+  printlog,logfile,i+1,file_basename(photfiles[i]),nphot,format='(I5,A22,I8)'
 
   ; Creating the column names (code from photcalib.pro)
   ui = uniq(alsfilter,sort(alsfilter))
@@ -587,7 +665,7 @@ For i=0,nphotfiles-1 do begin
     alsind1 = alsind[j]
     imagname = magname[alsind1]
     phind = where(phtags eq imagname,nphind)
-    if nphind gt 0 then begin
+    if nphind gt 0 and not keyword_set(quick) then begin
       ; Calculate "depth"
       hist = histogram(phot.(phind[0]),bin=0.2,locations=xhist,min=0,max=50)
       xhist += 0.5*0.2
@@ -607,6 +685,12 @@ For i=0,nphotfiles-1 do begin
         endif
       endif
     endif ; we have the proper column/tag
+    ;; Get rough E(B-V) quickly
+    if keyword_set(quick) then begin
+      glactc,chipstr[indgrp1].ra,chipstr[indgrp1].dec,2000.0,glon,glat,1,/deg
+      ebv = dust_getval(glon,glat,/noloop,/interp)
+      chipstr[indgrp1].ebv = median([ebv])
+    endif
   Endfor  ; images in group loop
 
   ; Fill in transformation equation info
@@ -624,8 +708,11 @@ For i=0,nphotfiles-1 do begin
       trans1 = trans[indtrans[0]]
       chipstr[indgrp1].calib_color = trans1.color
       chipstr[indgrp1].calib_zpterm = trans1.zpterm
+      chipstr[indgrp1].calib_zptermsig = trans1.zptermsig
       chipstr[indgrp1].calib_amterm = trans1.amterm
+      chipstr[indgrp1].calib_amtermsig = trans1.amtermsig
       chipstr[indgrp1].calib_colorterm = trans1.colterm
+      chipstr[indgrp1].calib_colortermsig = trans1.coltermsig
     Endfor
   endif 
 

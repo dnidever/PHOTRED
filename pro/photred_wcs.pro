@@ -195,6 +195,45 @@ if keyword_set(skipwcs) then begin
 
 endif
 
+;; GOOD IDEA BUT THIS IS WHAT THE INPUT/SUCCESS LISTS ARE FOR!!
+;; Check for previous success
+;if not keyword_set(redo) then begin
+;  printlog,logfile,'Checking for previous successes'
+;  ; Loop through the input files
+;  done = intarr(ninputlines)
+;  for i=0,ninputlines-1 do begin
+;    longfile = inputlines[i]
+;    file = FILE_BASENAME(longfile)
+;    filedir = FILE_DIRNAME(longfile)
+;    if strmid(file,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
+;    if fpack eq 1 then base=FILE_BASENAME(file,'.fits.fz') else $
+;      base = FILE_BASENAME(file,'.fits')
+;    if file_test(longfile) eq 0 then begin
+;      done[i] = 1
+;      goto,BOMB1
+;    endif
+;    ; Successful
+;    if fpack eq 1 then head=PHOTRED_READFILE(longfile,exten=1,/header) else $
+;       head = PHOTRED_READFILE(longfile,exten=0,/header)
+;    ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1,/silent),2)
+;    dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
+;    if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then done[i]=1
+;    BOMB1:
+;  endfor
+;  gd = where(done eq 0,ngd,comp=bd,ncomp=nbd)
+;  if ngd eq 0 then begin
+;    printlog,logfile,'All files previously successful.  None to process.'
+;    ; All files are put into the outlist
+;    outlist = inputlines
+;    ; UPDATE the Lists
+;    PHOTRED_UPDATELISTS,lists,outlist=outlist,setupdir=curdir,/silent
+;    goto,FINISH
+;  endif
+;  printlog,logfile,strtrim(nbd,2),' previous successes'
+;  printlog,logfile,strtrim(ngd,2),' files still to run'
+;  inputlines = inputlines[gd]
+;  ninputlines = ngd
+;endif
 
 
 ;####################################################
@@ -483,7 +522,7 @@ endif
 for i=0,ncmd-1 do begin
   ; Successful
   if strmid(cmdlongfile[i],6,7,/reverse_offset) eq 'fits.fz' then head=PHOTRED_READFILE(cmdlongfile[i],exten=1,/header) else $
-     head = PHOTRED_READFILE(cmdlongfile[i],exten=0)
+     head = PHOTRED_READFILE(cmdlongfile[i],exten=0,/header)
   ctype1 = strtrim(SXPAR(head,'CTYPE1',count=nctype1,/silent),2)
   dum = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nwcsfit)
   if (nctype1 gt 0 and ctype1 ne '0' and nwcsfit gt 0) then begin

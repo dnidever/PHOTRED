@@ -686,7 +686,7 @@ FOR i=0L,ninp-1 do begin
     if (nmatch gt 0) then begin
       mastrans[j] = trans[ind1[0]]
     endif else begin
-      printlog,logf,'NO TRANSFORMATION INPUT FOR  REFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
+      printlog,logf,'NO TRANSFORMATION INPUT FOR  REFFILE=',magbase,' OBSFILE=',obsfile,' NIGHT=',strtrim(inp.night[j],2),' CHIP=',$
                 strtrim(inp.chip[j],2),' FILTER=',inp.band[j]
       return
     endelse

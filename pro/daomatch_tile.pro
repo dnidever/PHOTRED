@@ -136,7 +136,6 @@ add_tag,filestr,'resamptrans',dblarr(ntrans),filestr
 add_tag,filestr,'resamptransrms',0.0,filestr
 filestr.catfile = bases+'.als'
 
-
 ; Creating MCH file in the tile coordinate system
 for i=0,nfiles-1 do begin
   ; Get the header
@@ -216,6 +215,7 @@ for i=0,nfiles-1 do begin
 endfor
 
 ; Write to the new MCH file
+mchbase = bases[0]
 mchfile = mchbase+'.mch'
 WRITELINE,mchfile,mchfinal
 

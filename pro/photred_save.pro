@@ -6,8 +6,9 @@
 ; see post_processingsmc.pro
 ;
 ; INPUTS:
-;  /redo Redo files that were already done.
-;  /stp  Stop at the end of the program.
+;  /redo      Redo files that were already done.
+;  /sumquick  Create the summary file quickly.
+;  /stp       Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The final calibrated photometry and astrometry files.
@@ -15,7 +16,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_save,redo=redo,stp=stp
+pro photred_save,redo=redo,sumquick=sumquick,stp=stp
 
 COMMON photred,setup
 
@@ -80,6 +81,10 @@ instrument = READPAR(setup,'INSTRUMENT')
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
+
+; Quick summary
+sumquick = READPAR(setup,'sumquick')
+if sumquick eq '0' or sumquick eq '' or sumquick eq '-1' then sumquick=0
 
 ; Clean intermediate files at the end
 clean = READPAR(setup,'CLEAN',count=nclean)
@@ -178,7 +183,7 @@ FOR i=0,ninputlines-1 do begin
       finalfile = ifield+'.final'
       printlog,logfile,'Copying ',file,' -> ',finalfile
       FILE_COPY,file,finalfile,/overwrite
-      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta'
+      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta',/overwrite
 
       ; Make the IDL SAVE file
       savefile = ifield+'.dat'
@@ -224,7 +229,7 @@ FOR i=0,ninputlines-1 do begin
       endelse
 
       ; Make Field Summary file
-      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo
+      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo,quick=sumquick
 
     ; No field match
     endif else begin
@@ -266,7 +271,7 @@ if keyword_set(clean) then begin
 
   ;; Remove FITS files that have resource files
   ;;  only successful ones
-  READLIST,setupdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=setupdir,count=nfitsfiles,logfile=logfile,/silent
+  READLIST,curdir+'/logs/DAOPHOT.success',fitsfiles,/unique,/fully,setupdir=curdir,count=nfitsfiles,logfile=logfile,/silent
   for i=0,nfitsfiles-1 do begin
     dir1 = file_dirname(fitsfiles[i])
     base1 = file_basename(fitsfiles[i])
