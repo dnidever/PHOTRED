@@ -384,6 +384,7 @@ endif
 ; Remove a smoothed background
 ; This removed bad structure in the background
 bsmooth = nxs*0.10 > nys*0.10
+bsmooth = bsmooth < ((nxs < nys)-1)  ; must be smaller than array dimensions
 backgd = SMOOTH(xcorr,bsmooth,/edge_truncate)
 xcorr = xcorr - backgd
 
