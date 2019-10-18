@@ -2181,6 +2181,7 @@ if n_elements(refname) eq 0 or n_elements(refcatfile) eq 1 then begin
   ; GAIADR2
   if tag_exist(refcat,'RA_ICRS') and tag_exist(refcat,'PLX') and tag_exist(refcat,'PMRA') then refname='GAIADR2'
   if tag_exist(refcat,'FG') and tag_exist(refcat,'PMRA') and tag_exist(refcat,'BP') then refname='GAIADR2'
+  if tag_exist(refcat,'PMRA') and tag_exist(refcat,'BP') and tag_exist(refcat,'RP') then refname='GAIADR2'
   if n_elements(refname) gt 0 then print,'Reference catalog type is ',refname else print,'Reference catalog type UNKNOWN'
 endif
 
