@@ -370,6 +370,24 @@ ${image}a.fits
 
 EXIT
 END_DAOPHOT
+# Sometimes there's a segmentation fault on NSTAR
+if [ ! -s ${image}a.fits ]; then
+   echo "Possible segmentation fault in NSTAR.  Rerunning SUBSTAR to create a.fits"
+daophot << END_DAOPHOT >> ${image}.log
+OPTIONS
+${image}.opt
+
+ATTACH ${image}.fits
+SUBSTAR
+${image}.psf
+${image}.nst
+y
+${image}.lst2
+${image}a.fits
+
+EXIT
+END_DAOPHOT
+fi
 #
 #  Run DAOPHOT to create ${image}.psf.log
 #
