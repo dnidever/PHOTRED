@@ -553,6 +553,18 @@ if [ ${fpackfile} == 1 ]; then
    echo "Removing temporarily uncompressed ${image}.fits file"
    rm ${image}.fits >& /dev/null
 fi
+# Fpack compress s.fits file
+if [ -s ${image}s.fits ]; then
+  # Not sure of the best way to test if fpack is available
+  #  just try it and see if it works
+  rm ${image}s.fits.fz >& /dev/null
+  fpack ${image}s.fits >& /dev/null
+  # It worked!
+  if [ -s ${image}s.fits.fz ]; then
+    echo "Fpack compressing ${image}s.fits"
+    rm ${image}s.fits >& /dev/null
+  fi
+fi
 ###################################################
 # Working in temporary directory, copy files back
 if [ -n ${workdir} ]; then
