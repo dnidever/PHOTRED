@@ -1282,11 +1282,14 @@ ENDWHILE       ; outlier rejection loop
 
 ; Final Statistics
 ; Calculating residuals
+bra = where(nra gt 360,nbra)
+if nbra gt 0 then nra[bra]-=360
 raresid = (double(refcatM.raj2000)-nra)*cos(double(refcatM.dej2000)/!radeg)*3600.
 decresid = (double(refcatM.dej2000)-ndec)*3600.
 resid = sqrt( raresid^2.0 + decresid^2.0 )
 rms =  sqrt( mean( resid^2. ) )
 ;rms =  sqrt( median( resid^2. ) )
+
 
 ; Printing statistics 
 if not keyword_set(silent) then begin
