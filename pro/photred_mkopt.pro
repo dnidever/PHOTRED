@@ -139,6 +139,12 @@ endif
 if n_elements(inp_fwhm) eq 0 then begin
   undefine,im,fwhm
   IMFWHM,file,fwhm,im=im,/silent
+  ;; somtimes imfwhm has problems if the saturation level in the
+  ;; header is too low, run without header
+  if fwhm gt 90 and n_elements(im) eq 0 then begin
+    FITS_READ,file,im
+    IMFWHM,'',fwhm,im=im,/silent
+  endif
 
   if fwhm gt 90.0 then begin
     print,'Error with FWHM'
