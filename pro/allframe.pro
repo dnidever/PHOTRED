@@ -621,7 +621,7 @@ if FILE_TEST(sexfile) eq 1 then begin
       add_tag,mag,newname[k],fix('',type=size(sex[0].(colind),/type)),mag
       mag[ind1].(n_tags(mag)-1) = sex[ind2].(colind)
       ;; convert to arcsec
-      if newcols[k] eq 'A_WORLD' or newcols[k] eq 'B_WORLD' then mag[ind1].(n_tags(mag)-1) *= 3600
+      if newcols[k] eq 'A_WORLD' or newcols[k] eq 'B_WORLD' or newcols[k] eq 'FWHM_WORLD' then mag[ind1].(n_tags(mag)-1) *= 3600
     endif
   endfor   
 
