@@ -360,7 +360,23 @@ FOR i=0,nsfields-1 do begin
   si = sort(expstr.mjd)  ; put in chronological order
   expstr = expstr[si]
   printlog,logfile,strtrim(nexp,2)+' exposures'
-  
+
+  ;; Check that all of the files have the same reference exposure
+  fbase = file_basename(fieldlines,'.phot')
+  fbase = reform((strsplitter(fbase,'-',/extract))[1,*])
+  fbase = reform((strsplitter(fbase,'_',/extract))[0,*])
+  fui = uniq(fbase,sort(fbase))
+  if n_elements(fui) gt 1 then begin
+    ufbase = fbase[fui]
+    findex = create_index(fbase)
+    print,'More than one REFERENCE exposure used for this field: ',strjoin(findex.value+' ('+strtrim(findex.num,2)+' files)',', ')
+    bestind = first_el(maxloc(findex.num))
+    ind = findex.index[findex.lo[bestind]:findex.hi[bestind]]
+    fieldlines = fieldlines[ind]
+    nfieldlines = n_elements(fieldlines)
+    print,'ASSUMING ',findex.value[bestind],' is the correct REFERENCE exposure - ',strtrim(nfieldlines,2),' PHOT files left'
+  endif  
+
   ;-------------------------------------------------
   ; LOOP through all the PHOT files for this field
   ;-------------------------------------------------
@@ -437,12 +453,14 @@ FOR i=0,nsfields-1 do begin
       endif
       ; Check that the fieldnames are the same
       if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
+stop
         PUSH,failurelist,file
         printlog,logfile,''
         printlog,logfile,file+' format does NOT agree with '+file0
         goto,BOMB2
       endif
       if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
+stop
         PUSH,failurelist,file
         printlog,logfile,''
         printlog,logfile,file+' format does NOT agree with '+file0
