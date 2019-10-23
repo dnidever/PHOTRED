@@ -110,6 +110,25 @@ if transfile ne '0' and transfile ne '-1' then begin
   if ntransfile gt 0 then begin
     ; Load the transformation equations
     READ_TRANS,transfile,trans,/silent
+
+    ;; Do we have NIGHT information
+    transnightinfo = 0
+    if tag_exist(trans,'NIGHT') then begin
+      gdtransnight = where(trans.night ge 0,ngdtransnight)
+      if ngdtransnight gt 0 then transnightinfo=1
+    endif
+    ;; Do we have CHIP information
+    transchipinfo = 0
+    if tag_exist(trans,'CHIP') then begin
+      gdtranschip = where(trans.chip ge 0,ngdtranschip)
+      if ngdtranschip gt 0 then transchipinfo=1
+    endif
+    ;; Do we have FILE information
+    transfileinfo = 0
+    if tag_exist(trans,'FILE') then begin
+      gdtransfile = where(trans.file ne '',ngdtransfile)
+      if ngdtransfile gt 0 then transfileinfo=1
+    endif
   endif
 endif
 
@@ -626,6 +645,7 @@ For i=0,nphotfiles-1 do begin
   ;   correction, Band2 ... 
   if newformat then begin
     alsfilter = inputarr[3:*:6]  ; filters
+    night = inputarr[1:*:6]      ; MJD 58766
   ; -- OLD Format --
   ; photometry filename, Band1 name, Band1 airmass, Band1 exptime, Band1
   ;   aperture correction, Band2 ... 
@@ -699,13 +719,52 @@ For i=0,nphotfiles-1 do begin
     For j=0,nindgrp-1 do begin
       indgrp1 = indgrp[j]
       alsind1 = alsind[j]
-      if tag_exist(trans,'CHIP') then if trans[0].chip ne -1 then begin
-        indtrans = where(trans.band eq chipstr[indgrp1].filter and $
-                         trans.chip eq chipstr[indgrp1].chip,nindtrans)
+
+      ;; There are four options for matching the file:
+      ;; 1) No chip/night/filename information
+      ;; 2) Only chip given
+      ;; 3) Night+chip given
+      ;; 4) Filename given
+      ;; This information can be different for each file, i.e. multiple
+      ;; formats can be used in a given trans file.  Try MOST specific
+      ;; (#4) to LEAST specific (#1).
+      nmatch = 0
+      ;; Try filename + band
+      if transfileinfo eq 1 then begin
+         ;; First check for an exact match
+         MATCH,trans.file+':'+trans.band,chipstr[indgrp1].base+':'+chipstr[indgrp1].filter,ind1,ind2,/sort,count=nmatch
+         ;; Check if FILE is in FIELD-EXPOSURE format and match to all chips of this exposure
+         if nmatch eq 0 then begin
+           match = bytarr(n_elements(trans))
+           for k=0,n_elements(trans)-1 do $
+             match[k] = (stregex(chipstr[indgrp1].base,trans[k].file,/boolean) eq 1 and trans[k].file ne '' and trans[k].band eq chipstr[indgrp1].filter)
+           ind1 = where(match eq 1,nmatch)
+         endif
+      endif
+      ;; Try night+chip + band
+      ;;  only want to match lines with file=''
+      if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
+         mjd = PHOTRED_GETMJD('',thisimager.observatory,dateobs=chipstr[indgrp1].utdate+'T'+chipstr[indgrp1].uttime,error=errormjd)
+         MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+               ':'+strtrim(mjd,2)+':'+strtrim(chipstr[indgrp1].chip,2)+':'+chipstr[indgrp1].filter,ind1,ind2,/sort,count=nmatch
+      ;; Try chip + band
+      ;;  only want to match lines with file='' and night=-1
+      if nmatch eq 0 and transchipinfo eq 1 then $
+         MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+               ':-1:'+strtrim(chipstr[indgrp1].chip,2)+':'+chipstr[indgrp1].filter,ind1,ind2,/sort,count=nmatch
+      ;; Try just the band
+      ;;  only want to match lines with file='', night=-1 and chip=-1
+      if nmatch eq 0 then $
+         MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
+               ':-1:-1:'+chipstr[indgrp1].filter,ind1,ind2,/sort,count=nmatch
+
+      ;; Found the transformation for this file+band
+      if (nmatch gt 0) then begin
+        trans1 = trans[ind1[0]]
       endif else begin
-        indtrans = where(trans.band eq chipstr[indgrp1].filter,nindtrans)
+        printlog,logf,'NO TRANSFORMATION INPUT FOR  ',chipstr[indgrp1].file
+        return
       endelse
-      trans1 = trans[indtrans[0]]
       chipstr[indgrp1].calib_color = trans1.color
       chipstr[indgrp1].calib_zpterm = trans1.zpterm
       chipstr[indgrp1].calib_zptermsig = trans1.zptermsig
