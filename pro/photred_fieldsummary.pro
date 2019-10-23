@@ -252,7 +252,7 @@ if keyword_set(mchusetiles) then begin
       push,alsinfo,alsinfo1
     endfor
  endif else printlog,logfile,'No ALS files in the MCH files for this field'
-endif else printlog,logfile,'No MCH files for this field'
+endif else printlog,logfile,'No MCH tiles for this field'
 
 ; Loop through all files for this field
 ;  and gather all of the necessary information
