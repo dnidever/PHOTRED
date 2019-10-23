@@ -741,10 +741,10 @@ For i=0,nphotfiles-1 do begin
            ind1 = where(match eq 1,nmatch)
          endif
       endif
+      mjd = PHOTRED_GETMJD('',thisimager.observatory,dateobs=chipstr[indgrp1].utdate+'T'+chipstr[indgrp1].uttime,error=errormjd)
       ;; Try night+chip + band
       ;;  only want to match lines with file=''
       if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
-         mjd = PHOTRED_GETMJD('',thisimager.observatory,dateobs=chipstr[indgrp1].utdate+'T'+chipstr[indgrp1].uttime,error=errormjd)
          MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
                ':'+strtrim(mjd,2)+':'+strtrim(chipstr[indgrp1].chip,2)+':'+chipstr[indgrp1].filter,ind1,ind2,/sort,count=nmatch
       ;; Try chip + band
