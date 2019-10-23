@@ -464,19 +464,19 @@ endif else begin
 
 endelse
 
-; Do we have NIGHT information
+;; Do we have NIGHT information
 transnightinfo = 0
 if tag_exist(trans,'NIGHT') then begin
   gdtransnight = where(trans.night ge 0,ngdtransnight)
   if ngdtransnight gt 0 then transnightinfo=1
 endif
-; Do we have CHIP information
+;; Do we have CHIP information
 transchipinfo = 0
 if tag_exist(trans,'CHIP') then begin
   gdtranschip = where(trans.chip ge 0,ngdtranschip)
   if ngdtranschip gt 0 then transchipinfo=1
 endif
-; Do we have FILE information
+;; Do we have FILE information
 transfileinfo = 0
 if tag_exist(trans,'FILE') then begin
   gdtransfile = where(trans.file ne '',ngdtransfile)
@@ -666,18 +666,18 @@ FOR i=0L,ninp-1 do begin
          ind1 = where(match eq 1,nmatch)
        endif
     endif
-    ; Try night+chip + band
-    ;  only want to match lines with file=''
+    ;; Try night+chip + band
+    ;;  only want to match lines with file=''
     if nmatch eq 0 and transchipinfo eq 1 and transnightinfo eq 1 then $
        MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
              ':'+strtrim(inp.night[j],2)+':'+strtrim(inp.chip[j],2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
-    ; Try chip + band
-    ;  only want to match lines with file='' and night=-1
+    ;; Try chip + band
+    ;;  only want to match lines with file='' and night=-1
     if nmatch eq 0 and transchipinfo eq 1 then $
        MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
              ':-1:'+strtrim(inp.chip[j],2)+':'+inp.band[j],ind1,ind2,/sort,count=nmatch
-    ; Try just the band
-    ;  only want to match lines with file='', night=-1 and chip=-1
+    ;; Try just the band
+    ;;  only want to match lines with file='', night=-1 and chip=-1
     if nmatch eq 0 then $
        MATCH,trans.file+':'+strtrim(trans.night,2)+':'+strtrim(trans.chip,2)+':'+trans.band,$
              ':-1:-1:'+inp.band[j],ind1,ind2,/sort,count=nmatch
