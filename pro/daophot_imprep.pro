@@ -59,7 +59,7 @@ ccdnum = sxpar(fhead,'CCDNUM')
 
 ;; add gain, rdnoise, saturation
 meta = fhead
-if strmid(meta[0],0,5) eq 'XTENS' then meta[0]='SIMPLE  =                    T / Fits standard'
+if strmid(meta[0],0,5) eq 'XTENS' then meta[0]='SIMPLE  =                    T / file does conform to FITS standard             '
 
 ;gain = (arr[ccd-1].gaina+arr[ccd-1].gainb)*0.5
 ;rdnoise = (arr[ccd-1].rdnoisea+arr[ccd-1].rdnoiseb)*0.5

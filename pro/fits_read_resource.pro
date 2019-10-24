@@ -103,9 +103,12 @@ if keyword_set(header) and tag_exist(rstr,'HEADER') then begin
   return,meta
 endif
 
+
 ;; Create a temporary directory to work in
-tmpdir = MKTEMP('rsrc',/directory,/nodot)
-FILE_CHMOD,tmpdir,/a_execute
+if not keyword_set(header) then begin
+  tmpdir = MKTEMP('rsrc',/directory,/nodot)
+  FILE_CHMOD,tmpdir,/a_execute
+endif
 
 ;; Get the flux file
 ;;   /mss1/archive/pipe/20170328/ct4m/2014B-0404/c4d_170329_043921_ooi_g_v1.fits.fz[39]
@@ -113,8 +116,10 @@ lo = strpos(rstr.fluxfile,'[')
 hi = strpos(rstr.fluxfile,']')
 fluxfile = strmid(rstr.fluxfile,0,lo)
 fext = strmid(rstr.fluxfile,lo+1,hi-lo-1)
-tfluxfile = tmpdir+'/flux.fits'
-SPAWN,['funpack','-E',fext,'-O',tfluxfile,fluxfile],/noshell
+if not keyword_set(header) then begin
+  tfluxfile = tmpdir+'/flux.fits'
+  SPAWN,['funpack','-E',fext,'-O',tfluxfile,fluxfile],/noshell
+endif
 
 ;; Construct the header from the extension and the main headers:
 ;;                       <required keywords for the extension:
@@ -133,7 +138,8 @@ SPAWN,['funpack','-E',fext,'-O',tfluxfile,fluxfile],/noshell
 ;;                       END
 ;; Need PDU header with exposure information
 mhead0 = HEADFITS(fluxfile,exten=0,errmsg=errmsg0)
-ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
+if keyword_set(header) then ehead0 = HEADFITS(fluxfile,exten=long(fext),errmsg=errmsg1) else $
+  ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
 ;; Required keywords
 ;XTENSION= 'IMAGE   '           /extension type                                  
 ;   SIMPE = T
@@ -145,7 +151,7 @@ ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
 ;GCOUNT  =                    1 /Number of groups  
 ;; Start the final header
 undefine,head
-head = ['SIMPLE  =                    T / file does conform to FITS standard']
+head = ['SIMPLE  =                    T / file does conform to FITS standard             ']
 sxaddpar,head,'BITPIX',sxpar(ehead0,'BITPIX'),'bits per data value'
 sxaddpar,head,'NAXIS',sxpar(ehead0,'NAXIS'),'number of data axes'
 sxaddpar,head,'NAXIS1',sxpar(ehead0,'NAXIS1'),'length of data axis 1'
@@ -155,39 +161,51 @@ sxaddpar,head,'GCOUNT',1,'Number of groups'
 sxdelpar,head,'END'  ;; sxaddpar adds an "END" line automatically
 ;; Remove required keywords from the main header
 mhead = mhead0
-sxdelpar,mhead,'SIMPLE'
-sxdelpar,mhead,'BITPIX'
-sxdelpar,mhead,'NAXIS'
-sxdelpar,mhead,'NAXIS1'
-sxdelpar,mhead,'NAXIS2'
-sxdelpar,mhead,'PCOUNT'
-sxdelpar,mhead,'GCOUNT'
-sxdelpar,mhead,'EXTEND'
-sxdelpar,mhead,'DATASUM'
-sxdelpar,mhead,'CHECKSUM'
-sxdelpar,mhead,'END'
+todel = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END']
+for j=0,n_elements(todel)-1 do sxdelpar,mhead,todel[j]
 ;; Remove required keywords from the extension header
 ehead = ehead0
-sxdelpar,ehead,'SIMPLE'
-sxdelpar,ehead,'XTENSION'
-sxdelpar,ehead,'BITPIX'
-sxdelpar,ehead,'NAXIS'
-sxdelpar,ehead,'NAXIS1'
-sxdelpar,ehead,'NAXIS2'
-sxdelpar,ehead,'PCOUNT'
-sxdelpar,ehead,'GCOUNT'
-sxdelpar,ehead,'DATASUM'
-sxdelpar,ehead,'CHECKSUM'
-sxdelpar,ehead,'END'
+todel = ['SIMPLE','XTENSION','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END']
+for j=0,n_elements(todel)-1 do sxdelpar,ehead,todel[j]
 ;; Combine them all
-PUSH,head,'BEGIN MAIN HEADER ---------------------------------'
+PUSH,head,'COMMENT BEGIN MAIN HEADER ---------------------------------                     '
 PUSH,head,mhead
-PUSH,head,'BEGIN EXTENSION HEADER ----------------------------'
+PUSH,head,'COMMENT BEGIN EXTENSION HEADER ----------------------------                     '
 PUSH,head,ehead
 PUSH,head,'END                                                                             '
 ;; Remove any blank lines
 bd = where(strtrim(head,2) eq '',nbd)
 if nbd gt 0 then REMOVE,bd,head
+
+;; Fix/remove FPACK keywords
+if keyword_set(header) then begin
+  sxaddpar,head,'BITPIX',sxpar(head,'ZBITPIX')
+  sxdelpar,head,'ZBITPIX'
+  sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
+  sxdelpar,head,'ZNAXIS'
+  sxdelpar,head,'ZNAXIS1'
+  sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  todel = ['ZNAXIS','ZNAXIS1','ZNAXIS2','ZIMAGE','ZTILE1','ZTILE2','ZCMPTYPE','ZNAME1','ZVAL1',$
+           'ZNAME2','ZVAL2','ZPCOUNt','ZGCOUNT','ZQUANTIZ','ZDITHER0','ZTENSION','TFIELDS','TTYPE1','TFORM1',$
+           'TTYPE2','TFORM2','TTYPE3','TFORM3']
+  for j=0,n_elements(todel)-1 do sxdelpar,head,todel[j]
+
+  ;; DAOPHOT_IMPREP adds GAIN and RDNOISE
+  if keyword_set(header) then begin
+    gainA = sxpar(head,'GAINA')
+    gainB = sxpar(head,'GAINB')
+    gain = (gainA+gainB)*0.5
+    rdnoiseA = sxpar(head,'RDNOISEA')
+    rdnoiseB = sxpar(head,'RDNOISEB')
+    rdnoise = (rdnoiseA+rdnoiseB)*0.5
+    sxaddpar,head,'GAIN',gain
+    sxaddpar,head,'RDNOISE',rdnoise
+  endif
+endif
+
+;; Returning only the header
+if keyword_set(header) then return,head
+
 ;; Now update the fluxfile with this new header
 MODFITS,tfluxfile,0,head
 
@@ -203,6 +221,7 @@ SPAWN,['funpack','-E',mext,'-O',tmaskfile,maskfile],/noshell
 ;;   taken from smashred_imprep_single.pro
 DAOPHOT_IMPREP,tfluxfile,tmaskfile,im,meta,header=header,error=error
 if n_elements(error) gt 0 then return,-1
+
 
 ;; Use the local header
 ;;   to write to the file and return
@@ -247,6 +266,7 @@ FILE_DELETE,file+'.lock',/allow
 ;  ; Delete normal FITS file
 ;  FILE_DELETE,newfile
 ;endif
+
 
 ;; Clean up
 FILE_DELETE,tfluxfile,tmaskfile,/allow
