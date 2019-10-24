@@ -269,7 +269,6 @@ printlog,logfile,'Chip-level information'
 printlog,logfile,''
 printlog,logfile,'  NUM       Filename    Filt  Exptime WCSRMS   FWHM   Skymode  Skysig  DAO_Nsrc DAO_Depth PSFtype NPSFstars PSFchi ALF_Nsrc APcor'
 For i=0,nfieldfiles-1 do begin
-
   undefine,fitsfile,base,shfield,expnum,chip,filter
   undefine,exptime,utdate,uttime,airmass,gain,rdnoise
   undefine,head,nx,ny,ctype1,astr,scale,ra,dec,wcsrms
@@ -298,24 +297,7 @@ For i=0,nfieldfiles-1 do begin
   chipstr[i].chip = chip
   chipstr[i].base = base
 
-  ; Filter, Exptime, Date/Time, airmass, gain, rdnoise
-  filter = PHOTRED_GETFILTER(fitsfile)
-  chipstr[i].filter = filter
-  exptime = PHOTRED_GETEXPTIME(fitsfile)
-  chipstr[i].exptime = exptime
-  utdate = PHOTRED_GETDATE(fitsfile)
-  chipstr[i].utdate = utdate
-  uttime = PHOTRED_GETUTTIME(fitsfile)
-  chipstr[i].uttime = uttime  
-  airmass = PHOTRED_GETAIRMASS(fitsfile)
-  chipstr[i].airmass = airmass
-  gain = PHOTRED_GETGAIN(fitsfile)
-  chipstr[i].gain = gain
-  rdnoise = PHOTRED_GETRDNOISE(fitsfile)
-  chipstr[i].rdnoise = rdnoise
-
-  ; From FITS header
-  ;  nx, ny, ctype, scale, ra, dec
+  ;; Read in the header
   if fpack eq 1 then begin
     head = PHOTRED_READFILE(fitsfile,exten=1,/header)
     ; Fix the NAXIS1/NAXIS2 in the header
@@ -324,6 +306,25 @@ For i=0,nfieldfiles-1 do begin
   endif else begin
     head = PHOTRED_READFILE(fitsfile,/header)
   endelse
+
+  ; Filter, Exptime, Date/Time, airmass, gain, rdnoise
+  filter = PHOTRED_GETFILTER(fitsfile,head=head)
+  chipstr[i].filter = filter
+  exptime = PHOTRED_GETEXPTIME(fitsfile,head=head)
+  chipstr[i].exptime = exptime
+  utdate = PHOTRED_GETDATE(fitsfile,head=head)
+  chipstr[i].utdate = utdate
+  uttime = PHOTRED_GETUTTIME(fitsfile,head=head)
+  chipstr[i].uttime = uttime  
+  airmass = PHOTRED_GETAIRMASS(fitsfile,head=head)
+  chipstr[i].airmass = airmass
+  gain = PHOTRED_GETGAIN(fitsfile,head=head)
+  chipstr[i].gain = gain
+  rdnoise = PHOTRED_GETRDNOISE(fitsfile,head=head)
+  chipstr[i].rdnoise = rdnoise
+
+  ; From FITS header
+  ;  nx, ny, ctype, scale, ra, dec
   nx = sxpar(head,'NAXIS1',count=n_nx)
   if n_nx gt 0 then chipstr[i].nx = nx
   ny = sxpar(head,'NAXIS2',count=n_ny)
@@ -335,7 +336,7 @@ For i=0,nfieldfiles-1 do begin
   endif
   EXTAST,head,astr,noparams
   if noparams ge 1 then begin
-    GETPIXSCALE,fitsfile,scale
+    GETPIXSCALE,fitsfile,scale,head=head
     chipstr[i].pixscale = scale
     head_xyad,head,nx/2,ny/2,ra,dec,/deg
     chipstr[i].ra = ra
