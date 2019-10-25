@@ -58,9 +58,10 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
 
   ; First line for the first star
   readf,unit,line4
-  arr4 = strsplit(line4,' ',/extract)
-  narr4 = n_elements(arr4)
-  ncol = narr4
+  ;arr4 = strsplit(line4,' ',/extract)
+  ;narr4 = n_elements(arr4)
+  ;ncol = narr4
+  instr = line4
 
   ; Check for continuation lines
   endflag = 0
@@ -76,9 +77,13 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
 
     ; This is a continuation line
     if strtrim(strmid(line4,0,15),2) eq '' then begin
-      arr4 = strsplit(line4,' ',/extract)
-      narr4 = n_elements(arr4)
-      ncol += narr4
+      trial = strmid(line4,33,1)
+      if trial eq ' ' then nspaces=24 else nspaces=25
+      instr1 = strmid(line4,nspaces)
+      instr += instr1
+      ;arr4 = strsplit(line4,' ',/extract)
+      ;narr4 = n_elements(arr4)
+      ;ncol += narr4
       nstarline++
       continuation=1
     endif else endflag=1
@@ -86,9 +91,12 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   close,unit
   free_lun,unit
 
-  ; ID  X  Y  MAG1  ERR1  MAG2  ERR2 ...  CHI SHARP
-  nmag = (ncol-5)/2
+  ;; Now parts the long line for a single star with a formatted read
+  ;fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)'
+  nmag = (strlen(instr)-(7+2*9+2*9)) / 9 / 2
 
+  ; ID  X  Y  MAG1  ERR1  MAG2  ERR2 ...  CHI SHARP
+  ;nmag = (ncol-5)/2
 
   ; Stars in this file
   numstar = (FILE_LINES(filename)-3L )/nstarline
