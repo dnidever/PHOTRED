@@ -43,6 +43,16 @@ ny = sz[2]
 nxs = (nx-1)/nstep + 1
 nys = (ny-1)/nstep + 1
 
+;; Small dimensions, just transform the full grid
+if nx le nstep or ny le nstep then begin
+  if not keyword_set(xyad) then begin
+    HEAD_ADXY,head,rr,dd,xx,yy,/deg
+  endif else begin
+    HEAD_XYAD,head,rr,dd,xx,yy,/deg
+  endelse
+  return
+endif
+
 ; Subsample the RA/DEC arrays
 rrs = rr[0:nx-1:nstep,0:ny-1:nstep]
 dds = dd[0:nx-1:nstep,0:ny-1:nstep]
