@@ -94,6 +94,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   ;; Now parts the long line for a single star with a formatted read
   ;fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)'
   nmag = (strlen(instr)-(7+2*9+2*9)) / 9 / 2
+  ncol = nmag*2+5
 
   ; ID  X  Y  MAG1  ERR1  MAG2  ERR2 ...  CHI SHARP
   ;nmag = (ncol-5)/2
