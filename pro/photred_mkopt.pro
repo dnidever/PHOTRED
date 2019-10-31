@@ -137,11 +137,11 @@ endif
 
 ; Run IMFWHM to get the FWHM
 if n_elements(inp_fwhm) eq 0 then begin
-  undefine,im,fwhm
-  IMFWHM,file,fwhm,im=im,/silent
+  undefine,im,fwhm,gstr
+  IMFWHM,file,fwhm,im=im,/silent,gstr=gstr
   ;; somtimes imfwhm has problems if the saturation level in the
   ;; header is too low, run without header
-  if fwhm gt 90 and n_elements(im) eq 0 then begin
+  if (fwhm gt 20 or n_elements(gstr) lt 10) and n_elements(im) eq 0 then begin
     FITS_READ,file,im
     IMFWHM,'',fwhm,im=im,/silent
   endif
