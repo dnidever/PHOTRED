@@ -453,14 +453,12 @@ FOR i=0,nsfields-1 do begin
       endif
       ; Check that the fieldnames are the same
       if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
-stop
         PUSH,failurelist,file
         printlog,logfile,''
         printlog,logfile,file+' format does NOT agree with '+file0
         goto,BOMB2
       endif
       if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
-stop
         PUSH,failurelist,file
         printlog,logfile,''
         printlog,logfile,file+' format does NOT agree with '+file0
