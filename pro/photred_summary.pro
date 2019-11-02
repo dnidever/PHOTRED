@@ -1,4 +1,4 @@
-pro photred_summary,stp=stp,stages=stags
+pro photred_summary,stp=stp,stages=stages,outlines=outlines
 
 ;+
 ;
@@ -32,12 +32,19 @@ if test eq 0 then begin
 endif
 
 CD,current=curdir
+undefine,outlines
 print,''
 print,'PHOTRED SUMMARY for ',curdir
 print,''
 print,'-----------------------------------------------------'
 print,'STAGE   INLIST   OUTLIST  SUCCESS  FAILURE  COMPLETED'
 print,'-----------------------------------------------------'
+
+push,outlines,'PHOTRED SUMMARY for '+curdir
+push,outlines,''
+push,outlines,'-----------------------------------------------------'
+push,outlines,'STAGE   INLIST   OUTLIST  SUCCESS  FAILURE  COMPLETED'
+push,outlines,'-----------------------------------------------------'
 
 ; Loop through the stages
 for i=0,nstages-1 do begin
@@ -149,11 +156,15 @@ for i=0,nstages-1 do begin
 
   ; Printing
   format = '(A-10,A-9,A-9,A-9,A-9,A-9)'
-  print,format=format,stage,intext,outtext,successtext,failuretext,completetext
+  outline1 = string(stage,intext,outtext,successtext,failuretext,completetext,format=format)
+  push,outlines,outline1
+  print,outline1
+  ;print,format=format,stage,intext,outtext,successtext,failuretext,completetext
 
 
 end
 
+push,outlines,'-----------------------------------------------------'
 print,'-----------------------------------------------------'
 
 if keyword_set(stp) then stop
