@@ -1,4 +1,4 @@
-pro photred_summary,stp=stp
+pro photred_summary,stp=stp,stages=stags
 
 ;+
 ;
@@ -19,8 +19,9 @@ pro photred_summary,stp=stp
 ;-
 
 ;
-stages = ['RENAME','SPLIT','WCS','DAOPHOT','MATCH','ALLFRAME',$
-          'APCOR','ASTROM','CALIB','COMBINE','DEREDDEN','SAVE','HTML']
+if not keyword_set(stages) then $
+  stages = ['RENAME','SPLIT','WCS','DAOPHOT','MATCH','ALLFRAME',$
+            'APCOR','ASTROM','CALIB','COMBINE','DEREDDEN','SAVE','HTML']
 nstages = n_elements(stages)
 
 ; Does the logs directory exist
