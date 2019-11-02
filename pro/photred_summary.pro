@@ -1,5 +1,3 @@
-pro photred_summary,stp=stp,stages=stages,outlines=outlines
-
 ;+
 ;
 ; PHOTRED_SUMMARY
@@ -17,6 +15,7 @@ pro photred_summary,stp=stp,stages=stages,outlines=outlines
 ;
 ; By D.Nidever   April 2008
 ;-
+pro photred_summary,stp=stp,stages=stages,outlines=outlines,quick=quick
 
 ;
 if not keyword_set(stages) then $
@@ -90,7 +89,7 @@ for i=0,nstages-1 do begin
   ; How many completed, for DAOPHOT and ALLFRAME
   completetext=''
   ; DAOPHOT, Check how many have ".als" and "a.als" files
-  if stage eq 'DAOPHOT' and (ninputlines gt 0 or nsuccesslines gt 0) then begin
+  if stage eq 'DAOPHOT' and (ninputlines gt 0 or nsuccesslines gt 0) and not keyword_set(quick) then begin
     undefine,files
     PUSH,files,inputlines
     PUSH,files,successlines
