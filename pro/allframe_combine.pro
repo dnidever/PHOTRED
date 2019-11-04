@@ -145,30 +145,6 @@ for i=0,nscripts-1 do begin
     FILE_COPY,info.name,curinfo.name,/overwrite
   endif
 endfor ; scripts loop
-;; Compile lstfilter.f it it wasn't already compiled
-;;   compiling it locally allows for different architectures/machines
-;;   using the same repository
-;if file_test('lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
-;  printlog,logfile,'Compiling lstfilter.f'
-;  file_copy,scriptsdir+'/lstfilter.f','.',/over
-;  ;; Check which fortran compiler we have
-;  compiler = ''
-;  spawn,['which','gfortran'],out,errout,/noshell
-;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
-;  spawn,['which','g77'],out,errout,/noshell
-;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
-;  if compiler eq '' then begin
-;    printlog,logfile,'NO fortran compiler found'
-;    return
-; endif
-;  ;; Compile
-;  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
-;  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
-;    printlog,logfile,'ERROR in compiling lstfilter.f'
-;    return
-; endif
-;endif
-
 
 ; FILENAME
 mchfile = file_basename(file)
