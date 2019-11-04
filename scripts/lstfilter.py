@@ -21,6 +21,9 @@ def write(filename,lines):
 
 # Main command-line program
 if __name__ == "__main__":
+    if len(sys.argv)<2:
+        print('lstfilter.py lstfilter [outfile]')
+        sys.exit()
     # List filename
     filename = sys.argv[1]
     print('Input list '+filename)
@@ -41,6 +44,20 @@ if __name__ == "__main__":
         nstars = len(slines)
     else:
         nstars = 1
+    # Load the coo file and sharp values
+    if os.path.exists(base+'.coo') is False:
+        raise Exception(base+'.coo NOT FOUND')
+    coolines = read(base+'.coo')
+    coolines = coolines.split('\n')
+    if coolines[-1]=='': del coolines[-1] # remove blank last line 
+    if coolines[-1]=='': del coolines[-1] # remove blank last line
+    if len(coolines)<4:
+        raise Exception('No stars in '+base+'.coo')
+    scoolines = coolines[3:]
+    sharpdict = {}
+    for l in scoolines:
+        cid,dum1,dum2,dum3,sharp,rnd,dum4 = l.split()
+        sharpdict[cid] = np.float(sharp)
     # Load the opt file
     if os.path.exists(base+'.opt') is False:
         raise Exception(base+'.opt NOT FOUND')
@@ -73,10 +90,15 @@ if __name__ == "__main__":
         yhi = np.int(np.min([np.round(y)+rad,ny]))
         subim = im[ylo:yhi,xlo:xhi]
         nbad = np.sum(subim>=sat)
-        # Some saturated pixels, remove
-        if nbad>0:
+        # Get sharp value
+        sharp = sharpdict[id]
+        # Some saturated pixels or bad sharp value, remove
+        if (nbad>0) | (sharp<0.2) | (sharp>1.0):
             badind.append(i)
-            print('Star '+str(id)+'  '+str(nbad)+' saturated pixels')
+            if nbad>0:
+                print('Star '+str(id)+'  '+str(nbad)+' saturated pixels')
+            else:
+                print('Star '+str(id)+'  bad sharp value. '+str(sharp))
         # No saturated pixels, keep
         else:
             soutlines.append(slines1)
@@ -85,6 +107,7 @@ if __name__ == "__main__":
     if len(soutlines)>0: outlines+=soutlines
     outlines += ['']
     outline = '\n'.join(outlines)
+    print(str(len(soutlines))+' out of '+str(nstars)+' stars left')
     # Write to output file
     if os.path.exists(outfile): os.remove(outfile)
     print('Writing to output list '+outfile)
