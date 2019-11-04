@@ -91,7 +91,10 @@ if __name__ == "__main__":
         subim = im[ylo:yhi,xlo:xhi]
         nbad = np.sum(subim>=sat)
         # Get sharp value
-        sharp = sharpdict[id]
+        if id in sharpdict.keys():
+            sharp = sharpdict[id]
+        else:
+            sharp = 0.0
         # Some saturated pixels or bad sharp value, remove
         if (nbad>0) | (sharp<0.2) | (sharp>1.0):
             badind.append(i)
