@@ -59,7 +59,7 @@ if [ ! -s goodpsf.pro ]; then
    echo "ERROR: GOODPSF program required to filter bad PSF stars."
    exit 1
 fi
-if [ ! -s lstfilter ]; then
+if [ ! -s lstfilter.py ]; then
    echo "ERROR: LSTFILTER program required to filter bad PSF stars."
    exit 1
 fi
@@ -183,11 +183,12 @@ fi
 echo " " >> ${image}.log 
 echo "LSTFILTER ${image}.lst" >> ${image}.log
 # Always run the LOCAL version of "lstfilter"
-./lstfilter << END_LSTFILTER >> ${image}.log
-${image}.lst
-${image}.coo
-${image}.lst1
-END_LSTFILTER
+#./lstfilter << END_LSTFILTER >> ${image}.log
+#${image}.lst
+#${image}.coo
+#${image}.lst1
+#END_LSTFILTER
+./lstfilter.py ${image}.lst ${image}.lst1  >> ${image}.log
 #
 #  Run DAOPHOT to construct a first version of PSF.
 #
