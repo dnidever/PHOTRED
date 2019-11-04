@@ -125,7 +125,7 @@ if n_elements(scriptsdir) eq 0 then begin
   return
 endif
 ; Check if the scripts exist in the current directory
-scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter.f','goodpsf.pro','allframe.opt',$
+scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter.py','goodpsf.pro','allframe.opt',$
            'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 ; Loop through the scripts
@@ -148,26 +148,26 @@ endfor ; scripts loop
 ;; Compile lstfilter.f it it wasn't already compiled
 ;;   compiling it locally allows for different architectures/machines
 ;;   using the same repository
-if file_test('lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
-  printlog,logfile,'Compiling lstfilter.f'
-  file_copy,scriptsdir+'/lstfilter.f','.',/over
-  ;; Check which fortran compiler we have
-  compiler = ''
-  spawn,['which','gfortran'],out,errout,/noshell
-  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
-  spawn,['which','g77'],out,errout,/noshell
-  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
-  if compiler eq '' then begin
-    printlog,logfile,'NO fortran compiler found'
-    return
- endif
-  ;; Compile
-  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
-  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
-    printlog,logfile,'ERROR in compiling lstfilter.f'
-    return
- endif
-endif
+;if file_test('lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
+;  printlog,logfile,'Compiling lstfilter.f'
+;  file_copy,scriptsdir+'/lstfilter.f','.',/over
+;  ;; Check which fortran compiler we have
+;  compiler = ''
+;  spawn,['which','gfortran'],out,errout,/noshell
+;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
+;  spawn,['which','g77'],out,errout,/noshell
+;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
+;  if compiler eq '' then begin
+;    printlog,logfile,'NO fortran compiler found'
+;    return
+; endif
+;  ;; Compile
+;  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
+;  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
+;    printlog,logfile,'ERROR in compiling lstfilter.f'
+;    return
+; endif
+;endif
 
 
 ; FILENAME

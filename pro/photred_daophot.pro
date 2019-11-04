@@ -184,7 +184,7 @@ endif
 ; Copy the scripts to the directories
 ;-------------------------------------
 ;; Checking that the scripts exist
-scripts = ['photo.opt','apcor.opt','daophot.sh','daophot_fake.sh','lstfilter.f','goodpsf.pro','srcfilter.pro']
+scripts = ['photo.opt','apcor.opt','daophot.sh','daophot_fake.sh','lstfilter.py','goodpsf.pro','srcfilter.pro']
 nscripts = n_elements(scripts)
 for i=0,nscripts-1 do begin
   scriptfile = FILE_SEARCH(scriptsdir+'/'+scripts[i],count=nscriptfile)
@@ -199,28 +199,28 @@ for i=0,ndirs-1 do FILE_COPY,scriptsdir+'/'+scripts,dirs[i],/overwrite
 ;; Compile lstfilter.f it it wasn't already compiled
 ;;   compiling it locally allows for different architectures/machines
 ;;   using the same repository
-;if file_test(curdir+'/lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
-  printlog,logfile,'Compiling lstfilter.f'
-  file_copy,scriptsdir+'/lstfilter.f',curdir,/over,/allow
-  ;; Check which fortran compiler we have
-  compiler = ''
-  spawn,['which','gfortran'],out,errout,/noshell
-  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
-  spawn,['which','g77'],out,errout,/noshell
-  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
-  if compiler eq '' then begin
-    printlog,logfile,'NO fortran compiler found'
-    return
-  endif
-  ;; Compile
-  if file_test(curdir+'/lstfilter') eq 1 then file_delete,curdir+'/lstfilter'
-  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
-  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
-    printlog,logfile,'ERROR in compiling lstfilter.f'
-    return
-  endif
-  ;; Copy the binary to all the directories
-  for i=0,ndirs-1 do file_copy,'lstfilter',dirs[i],/overwrite
+;;if file_test(curdir+'/lstfilter') eq 0 and file_test(scriptsdir+'/lstfilter.f') then begin
+;  printlog,logfile,'Compiling lstfilter.f'
+;  file_copy,scriptsdir+'/lstfilter.f',curdir,/over,/allow
+;  ;; Check which fortran compiler we have
+;  compiler = ''
+;  spawn,['which','gfortran'],out,errout,/noshell
+;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='gfortran'
+;  spawn,['which','g77'],out,errout,/noshell
+;  if file_test(strtrim(out[0],2)) eq 1 and errout[0] eq '' then compiler='g77'
+;  if compiler eq '' then begin
+;    printlog,logfile,'NO fortran compiler found'
+;    return
+;  endif
+;  ;; Compile
+;  if file_test(curdir+'/lstfilter') eq 1 then file_delete,curdir+'/lstfilter'
+;  spawn,[compiler,'lstfilter.f','-o','lstfilter'],out,errout,/noshell
+;  if file_test('lstfilter') eq 0 or errout[0] ne '' then begin
+;    printlog,logfile,'ERROR in compiling lstfilter.f'
+;    return
+;  endif
+;  ;; Copy the binary to all the directories
+;  for i=0,ndirs-1 do file_copy,'lstfilter',dirs[i],/overwrite
 ;endif
 
 

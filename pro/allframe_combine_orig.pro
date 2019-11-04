@@ -117,7 +117,7 @@ if n_elements(scriptsdir) eq 0 then begin
   return
 endif
 ; Check if the scripts exist in the current directory
-scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter','goodpsf.pro','allframe.opt',$
+scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter.py','goodpsf.pro','allframe.opt',$
            'default.sex','default.param','default.nnw','default.conv']
 nscripts = n_elements(scripts)
 ; Loop through the scripts
