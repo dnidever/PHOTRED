@@ -59,7 +59,7 @@ if [ ! -s goodpsf.pro ]; then
    echo "ERROR: GOODPSF program required to filter bad PSF stars."
    exit 1
 fi
-if [ ! -s lstfilter ]; then
+if [ ! -s lstfilter.py ]; then
    echo "ERROR: LSTFILTER program required to filter bad PSF stars."
    exit 1
 fi
@@ -75,8 +75,8 @@ if [ -n ${baseworkdir} ]; then
    export workdir=`mktemp -d --tmpdir=${baseworkdir} dao.XXXXXX`
    echo "Working in temporary directory ${workdir}"
    # Copy the files that we need
-   #  fits, photo.opt, apcor.opt, opt, als.opt, goodpsf.pro, lstfilter
-   cp -f photo.opt apcor.opt goodpsf.pro lstfilter ${workdir} >& /dev/null
+   #  fits, photo.opt, apcor.opt, opt, als.opt, goodpsf.pro, lstfilter.py
+   cp -f photo.opt apcor.opt goodpsf.pro lstfilter.py ${workdir} >& /dev/null
    cp -f ${image}.opt ${image}.als.opt ${workdir} >& /dev/null
    if [ -s ${image}.fits ]; then
      cp -f ${image}.fits ${workdir} >& /dev/null
@@ -215,12 +215,8 @@ fi
 #
 echo " " >> ${image}.log 
 echo "LSTFILTER ${image}.lst" >> ${image}.log
-# Always run the LOCAL version of "lstfilter"
-./lstfilter << END_LSTFILTER >> ${image}.log
-${image}.lst
-${image}.coo
-${image}.lst1
-END_LSTFILTER
+## Always run the LOCAL version of "lstfilter.py"
+./lstfilter.py ${image}.lst ${image}.lst1  >> ${image}.log
 #
 #  Run DAOPHOT to construct a first version of PSF.
 #
