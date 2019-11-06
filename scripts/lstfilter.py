@@ -69,7 +69,8 @@ if __name__ == "__main__":
     for o in optlines:
         if o.find('PS')>-1: ps=np.float(o.split('=')[1])
         if o.find('HI')>-1: sat=np.float(o.split('=')[1])
-    sat -= 3000  # reduce the number a bit to be safe
+    sat -= 3000                  # reduce the number a bit to be safe
+    sat = np.min([sat,59500])    # bad pixels set to 60000
     rad = np.ceil(ps)
     # Load the fits file
     if os.path.exists(base+'.fits') is False:
