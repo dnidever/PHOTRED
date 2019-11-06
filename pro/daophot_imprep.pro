@@ -148,6 +148,9 @@ if keyword_set(nodiffmaskflag) then begin
   plver = sxpar(fhead,'plver',count=nplver)  ; DESDM doesn't have this
   plver = strtrim(plver,2)
   if nplver gt 0 then begin  ; CP data
+    ; DES, didn't have this flag, so skip
+    if strmid(plver,0,3) eq 'DES' then goto,SKIP
+
     ; V3.5.0 and on, Integer masks
     versnum = long(strsplit(strmid(plver,1),'.',/extract))
     if versnum[0] gt 3 or (versnum[0] eq 3 and versnum[1] ge 5) then begin
@@ -162,6 +165,7 @@ if keyword_set(nodiffmaskflag) then begin
     ;print,strtrim(nbdpix,2),' pixels cleared of difference image mask flag'
   endif
 endif
+SKIP:
 
 bdpix = where(mim gt 0.0,nbdpix)
 if nbdpix gt 0 then im[bdpix]=6e4
