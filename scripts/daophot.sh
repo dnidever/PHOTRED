@@ -179,7 +179,7 @@ ${image}.opt
 ATTACH ${image}.fits
 PICKPSF
 ${image}.psfini.ap
-100,${maglim}
+150,${maglim}
 ${image}.lst
 EXIT
 END_DAOPHOT
@@ -203,7 +203,7 @@ ${image}.opt
 ATTACH ${image}.fits
 PICKPSF
 ${image}.psfini.ap
-100,${maglim2}
+150,${maglim2}
 ${image}.lst
 EXIT
 END_DAOPHOT

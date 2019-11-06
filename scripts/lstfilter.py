@@ -69,6 +69,7 @@ if __name__ == "__main__":
     for o in optlines:
         if o.find('PS')>-1: ps=np.float(o.split('=')[1])
         if o.find('HI')>-1: sat=np.float(o.split('=')[1])
+    sat -= 3000  # reduce the number a bit to be safe
     rad = np.ceil(ps)
     # Load the fits file
     if os.path.exists(base+'.fits') is False:
