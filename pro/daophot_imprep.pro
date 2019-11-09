@@ -170,6 +170,8 @@ SKIP:
 ;; Set saturated pixels to 65000.0
 bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
 if nbdpix gt 0 then im[bdpix]=65000.0
-sxaddpar,meta,'saturate',65000.0
+saturate = sxpar(meta,'saturate',count=nsaturate)
+if nsaturate gt 0 then saturate<=65000.0 else saturate=65000.0
+sxaddpar,meta,'saturate',saturate
 
 end
