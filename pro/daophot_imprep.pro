@@ -167,7 +167,9 @@ if keyword_set(nodiffmaskflag) then begin
 endif
 SKIP:
 
-bdpix = where(mim gt 0.0,nbdpix)
-if nbdpix gt 0 then im[bdpix]=6e4
+;; Set saturated pixels to 65000.0
+bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
+if nbdpix gt 0 then im[bdpix]=65000.0
+sxaddpar,meta,'saturate',65000.0
 
 end
