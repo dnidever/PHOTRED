@@ -167,11 +167,31 @@ if keyword_set(nodiffmaskflag) then begin
 endif
 SKIP:
 
+;; Add background back in for DES SV data
+skybrite = sxpar(meta,'skybrite',count=nskybrite)
+bunit = strtrim(sxpar(meta,'bunit',count=nbunit),2)
+if nbunit eq 0 then bunit='adu'
+if bunit eq 'electrons' and nskybrite gt 0 then begin
+  saturate = sxpar(meta,'saturate',count=nsaturate)
+  if nsaturate eq 0 then saturate=65000.0
+  gdpix = where(mim eq 0 and im lt saturate,ngdpix)
+  medim = median(im[gdpix])
+  if medim lt 100 then begin
+    ;; Add sky background back in so DAOPHOT can create a proper
+    ;; noise model
+    ;; SKYBRITE is given in electrons as well
+    im[gdpix] += skybrite
+  endif
+endif
+
 ;; Set saturated pixels to 65000.0
-bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
-if nbdpix gt 0 then im[bdpix]=65000.0
-saturate = sxpar(meta,'saturate',count=nsaturate)
-if nsaturate gt 0 then saturate<=64500.0 else saturate=64500.0  ; set it slightly lower than 65000 for DAOPHOT
-sxaddpar,meta,'saturate',saturate
+;;   allow value to be larger for DES SV data in electrons
+if bunit ne 'electrons' then begin
+  bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
+  if nbdpix gt 0 then im[bdpix]=65000.0
+  saturate = sxpar(meta,'saturate',count=nsaturate)
+  if nsaturate gt 0 then saturate<=64500.0 else saturate=64500.0  ; set it slightly lower than 65000 for DAOPHOT
+  sxaddpar,meta,'saturate',saturate
+endif
 
 end
