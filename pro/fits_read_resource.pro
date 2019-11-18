@@ -203,8 +203,17 @@ if keyword_set(header) then begin
   endif
 endif
 
+;; This is done in daophot_imprep.pro but if we are only returning
+;; the header then do it here
+if keyword_set(header) then begin
+  saturate = sxpar(head,'saturate',count=nsaturate)
+  if nsaturate gt 0 then saturate<=64500.0 else saturate=64500.0  ; set it slightly lower than 65000 for DAOPHOT
+  sxaddpar,head,'saturate',saturate
+endif
+
 ;; Returning only the header
 if keyword_set(header) then return,head
+
 
 ;; Now update the fluxfile with this new header
 MODFITS,tfluxfile,0,head
