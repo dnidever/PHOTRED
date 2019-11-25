@@ -108,7 +108,7 @@ if __name__ == "__main__":
         else:
             soutlines.append(slines1)
     # Create output lines
-    outlines = lines[0:3].copy()
+    outlines = lines[0:3]
     if len(soutlines)>0: outlines+=soutlines
     outlines += ['']
     outline = '\n'.join(outlines)
