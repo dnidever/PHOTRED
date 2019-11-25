@@ -545,7 +545,7 @@ Endfor
 g = where(chipstr.dao_nsources gt 0,ng)
 if ng gt 0 then begin
   ;; Get the median chip file in DAO_NSOURCES
-  ind = where(chipstr[g].dao_nsources eq median(chipstr[g].dao_nsources))
+  ind = where(chipstr[g].dao_nsources eq median([chipstr[g].dao_nsources]))
   bestind = g[ind[0]]
   LOADALS,file_dirname(chipstr[bestind].file)+'/'+chipstr[bestind].base+'.als',als,alshead,count=nals
   ; Calculate "depth"
