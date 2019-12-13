@@ -96,11 +96,10 @@ if keyword_set(header) and tag_exist(rstr,'HEADER') then begin
   if file_test(hfile) eq 0 then begin
     error = 'Local header file '+hfile+' NOT FOUND'
     print,error
-    undefine,meta,im
-    return,-1
-  endif
-  READLINE,hfile,meta
-  return,meta
+  endif else begin
+    READLINE,hfile,meta
+    return,meta
+  endelse
 endif
 
 
