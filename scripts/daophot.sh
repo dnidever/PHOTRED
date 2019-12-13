@@ -85,7 +85,7 @@ if [ -n ${baseworkdir} ]; then
    fi
    # Copy the cmn files
    if [ -s ${image}.cmn.lst ]; then
-     cp -f ${image}.cmn.ap ${image}.cmn.coo ${image}.cmn.log ${image}.lst ${workdir} >& /dev/null
+     cp -f ${image}.cmn.ap ${image}.cmn.coo ${image}.cmn.log ${image}.cmn.lst srcfilter.pro ${workdir} >& /dev/null
    fi
    # Go there
    cd ${workdir}
