@@ -64,6 +64,10 @@ for k=0,nf-1 do begin
 
     ; Matching them
     MATCH,id1,id2,ind1,ind2,count=nind1
+    if nind1 eq 0 then begin
+      print,'No matches for ',aalsfile[k]
+      goto,BOMB
+    endif
     id3 = id1[ind1]
     amag2 = amag[ind1]
     tmag2 = tmag[ind2]
@@ -82,6 +86,7 @@ for k=0,nf-1 do begin
     print,atotfile[k],' NOT FOUND'
   endelse
     
+  BOMB:
 endfor
 
 
