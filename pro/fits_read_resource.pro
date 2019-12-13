@@ -138,7 +138,7 @@ endif
 ;;                       END
 ;; Need PDU header with exposure information
 mhead0 = HEADFITS(fluxfile,exten=0,errmsg=errmsg0)
-if keyword_set(header) then ehead0 = HEADFITS(fluxfile,exten=long(fext),errmsg=errmsg1) else $
+if keyword_set(header) then ehead0 = HEADFITS(fluxfile,exten=fext,errmsg=errmsg1) else $
   ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
 ;; Required keywords
 ;XTENSION= 'IMAGE   '           /extension type                                  
