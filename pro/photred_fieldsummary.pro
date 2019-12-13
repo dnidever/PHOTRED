@@ -413,22 +413,30 @@ For i=0,nfieldfiles-1 do begin
   psffile = fitsdir+base+'.psf'
   if file_test(psffile) eq 1 then begin
     READLINE,psffile,psflines
-    ; PENNY1     69    4    6    0   14.048       1091.621   1022.5   2046.5
-    psfarr = strsplit(psflines[0],' ',/extract)
-    chipstr[i].dao_psftype = psfarr[0]
-    chipstr[i].dao_psfboxsize = long(psfarr[1])
-    ; Get PSF spatial variation from OPT file (VA)
-    if n_elements(optarr) gt 0 then begin
-      indva = where(strtrim(optarr[0,*],2) eq 'VA',nindva)
-      if nindva gt 0 then psfva=long(optarr[1,indva[0]])
-    endif
-    ; Get PSF spatial variation from PSF file
-    if n_elements(psfva) eq 0 then begin
-      ; NEXP=1 (VA=0), NEXP=3 (VA=1), NEXP=6 (VA=2)
-      nexp = long(psfarr[3])
-      psfva = nexp/3 
-    endif
-    if n_elements(psfva) gt 0 then chipstr[i].dao_psfvarorder=psfva
+    if n_elements(pstlines) gt 0 then begin
+      ; PENNY1     69    4    6    0   14.048       1091.621   1022.5   2046.5
+      psfarr = strsplit(psflines[0],' ',/extract)
+      chipstr[i].dao_psftype = psfarr[0]
+      chipstr[i].dao_psfboxsize = long(psfarr[1])
+      ; Get PSF spatial variation from OPT file (VA)
+      if n_elements(optarr) gt 0 then begin
+        indva = where(strtrim(optarr[0,*],2) eq 'VA',nindva)
+        if nindva gt 0 then psfva=long(optarr[1,indva[0]])
+      endif
+      ; Get PSF spatial variation from PSF file
+      if n_elements(psfva) eq 0 then begin
+        ; NEXP=1 (VA=0), NEXP=3 (VA=1), NEXP=6 (VA=2)
+        nexp = long(psfarr[3])
+        psfva = nexp/3 
+      endif
+      if n_elements(psfva) gt 0 then chipstr[i].dao_psfvarorder=psfva
+    endif else begin
+      ;; no PSF lines
+      printlog,logfile,psffile,' IS EMPTY'
+      chipstr[i].dao_psftype = -1
+      chipstr[i].dao_psfboxsize = -1
+      chipstr[i].dao_psfvarorder = -99
+    endelse
   endif
 
   ; PSF chi-value
