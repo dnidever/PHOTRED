@@ -186,12 +186,10 @@ endif
 
 ;; Set saturated pixels to 65000.0
 ;;   allow value to be larger for DES SV data in electrons
-if bunit ne 'electrons' then begin
-  bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
-  if nbdpix gt 0 then im[bdpix]=65000.0
-  saturate = sxpar(meta,'saturate',count=nsaturate)
-  if nsaturate gt 0 then saturate<=64500.0 else saturate=64500.0  ; set it slightly lower than 65000 for DAOPHOT
-  sxaddpar,meta,'saturate',saturate
-endif
+bdpix = where(mim gt 0.0 or fim gt 65000.0,nbdpix)
+if nbdpix gt 0 then im[bdpix]=65000.0
+saturate = sxpar(meta,'saturate',count=nsaturate)
+if nsaturate gt 0 then saturate<=64500.0 else saturate=64500.0  ; set it slightly lower than 65000 for DAOPHOT
+sxaddpar,meta,'saturate',saturate
 
 end
