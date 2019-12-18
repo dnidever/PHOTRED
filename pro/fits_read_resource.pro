@@ -95,7 +95,7 @@ if info.exists eq 1 and info.size gt 1 then begin
 
   ;; Decide which header to use
   if n_elements(rmeta) gt 0 then begin
-    print,'Using resource header ',hfile
+    ;print,'Using resource header ',hfile
     meta = rmeta
   endif
 
