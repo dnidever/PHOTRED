@@ -359,7 +359,7 @@ ny = n_elements(hist2d[0,*])
 
 ; Check that an entry in list2 is closer than MINDIST
 nrepeat = 0
-mindist = 1.0  ; Minimum matching distance
+mindist = 5.0  ; Minimum matching distance, 5 pixels
 COMPARE:
 bestdist = fltarr(nap)+999999.
 ; Loop through list1
