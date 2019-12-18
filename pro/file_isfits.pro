@@ -31,7 +31,11 @@ function file_isfits,filename
   ;; Open the file normally
   OPENR,unit,filename,/get_lun
   ;; Check if the file is empty 
-  if EOF(unit) then return,0
+  if EOF(unit) then begin
+    CLOSE,unit
+    FREE_LUN,unit
+    return,0
+  endif
   ;; Read the beginning of the file
   hdr = bytarr(80,/nozero)
   ON_IOERROR,badread
@@ -43,6 +47,12 @@ function file_isfits,filename
 
   ;; Check if its a gzipped FITS file
   OPENR,unit,filename,/get_lun,/compress
+  ;; Check if the file is empty 
+  if EOF(unit) then begin
+    CLOSE,unit
+    FREE_LUN,unit
+    return,0
+  endif
   ;; Read the beginning of the file
   hdr = bytarr(80,/nozero)
   ON_IOERROR,badread  
