@@ -270,8 +270,7 @@ function photred_readfile,filename,meta,exten=exten,count=count,header=header,no
          ;; Load using resource file
          rfilename = dir+'/.'+base
          rinfo = file_info(rfilename)
-         ;;  only use if FITS file does not exist
-         if info.size le 1 and rinfo.exists eq 1 then begin
+         if rinfo.exists eq 1 then begin
            result = FITS_READ_RESOURCE(filename,meta,header=header,nowrite=nowrite)
            count = 1
            return,result

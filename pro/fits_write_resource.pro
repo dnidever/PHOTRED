@@ -33,7 +33,6 @@ endif
 ;; Resource file name
 dir = file_dirname(file)
 rfile = dir+'/.'+file
-
 ;; We have a resource file
 if file_test(rfile) eq 1 then begin
   info = file_info(file)
@@ -57,6 +56,9 @@ if file_test(rfile) eq 1 then begin
   if nlines gt 1 then for k=1,nlines-1 do rstr=create_struct(rstr,names[k],vals[k])
   ;; Does a header already exist
   if tag_exist(rstr,'HEADER') then newhfile=rstr.header else newhfile=file+'.head'
+  ;; Remove blank lines
+  bd = where(strtrim(head,2) eq '',nbd)
+  if nbd gt 0 then REMOVE,bd,head
   WRITELINE,newhfile,head
   ;; Update resource file
   newrlines = rlines

@@ -62,15 +62,47 @@ if lockinfo.exists eq 1 and t0-lockinfo.ctime lt 100. then begin
   while (file_test(file+'.lock') eq 1 and systime(1)-t0 lt 100.) do wait,5
 endif
 
-;; If the file exists and is not empty then just return it
-;;=======================================================
+;; If the file exists and is not empty then just use it's data
+;;  Might need to use resource header though
+;;============================================================
 info = file_info(file)
 if info.exists eq 1 and info.size gt 1 then begin
-  if keyword_set(header) then begin
-    meta = HEADFITS(file)
-    return,meta
+  ;; Check if there's a resouce header we should use
+  ;; It has a resource file
+  undefine,rmeta
+  if file_test(rfile) then begin
+    ;; Load the resource file
+    READLINE,rfile,rlines,count=nlines,/noblank,comment='#'
+    arr = strtrim(strsplitter(rlines,'=',/extract),2)
+    names = reform(arr[0,*])
+    vals = reform(arr[1,*])
+    rstr = create_struct(names[0],vals[0])
+    if nlines gt 1 then for k=1,nlines-1 do rstr=create_struct(rstr,names[k],vals[k])
+    ;; There is a resource header
+    if tag_exist(rstr,'HEADER') then begin
+      if strmid(rstr.header,0,1) eq '/' then hfile=rstr.header else hfile = dir+'/'+rstr.header
+      if file_test(hfile) eq 0 then begin
+        error = 'Local header file '+hfile+' NOT FOUND'
+        print,error
+      endif else begin
+        hinfo = file_info(hfile)
+        READLINE,hfile,rmeta
+      endelse
+    endif
   endif
-  FITS_READ,file,im,meta
+  ;; Load the regular FITS file header
+  meta = HEADFITS(file)
+
+  ;; Decide which header to use
+  if n_elements(rmeta) gt 0 then begin
+    print,'Using resource header ',hfile
+    meta = rmeta
+  endif
+
+  ;; Only return the header
+  if keyword_set(header) then return,meta
+  ;; Load the data in the fits file
+  FITS_READ,file,im
   return,im
 endif
 
@@ -224,6 +256,7 @@ maskfile = strmid(rstr.maskfile,0,lo)
 mext = strmid(rstr.maskfile,lo+1,hi-lo-1)
 tmaskfile = tmpdir+'/mask.fits'
 SPAWN,['funpack','-E',mext,'-O',tmaskfile,maskfile],/noshell
+
 
 ;; Create the DAOPHOT file
 ;;   taken from smashred_imprep_single.pro
