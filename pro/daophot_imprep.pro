@@ -169,6 +169,7 @@ SKIP:
 
 ;; Add background back in for DES SV data
 skybrite = sxpar(meta,'skybrite',count=nskybrite)
+skysigma = sxpar(meta,'skybrite',count=nskysigma)
 bunit = strtrim(sxpar(meta,'bunit',count=nbunit),2)
 if nbunit eq 0 then bunit='adu'
 if bunit eq 'electrons' and nskybrite gt 0 then begin
@@ -180,7 +181,13 @@ if bunit eq 'electrons' and nskybrite gt 0 then begin
     ;; Add sky background back in so DAOPHOT can create a proper
     ;; noise model
     ;; SKYBRITE is given in electrons as well
-    im[gdpix] += skybrite
+    if skybrite ne 0 then begin
+      im[gdpix] += skybrite
+    endif else begin
+      ;; Sometimes SKYBRITE=0, in that case use SKYSIGMA^2
+      ;;  measure sigma ourselves if SKYSIGMA is not given
+      if nskysigma gt 0 and skysigma gt 0 then im[gdpix]+=skysigma^2 else im[gdpix]+=mad(im[gdpix])^2
+    endelse
   endif
 endif
 
