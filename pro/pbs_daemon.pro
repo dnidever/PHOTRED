@@ -393,7 +393,11 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
     available = -1.0
     SPAWN,'df -m '+dirs[0],dfout,dfouterr
     if n_elements(dfout) gt 1 and dfouterr[0] eq '' then begin
-      line = first_el(dfout,/last) 
+      ;; sometimes the information is split across two lines, e.g.
+      ;; Filesystem           1M-blocks      Used Available Use% Mounted on
+      ;;  dlnfs.datalab.noao.edu:/net/dl1
+      ;;                      366257664 333705629  32552035  92% /net/dl1
+      if n_elements(dfout) eq 3 then line=dfout[1]+'  '+dfout[2] else line = first_el(dfout,/last) 
       dfarr = strsplit(line,' ',/extract)
       if n_elements(dfarr) ge 4 then available = float(dfarr[3])
     endif
