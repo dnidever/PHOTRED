@@ -413,7 +413,7 @@ For i=0,nfieldfiles-1 do begin
   psffile = fitsdir+base+'.psf'
   if file_test(psffile) eq 1 then begin
     READLINE,psffile,psflines
-    if n_elements(pstlines) gt 0 then begin
+    if n_elements(psflines) gt 0 then begin
       ; PENNY1     69    4    6    0   14.048       1091.621   1022.5   2046.5
       psfarr = strsplit(psflines[0],' ',/extract)
       chipstr[i].dao_psftype = psfarr[0]
