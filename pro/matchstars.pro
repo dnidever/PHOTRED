@@ -1154,6 +1154,115 @@ end
 
 ;stop
 
+
+;----------------------------------------------------------------------
+; Checking INTERMEDIATE Rotations at normal orientation
+;----------------------------------------------------------------------
+xhalf = round(0.5*maxx2)
+yhalf = round(0.5*maxy2)
+
+if (nsig lt 5.) then begin
+
+  if not keyword_set(silent) then $
+    print,'CHECKING intermediate rotations at normal orientation'
+
+  ;; Check the rotations
+  nrot = 21
+  rotarr = findgen(nrot)*1.0-10.0
+  nsigarr = fltarr(nrot)
+  xshiftarr = fltarr(nrot)
+  yshiftarr = fltarr(nrot)
+  nmatcharr = fltarr(nrot)
+
+  for j=0,nrot-1 do begin
+    ;; Rotate the coordinates
+    rxx2 =  (xx2-xhalf)*cos(rotarr[j]/!radeg) + (yy2-yhalf)*sin(rotarr[j]/!radeg) + xhalf
+    ryy2 = -(xx2-xhalf)*sin(rotarr[j]/!radeg) + (yy2-yhalf)*cos(rotarr[j]/!radeg) + yhalf
+
+    gd2 = where(rxx2 ge 0 and rxx2 le max(xx1) and ryy2 ge 0 and ryy2 le max(yy1),ngd2)
+    xx1s = xx1
+    yy1s = yy1
+    xx2s = rxx2[gd2]
+    yy2s = ryy2[gd2]
+
+    MATCHSTARS_XCORR,xx1s,yy1s,xx2s,yy2s,xshift,yshift,angle,bestcorr,xcorr,silent=silent,$
+                     smooth=5,xyscale=10,fwhm=3,matchnum=matchnum,nsig=nsig
+
+    ; with xyscale=15 it is accurate to +/-10 deg
+    ; only step by 5 deg
+    ; stars are probably overlapping now
+
+    nsigarr[j] = nsig
+    xshiftarr[j] = xshift
+    yshiftarr[j] = yshift
+    nmatcharr[j] = matchnum
+
+  endfor  ; rotations
+
+  ; Find best rotation, spline
+  rotarrb = scale_vector(findgen(100),min(rotarr),max(rotarr))
+  nsigarrb = spline(rotarr,nsigarr,rotarrb)
+  xshiftarrb = spline(rotarr,xshiftarr,rotarrb)
+  yshiftarrb = spline(rotarr,yshiftarr,rotarrb)
+  nmatcharrb = spline(rotarr,nmatcharr,rotarrb)
+  bestind = first_el(maxloc(nsigarrb))
+  nsig = nsigarrb[bestind]
+  angle = rotarrb[bestind]
+  if not keyword_set(silent) then $
+    print,'Nsig = ',strtrim(nsig,2) 
+
+
+  ; We have a decent solution, Refining
+  if (nsig gt 5.) then begin
+    xshift = xshiftarrb[bestind]
+    yshift = yshiftarrb[bestind]
+    matchnum = nmatcharrb[bestind]
+
+    ; Do one more XCORR at higher resolution
+    if not keyword_set(silent) then $
+      print,'Refining the solution'
+
+    ; Rotate the coordinates
+    rxx2 =  (xx2-xhalf)*cos(angle/!radeg) + (yy2-yhalf)*sin(angle/!radeg) + xhalf
+    ryy2 = -(xx2-xhalf)*sin(angle/!radeg) + (yy2-yhalf)*cos(angle/!radeg) + yhalf
+
+    gd2 = where(rxx2 ge 0 and rxx2 le max(xx1) and ryy2 ge 0 and ryy2 le max(yy1),ngd2)
+    xx2s = rxx2[gd2]
+    yy2s = ryy2[gd2]
+    
+    MATCHSTARS_XCORR,xx1,yy1,xx2s,yy2s,xshift,yshift,angle0,bestcorr,xcorr,smooth=5,$
+                 xyscale=4,fwhm=5,nsig=nsig,matchnum=matchnum,/extra,silent=silent
+
+    ; THESE angles are NOT that reliable
+    ; Updating the angle
+    ;angle_orig = angle
+    ;if xflip eq 1 then angle = angle + angle0 ;- angle0
+    ;if xflip eq 0 then angle = angle - angle0 ;+ angle0
+
+    ; Printing info if we have a good fit
+    if (nsig gt 5.0) and not keyword_set(silent) then begin
+      print,'Rough cross-correlation shifts and rotation angle:'
+      print,'Xshift = ',strtrim(xshift,2)
+      print,'Yshift = ',strtrim(yshift,2)
+      print,'Angle = ',strtrim(angle,2),' degrees'
+      if xflip eq 1 then print,'XFLIP'
+      print,'Nsig = ',strtrim(nsig,2)
+      print,'Rough number of Xcorr matches = ',strtrim(matchnum,2)
+      print,''
+    endif else begin
+      if not keyword_set(silent) then $
+        print,'Fit not good'
+    endelse
+
+  ; No good solution
+  endif else begin
+    if not keyword_set(silent) then $
+      print,'No good Intermediate Rotation solution'
+  endelse
+
+endif  ; intermediate rotations at normal orientation
+
+
 ;----------------------------------------------------------------------
 ; Checking INTERMEDIATE Rotations
 ; Fit is bad, check rotations of up to +/-5 deg around the 8 orientations
