@@ -28,7 +28,9 @@ str = replicate({file:'',rms:999999.0,nmatch:-1L},nfiles)
 str.file = files
 for i=0,nfiles-1 do begin
   if file_test(files[i]) eq 1 then begin
-    head = PHOTRED_READFILE(files[i],exten=0,/header)
+    if strmid(files[i],6,7,/reverse_offset) eq 'fits.fz' then $
+     head=PHOTRED_READFILE(files[i],exten=1,/header) else $
+     head = PHOTRED_READFILE(files[i],exten=0,/header)
     rmsind = where(stregex(head,'WCSFIT: RMS',/boolean) eq 1,nrmsind)
     if nrmsind gt 0 then begin
       line = head[first_el(rmsind,/last)]
