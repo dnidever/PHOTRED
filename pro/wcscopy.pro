@@ -8,6 +8,7 @@
 ;  file1   The FITS file with the reference WCS that is to be copied
 ;  file2   The FITS file to be updated.
 ;  /distortion  Include the distortion terms (for TNX and TPV only for now).
+;  /keepcrpix   Keep the original CRPIX values.
 ;  /stp    Stop at the end of the program.
 ;
 ; OUTPUTS:
@@ -19,14 +20,14 @@
 ; By D. Nidever   Jun 2008
 ;-
 
-pro wcscopy,file1,file2,stp=stp,distortion=distortion
+pro wcscopy,file1,file2,stp=stp,distortion=distortion,keepcrpix=keepcrpix
 
 nfile1 = n_elements(file1)
 nfile2 = n_elements(file2)
 
 ; Not enough inputs
 if (nfile1 eq 0 or nfile2 eq 0) then begin
-  print,'Syntax - wcscopy,file1,file2,distortion=distortion'
+  print,'Syntax - wcscopy,file1,file2,distortion=distortion,keepcrpix=keepcrpix'
   return
 endif
 
@@ -81,6 +82,7 @@ endif
 
 ; Loading FILE2
 im2 = PHOTRED_READFILE(file2,head2,error=error2)
+EXTAST,head2,astr2
 
 if n_elements(error2) gt 0 then begin
   print,'ERROR reading in ',file2
@@ -90,7 +92,9 @@ endif
 
 ; Putting WCS into FILE2
 if n_elements(wcs) eq 0 then begin
-  PUTAST,head2,astr1
+  putastr1 = astr1
+  if keyword_set(keepcrpix) then putastr1.crpix=astr2.crpix
+  PUTAST,head2,putastr1
 endif else begin
   case wcstype of  ; WCS type
   'TNX': wcstnx2hdr, head2, wcs
