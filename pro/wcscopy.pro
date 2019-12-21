@@ -99,7 +99,6 @@ endif else begin
   endcase
 endelse
 
-
 ; Updating FILE2
 print,'Updating ',file2
 FITS_WRITE_RESOURCE,file2,0,head2,error=error
