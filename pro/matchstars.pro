@@ -1176,9 +1176,11 @@ if (nsig lt 5.) then begin
 
   for i=0,7 do begin
 
-    ; Check the rotations
-    nrot = 11
-    rotarr2 = findgen(nrot)*1.0-5.0 + rotarr1[i] 
+    ;; Check the rotations
+    ;nrot = 11
+    ;rotarr2 = findgen(nrot)*1.0-5.0 + rotarr1[i] 
+    nrot = 21
+    rotarr2 = findgen(nrot)*1.0-10.0 + rotarr1[i] 
     nsigarr2 = fltarr(nrot)
     xshiftarr2 = fltarr(nrot)
     yshiftarr2 = fltarr(nrot)
