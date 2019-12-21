@@ -238,7 +238,7 @@ if n_elements(fft1) eq 0 and n_elements(fft2) eq 0 and n_elements(fftp) eq 0 the
     for i=0,ntest-1 do begin
       factor,testarr1[i],p,nn,/quiet
       sumarr1[i] = total(p*nn)
-    end
+    endfor
     best1 = first_el(minloc(sumarr1))
     nxs = testarr1[best1]
 
@@ -249,10 +249,10 @@ if n_elements(fft1) eq 0 and n_elements(fft2) eq 0 and n_elements(fftp) eq 0 the
     for i=0,ntest-1 do begin
       factor,testarr2[i],p,nn,/quiet
       sumarr2[i] = total(p*nn)
-    end
+    endfor
     best2 = first_el(minloc(sumarr2))
     nys = testarr2[best2]
-  end
+  endelse
 
 ; Getting NX/NY from input FFT arrays
 endif else begin
@@ -279,21 +279,51 @@ endelse
 gd1b = where(xx1s le (nxs-1) and yy1s le (nys-1),ngd1b)
 gd2b = where(xx2s le (nxs-1) and yy2s le (nys-1),ngd2b)
 if ngd1b eq 0 or ngd2b eq 0 then begin
-  if not keyword_set(silent) then $
-    print,'MATCHSTARS_XCORR error'
-  xshift = 999999.
-  yshift = 999999.
-  angle = 999999.
-  xcorr = -1
-  bestcorr = -1
-  matchnum = -1
-  nsig = -1
-  return
+  ;; Try a few numbers right around the original NX/NY
+  numarr1 = findgen(5)-2+nxorig
+  sumarr1 = fltarr(5)
+  for i=0,4 do begin
+    factor,numarr1[i],p,nn,/quiet
+    sumarr1[i] = total(p*nn)
+  endfor
+  bestind1 = first_el(minloc(sumarr1))
+  nxs = numarr1[bestind1]    
+
+  numarr2 = findgen(5)-2+nyorig
+  sumarr2 = fltarr(5)
+  for i=0,4 do begin
+    factor,numarr2[i],p,nn,/quiet
+    sumarr2[i] = total(p*nn)
+  endfor
+  bestind2 = first_el(minloc(sumarr2))
+  nys = numarr2[bestind2]    
+
+  gd1b = where(xx1s le (nxs-1) and yy1s le (nys-1),ngd1b)
+  gd2b = where(xx2s le (nxs-1) and yy2s le (nys-1),ngd2b)
 endif
-xx1s = xx1s[gd1b]
-yy1s = yy1s[gd1b]
-xx2s = xx2s[gd2b]
-yy2s = yy2s[gd2b]
+
+if ngd1b gt 0 and ngd2b gt 0 then begin
+  xx1s = xx1s[gd1b]
+  yy1s = yy1s[gd1b]
+  xx2s = xx2s[gd2b]
+  yy2s = yy2s[gd2b]
+endif else begin
+  ;; keep the original dimensions
+  nxs = nxorig
+  nys = nyorig
+endelse
+;if ngd1b eq 0 or ngd2b eq 0 then begin
+;  if not keyword_set(silent) then $
+;    print,'MATCHSTARS_XCORR error'
+;  xshift = 999999.
+;  yshift = 999999.
+;  angle = 999999.
+;  xcorr = -1
+;  bestcorr = -1
+;  matchnum = -1
+;  nsig = -1
+;  return
+;endif
 
 
 ; THINGS TO DO:
