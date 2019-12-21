@@ -1156,7 +1156,7 @@ end
 
 
 ;----------------------------------------------------------------------
-; Checking INTERMEDIATE Rotations at normal orientation
+; Checking INTERMEDIATE Rotations at default orientation
 ;----------------------------------------------------------------------
 xhalf = round(0.5*maxx2)
 yhalf = round(0.5*maxy2)
@@ -1164,7 +1164,7 @@ yhalf = round(0.5*maxy2)
 if (nsig lt 5.) then begin
 
   if not keyword_set(silent) then $
-    print,'CHECKING intermediate rotations at normal orientation'
+    print,'CHECKING intermediate rotations at default orientation'
 
   ;; Check the rotations
   nrot = 21
@@ -1260,7 +1260,8 @@ if (nsig lt 5.) then begin
       print,'No good Intermediate Rotation solution'
   endelse
 
-endif  ; intermediate rotations at normal orientation
+endif  ; intermediate rotations at default orientation
+
 
 
 ;----------------------------------------------------------------------
@@ -1392,8 +1393,7 @@ if (nsig lt 5.) then begin
     ; THESE angles are NOT that reliable
     ; Updating the angle
     ;angle_orig = angle
-    ;if xflip eq 1 then angle = angle + angle0 ;- angle0
-    ;if xflip eq 0 then angle = angle - angle0 ;+ angle0
+    ;angle += angle0
 
     ; Printing info if we have a good fit
     if (nsig gt 5.0) and not keyword_set(silent) then begin
@@ -1571,7 +1571,7 @@ if (nsig lt 5.) then begin
       yshiftarr2[i] = yshift
       nmatcharr2[i] = matchnum
 
-    end
+    endfor
 
     ; Find best rotation, spline
     rotarr2b = scale_vector(findgen(3600),min(rotarr2),max(rotarr2))
@@ -1662,7 +1662,7 @@ if (nsig lt 5.) then begin
       xshiftarr3[i] = xshift
       yshiftarr3[i] = yshift 
       nmatcharr3[i] = matchnum
-    end
+    endfor
        
     ; Find best rotation, spline
     rotarr3b = scale_vector(findgen(3600),min(rotarr3),max(rotarr3))
@@ -1690,7 +1690,7 @@ if (nsig lt 5.) then begin
 
   endif  ; refining
 
-end  ; still bad
+endif  ; still bad
 
 
 ; No good cross-correlation fit
@@ -1701,9 +1701,6 @@ if (nsig lt 5.0) then begin
   count = 0
   return
 endif
-
-
-
 
 
 ;###################################################
@@ -1734,7 +1731,7 @@ xx2c = reform(out[0,*])
 yy2c = reform(out[1,*])
 
 ; Match them
-dcr = 15.  ;10.0
+dcr = 30.0 ;15.  ;10.0
 SRCMATCH,xx1,yy1,xx2c,yy2c,dcr,ind1a,ind2a,count=nind1a
 if nind1a eq 0 then begin
   undefine,ind1,ind2,trans
@@ -1762,8 +1759,6 @@ if keyword_set(plotresid) then begin
   oplot,xx1m,yy1m-yy2c[ind2a],ps=3,co=250
   stop
 endif
-
-
 
 
 ;#################################################
@@ -1831,7 +1826,6 @@ if (nind1b lt 6) then begin
 endif
 
 
-
 ;########################################
 ; MPFIT - FIRST time
 ;########################################
@@ -1842,7 +1836,6 @@ fa = {x1:double(xx1m), y1:double(yy1m), x2:double(xx2m), y2:double(yy2m)}
 par = double(fpar1)
 fpar2 = MPFIT(func,par,functargs=fa, perror=perror, niter=iter, status=status,$
              bestnorm=chisq, dof=dof, autoderivative=1, /quiet)  ;ftol=1d-10
-
 if (status lt 1) then begin
   if not keyword_set(silent) then $
     print,'MPFIT problem'
@@ -1897,7 +1890,6 @@ fa = {x1:xinp1m, y1:yinp1m, x2:xinp2m, y2:yinp2m}
 par = fpar2
 fpar3 = MPFIT(func,par,functargs=fa, perror=perror, niter=iter, status=status,$
              bestnorm=chisq, dof=dof, autoderivative=1, /quiet)
-
 if (status lt 1) then begin
   if not keyword_set(silent) then $
     print,'MPFIT problem'
@@ -1911,7 +1903,6 @@ rms3 = sqrt(mean(diff3^2.))
 
 sigpar = perror * sqrt(chisq/dof)
 chisq2 = chisq/n_elements(xinp1m)
-
 
 
 ;##############################################
