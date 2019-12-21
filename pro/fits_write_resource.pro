@@ -32,7 +32,8 @@ endif
 
 ;; Resource file name
 dir = file_dirname(file)
-rfile = dir+'/.'+file
+base = file_basename(file)
+rfile = dir+'/.'+base
 ;; We have a resource file
 if file_test(rfile) eq 1 then begin
   info = file_info(file)
