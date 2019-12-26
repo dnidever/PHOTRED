@@ -444,25 +444,23 @@ FOR i=0,nsfields-1 do begin
     ;; Multi-amps and NOT using tiles
     ;;-------------------------------
     If (not keyword_set(mchusetiles)) and (thisimager.namps gt 1) then begin
-      ; FORCE the format to be the same for ALL chip files, otherwise we sometimes
-      ;  get "type mismatch" errors with double/floats
+      ;; FORCE the format to be the same for ALL chip files, otherwise we sometimes
+      ;;  get "type mismatch" errors with double/floats
       if j eq 0 then begin
         fieldnames0 = fieldnames
         fieldtypes0 = fieldtypes
         file0 = file
       endif
-      ; Check that the fieldnames are the same
+      ;; Check that the fieldnames are the same
+      ;; Just a warning now.  Formats are fixed below with
+      ;; photred_combine_reformatphot.pro even if there are missing files
       if n_elements(fieldnames0) ne n_elements(fieldnames) then begin
-        PUSH,failurelist,file
         printlog,logfile,''
-        printlog,logfile,file+' format does NOT agree with '+file0
-        goto,BOMB2
+        printlog,logfile,'Warning: '+file+' format does NOT agree with '+file0
       endif
       if total(strcmp(fieldnames0,fieldnames)) ne n_elements(fieldnames0) then begin
-        PUSH,failurelist,file
         printlog,logfile,''
-        printlog,logfile,file+' format does NOT agree with '+file0
-        goto,BOMB2
+        printlog,logfile,'Warning: '+file+' format does NOT agree with '+file0
       endif      
       ; Getting the amplifier number (extension)
       ;-----------------------------------------
@@ -513,7 +511,7 @@ FOR i=0,nsfields-1 do begin
 
     PHOTRED_COMBINE_REFORMATPHOT,str_orig,filestr,expstr,str
 
-      ; Check that the structure has RA/DEC
+    ; Check that the structure has RA/DEC
     ;------------------------------------
     gdra = where(tags eq 'RA',ngdra)
     gddec = where(tags eq 'DEC',ngddec)
