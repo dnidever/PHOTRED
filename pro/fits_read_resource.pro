@@ -62,6 +62,7 @@ if lockinfo.exists eq 1 and t0-lockinfo.ctime lt 100. then begin
   while (file_test(file+'.lock') eq 1 and systime(1)-t0 lt 100.) do wait,5
 endif
 
+
 ;; If the file exists and is not empty then just use it's data
 ;;  Might need to use resource header though
 ;;============================================================
@@ -273,10 +274,11 @@ if tag_exist(rstr,'HEADER') then begin
     print,error
   endif else begin
     READLINE,hfile,meta
-    meta0 = meta
-    READLINE,rstr.header,meta
+    ;meta0 = meta
+    ;READLINE,rstr.header,meta
   endelse
 endif
+
 
 ;;; Put in FPACK parameters
 ;if keyword_set(fpack) then begin
