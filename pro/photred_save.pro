@@ -16,7 +16,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_save,redo=redo,sumquick=sumquick,stp=stp
+pro photred_save,redo=redo,sumquick=sumquick,nmulti=nmulti,stp=stp
 
 COMMON photred,setup
 
@@ -69,24 +69,44 @@ if n_elements(setup) eq 0 then begin
 endif
 
 
-; Are we redoing?
+;; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 
-; Telescope, Instrument
+;; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
 instrument = READPAR(setup,'INSTRUMENT')
 
-; Catalog format to use
+;; Catalog format to use
 catformat = READPAR(setup,'catformat')
 if catformat eq '0' or catformat eq '' or catformat eq '-1' then catformat='ASCII'
 if catformat ne 'ASCII' and catformat ne 'FITS' then catformat='ASCII'
 
-; Quick summary
-sumquick = READPAR(setup,'sumquick')
-if sumquick eq '0' or sumquick eq '' or sumquick eq '-1' then sumquick=0
+;; Quick summary
+if n_elements(sumquick) eq 0 then begin
+  sumquick = READPAR(setup,'sumquick')
+  if sumquick eq '0' or sumquick eq '' or sumquick eq '-1' then sumquick=0
+endif
 
-; Clean intermediate files at the end
+;; Getting NMULTI from setup file if not given on command line
+if n_elements(nmulti) eq 0 then begin
+  nmulti_setup = READPAR(setup,'NMULTI')
+  if nmulti_setup ne '0' and nmulti_setup ne '' and nmulti_setup ne '-1' then nmulti=long(nmulti_setup)
+
+  ;; Use NMULTI_SAVE if set
+  nmultisave = READPAR(setup,'NMULTI_SAVE')
+  if nmultisave ne '0' and nmultisave ne '' and nmultisave ne '-1' then nmulti=long(nmultisave)
+  if n_elements(nmulti) eq 0 then nmulti=5  ; by default
+  nmulti = nmulti > 1  ; must be >=1
+endif
+
+;; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread',count=nhyperthread)
+if nhyperthread gt 0 and hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if nhyperthread gt 0 and strtrim(hyperthread,2) eq '0' then hyperthread=0
+if nhyperthread eq 0 then hyperthread=1  ; use by default
+
+;; Clean intermediate files at the end
 clean = READPAR(setup,'CLEAN',count=nclean)
 if nclean eq 0 then undefine,clean
 
@@ -141,12 +161,15 @@ if (nfields eq 0) then begin
   return
 endif
 
+;; Run PHOTRED_SAVE_FIELD.PRO
+cmd = "photred_save_field,'"+inputlines+"'"
+if keyword_set(sumquick) then cmd+=',/sumquick'
+if keyword_set(redo) then cmd+=',/redo'
+cmddir = file_dirname(inputlines)
+PBS_DAEMON,cmd,cmddir,jobs=jobs,/idle,hyperthread=hyperthread,nmulti=nmulti,prefix='sav',wait=1
 
-; Rename and save the files
-
+;; Check the outputs
 undefine,outlist,successlist,failurelist
-
-; Loop through all input files
 FOR i=0,ninputlines-1 do begin
 
   longfile = inputlines[i]
@@ -167,57 +190,28 @@ FOR i=0,ninputlines-1 do begin
     ishortfield = first_el(strsplit(base,sep,/extract))
     gd = where(shortfields eq ishortfield,ngd)
 
-    ; A field matched
+    ;; A field matched
     if (ngd gt 0) then begin
-
-      ifield = fields[gd[0]]
-
-      printlog,logfile,''
-      printlog,logfile,'=============================='
-      printlog,logfile,file,'  ',ifield
-      printlog,logfile,'=============================='
-      printlog,logfile,''
-      printlog,logfile,systime(0)
-      
-      ; Copy the DERED file to FINAL
+      ifield = fields[gd[0]]      
       finalfile = ifield+'.final'
-      printlog,logfile,'Copying ',file,' -> ',finalfile
-      FILE_COPY,file,finalfile,/overwrite
-      if file_test(file+'.meta') eq 1 then FILE_COPY,file+'.meta',finalfile+'.meta',/overwrite
-
-      ; Make the IDL SAVE file
       savefile = ifield+'.dat'
-      final = PHOTRED_READFILE(file,meta,count=count)
-      printlog,logfile,'Making IDL SAVE file ',savefile
-      if n_elements(meta) gt 0 then SAVE,final,meta,file=savefile else SAVE,final,file=savefile
-
-      ; Make FITS binary file
       fitsfile = ifield+'.fits'
-      printlog,logfile,'Making FITS binary file ',fitsfile
-      MWRFITS,final,fitsfile,/create
-      if n_elements(meta) gt 0 then MWRFITS,meta,fitsfile,/silent
-      printlog,logfile,'Compressing FITS binary file'
       gfitsfile = fitsfile+'.gz'
-      if file_test(gfitsfile) then file_delete,gfitsfile    
-      SPAWN,['gzip',fitsfile],/noshell
 
-      ; Copy final files from FIELD subdirectory to "main" directory
+      ;; Copy final files from FIELD subdirectory to "main" directory
       if filedir ne curdir then begin
-        printlog,logfile,'Copying final files to main directory ',curdir
-        FILE_COPY,[finalfile,savefile,gfitsfile],curdir+'/'+[finalfile,savefile,gfitsfile],/allow_same,/overwrite
-        if file_test(finalfile+'.meta') eq 1 then FILE_COPY,finalfile+'.meta',curdir,/allow_same,/overwrite
         ; Rename the final output files
         finalfile = curdir+'/'+finalfile
         savefile = curdir+'/'+savefile
         gfitsfile = curdir+'/'+gfitsfile
       endif
 
-      ; Check that the FINAL and DAT files exist
+      ;; Check that the FINAL and DAT files exist
       finaltest = FILE_TEST(finalfile)
       savetest = FILE_TEST(savefile)
       fitstest = FILE_TEST(gfitsfile)
 
-      ; We were successful
+      ;; We were successful
       if (finaltest eq 1) and (savetest eq 1) and (fitstest eq 1) then begin
         PUSH,outlist,[finalfile,savefile,gfitsfile]   ; add all files to outputarr
         PUSH,successlist,longfile
@@ -228,17 +222,14 @@ FOR i=0,ninputlines-1 do begin
         if savetest eq 0 then printlog,logfile,gfitsfile,' NOT FOUND'
       endelse
 
-      ; Make Field Summary file
-      PHOTRED_FIELDSUMMARY,ishortfield,setupdir=curdir,redo=redo,quick=sumquick
-
-    ; No field match
+    ;; No field match
     endif else begin
       PUSH,failurelist,longfile
       printlog,logfield,'NO field matched for ',field
     endelse
 
 
-  ; File NOT FOUND
+  ;; File NOT FOUND
   endif else begin
     PUSH,failurelist,longfile
     printlog,logfile,'File ',file,' NOT FOUND'
