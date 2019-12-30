@@ -20,6 +20,7 @@
 ;  =extension   Only accept inputs with this extension (i.e. 'als').  Do
 ;                 not include the dot.  This can be an array for accepting
 ;                 multiple extensions.
+;  /silent      Don't print anything to the screen.
 ;
 ; OUTPUTS:
 ;  lists        An IDL structure that includes all of the list information: precursor, prestage,
@@ -34,7 +35,7 @@
 ;-
 
 function photred_getinput,thisprog,precursor,redo=redo,stp=stp,error=error,$
-                          extension=extension,noempty=noempty
+                          extension=extension,noempty=noempty,silent=silent
 
 COMMON photred,setup
 
@@ -115,29 +116,30 @@ endif
 ;############################################
 ;#  DEALING WITH LIST FILES
 ;############################################
-printlog,logfile,''
-printlog,logfile,'--------------------'
-printlog,logfile,'CHECKING THE LISTS'
-printlog,logfile,'--------------------'
-printlog,logfile,''
-
+if not keyword_set(silent) then begin
+  printlog,logfile,''
+  printlog,logfile,'--------------------'
+  printlog,logfile,'CHECKING THE LISTS'
+  printlog,logfile,'--------------------'
+  printlog,logfile,''
+endif
 
 ; CHECK LISTS
 ;-----------------
 READLIST,inputfile,inputlines,/exist,/unique,/fully,count=ninputlines,logfile=logfile,/silent
-printlog,logfile,strtrim(ninputlines,2),' files in '+thisprog+'.inlist'
+if not keyword_set(silent) then printlog,logfile,strtrim(ninputlines,2),' files in '+thisprog+'.inlist'
 
 ; Load the output list
 READLIST,outputfile,outputlines,/unique,/fully,count=noutputlines,logfile=logfile,/silent
-printlog,logfile,strtrim(noutputlines,2),' files in '+thisprog+'.outlist'
+if not keyword_set(silent) then printlog,logfile,strtrim(noutputlines,2),' files in '+thisprog+'.outlist'
 
 ; Load the success list
 READLIST,successfile,successlines,/unique,/fully,count=nsuccesslines,logfile=logfile,/silent
-printlog,logfile,strtrim(nsuccesslines,2),' files in '+thisprog+'.success'
+if not keyword_set(silent) then printlog,logfile,strtrim(nsuccesslines,2),' files in '+thisprog+'.success'
 
 ; Load the failure list
 READLIST,failurefile,failurelines,/unique,/fully,count=nfailurelines,logfile=logfile,/silent
-printlog,logfile,strtrim(nfailurelines,2),' files in '+thisprog+'.failure'
+if not keyword_set(silent) then printlog,logfile,strtrim(nfailurelines,2),' files in '+thisprog+'.failure'
 
 
 ; CREATING INLIST
@@ -156,7 +158,7 @@ WHILE (flag eq 0) do begin
   nparts = n_elements(parts)
   if nparts eq 1 then ending='.outlist' else ending='.'+parts[1]
   prefile = 'logs/'+prestage+ending
-  printlog,logfile,'PRESTAGE = ',prestage
+  if not keyword_set(silent) then printlog,logfile,'PRESTAGE = ',prestage
 
   ; Check that this is a valid stage
   prestageind = where(stages eq prestage,nprestageind)
@@ -170,7 +172,7 @@ WHILE (flag eq 0) do begin
   if (pretest eq 1) then begin
     ; Read list, make sure the files exist!!
     READLIST,prefile,poutputlines,/exist,/unique,/fully,count=npoutputlines,logfile=logfile,/silent
-    printlog,logfile,strtrim(npoutputlines,2),' files in '+prestage+ending+' file that exist'
+    if not keyword_set(silent) then printlog,logfile,strtrim(npoutputlines,2),' files in '+prestage+ending+' file that exist'
   endif else npoutputlines=0
 
   ; Some files in PRECURSOR.outlist
@@ -183,7 +185,7 @@ WHILE (flag eq 0) do begin
     ; "Empty" PRECURSOR output
     ; ONLY if it is an "outlist" and not RENAME
     if (prestage ne 'RENAME') and (ending eq '.outlist') and not keyword_set(noempty) then begin
-      printlog,logfile,'EMPTYING '+prestage+ending
+      if not keyword_set(silent) then printlog,logfile,'EMPTYING '+prestage+ending
       FILE_DELETE,prefile
       SPAWN,'touch '+prefile,out
     endif
@@ -204,7 +206,7 @@ WHILE (flag eq 0) do begin
   ; The PRECURSOR outlist is empty
   endif else begin
     if pretest eq 0 then $
-      printlog,logfile,'NO FILES in ',prestage+ending
+      if not keyword_set(silent) then printlog,logfile,'NO FILES in ',prestage+ending
   endelse
 
 
@@ -228,15 +230,15 @@ if (ninputlines gt 0) and (noutputlines gt 0) then begin
   MATCH,inputlines,outputlines,ind1,ind2,count=nind1
 
   if (nind1 gt 0) then begin
-    printlog,logfile,strtrim(nind1,2),' files in '+thisprog+'.outlist are also in '+thisprog+'.inlist'
+    if not keyword_set(silent) then printlog,logfile,strtrim(nind1,2),' files in '+thisprog+'.outlist are also in '+thisprog+'.inlist'
 
     ; REDOING these
     if keyword_set(redo) then begin
-      printlog,logfile,'REDO set.  Files in '+thisprog+'.outlist *NOT* removed from '+thisprog+'.inlist'
+      if not keyword_set(silent) then printlog,logfile,'REDO set.  Files in '+thisprog+'.outlist *NOT* removed from '+thisprog+'.inlist'
 
     ; Not redoing these
     endif else begin
-      printlog,logfile,strtrim(nind1,2),' files in '+thisprog+'.outlist removed from '+thisprog+'.inlist'
+      if not keyword_set(silent) then printlog,logfile,strtrim(nind1,2),' files in '+thisprog+'.outlist removed from '+thisprog+'.inlist'
       if nind1 lt ninputlines then REMOVE,ind1,inputlines
       if nind1 eq ninputlines then undefine,inputlines
       ninputlines = n_elements(inputlines)
@@ -251,15 +253,15 @@ if (ninputlines gt 0) and (nsuccesslines gt 0) then begin
   MATCH,inputlines,successlines,ind1b,ind2b,count=nind1b
 
   if (nind1b gt 0) then begin
-    printlog,logfile,strtrim(nind1b,2),' files in '+thisprog+'.success are also in '+thisprog+'.inlist'
+    if not keyword_set(silent) then printlog,logfile,strtrim(nind1b,2),' files in '+thisprog+'.success are also in '+thisprog+'.inlist'
 
     ; REDOING these
     if keyword_set(redo) then begin
-      printlog,logfile,'REDO set.  Files in '+thisprog+'.success *NOT* removed from '+thisprog+'.inlist'
+      if not keyword_set(silent) then printlog,logfile,'REDO set.  Files in '+thisprog+'.success *NOT* removed from '+thisprog+'.inlist'
 
     ; Not redoing these
     endif else begin
-      printlog,logfile,strtrim(nind1b,2),' files in '+thisprog+'.success removed from '+thisprog+'.inlist'
+      if not keyword_set(silent) then printlog,logfile,strtrim(nind1b,2),' files in '+thisprog+'.success removed from '+thisprog+'.inlist'
       if nind1b lt ninputlines then REMOVE,ind1b,inputlines
       if nind1b eq ninputlines then undefine,inputlines
       ninputlines = n_elements(inputlines)
@@ -304,7 +306,7 @@ if (ninputlines gt 0) then begin
 
 ; No input files, empty it
 endif else begin
-  printlog,logfile,'NO input files'
+  if not keyword_set(silent) then printlog,logfile,'NO input files'
   FILE_DELETE,inputfile
   TOUCHZERO,inputfile
 endelse
