@@ -276,7 +276,7 @@ For i=0,nfieldfiles-1 do begin
   undefine,als,alshead,hist,xhist,minarr,maxarr,alsdepth
   undefine,lstlines,psflines,psfarr,psfva,psfloglines
   undefine,chilines,chilinesarr,chiarr,psfan,minpsftype,maxpsftype,psfchi
-  
+
   fitsfile = fieldfiles[i]
   fitsdir = file_dirname(fitsfile)+'/'
   if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then fpack=1 else fpack=0
@@ -378,20 +378,28 @@ For i=0,nfieldfiles-1 do begin
       chipstr[i].skysig = skysig
     endif
   endif
-  if n_elements(skymode) eq 0 then begin 
-    im = PHOTRED_READFILE(fitsfile,head)
-    SKY,im,skymode,skysig,/silent
-    chipstr[i].skymode = skymode
-    chipstr[i].skysig = skysig
-  endif
+  ;; Get the sky level from the ALS below instead,
+  ;;    much faster if I need to recreate the FITS files
+  ;if n_elements(skymode) eq 0 then begin 
+  ;  im = PHOTRED_READFILE(fitsfile,head)
+  ;  SKY,im,skymode,skysig,/silent
+  ;  chipstr[i].skymode = skymode
+  ;  chipstr[i].skysig = skysig
+  ;endif
 
   ; Load ALS file
   alsfile = fitsdir+base+'.als'
   if file_test(alsfile) eq 1 then begin
-    if not keyword_set(quick) then begin
+    if not keyword_set(quick) or n_elements(skymode) eq 0 then begin
       LOADALS,alsfile,als,alshead,count=nals
       chipstr[i].dao_nsources = nals
-      ; Calculate "depth"
+      ;; Calculate sky values
+      ;;   much faster than reading from FITS if I need to recreate the FITS files 
+      if n_elements(skymode) eq 0 then begin
+        chipstr[i].skymode = median([als.sky])
+        chipstr[i].skysig = mad([als.sky])
+      endif
+      ;; Calculate "depth"
       if nals gt 0 then begin
         hist = histogram(als.mag,bin=0.2,locations=xhist,min=0,max=30)
         xhist += 0.5*0.2
