@@ -199,6 +199,12 @@ printlog,logfile,'Found ',strtrim(nfieldfiles,2),' frames of FIELD=',field
 
 ; Getting names of final/dat/dered files
 finalfile = file_search('*.final',count=nfinalfile)  ; e.g. Field57sh.final
+;; if there are multiple, then take the most recent one
+if nfinalfile gt 0 then begin
+  info = file_info(finalfile)
+  si = reverse(sort(info.mtime))  ;; most recent one first
+  finalfile = finalfile[si[0]]
+endif
 finalname = file_basename(finalfile,'.final')
 datfile = finalname+'.dat'
 deredfile = file_search(field+'-*.dered',count=ndered)
