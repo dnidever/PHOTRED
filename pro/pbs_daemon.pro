@@ -132,7 +132,7 @@ if keyword_set(hyperthread) then begin
     WRITELINE,'runbatch',lines
     FILE_CHMOD,'runbatch','755'o
   endif
-  if keyword_set(idle) and FILE_TEST('idlbatch') eq 0 then begin
+  if keyword_set(idle) then begin
     undefine,lines
     push,lines,"if test $# -eq 0"
     push,lines,"then"
