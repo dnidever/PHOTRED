@@ -99,8 +99,17 @@ if nsources lt minsources[long(vaval)+1] then begin
   WRITELINE,base+'.opt',newoptlines
 endif
 
+;; Sometimes the filenames get too long for DAOPHOT
+;; use temporary files and symlinks
+tbase = (file_basename(MKTEMP('cmb',/nodot)))[0]  ; create base, leave so other processes won't take it
+tfits = tbase+'.fits'    &  file_delete,tfits,/allow  &  file_link,base+'.fits',tfits
+topt = tbase+'.opt'      &  file_delete,topt,/allow   &  file_link,base+'.opt',topt
+taopt = tbase+'.als.opt' &  file_delete,taopt,/allow  &  file_link,base+'.als.opt',taopt
+tcoo = tbase+'.coo'      &  file_delete,tcoo,/allow   &  file_link,base+'.coo',tcoo
+
+
 ;; Get the PSF of the combined image
-SPAWN,['./getpsfnofind.sh',base],/noshell
+SPAWN,['./getpsfnofind.sh',tbase],/noshell
 
 ;; If getpsf failed, change to VA=0
 info = file_info(base+'.psf')
@@ -112,8 +121,11 @@ if info.exists eq 0 or info.size eq 0 then begin
   newoptlines[vaind] = 'VA = '+string(0.0,format='(F8.2)')
   WRITELINE,base+'.opt',newoptlines
   printlog,logfile,'getpsfnofind.sh failed.  Changing to VA=0.  Trying again.'
-  SPAWN,['./getpsfnofind.sh ',base],/noshell
+  SPAWN,['./getpsfnofind.sh ',tbase],/noshell
 endif
+
+;; Delete the temporary symlinks
+FILE_DELETE,[tbase,tfits,topt,taopt,tcoo],/allow
 
 ;; No PSF file found
 info = file_info(base+'.psf')
