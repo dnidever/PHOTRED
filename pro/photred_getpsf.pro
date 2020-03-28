@@ -112,7 +112,7 @@ tcoo = tbase+'.coo'      &  file_delete,tcoo,/allow   &  file_link,base+'.coo',t
 SPAWN,['./getpsfnofind.sh',tbase],/noshell
 
 ;; If getpsf failed, change to VA=0
-info = file_info(base+'.psf')
+info = file_info(tbase+'.psf')
 if info.exists eq 0 or info.size eq 0 then begin
   READLINE,base+'.opt',optlines
   vaind = where(strmid(optlines,0,2) eq 'VA',nvaind)
@@ -126,6 +126,15 @@ endif
 
 ;; Delete the temporary symlinks
 FILE_DELETE,[tbase,tfits,topt,taopt,tcoo],/allow
+
+;; Getpsf succeeded, rename files
+info = file_info(tbase+'.psf')
+if info.exists eq 1 and info.size gt 0 then begin
+  outfiles = file_search(tbase+'*',count=noutfiles)
+  renamefiles = repstr(outfiles,tbase,base)
+  FILE_MOVE,outfiles,renamefiles,/allow,/over
+endif
+
 
 ;; No PSF file found
 info = file_info(base+'.psf')
