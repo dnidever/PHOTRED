@@ -95,6 +95,12 @@ med1slp = slope(med1)
 
 im = fim
 
+;; DAOPHOT cannot handle DOUBLE arrays (BITPIX=-64)
+if sxpar(meta,'bitpix') eq -64 then begin
+  sxaddpar,meta,'bitpix',-32
+  im = float(im)
+endif
+
 ; Check for differences in amp background levels
 med1 = median(im[800:1023,*])
 med2 = median(im[1024:1200,*])
