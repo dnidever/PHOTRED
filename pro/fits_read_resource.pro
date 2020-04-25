@@ -150,6 +150,7 @@ fluxfile = strmid(rstr.fluxfile,0,lo)
 fext = strmid(rstr.fluxfile,lo+1,hi-lo-1)
 if not keyword_set(header) then begin
   tfluxfile = tmpdir+'/flux.fits'
+  FILE_WAIT,fluxfile
   SPAWN,['funpack','-E',fext,'-O',tfluxfile,fluxfile],/noshell
 endif
 
@@ -256,6 +257,7 @@ hi = strpos(rstr.maskfile,']')
 maskfile = strmid(rstr.maskfile,0,lo)
 mext = strmid(rstr.maskfile,lo+1,hi-lo-1)
 tmaskfile = tmpdir+'/mask.fits'
+FILE_WAIT,maskfile
 SPAWN,['funpack','-E',mext,'-O',tmaskfile,maskfile],/noshell
 
 
