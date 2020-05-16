@@ -411,7 +411,7 @@ pro iraf_imcombine,input,output,headers=headers,bpmasks=bpmasks,rejmask=rejmask,
               statsec=statsec,expname=expname,lthreshold=lthreshold,$
               hthreshold=hthreshold,nlow=nlow,nhigh=nhigh,nkeep=nkeep,mclip=mclip,$
               lsigma=lsigma,hsigma=hsigma,rdnoise=rdnoise,gain=gain,snoise=snoise,$
-              sigscale=sigscale,pclip=pclip,grow=grow,irafdir=irafdir,error=error
+              sigscale=sigscale,pclip=pclip,grow=grow,irafdir=irafdir,error=error,stp=stp
 
 undefine,error
 
@@ -538,6 +538,8 @@ sgrow = strtrim(grow,2)
 ; Write IRAF script
 push,cmd,'print("")'   ; first line will be ignored
 push,cmd,'cd '+curdir
+push,cmd,'reset min_lenuserarea = 200000'
+push,cmd,'flpr'
 push,cmd,'immatch'
 push,cmd,'imcombine.headers = "'+sheaders+'"'
 push,cmd,'imcombine.bpmasks = "'+sbpmasks+'"'
