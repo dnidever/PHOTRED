@@ -609,7 +609,10 @@ if FILE_TEST(sexfile) eq 1 then begin
   ; Write the final output file
   ;----------------------------
   finalfile = mchbase+'.mag'
-  if catformat eq 'FITS' then begin
+  ;; FITS has a limit 999 columns/fields for binary tables, use ASCII
+  ;; if over that limit
+  if catformat eq 'FITS' and n_tags(mag) gt 999 then printlog,logf,'Cannot use FITS output because number of columns>999.  Using ASCII instead'
+  if (catformat eq 'FITS') and (n_tags(mag) lt 1000) then begin
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
     PRINTSTR,mag,finalfile,/silent
@@ -636,9 +639,10 @@ if FILE_TEST(sexfile) eq 1 then begin
 ; DAOPHOT
 endif else begin
 
-  ; No SExtractor information, just copy .makemag to .mag
+  ;; No SExtractor information, just copy .makemag to .mag
   finalfile = mchbase+'.mag'
-  if catformat eq 'FITS' then begin
+  if catformat eq 'FITS' and n_tags(mag) gt 999 then printlog,logf,'Cannot use FITS output because number of columns>999.  Using ASCII instead'
+  if (catformat eq 'FITS') and (n_tags(mag) lt 1000) then begin
     LOADRAW,mchbase+'.makemag',mag,alfhead
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
