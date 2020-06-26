@@ -575,7 +575,7 @@ if FILE_TEST(sexfile) eq 1 then begin
   nsex = n_elements(sex)
 
   ; Load the MAKEMAG file
-  LOADRAW,mchbase+'.makemag',mag,alfhead
+  LOADMAKEMAG,mchbase+'.makemag',mag,alfhead
   nmag = n_elements(mag)
 
   ; Match them with IDs
@@ -643,7 +643,7 @@ endif else begin
   finalfile = mchbase+'.mag'
   if catformat eq 'FITS' and n_tags(mag) gt 999 then printlog,logf,'Cannot use FITS output because number of columns>999.  Using ASCII instead'
   if (catformat eq 'FITS') and (n_tags(mag) lt 1000) then begin
-    LOADRAW,mchbase+'.makemag',mag,alfhead
+    LOADMAKEMAG,mchbase+'.makemag',mag,alfhead
     MWRFITS,mag,finalfile,/create,/silent
   endif else begin  ; ASCII
     FILE_COPY,mchbase+'.makemag',finalfile,/allow,/over
