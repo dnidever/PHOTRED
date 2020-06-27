@@ -8,7 +8,7 @@ base = file_basename(mchfile,'.mch')
 loadmch,mchfile,files,trans
 loadals,dir+'/'+base+'.nmg',nmg
 n = n_elements(files)
-head = photred_readfile(dir+'/'+base+'.fits.fz',/header)
+head = photred_readfile(dir+'/'+base+'.fits.fz',exten=1,/header)
 head_xyad,head,nmg.x-1,nmg.y-1,ra,dec,/deg
 out = replicate({file:'',nalf:0L,decstd:-1.0},n)
 for i=1,n-1 do begin
