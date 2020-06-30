@@ -36,6 +36,8 @@
 ;  =catformat     Catalog format to use: FITS or ASCII.  Default is ASCII.
 ;  =imager        Imager structure with basic information.
 ;  =workdir       Use a temporary working directory with this as the base.
+;  =geocoef       The number of geometric coefficients to allow for
+;                    fitting in ALLFRAME.
 ;  /stp           Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -54,7 +56,8 @@
 pro allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,detectprog=detectprog,$
              error=error,logfile=logfile,finditer=finditer0,$
              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,$
-             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir,stp=stp
+             usecmn=usecmn,fake=fake,catformat=catformat,imager=imager,workdir=workdir,$
+             geocoef=geocoef,stp=stp
 
 COMMON photred,setup
 
@@ -66,7 +69,7 @@ if (nfile eq 0) or n_elements(setupdir) eq 0 then begin
   print,'Syntax - allframe,file,tile=tile,setupdir=setupdir,scriptsdir=scriptsdir,finditer=finditer,satlevel=satlevel,'
   print,'                  detectprog=detectprog,nocmbimscale=nocmbimscale,error=error,logfile=logfile,'
   print,'                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake,catformat=catformat,'
-  print,'                  imager=imager,workdir=workdir,stp=stp'
+  print,'                  imager=imager,workdir=workdir,geocoef=geocoef,stp=stp'
   error = 'Not enough inputs'
   return
 endif
@@ -477,15 +480,26 @@ tbase = (file_basename(MKTEMP('allf',/nodot)))[0]  ; create base, leave so other
 tmch = tbase+'.mch'  &  file_delete,tmch,/allow  &  file_link,combmch,tmch
 tals = tbase+'.als'  &  file_delete,tals,/allow  &  file_link,mchbase+'_comb_allf.als',tals
 
+;; Geometric coefficients
+if n_elements(geocoef) gt 0 then begin
+  printlog,logf,'Modifying ALLFRAME Geometric Coefficients to '+strtrim(geocoef,2)
+  if file_test('allframe.opt') gt 0 then begin
+    READLINE,'allframe.opt',optlines
+    g = where(stregex(optlines,'GE = ',/boolean) eq 1,ng)
+    if ng gt 0 then begin
+      optlines[g[0]] = 'GE = '+strtrim(geocoef,2)
+    endif else push,optlines,'GE = '+strtrim(geocoef,2)
+    WRITELINE,'allframe.opt',optlines
+  endif
+endif
+
 ; Make input file
 undefine,cmd
+if n_elements(geocoef) gt 0 then push,cmd,'ge='+strtrim(geocoef,2)    ;; geometric coefficients
 push,cmd,'    '
-;push,cmd,combmch               ; mch file
-;push,cmd,mchbase+'_comb_allf.als'  ; coord file
 push,cmd,tmch
 push,cmd,tals
 push,cmd,'    '
-;cmdfile = maketemp('temp','.inp')
 cmdfile = MKTEMP('temp')
 WRITELINE,cmdfile,cmd
 
