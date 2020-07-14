@@ -38,7 +38,7 @@ dir = file_dirname(mchfile)
 base = file_basename(mchfile,'.mch')
 
 LOADMCH,mchfile,files,trans
-LOADALS,dir+'/'+base+'.nmg',nmg
+LOADALS,dir+'/'+base+'.nmg',nmg,/silent
 n = n_elements(files)
 head = photred_readfile(dir+'/'+base+'.fits.fz',exten=1,/header)
 HEAD_XYAD,head,nmg.x-1,nmg.y-1,ra,dec,/deg
@@ -47,7 +47,7 @@ for i=0,n-1 do begin
   alffile = dir+'/'+repstr(files[i],'.als','.alf')
   out[i].file = alffile
   if file_test(alffile) eq 1 then begin
-    LOADALS,alffile,alf,count=nalf
+    LOADALS,alffile,alf,count=nalf,/silent
     out[i].nalf = nalf
     if nalf gt 0 then begin
       fitsfile = dir+'/'+repstr(files[i],'.als','.fits')
