@@ -46,16 +46,20 @@ out = replicate({file:'',nalf:0L,decstd:-1.0},n)
 for i=0,n-1 do begin
   alffile = dir+'/'+repstr(files[i],'.als','.alf')
   out[i].file = alffile
-  LOADALS,alffile,alf,count=nalf
-  out[i].nalf = nalf
-  if nalf gt 0 then begin
-    fitsfile = dir+'/'+repstr(files[i],'.als','.fits')
-    head1 = photred_readfile(fitsfile,/header)
-    HEAD_XYAD,head1,alf.x-1,alf.y-1,ra1,dec1,/deg
-    MATCH,nmg.id,alf.id,ind1,ind2,/sort,count=nmatch
-    if nmatch gt 0 then out[i].decstd = stddev(dec[ind1]-dec1[ind2])*3600
-    if not keyword_set(silent) then print,alffile,out[i].nalf,out[i].decstd
-  endif
+  if file_test(alffile) eq 1 then begin
+    LOADALS,alffile,alf,count=nalf
+    out[i].nalf = nalf
+    if nalf gt 0 then begin
+      fitsfile = dir+'/'+repstr(files[i],'.als','.fits')
+      head1 = photred_readfile(fitsfile,/header)
+      HEAD_XYAD,head1,alf.x-1,alf.y-1,ra1,dec1,/deg
+      MATCH,nmg.id,alf.id,ind1,ind2,/sort,count=nmatch
+      if nmatch gt 0 then out[i].decstd = stddev(dec[ind1]-dec1[ind2])*3600
+      if not keyword_set(silent) then print,alffile,out[i].nalf,out[i].decstd
+    endif
+  endif else begin
+    if not keyword_set(silent) then print,alffile,' NOT FOUND'
+  endelse
 endfor
 
 return,out
