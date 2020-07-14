@@ -8,6 +8,7 @@
 ;
 ; INPUTS:
 ;  mchfile  The combined mch filename (absolute if not in that directory).
+;  /silent  No output to the screen.
 ;
 ; OUTPUTS:
 ;  out   Structure giving information for each input image file.
@@ -18,7 +19,7 @@
 ; By D. Nidever  June 2020
 ;;-
 
-function check_allframe_coordtrans,mchfile
+function check_allframe_coordtrans,mchfile,silent=silent
 
 ;; Check the ALLFRAME coordinate transformation
 
@@ -53,7 +54,7 @@ for i=1,n-1 do begin
     HEAD_XYAD,head1,alf.x-1,alf.y-1,ra1,dec1,/deg
     MATCH,nmg.id,alf.id,ind1,ind2,/sort,count=nmatch
     if nmatch gt 0 then out[i].decstd = stddev(dec[ind1]-dec1[ind2])*3600
-    print,alffile,out[i].nalf,out[i].decstd
+    if not keyword_set(silent) then print,alffile,out[i].nalf,out[i].decstd
   endif
 endfor
 
