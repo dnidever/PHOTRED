@@ -56,7 +56,9 @@ for i=0,n-1 do begin
       MATCH,nmg.id,alf.id,ind1,ind2,/sort,count=nmatch
       if nmatch gt 0 then out[i].decstd = stddev(dec[ind1]-dec1[ind2])*3600
       if not keyword_set(silent) then print,alffile,out[i].nalf,out[i].decstd
-    endif
+    endif else begin
+      if not keyword_set(silent) then print,alffile,' IS EMPTY'
+    endelse
   endif else begin
     if not keyword_set(silent) then print,alffile,' NOT FOUND'
   endelse
