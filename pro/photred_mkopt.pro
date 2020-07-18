@@ -142,8 +142,15 @@ if n_elements(inp_fwhm) eq 0 then begin
   ;; somtimes imfwhm has problems if the saturation level in the
   ;; header is too low, run without header
   if (fwhm gt 20 or n_elements(gstr) lt 10) and n_elements(im) eq 0 then begin
+    fwhm1 = fwhm
+    print,'Running IMFWHM again.  FWHM too high or number of sources too small'
     FITS_READ,file,im
     IMFWHM,'',fwhm,im=im,/silent
+    ;; Still bad, using original one if possible
+    if fwhm gt 90.0 and fwhm1 lt 20 then begin
+      print,'New FWHM is bad but original FWHM was acceptable.  Using it'
+      fwhm = fwhm1
+    endif
   endif
 
   if fwhm gt 90.0 then begin
