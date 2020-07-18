@@ -34,7 +34,7 @@ endif
 ; Test the file
 test = file_test(mchfile)
 if test eq 0 then begin
-  print,file,' NOT FOUND'
+  print,mchfile,' NOT FOUND'
   return
 endif
 
