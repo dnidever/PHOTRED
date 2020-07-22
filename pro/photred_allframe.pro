@@ -537,7 +537,7 @@ nprocbaselist = n_elements(procbaselist)
 ; How many FIND iterations do we want
 finditer = READPAR(setup,'FINDITER')
 finditer = strtrim(finditer,2)
-if finditer eq '0' or finditer eq '-1' or finditer eq '' then finditer='2'
+if finditer eq '0' or finditer eq '-1' or finditer eq '' then finditer='2'   ; 2->1 on 7/22/20
 
 
 ; Have some been done already??
