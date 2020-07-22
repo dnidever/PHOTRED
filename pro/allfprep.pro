@@ -147,7 +147,7 @@ base = FILE_BASENAME(file,'.fits')
 
 ; Defaults
 nmaxiter = n_elements(maxiter)
-if nmaxiter eq 0 then maxiter=2
+if nmaxiter eq 0 then maxiter=1  ; 2  ; changed to 1 on 7/22/20
 if n_elements(xoff) eq 0 then xoff=0.0
 if n_elements(yoff) eq 0 then yoff=0.0
 
