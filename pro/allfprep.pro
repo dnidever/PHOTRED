@@ -264,6 +264,8 @@ WHILE (flag eq 0) do begin
       if n_tags(sex) eq 1 then sex=MRDFITS(catfile,2,/silent)
     endelse
     nsex = n_elements(sex)
+    add_tag,sex,'ndetiter',0,sex   ;; add the detection iteration
+    sex.ndetiter = count
     printlog,logf,'SExtractor found '+strtrim(nsex,2)+' sources'
 
     ;-------------------------------------
