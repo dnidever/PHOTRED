@@ -85,7 +85,7 @@ if (Error_status ne 0) then begin
 endif
 
 ; How many FIND iterations
-if n_elements(finditer0) eq 0 then finditer=2 else finditer=finditer0
+if n_elements(finditer0) eq 0 then finditer=1 else finditer=finditer0   ; 2->1 on 7/22/20
 finditer = finditer < 10  ; maximum 10.
 
 ; Saturation level

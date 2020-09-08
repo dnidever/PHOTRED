@@ -15,7 +15,7 @@
 ;                   image.  If not set then the "original" method is
 ;                   used.
 ;  =finditer      The maximum number of iterations to use when finding
-;                   sources with SExtractor/ALLSTAR.  The default is 2,
+;                   sources with SExtractor/ALLSTAR.  The default is 1,
 ;                   and the maximum allowed it 10.
 ;  =detectprog    The program to use to detect sources.  Either
 ;                   'sextractor' or 'daophot'.  'sextractor' is the
@@ -99,7 +99,7 @@ if nsetup eq 0 then begin
 endif
 
 ; How many FIND iterations
-if n_elements(finditer0) eq 0 then finditer=2 else finditer=finditer0
+if n_elements(finditer0) eq 0 then finditer=1 else finditer=finditer0   ; 2->1 on 7/22/20
 finditer = finditer < 10  ; maximum 10.
 
 ; Saturation level
@@ -355,7 +355,6 @@ endif
 
 
 
-
 ;###########################################
 ; STEP 1: COMBINE the images
 
@@ -397,7 +396,7 @@ printlog,logf,'----------------------------------------'
 printlog,logf,systime(0)
 combbase = file_basename(combfile,'.fits')
 if not keyword_set(fake) then begin
-  ; Make .opt files, set saturation just below the mask data level
+  ;; Make .opt files, set saturation just below the mask data level
   PHOTRED_MKOPT,combfile,va=1,hilimit=maskdatalevel-1000,error=opterror
   if n_elements(opterror) gt 0 then begin
     printlog,logf,opterror

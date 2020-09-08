@@ -6,6 +6,7 @@
 ;
 ; INPUTS:
 ;  filename   The name of the ALS file
+;  /silent    Don't print anything to the screen.
 ;  /stp       Stop at the end of the program
 ;
 ; OUTPUTS:
@@ -20,7 +21,7 @@
 ; By D. Nidever   January 2007
 ;-
 
-pro loadals,filename,phot,head,count=count,stp=stp
+pro loadals,filename,phot,head,count=count,silent=silent,stp=stp
 
 count=0
 
@@ -32,14 +33,14 @@ endif
 
 test = file_test(filename)
 if test eq 0 then begin
-  print,'FILE ',filename,' DOES NOT EXIST'
+  if not keyword_set(silent) then print,'FILE ',filename,' DOES NOT EXIST'
   phot=-1
   return
 endif
 
 nlines = file_lines(filename)
 if nlines lt 4 then begin
-  print,'No sources in '+filename
+  if not keyword_set(silent) then print,'No sources in '+filename
   phot = -1
   return
 endif

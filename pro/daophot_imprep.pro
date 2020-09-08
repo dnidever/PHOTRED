@@ -197,6 +197,16 @@ if bunit eq 'electrons' and nskybrite gt 0 then begin
   endif
 endif
 
+;; Mask bad half of DECam chip 31
+dateobs = sxpar(meta,'DATE-OBS',count=ndateobs)
+if ndateobs gt 0 then mjd=date2jd(dateobs,/mjd) else mjd=58000.0d0  ;; assume bad if no date
+if strtrim(sxpar(meta,'INSTRUME'),2) eq 'DECam' and sxpar(meta,'CCDNUM') eq 31 and mjd gt 56660 then begin
+  print,'Masking bad half of DECam chip 31'
+  ;; X: 1-1000 okay
+  ;; X: 1000-2049 bad
+  fim[1000:*,*] = 1e6
+endif
+
 ;; Set saturated pixels to 65000.0
 if bunit ne 'electrons' then begin
   saturate = sxpar(meta,'saturate',count=nsaturate)

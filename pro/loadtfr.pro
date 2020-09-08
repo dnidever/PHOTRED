@@ -97,7 +97,7 @@ index = tarr[3:*,*]
 nindexcol = (size(index,/dimensions))[0]
 
 ; Get unique star IDs and X/Y values
-ui = uniq(allid,sort(allid))
+ui = uniq(allid)
 uid = allid[ui]
 ux = allx[ui]
 uy = ally[ui]
