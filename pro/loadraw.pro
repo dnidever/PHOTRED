@@ -170,7 +170,7 @@ if arr1[0] eq 'NL' and strtrim(line3,2) eq '' then begin
   free_lun,unit
 
   ; Now transfer to structure
-  fieldtypes = [3,lonarr(nmag-1)+4]
+  fieldtypes = [3,lonarr(4+2*nmag)+4]
   fieldnames = ['ID','X','Y']
   for i=1,nmag do fieldnames = [fieldnames,'MAG'+strtrim(i,2),'ERR'+strtrim(i,2)]
   fieldnames = [fieldnames,'CHI','SHARP']

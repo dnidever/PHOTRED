@@ -283,7 +283,7 @@ IF not keyword_set(allfloat) THEN BEGIN
 ENDIF ELSE BEGIN
 
   ; Checking the data types
-  typearr = datatypes(arr1)
+  if n_elements(typearr) eq 0 then typearr = datatypes(arr1)
   bd = where(typearr eq 7,nbd)
 
   ; Some of the columns are strings
@@ -304,11 +304,14 @@ ENDIF ELSE BEGIN
   ;ddd = execute(cmd)
   ;str = replicate(dum,nrow)
 
-  dum = CREATE_STRUCT(fieldnames[0],0.0)
-  for i=1,ncol-1 do $
-    dum = CREATE_STRUCT(dum,fieldnames[i],0.0)
-  str = replicate(dum,nrow)
 
+  dum = CREATE_STRUCT(fieldnames[0],fix(0,type=typearr[0]))
+  for i=1,ncol-1 do $
+    dum = CREATE_STRUCT(dum,fieldnames[i],fix(0,type=typearr[i]))
+  ;dum = CREATE_STRUCT(fieldnames[0],0.0)
+  ;for i=1,ncol-1 do $
+  ;  dum = CREATE_STRUCT(dum,fieldnames[i],0.0)
+  str = replicate(dum,nrow)
 
   ; Transferring the data
   for i=0,ncol-1 do str.(i) = reform(arr[i,*])
