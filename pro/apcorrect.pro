@@ -178,6 +178,10 @@ if (ngrofile gt 0 and napername gt 0) then begin
   ; Getting cumulative aperture correction errors
   csigind = where(stregex(framegrolines,'--> '+num,/boolean) eq 1 and $
                   stregex(framegrolines,'Sigma\(C\)',/boolean) eq 1,ncsigind)
+  if ncsigind eq 0 then begin  ;; newer daogrow use Sigma_C
+    csigind = where(stregex(framegrolines,'--> '+num,/boolean) eq 1 and $
+                    stregex(framegrolines,'Sigma_C',/boolean) eq 1,ncsigind)
+  endif
   if (ncsigind eq 0) then begin
     print,'Cumulative aperture correction errors for frame '+gronum+' NOT FOUND'
     error = 'Cumulative aperture correction errors for frame '+gronum+' NOT FOUND'
