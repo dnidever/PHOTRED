@@ -73,6 +73,7 @@ nkeys = n_elements(keys)
 
 ;; Make the structure, assume they are all floats
 optstr = create_struct(keys[0],float(values[0]))
-for i=1,nkeys-1 do optstr = create_struct(optstr,keys[i],float(values[i]))
+for i=1,nkeys-1 do $
+   optstr = create_struct(optstr,idl_validname(keys[i],/convert_all),float(values[i]))
 
 end
