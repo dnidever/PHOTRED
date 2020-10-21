@@ -239,7 +239,7 @@ nalsarr = lonarr(nfiles)
 for i=0,nfiles-1 do nalsarr[i]=file_lines(bases[i]+'.als')-3
 
 ; Initialize the RAW structure
-raw = REPLICATE(schema,total(nalsarr))
+raw = REPLICATE(schema,100000L>nalsarr[0])
 
 ; Loop over the images
 ;---------------------
@@ -314,6 +314,15 @@ For i=0,nfiles-1 do begin
 
     ; Add leftover sources
     if nals gt 0 then begin
+      ;; Add more elements to RAW and TFR
+      if count+nals gt n_elements(raw) then begin
+         raw = add_elements(raw,100000L>nals)
+         oldtfr = tfr
+         tfr = lonarr(n_elements(raw),nfiles)
+         sz = size(oldtfr)
+         tfr[0:sz[1]-1,*] = oldtfr
+         undefine,oldtfr
+      endif
       if keyword_set(verbose) then printlog,logf,'Adding ',strtrim(nals,2),' leftover sources'
       raw[count:count+nals-1].id = lindgen(nals)+1+count
       raw[count:count+nals-1].x = xref
