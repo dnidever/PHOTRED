@@ -24,7 +24,7 @@ pro photred_errormsg,logfile=logfile
 if n_elements(logfile) eq 0 then logfile=-1
 
 help, Calls=callStack
-callingRoutine = (Str_Sep(StrCompress(callStack[1])," "))[0]
+callingRoutine = (strsplit(StrCompress(callStack[1])," ",/extract))[0]
 help, /Last_Message, Output=traceback
 printlog,logfile,''
 printlog,logfile, 'Traceback Report from ' + StrUpCase(callingRoutine) + ':'
