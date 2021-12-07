@@ -2517,7 +2517,7 @@ if (nmatch lt 3 or initrms gt 1.5*rmslim) and (refdensity gt imdensity) then beg
       if tag_exist(refcat1b,'R1MAG') then si=sort(refcat1b.r1mag)
       if tag_exist(refcat1b,'_GMAG_') then si=sort(refcat1b._gmag_)
     endelse
-    if n_elements(si) eq 0 then si=lindgen(n_elemetns(refcat1b))
+    if n_elements(si) eq 0 then si=lindgen(n_elements(refcat1b))
     refcat1b = refcat1b[si]
   endelse
 

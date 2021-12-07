@@ -312,11 +312,13 @@ function photred_readfile,filename,meta,exten=exten,count=count,header=header,no
             ;; Both exist, both HDU0 and HDU1 have data (meta-data in HDU1)
             if sxpar(hd0,'NAXIS') gt 0 and sxpar(hd1,'NAXIS') gt 0 then begin
                meta = MRDFITS(filename,1,/silent)
+               ;; HDU1 data is NOT meta-data, use header0
+               if size(meta,/type) ne 7 and size(meta,/type) ne 8 then meta = hd0
                if keyword_set(header) then return,meta
                result = MRDFITS(filename,0,/silent)
                count = n_elements(result)
                return,result
-            endif  
+            endif
          endelse
        end
      else:  begin
