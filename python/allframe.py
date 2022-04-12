@@ -9,23 +9,168 @@ from datetime import datetime
 import subprocess
 import tempfile
 import logging
+import re
 from glob import glob
+from astropy.io import fits,ascii
+from astropy.table import Table
+from dlnpyutils import utils as dln
 
 def loadsetup():
-    pass
-
-def readpar():
     pass
 
 def loadmch():
     pass
 
-def file_isfits():
-    pass
+def loadmch(mchfile):
+    """
+    This loads a DAOMATCH/DAOMASTER mch file 
+     
+    Parameters
+    ----------
+    mchfile  The MCH filename 
+     
+    Returns
+    -------
+    files    The list of files in the MCH file 
+    trans    The transformation equations in a Nfilesx6 array. 
+    magoff   The magnitude offsets and errors array. 
+     
+    Example
+    -------
 
-# Clean up
+    files,trans,magoff = loadmch('ccd1001.mch')
+     
+    By D.Nidever   February 2008 
+    Translated to Python by D. Nidever,  April 2022
+    """ 
+     
+    count = 0 
+     
+    # Test the file 
+    if os.path.exists(mchfile)==False:
+        raise ValueError(mchfile+' NOT FOUND')
+
+    # Read in the file
+    lines = dln.readlines(mchfile)
+
+    # Creating the trans array
+    lines2 = [re.sub("'","",l) for l in lines]
+    #lines2 = repstr(lines,"'",'') 
+    nlines = len(lines)
+
+    arr = lines2[0].split()
+    ntrans = len(arr)-3  # first line is the samee, last two are mag offsets 
+ 
+    # Getting the file names
+    arr2 = [l.split() for l in lines2]
+    files = [a[0] for a in arr2]
+ 
+    # Initializing the array
+    trans = np.zeros((nlines,ntrans),float)
+    magoff = np.zeros((nlines,2),float)
+    # Filling the aray 
+    for i in range(nlines):
+        arr = lines2[i].split()
+        trans[i,:] = arr[1:ntrans+1]
+        magoff[i,:] = arr[ntrans+1:]
+ 
+    return files,trans,magoff
+
+
+def readpar(array,keyword):
+    """
+    This allows you to get a parameter value from 
+    a 2xN array of keyword/value pairs. 
+    This is similar to getting keyword values from 
+    headers with SXPAR.PRO. 
+    
+    Parameters
+    ----------
+    array    A 2xN array of keyword-value pairs 
+    keyword  A keyword string for which to return the value. 
+            Case insensitive. 
+ 
+    Returns
+    -------
+    value    The value corresponding to the input keyword 
+              is output.  If none is found then '0' is returned. 
+              If the keyword exists in array but has not value 
+              then an empty string '' is returned. 
+    count   The number of parameters found by READPAR.  count=0 
+              if the parameter was not found. 
+
+    Example
+    -------
+
+    value = readpar(setup,'MOSAIC') 
+ 
+    By D. Nidever    Oct. 2007 
+    Translated to Python by D. Nidever,  April 2022
+    """
+    
+    #sz = size(array)
+    #if sz[0] != 2 or sz[1] != 2: # must be 2xN 
+    #    return None
+    #if size(array,/type) != 7: # must be string 
+    #    return None 
+     
+    # Looking for keyword 
+    keyword2 = strlowcase(str(keyword[0],2)) 
+    keys = reform(array[0,:]) 
+    values = reform(array[1,:])
+    gd, = dln.grep(keys==keyword2)
+    if len(gd)==0:
+        return None
+    value = str(values[gd[0]])  # returning the first value 
+    return value
+
+def file_isfits(filename):
+    """
+    Check if this file is a FITS file or not. 
+ 
+    Parameters
+    ----------
+    filename   The name of the file to check. 
+ 
+    Returns
+    -------
+    return     1 if the file is a FITS file and 0 otherwise. 
+ 
+    Example
+    ------
+  
+    test = file_isfits(filename) 
+ 
+    By D. Nidever, Jan 2019 
+    Based partially from is_fits.pro by Dave Bazell 
+    Translated to python by D. Nidever, April 2022
+    """
+
+    # Does the file exist 
+    if os.path.exists(filename)==False:
+        return False
+     
+    # Four possible possibilities: 
+    # 1) Regular FITS file (this includes fpacked FITS files) 
+    # 2) Gzipped FITS file 
+    # 3) ASCII file 
+    # 4) Some other binary file 
+     
+    # Try to open the file normally
+    # astropy will catch lots of problems
+    #  empty file, corrupted file, not a FITS file
+    try:
+        hdu = fits.open(filename)
+    except:
+        return False
+
+    hdu.close()
+    return True
+
+
 def cleanup(mchbase,files,fpack,mchdir,workdir,tempdir):
-         
+    """ Clean up """
+    
     # Delete temporarily funpacked files 
     bdfpack, = np.where(fpack)
     if len(bdfpack)>0:
@@ -163,8 +308,8 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     finditer = np.minimum(finditer, 10)  # maximum 10. 
          
     # Getting scripts directory and iraf directory 
-    scriptsdir = readpar(setup,'SCRIPTSDIR') 
-    irafdir = readpar(setup,'IRAFDIR') 
+    scriptsdir = setup['scriptsdir']
+    irafdir = setup['irafdir']
          
     # No irafdir
     if scriptsdir is None:
