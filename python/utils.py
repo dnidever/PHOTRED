@@ -18,22 +18,94 @@ import struct
 from itertools import zip_longest
 from itertools import accumulate
 
-def loadsetup():
-    pass
 
-def make_parser(fieldwidths):
+def make_parser(fieldwidths,fieldtypes=None):
     # https://stackoverflow.com/questions/4914008/how-to-efficiently-parse-fixed-width-files
     cuts = tuple(cut for cut in accumulate(abs(fw) for fw in fieldwidths))
     pads = tuple(fw < 0 for fw in fieldwidths) # bool flags for padding fields
-    flds = tuple(zip_longest(pads, (0,)+cuts, cuts))[:-1]  # ignore final one
-    slcs = ', '.join('line[{}:{}]'.format(i, j) for pad, i, j in flds if not pad)
+    if fieldtypes is None:
+        flds = tuple(zip_longest(pads, (0,)+cuts, cuts))[:-1]  # ignore final one        
+        slcs = ', '.join('line[{}:{}]'.format(i, j) for pad, i, j in flds if not pad)
+    else:
+        tdict = {'s':'str','d':'int','f':'float'}
+        ftypes = [tdict[ft] for ft in fieldtypes]
+        flds = tuple(zip_longest(ftypes,pads, (0,)+cuts, cuts))[:-1]  # ignore final one        
+        slcs = ', '.join('{}(line[{}:{}])'.format(ftype, i, j) for ftype, pad, i, j in flds if not pad)        
     parse = eval('lambda line: ({})\n'.format(slcs))  # Create and compile source code.
     # Optional informational function attributes.
     parse.size = sum(abs(fw) for fw in fieldwidths)
-    parse.fmtstring = ' '.join('{}{}'.format(abs(fw), 'x' if fw < 0 else 's')
-                                                for fw in fieldwidths)
+    if fieldtypes is None:
+        parse.fmtstring = ' '.join('{}{}'.format(abs(fw), 'x' if fw < 0 else 's')
+                                   for fw in fieldwidths)
+    else:
+        parse.fmtstring = ' '.join('{}{}'.format(a[0],a[1]) for a in zip(fieldwidths,fieldtypes))
     return parse
 
+def loadsetup(fake=False,setupdir=None,std=False):
+    """
+
+    Parameters
+    ----------
+    fake      Load the fakered.setup file. 
+    setupdir  The directory in which to look for the setup file. 
+ 
+    Returns
+    -------
+    setup      The setup file.  It is a string array with 
+                 dimensions of 2xN_parameters.  READPAR can be 
+                 used to read the parameters. 
+
+    Example
+    -------
+
+    setup = loadsetup()
+ 
+    By D.Nidever  March 2008 
+    Translated to Python by D. Nidever,  April 2022
+    """
+ 
+    if setupdir is None:  # default setup directory 
+        setupdir = '.' 
+     
+    # Type of setup file 
+    setupfile = 'photred'
+    if std:
+        setupfile = 'stdred'
+    if fake:
+        setupfile = 'fakered' 
+     
+    # LOAD THE SETUP FILE 
+    #-------------------- 
+    # This is a 2xN array.  First colume are the keywords 
+    # and the second column are the values. 
+    # Use READPAR.PRO to read it 
+    setupfiles = glob(setupdir+'/'+setupfile+'.*setup')
+    nsetupfiles = len(setupfiles)
+    if (nsetupfiles < 1): 
+        raise ValueError('NO '+strupcase(setupfile)+' SETUP FILE')
+    if (nsetupfiles > 1):
+        raise ValueError('MORE THAN ONE '+strupcase(setupfile)+' SETUP FILE FOUND')
+     
+    # Read the setup file
+    lines = dln.readlines(setupfiles[0],comment='#')
+    nlines = len(files)
+     
+    # Process the lines
+    setup = {}
+    if nlines > 0:
+        for l in lines:
+            if l.strip()!='':
+                arr = l.split()
+                if len(arr)==1:
+                    setup[arr[0]] = ''
+                else:
+                    setup[arr[0]] = arr[1]
+         
+    # No lines to process 
+    else: 
+        raise ValueError(setupfiles[0],' HAS NOT LINES TO PROCESS')
+
+    return setup
 
 def loadmch(mchfile):
     """
@@ -241,8 +313,9 @@ def loadmakemag(filename):
                 out = np.loadtxt(StringIO(line), dtype={'names':names,'formats':formats})
                 #num,x,y,mags = np.loadtxt(d, dtype={'names': ('a','b','c','d'),
                 #                                    'formats': ('i7','s9','s9','f4')},unpack=True)
-                fieldwidths = tuple([7,9,9]+(2*nmag+2)*[9])
-                parser = make_parser(fieldwidths)
+                fieldwidths = tuple([9,9,9]+(2*nmag+2)*[9])
+                fieldtypes = tuple(['d','f','f']+(2*nmag+2)*['f'])
+                parser = make_parser(fieldwidths,fieldtypes)
                 out = parser(line)
 
                 line = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n'
@@ -253,12 +326,12 @@ def loadmakemag(filename):
                 print('fields: {}'.format(fields))
                 
                 
-                fmt = '(I7,2A9,'+str(2*nmag+2,2)+'F9.4)' 
-                id = 0
-                x=''
-                y=''
-                all=np.zeros(2*nmag+2,float) 
-                reads,instr,id,x,y,all,format=fmt 
+                #fmt = '(I7,2A9,'+str(2*nmag+2,2)+'F9.4)' 
+                #id = 0
+                #x=''
+                #y=''
+                #all=np.zeros(2*nmag+2,float) 
+                #reads,instr,id,x,y,all,format=fmt 
                 inline[0] = id 
                 inline[1] = x 
                 inline[2] = y 
