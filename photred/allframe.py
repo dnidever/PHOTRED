@@ -17,6 +17,507 @@ from dlnpyutils import utils as dln
 from . import utils
 
 
+def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
+             detectprog='sextractor',logfile=None,maskfile=None):
+    """
+    IDL version of Jamie's allfprep.cl that runs SExtractor 
+    iteratively on stacked images and then runs ALLSTAR 
+    to get PSF sources. 
+ 
+    The final ALS file will be called file+'_allf.als' 
+    A file with all of the sources that SExtractor found 
+    that can be matched to the ALS file using IDs is called 
+    file+'_allf.sex' 
+ 
+    Parameters
+    ----------
+    file        Filename of the stacked images 
+    xoff        The offset in X between the original and shifted images 
+                  xorig = xshift + xoff 
+    yoff        The offset in Y between the original and shifted images 
+                  yorig = yshift + yoff 
+    maskfile    The name of a mask/weight file to use for the combined image. 
+    maxiter     Maximum number of times to iterate. 
+                  By default, maxiter=1
+    scriptsdir  Directory that contains the scripts. 
+    detectprog  The program to use for source detection.  The options 
+                  are 'SEXTRACTOR' (the default) or 'DAOPHOT'. 
+    logfile     A logfile to print output to. 
+ 
+    Returns
+    -------
+    als       Final ALLSTAR structure 
+ 
+    Example
+    -------
+    als = allfprep('ccd1001_comb.fits',scriptsdir=scriptsdir,logfile=logfile)
+ 
+    By D. Nidever    February 2008 (copied from Jamie's allfprep.cl) 
+    Translated to Python by D. Nidever,  April 2022
+    """
+ 
+     # Logfile
+     if logfile is None:
+         logger = dln.basiclogger()
+     
+    # Make sure file exists 
+    if os.path.exists(filename):
+        raise ValueError(filename+' NOT FOUND')
+     
+    # What program are we using for source detection? 
+    #------------------------------------------------ 
+    detectprog = detectprog.lower()
+    if detectprog == 'sex': 
+        detectprog = 'sextractor' 
+    if detectprog=='dao': 
+        detectprog = 'daophot' 
+    if detectprog != 'sextractor' and detectprog != 'daophot': 
+        raise ValueError('DETECTPROG = '+detectprog+' NOT AN OPTION.  Use sextractor or daophot')
+     
+    # Copy the scripts 
+    #--------------------- 
+    # No scriptsdir
+    if scriptsdir is None:
+        raise ValueError('scriptsdir NOT INPUT')
+    # Check if the scripts exist in the current directory 
+    scripts = ['default.sex','default.param','default.nnw','default.conv'] 
+    nscripts = len(scripts) 
+    # Loop through the scripts 
+    for i in range(nscripts):
+        exists = os.path.exists(scriptsdir+'/'+scripts[i])
+        if exists:
+            size = os.stat(scripts[i])
+        else:
+            size = 0
+        curexists = os.path.exists(scripts[i])
+        if curexists:
+            cursize = os.stat(scripts[i])
+        else:
+            cursize = 0
+        # No file
+        if exists==False or size==0:
+            raise ValueError(scriptsdir+'/'+scripts[i]+' NOT FOUND or EMPTY')
+        # Check if the two files are the same size, if not copy it
+        if size!=cursize:
+            if curexists:
+                os.remove(scripts[i])
+            shutil.copyfile(scriptsdir+'/'+scripts[i],scripts[i])
+
+    # Check that the SEXTRACTOR program exists
+    out = subprocess.check_output(['which','sextractor'],shell=False)
+    if type(out) is bytes: out = out.decode()
+    out = out.strip()
+    if os.path.exists(out)==False:
+        raise ValueError('No sextractor program found')
+    # Check that the ALLSTAR program exists
+    out = subprocess.check_output(['which','allstar'],shell=False)
+    if type(out) is bytes: out = out.decode()
+    out = out.strip()
+    if os.path.exists(out)==False:
+        raise ValueError('No allstar program found')    
+   # Check that the DAOPHOT program exists
+    out = subprocess.check_output(['which','daophot'],shell=False)
+    if type(out) is bytes: out = out.decode()
+    out = out.strip()
+    if os.path.exists(out)==False:
+        raise ValueError('No daophot program found') 
+     
+    base,ext = os.path.splitext(os.path.basename(filename))
+     
+    # Read the .opt file
+    opt = utils.readopt(base+'.opt')
+    satlevel = opt['HI']
+    gain = opt['GA']
+    fwhm = opt['FW']
+     
+    # Get pixel scale
+    scale = utils.getpixscale(filename)
+    if scale is  None: # default 
+        scale = 0.5 
+     
+    # Filenames 
+    origfile = filename
+    subbase = base+'_sub' 
+    subfile = subbase+'.fits' 
+    catfile = subbase+'.cat' 
+    sexfile = base+'_allf.sex'
+    if os.path.exists(subfile): os.remove(subfile)
+    shutil.copyfile(filename,subfile)
+     
+    # Make customized SEXTRACTOR file 
+    #-------------------------------- 
+    if (detectprog == 'sextractor'): 
+        sexconfigfile = base+'.sex'
+        if os.path.exists(sexconfigfile): os.remove(sexconfigfile)
+        shutil.copyfile('default.sex',sexconfigfile)
+        sexlines = dln.readlines(sexconfigfile)
+        sexlines2 = sexlines.copy()
+        for line,i in enumerate(sexlines):
+            # CATALOG_NAME
+            if line.find('**CATALOG_NAME')>-1:
+                sexlines2[i] = 'CATALOG_NAME    '+catfile+'# name of the output catalog' 
+            # SATUR_LEVEL
+            elif line.find('**SATUR_LEVEL')>-1:
+                sexlines2[i] = 'SATUR_LEVEL     '+satlevel+'# level (in ADUs) at which arises saturation' 
+            # GAIN
+            elif line.find('**GAIN')>-1:
+                sexlines2[i] = 'GAIN            '+gain+'# detector gain in e-/ADU.' 
+            # PIXEL_SCALE
+            elif line.find('**PIXEL_SCALE')>-1:
+                sexlines2[i] = 'PIXEL_SCALE     '+str(scale)+'# size of pixel in arcsec (0=use FITS WCS info).' 
+            # SEEING_FWHM
+            elif line.find('**SEEING_FWHM'):
+                fwhmas = float(fwhm)*float(scale) 
+                sexlines2[i] = 'SEEING_FWHM     '+str(fwhmas)+'# stellar FWHM in arcsec' 
+        # MASK/WEIGHT file 
+        if maskfile is not None:
+            sexlines2 += ['WEIGHT_IMAGE  '+maskfile,'WEIGHT_TYPE   MAP_WEIGHT']
+        # Write the file
+        dln.writelines(sexconfigfile,sexlines2)
+     
+     
+    logger.info('Using '+strupcase(detectprog)+' for Source Detection' 
+     
+    #Loop to find all the objects the first time, bright star problems 
+    flag = 0 
+    nals = 0 
+    count = 1 
+    undefine,allsex 
+    WHILE (flag == 0): 
+         
+        #print,'' 
+        #print,'----------------------------' 
+        #print,'ITERATION ',strtrim(count,2) 
+        #print,'----------------------------' 
+        #print,'' 
+        logger.info('--Iteration '+str(count,2)+'--' 
+         
+        nlastals = nals 
+         
+         
+        ####################### 
+        # Detect New Sources 
+        ####################### 
+         
+        #---------------------------- 
+        # SExtractor Source Detection 
+        #---------------------------- 
+        if (detectprog == 'sextractor'): 
+             
+            #------------------------------------- 
+            # Initial run of SExtractor -- output sex.cat 
+            #!sex allf.fits -c default.sex 
+            # Run sextractor on star subtracted file 
+            logger.info('Running SExtractor')
+            if os.path.exists(catfile): os.remove(catfile) # delete sextractor catalog file 
+            out = subprocess.check_output(['sex',subfile,'-c',sexconfigfile],shell=False)
+            exists = os.path.exists(catfile)
+            size = os.size(catfile)
+            if exists==False or size==0:  # no output file 
+                raise ValueError('Error when running SExtractor')
+             
+            #------------------------------------- 
+            # Load sextractor output file 
+            # default.param specifies the output columns 
+            if utils.file_isfits(catfile) == 0: 
+                READLINE,'default.param',fields 
+                gd , = np.where(strmid(fields,0,1) != '#' and strtrim(fields,2) ne '',ngd) 
+                fields = fields[gd] 
+                fields = repstr(fields,'(1)','') 
+                #fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR'] 
+                sex = IMPORTASCII(catfile,fieldnames=fields,/noprint) 
+            else: 
+                sex = MRDFITS(catfile,1,/silent) 
+                if n_tags(sex) == 1 : 
+                    sex=MRDFITS(catfile,2,/silent) 
+            nsex = len(sex) 
+            add_tag,sex,'ndetiter',0,sex# add the detection iteration 
+            sex.ndetiter = count 
+            logger.info('SExtractor found '+str(nsex,2)+' sources')
+             
+            #------------------------------------- 
+            # Make coordinate input file for ALLSTAR 
+             
+            # Get ALS header
+            with open(base+'.als','r') as f:
+                line1 = f.readline().replace("\n","")
+                line2 = f.readline().replace("\n","")                        
+            head = [line1,line2,''] 
+             
+            # Concatenate with the ALS file to make a combined 
+            # list of sources 
+            coofile = base+'_all.coo' 
+            os.remove(coofile,/allow# delete final coordinate file 
+            nals = len(als) 
+             
+            # ALS file exists, concatenate 
+            if nals > 0: 
+                maxid = np.max(als['id'])# The last ALS ID 
+                 
+                nsex = len(sex) 
+                # Making ALS structure for new SEX sources 
+                dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
+                      ('sky',float),('iter',int),('chi',float),('sharp'f,loat)]
+                sex2 = replicate(dum,nsex) 
+                sex2.id = sex.number + maxid# offset the IDs, sex IDs start at 1 
+                sex2.x = sex.x_image 
+                sex2.y = sex.y_image 
+                sex2.mag = sex.mag_aper 
+                sex2.err = sex.magerr_aper 
+                sex2.sky = np.median(als.sky) 
+                sex2.iter = 1 
+                sex2.chi = 1.0 
+                sex2.sharp = 0.0 
+                 
+                # Add to final sextractor file 
+                # This will be a file that has all sources SExtractor found 
+                # with their IDs properly offset so they can be matched to the 
+                # final ALS file 
+                sex.number += maxid# offset the IDs 
+                #tempfile = MKTEMP('temp') 
+                #WRITECOL,tempfile,sex.number,sex.x_image,sex.y_image,sex.mag_aper,sex.magerr_aper,      ;         sex.flags,sex.class_star,fmt='(I10,F11.3,F11.3,F9.4,F9.4,I4,F6.2)' 
+                #SPAWN,'cat '+tempfile+' >> '+sexfile,out,errout 
+                #FILE_DELETE,tempfile,/allow 
+                PUSH,allsex,sex 
+                 
+                # Concatenate 
+                all = [als,sex2] 
+                nall = len(all) 
+                 
+                # Write to file 
+                WRITEALS,coofile,all,alshead 
+                 
+                # First time, no ALS file yet 
+            else: 
+                 
+                # Making ALS structure for new SEX sources 
+                dum = {ID:0L,X:0.0,Y:0.0,MAG:0.0,ERR:0.0,SKY:0.0,ITER:0.0,CHI:0.0,SHARP:0.0} 
+                dt = [()]
+                sex2 = np.zeros(nsex,dtype=np.dtype(dt))
+                sex2['id'] = sex['number']
+                sex2['x'] = sex['x_image']
+                sex2['y'] = sex['y_image']
+                sex2['mag'] = sex['mag_aper'] 
+                sex2['err'] = sex['magerr_aper']
+                sex2['sky'] = 0.0 
+                sex2['iter'] = 1 
+                sex2['chi'] = 1.0 
+                sex2['sharp'] = 0.0 
+                 
+                # Write to file 
+                utils.writeals(coofile,sex2,head)
+                 
+                # Initialize the structure of all SExtractor detections 
+                allsex = sex 
+             
+             
+        #------------------------- 
+        # DAOPHOT Source Detection 
+        #------------------------- 
+        else: 
+             
+            # Remove the SExtractor file.  If it exists it's an old one.
+            if os.path.exists(sexfile): os.remove(sexfile)
+             
+            #------------------------------------- 
+            # Run DAOPHOT/FIND and PHOT on star subtracted file 
+            logger.info('Running DAOPHOT')
+             
+            # Copy the OPT file from _comb.opt to _comb_sub.opt 
+            if os.path.exists(subbase+'.opt')==False:
+                if os.path.exists(subbase+'.opt'): os.remove(subbase+'.opt')
+                shutil.copyfile(base+'.opt',subbase+'.opt')
+             
+            # Copy the .opt file daophot.opt 
+            if os.path.exists('daophot.opt')==False:
+                if os.path.exists('daophot.opt'): os.remove('daophot.opt')
+                shutil.copyfile(subbase+'.opt','daophot.opt')
+             
+            # Make temporary photo.opt file 
+            tphotofile = MKTEMP('photo') 
+            photlines = []
+            push,photlines,'A1 = '+STRING(fwhm*3.0,format='(F7.4)') 
+            push,photlines,'IS = 45.0000' 
+            push,photlines,'OS = 50.0000' 
+            dln.writelines(tphotofile,photlines)
+                        
+            # Make a temporary script to run FIND 
+            lines = []
+            push,lines,'#!/bin/sh' 
+            #push,lines,'daophot="/net/astro/bin/daophot"' 
+            push,lines,'export image=${1}' 
+            push,lines,'rm ${image}.temp.log      >& /dev/null' 
+            push,lines,'rm ${image}.temp.coo      >& /dev/null' 
+            push,lines,'rm ${image}.temp.ap       >& /dev/null' 
+            push,lines,'daophot << END_DAOPHOT >> ${image}.temp.log' 
+            push,lines,'OPTIONS' 
+            push,lines,'${image}.opt' 
+            push,lines,'' 
+            push,lines,'ATTACH ${image}.fits' 
+            push,lines,'FIND' 
+            push,lines,'1,1' 
+            push,lines,'${image}.temp.coo' 
+            push,lines,'y' 
+            push,lines,'PHOTOMETRY' 
+            push,lines,os.path.basename(tphotofile) 
+            push,lines,'' 
+            push,lines,'${image}.temp.coo' 
+            push,lines,'${image}.temp.ap' 
+            push,lines,'EXIT' 
+            push,lines,'END_DAOPHOT' 
+            #tempfile = maketemp('dao','.sh') 
+            tempfile = MKTEMP('dao')# absolute path
+            dln.writelines(tempfile,lines)
+            os.chmod(tempfile,0o755)
+             
+            # Run the program
+            out = subprocess.check_output(tempfile+' '+subbase)
+            if os.path.exists(tempfile): os.remove(tempfile) # delete the temporary script 
+             
+            #------------------------------------- 
+            # Load DAOPHOT FIND and PHOT output files
+            utils.loadcoo(subbase+'.temp.coo',coo,coohead)
+            utils.loadaper(subbase+'.temp.ap',aper,aperhead)
+            for f in [subbase+'.temp.coo',subbase+'.temp.ap']:
+                if os.path.exists(f): os.remove(f)
+            ncoo = len(coo) 
+            logger.info('DAOPHOT found '+str(ncoo)+' sources')
+                          
+            # Get ALS header
+            with open(base+'.ls','r') as f:
+                line1 = f.readline().replace("\n","")
+                line2 = f.readline().replace("\n","")                        
+            head = [line1,line2,''] 
+             
+            # Concatenate with the ALS file to make a combined 
+            # list of sources 
+            coofile = base+'_all.coo'
+            if os.path.exists(coofile): os.remove(coofile) # delete final coordinate file 
+            nals = len(als) 
+            # ALS file exists, concatenate 
+            if (nals > 0): 
+                maxid = np.max(als['id'])  # The last ALS ID 
+                 
+                # Make a fake ALS structure 
+                #-------------------------- 
+                ndao = len(coo) 
+                # Making ALS structure for new DAOPHOT sources
+                dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
+                      ('sky',float),('iter',int),('chi',float),('sharp'f,loat)]
+                dao = np.zeros(ndao,dtype=np.dtype(dt))
+                dao['id'] = coo['id'] + maxid  # offset the IDs, sex IDs start at 1 
+                dao['x'] = coo['x'] 
+                dao['y'] = coo['y'] 
+                dao['mag'] = aper['mag'][0] 
+                dao['err'] = aper['err'][0] 
+                dao['sky'] = aper['sky']
+                dao['iter'] = 1 
+                dao['chi'] = 1.0 
+                dao['sharp'] = 0.0 
+                 
+                # Concatenate 
+                all = [als,dao] 
+                nall = len(all) 
+                 
+                # Write to file 
+                utils.writeals(coofile,all,alshead)
+
+                 
+            # First time, no ALS file yet 
+            else: 
+                                  
+                # Make a fake ALS structure 
+                #-------------------------- 
+                ndao = len(coo) 
+                # Making ALS structure for new DAOPHOT sources 
+                dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
+                      ('sky',float),('iter',int),('chi',float),('sharp'f,loat)]
+                dao = np.zeros(ndao,dtype=np.dtype(dt))
+                dao['id'] = coo['id'] 
+                dao['x'] = coo['x'] 
+                dao['y'] = coo['y'] 
+                dao['mag'] = aper['mag'][0] 
+                dao['err'] = aper['err'][0] 
+                dao['sky'] = aper['sky'] 
+                dao['iter'] = 1 
+                dao['chi'] = 1.0 
+                dao['sharp'] = 0.0 
+                 
+                # Use the DAOPHOT FIND/PHOT data 
+                utils.writeals(coofile,dao,head)
+             
+    # DAOPHOT 
+         
+        #----------------------------------------------------- 
+        # Run ALLSTAR on all sources found so far 
+        # on original frame 
+        logger.info('Running ALLSTAR')
+        os.remove(subfile,/allow# delete fits subfile 
+        os.remove(subbase+'.als',/allow# delete als output file 
+        # Sometimes the filenames get too long for daophot/allstar, 
+        # use temporary files and symlinks 
+        tbase = (os.path.basename(MKTEMP('base',/nodot)))[0]# create base, leave so other processes won't take it 
+        tsub = (os.path.basename(MKTEMP('sub',/nodot)))[0]# create sub base, leave so other processes won't take it 
+        tbasefits = tbase+'.fits'       & os.remove(tbasefits,/allow & file_link,base+'.fits',tbasefits 
+        tbasepsf = tbase+'.psf'         & os.remove(tbasepsf,/allow  & file_link,base+'.psf',tbasepsf 
+        tcoofile = (os.path.basename(MKTEMP('coo',/nodot))+'.coo')[0] & os.remove(tcoofile,/allow  & file_link,coofile,tcoofile 
+        tsubals = tsub+'.als'           & os.remove(tsubals,/allow 
+        tsubfits = tsub+'.fits'         & os.remove(tsubals,/allow 
+        # Make Input file 
+        cmd = []
+        alsoptlines = dln.readlines(base+'.als.opt') # make sure we use the right als options 
+        cmd += alsoptlines
+        cmd += [tbasefits] # image file (symlink) 
+        cmd += [tbasepsf]  # psf file (symlink)
+        cmd += [tcoofile]  # coordinate file (symlink) 
+        cmd += [tsubals]   # new als file (temporary file) 
+        cmd += [tsubfits]  # subtracted fits file (temporary file) 
+        cmdfile = MKTEMP('temp') 
+        dln.writelines(cmdfile,cmd)
+        out = subprocess.check_output('allstar < '+cmdfile)
+        # Copy and clean up 
+        FILE_MOVE,tsubals,subbase+'.als',/allow,/over 
+        FILE_MOVE,tsubfits,subbase+'.fits',/allow,/over 
+        os.remove(cmdfile,/allow)
+        os.remove([tbase,tsub,tbasefits,tbasepsf,tcoofile],/allow)
+         
+        # Load ALS file 
+        LOADALS,subbase+'.als',als,alshead 
+        nals = len(als) 
+        logger.info('ALLSTAR found '+str(nals)+' sources')
+         
+        # How many new stars 
+        nnew = nals-nlastals 
+        logger.info(str(nnew,2)+' new stars found' 
+        if nnew < 10 : 
+            flag=1 
+        if nnew < int(np.round(nals*0.01) :# more than 1% of total 
+            flag=1 
+        if count >= maxiter : 
+            flag=1 
+         
+        # Increment counter 
+        count += 1 
+         
+     
+    # Write out the SExtractor catalog 
+    allsex.write(sexfile,overwrite=True)
+     
+    # The X/Y pixel coordinates should already be in the reference image 
+    # coordinate system 
+     
+    # Need to offset the final X/Y pixel coordinates for XOFF/YOFF 
+    logger.info('Applying offsets: Xoff=%.2f Yoff=%.2f' % (xoff,yoff))
+    LOADALS,subbase+'.als',als,alshead 
+    als['x'] += xoff 
+    als['y'] += yoff 
+    WRITEALS,base+'_allf.als',als,alshead 
+    logger.info('Final ALS file = '+base+'_allf.als')
+    if os.path.exists(sexfile):
+        logger.info('Final SExtractor file = '+sexfile)
+     
+
+
 def cleanup(mchbase,files,fpack,mchdir,workdir,tempdir):
     """ Clean up """
     

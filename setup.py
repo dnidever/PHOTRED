@@ -3,7 +3,7 @@
 #from distutils.core import setup
 from setuptools import setup, find_packages
 
-setup(name='PHOTRED',
+setup(name='photred',
       version='1.0.0',
       description='Generic PSF Photometry Pipeline',
       author='David Nidever',
