@@ -583,34 +583,51 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     
     Parameters
     ---------- 
-    file           The MCH filename 
-    tile          Information on the tiling to use for the combined 
-                  image.  If not set then the "original" method is 
-                  used. 
-    finditer      The maximum number of iterations to use when finding 
-                  sources with SExtractor/ALLSTAR.  The default is 1, 
-                  and the maximum allowed it 10. 
-    detectprog    The program to use to detect sources.  Either 
-                  'sextractor' or 'daophot'.  'sextractor' is the 
-                  default.  'daophot' is better for VERY crowded 
-                  regions. 
-    nocmbimscale  Don't scale the images when combining them.  Not 
-                  recommended, but the old way of doing it.  Bright 
-                  stars can be missed this way. 
-    combtrim      Trim the combined images to the overlapping region. 
-                  This used to be the default, but now the default 
-                  is to keep the entire original region. 
-    setupdir      The original base directory which contains photred.setup. 
-    scriptsdir    The directory that contains all of the necessary scripts. 
-    irafdir       The IRAF home directory. 
-    logfile       A logfile to print to output to. 
-    usecmn        Use the common sources file of the reference image. 
-    fake          Run for artificial star tests. 
-    catformat     Catalog format to use: FITS or ASCII.  Default is ASCII. 
-    imager        Imager structure with basic information. 
-    workdir       Use a temporary working directory with this as the base. 
-    geocoef       The number of geometric coefficients to allow for 
-                   fitting in ALLFRAME. 
+    infile : str
+       The MCH filename 
+    tile : struct, optional
+       Information on the tiling to use for the combined 
+         image.  If not set then the "original" method is 
+         used. 
+    finditer : int, optional
+       The maximum number of iterations to use when finding 
+         sources with SExtractor/ALLSTAR.  The default is 1, 
+         and the maximum allowed it 10. 
+    detectprog : str, optional
+       The program to use to detect sources.  Either 
+         'sextractor' or 'daophot'.  'sextractor' is the 
+         default.  'daophot' is better for VERY crowded 
+         regions.  Default is 'sextractor'.
+    nocmbimscale : boolean, optional
+       Don't scale the images when combining them.  Not 
+         recommended, but the old way of doing it.  Bright 
+        stars can be missed this way. 
+    combtrim : boolean, optional
+       Trim the combined images to the overlapping region. 
+         This used to be the default, but now the default 
+         is to keep the entire original region. 
+    setupdir : str, optional
+       The original base directory which contains photred.setup. 
+    scriptsdir : str, optional
+       The directory that contains all of the necessary scripts. 
+    irafdir : str, optional
+       The IRAF home directory. 
+    logfile : str, optional
+        A logfile to print to output to. 
+    usecmn : boolean, optional
+        Use the common sources file of the reference image. 
+    fake : boolean, optional
+        Run for artificial star tests. 
+    catformat : str, optional
+        Catalog format to use: FITS or ASCII.  Default is ASCII.
+    imager : struct
+        Imager structure with basic information. 
+    workdir : str, optional
+        Use a temporary working directory with this as the base. 
+    geocoef : int, optional
+        The number of geometric coefficients to allow for 
+          fitting in ALLFRAME. 
+
     Returns
     -------
     The final allframe output file name is filebase+'.mag' 
