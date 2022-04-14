@@ -13,6 +13,7 @@
 # Make sure that all of the stages actually exist and work
 
 # Stages Loop
+stagelist = []
 for stagename in stagelist:
 
     # Instantiate the stage object
@@ -27,7 +28,7 @@ for stagename in stagelist:
 
 # The photred jobs daemon
 def jobdaemon(lists):
-
+    pass
     # Initialize the stage object
     
     # Initalize jobs structure
@@ -48,15 +49,18 @@ def jobdaemon(lists):
     
 # Create a script for the jobs daemon
 def job_makescript():
-    
+    pass
 # This checks the status of the jobs
 def job_checkstat(jobs):
 
     # Loop through the jobs
     for i in jobs:
-    
+        pass
+        
 # This reports the current status
 def job_reportstatus(jobs):
+    pass
 
 # This submits new jobs
-def job_submitnew
+def job_submitnew():
+    pass

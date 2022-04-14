@@ -753,3 +753,345 @@ def getpixscale(filename,head=None):
         print(error)
 
     return scale
+
+def loadals(filename,silent=False):
+    """
+    This loads the ALLSTAR photometry file (.als).
+ 
+    Parameters
+    ----------
+    filename : str
+       The name of the ALS file.
+    silent : boolean, optional
+       Don't print anything to the screen.  Default is False.
+ 
+    Returns
+    -------
+    phot : astropy table
+       A table with the ALS data.
+    head : list
+       A string list with the ALS header.
+ 
+    Example
+    -------
+    
+    phot,head = loadals('obj2153_1.als')
+ 
+    By D. Nidever   January 2007 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    if os.path.exists(filename)==False:
+        raise ValueError(filename+' NOT FOUND')
+     
+    nlines = dln.numlines(filename) 
+    if nlines < 4:
+        if silent==False:
+            print('No sources in '+filename)
+        return None,None
+     
+    # Is this an ALS or PHOT file
+    with open(filename,'r') as f:
+        line1 = f.readline().replace("\n","")
+        line2 = f.readline().replace("\n","")
+        line3 = f.readline().replace("\n","")
+        line4 = f.readline().replace("\n","")        
+     
+    # This is an ALS file
+    arr1 = line1.split()
+    if arr1[0] == 'NL' and line3.strip() == '':
+        numstars = dln.numlines(filename)-3        
+        dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),('sky',float),
+              ('niter',int),('chi',float),('sharp',float)]
+        phot = np.zeros(numstars,dtype=np.dtype(dt))
+
+        fieldwidths = tuple([7,9,9,9,9,9,9,9,9])
+        fieldtypes = tuple(['d','f','f','f','f','f','f','f','f'])
+        parser = make_parser(fieldwidths,fieldtypes)
+
+        f = open(filename,'r')
+        line1 = f.readline().replace("\n","")
+        line2 = f.readline().replace("\n","")
+        line3 = f.readline().replace("\n","")
+        head = [line1,line2] 
+        
+        # Loop through the stars 
+        for i in np.arange(numstars):
+            line = f.readline().replace("\n","")
+            out = parser(line)
+            phot[i] = out
+        f.close()
+        phot = Table(phot)  # convert to astropy table
+
+    # This is a PHOT file 
+    else: 
+        raise ValueError('This is NOT an ALLSTAR output file')
+
+    return phot,head
+     
+
+def loadcoo(filename,silent=False):
+    """
+    This loads the DAOPHOT coordinates file (.coo).
+
+    Parameters
+    ----------
+    filename : str
+       The name of the coo file 
+    silent : boolean, optional
+       Don't print anything to the screen.  Default is False.
+ 
+    Returns
+    -------
+    phot : astropy table
+       A table with the coo data.
+    head : list
+       A string list with the coo header.
+ 
+    Example
+    -------
+    
+    phot,head = loadcoo('obj2153_1.coo')
+ 
+    By D. Nidever   January 2007 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    if os.path.exists(filename)==False:
+        raise ValueError(filename+' NOT FOUND')
+     
+    nlines = dln.numlines(filename) 
+    if nlines < 4:
+        if silent==False:
+            print('No sources in '+filename)
+        return None,None
+     
+    # Is this an DAOPHOT file
+    with open(filename,'r') as f:
+        line1 = f.readline().replace("\n","")
+        line2 = f.readline().replace("\n","")
+        line3 = f.readline().replace("\n","")
+        line4 = f.readline().replace("\n","")        
+     
+    # This is a DAOPHOT file
+    arr1 = line1.split()
+    if arr1[0] == 'NL' and line3.strip() == '':
+        numstars = dln.numlines(filename)-3        
+        dt = [('id',int),('x',float),('y',float),('mag',float),('sharp',float),('round',float),('round2',float)]
+        tab = np.zeros(numstars,dtype=np.dtype(dt))
+
+        fieldwidths = tuple([7,9,9,9,9,9,9])
+        fieldtypes = tuple(['d','f','f','f','f','f','f'])
+        parser = make_parser(fieldwidths,fieldtypes)
+
+        f = open(filename,'r')
+        line1 = f.readline().replace("\n","")
+        line2 = f.readline().replace("\n","")
+        line3 = f.readline().replace("\n","")
+        head = [line1,line2] 
+        
+        # Loop through the stars 
+        for i in np.arange(numstars):
+            line = f.readline().replace("\n","")
+            out = parser(line)
+            tab[i] = out
+        f.close()
+        tab = Table(tab)  # convert to astropy table
+
+    # This is not a DAOPHOT file 
+    else: 
+        raise ValueError('This is NOT an DAOPHOT output file')
+
+    return tab,head
+     
+
+def loadaper(filename,silent=False):
+    """
+    This loads the DAOPHOT aperture photometry file (.ap).
+ 
+    Parameters
+    ----------
+    filename : str
+       The name of the aperture photometry file.
+    silent : boolean, optional
+       Don't print anything to the screen.  Default is False.
+ 
+    Returns
+    -------
+    phot : astropy table
+       A table with the aper data.
+    head : list
+       A string list with the aper header.
+ 
+    Example
+    -------
+    
+    phot,head = loadaper('obj2153_1.ap')
+ 
+    By D. Nidever   January 2007 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    if os.path.exists(filename)==False:
+        raise ValueError(filename+' NOT FOUND')
+     
+    nlines = dln.numlines(filename) 
+    if nlines < 4:
+        if silent==False:
+            print('No sources in '+filename)
+        return None,None
+     
+    # Is this an aperture photometry file
+    with open(filename,'r') as f:
+        line1 = f.readline().replace("\n","")
+        line2 = f.readline().replace("\n","")
+        line3 = f.readline().replace("\n","")
+        line4 = f.readline().replace("\n","")
+        line5 = f.readline().replace("\n","")        
+     
+    # This is an ALS file
+    arr1 = line1.split()
+    arr2 = line2.split()    
+    if arr1[0] == 'NL' and arr2[0].strip()[0]=='2' and line3.strip()=='' and line4.strip()=='':
+        
+        # This is what a Daophot aperture photometry file looks like 
+        # NL    NX    NY  LOWBAD HIGHBAD  THRESH     AP1  PH/ADU  RNOISE    FRAD 
+        #  2  2040  2047  1837.1 26000.0  114.56    4.00    2.20    2.86    1.98 
+        # 
+        # 
+        #      1    3.000    1.000   97.999 
+        #      2055.039 41.29  0.00  9.9999 
+        # 
+        #      2  397.000    1.000   97.999 
+        #      2066.848 37.25  0.12  9.9999 
+        # 
+        #  The columns are: ID, X, Y, Mag1, Mag2, etc.. 
+        #                   Sky, St.Dev. of sky, skew of sky, Mag1err, Mag2err, etc. 
+        # 
+        
+        # Figure out the number of columns
+        # First line for the first star
+        ncol = (len(line5)-7)//9 + 1
+        nmag = ncol-3
+         
+        # ID  X  Y  MAG1  ERR1  MAG2  ERR2 ...  CHI SHARP 
+        #nmag = (ncol-5)/2 
+         
+        # Stars in this file
+        #  3 header lines
+        #  3 lines per star except the last one
+        numstar = int((dln.numlines(filename)-3 )/3)
+         
+        # LOADING THE DATA 
+        #------------------              
+        dt = [('id',int),('x',float),('y',float)]
+        for m in np.arange(nmag): dt += [('mag'+str(m+1),float)]
+        dt += [('sky',float),('skysig',float),('skyskew',float)]
+        for m in np.arange(nmag): dt += [('err'+str(m+1),float)]        
+        phot = np.zeros(numstar,dtype=np.dtype(dt))
+            
+        # Reading in the magnitude file
+        f = open(filename,'r')
+        line1 = f.readline().replace("\n", "")
+        line2 = f.readline().replace("\n", "")
+        line3 = f.readline().replace("\n", "")
+        head = [line1,line2] 
+
+        # WRITE (1,111) IDMAST(IMASTR), POSIT1, POSIT2, 
+        # .            ((DATUM(J,I), J=1,2), I=1,NFRM), SUMCHI, SUMSHP 
+        #        111       FORMAT (I7, 2A9, 12F9.4:/ (25X, 12F9.4))
+        #      1   39.000   19.740   99.999   99.999   99.999   99.999   99.999   99.999   99.999   99.999   99.999   99.999   99.999   99.999
+        #      1080.900 17.42  0.00  9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999   9.9999
+        fieldwidths = tuple([7]+(nmag+2)*[9]+[14,6,6]+nmag*[9])
+        fieldtypes = tuple(['d']+(2*nmag+5)*['f'])
+        parser = make_parser(fieldwidths,fieldtypes)
+        
+        # Loop through the stars 
+        for i in np.arange(numstar):
+            line1 = f.readline().replace("\n", "")   # blank
+            line2 = f.readline().replace("\n", "")   # line 1: ID, X, Y, MAGs
+            line3 = f.readline().replace("\n", "")   # line 2: sky, skysig, skyskew, ERRs
+            line = line2 + line3
+            out = parser(line)
+            phot[i] = out
+        f.close()
+
+        # Convert to astropy table
+        phot = Table(phot)
+        
+    # Not a DAOPHOT aperture photometry file
+    else:
+        raise ValueError('This is NOT a DAOPHOT aperture photometry file')
+
+    return phot,head
+
+
+def writeals(outfile,phot,head):
+    """
+    This writes a photometry structure in the ALLSTAR output
+    format.
+
+    Parameters
+    ----------
+    outfile : str
+       The name of the ALS output file
+    phot : astropy table
+       The input photometry structure.  This should have
+         the following data (in the same order):
+          ID, X, Y, MAG, ERR, SKY, NITER, CHI, SHARP
+    head : list
+       The ALS header as list.
+
+    Returns
+    -------
+    The ALS file to "outfile"
+
+    Example
+    -------
+
+    writeals('temp.als',phot,head)
+
+    By D.Nidever  September 2007
+    Translated to Python by D. Nidever,  April 2022
+    """
+
+    if type(outfile) is not str:
+        raise ValueError('outfile must be a string')
+    if type(head) is not list:
+        raise ValueError('head must be a list')
+    if np.array(head).size != 2:
+        raise valueError('head must be a 2-element list')
+
+    # Opening the output file
+    if os.path.exists(outfile): os.remove(outfile)
+    f = open(outfile,'w')
+
+    # Print header
+    f.write(head[0]+'\n')
+    f.write(head[1]+'\n')
+    f.write(' \n')
+
+    # NL    NX    NY  LOWBAD HIGHBAD  THRESH     AP1  PH/ADU  RNOISE    FRAD
+    #  1  2046  4094   114.2 38652.0   11.70    3.00    3.91    1.55    7.02
+    # 
+    #     10 1476.102   34.512   16.313   0.0318  161.060       4.    0.954   -0.244
+    #     24  461.950   55.882   15.043   0.0127  160.980       4.    1.048   -0.372
+    
+    # Setting up the command
+    # From allstar.f
+    #            STRNG1 = RNDOFF(XC(I), 9, 3)
+    #            STRNG2 = RNDOFF(YC(I), 9, 3)
+    #            STRNG3 = RNDOFF(SKY(I), 9, 3)
+    #            WRITE (1,321) ID(I), STRNG1, STRNG2, MAG(I), ERR, STRNG3,
+    #     .           FLOAT(NITER), CHI(I), SHARP
+    #  321       FORMAT (I7, 2A9, F9.3, F9.4, A9, F9.0, 2F9.3)
+    numstars = len(phot)
+    
+    fmt = '%7d%9.3f%9.3f%9.3f%9.4f%9.3f%9s%9.3f%9.3f\n'
+    for i in range(numstars):
+        data = (phot['id'][i],phot['x'][i],phot['y'][i],phot['mag'][i],phot['err'][i],phot['sky'][i],
+                str(phot['niter'][i])+'.',phot['chi'][i],phot['sharp'][i])
+        f.write(fmt % data)
+
+    # Closing the file
+    f.close()
