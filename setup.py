@@ -10,6 +10,7 @@ setup(name='photred',
       author_email='dnidever@montana.edu',
       url='https://github.com/dnidever/PHOTRED',
       packages=['photred'],
+      package_dir={'':'python'},
       #scripts=['bin/photred'],
       install_requires=['numpy','astropy(>=4.0)','scipy','dlnpyutils(>=1.0.3)']
       #include_package_data=True,
