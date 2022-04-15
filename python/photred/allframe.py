@@ -14,7 +14,7 @@ from glob import glob
 from astropy.io import fits,ascii
 from astropy.table import Table
 from dlnpyutils import utils as dln
-from . import utils
+from . import utils,io
 
 
 def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
@@ -360,8 +360,8 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
              
             #------------------------------------- 
             # Load DAOPHOT FIND and PHOT output files
-            utils.loadcoo(subbase+'.temp.coo',coo,coohead)
-            utils.loadaper(subbase+'.temp.ap',aper,aperhead)
+            io.loadcoo(subbase+'.temp.coo',coo,coohead)
+            io.loadaper(subbase+'.temp.ap',aper,aperhead)
             for f in [subbase+'.temp.coo',subbase+'.temp.ap']:
                 if os.path.exists(f): os.remove(f)
             ncoo = len(coo) 
@@ -484,7 +484,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             if os.path.exists(f): os.remove(f)
          
         # Load ALS file
-        als,alshead = utils.loadals(subbase+'.als')
+        als,alshead = io.loadals(subbase+'.als')
         nals = len(als) 
         logger.info('ALLSTAR found '+str(nals)+' sources')
          
@@ -510,7 +510,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
      
     # Need to offset the final X/Y pixel coordinates for XOFF/YOFF 
     logger.info('Applying offsets: Xoff=%.2f Yoff=%.2f' % (xoff,yoff))
-    als,alshead = utils.loadals(subbase+'.als')
+    als,alshead = io.loadals(subbase+'.als')
     als['x'] += xoff 
     als['y'] += yoff
     utils.writeals(base+'_allf.als',als,alshead)
@@ -669,7 +669,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     
     # Get the setup information
     if setup is None:
-        setup = loadsetup(setupdir)
+        setup = io.loadsetup(setupdir)
         if setup is None:
             raise ValueError('No setup file found')
          
@@ -761,7 +761,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     # CHECK NECESSARY FILES 
      
     # Load the MCH file
-    files,trans = loadmch(mchfile)
+    files,trans = io.readfile(mchfile)
      
     # Check that the fits, als, opt, and psf files exist 
     nfiles = len(files) 
@@ -1080,7 +1080,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
             nsex = len(sex)
              
             # Load the MAKEMAG file 
-            mag,alfhead = loadmakemag(mchbase+'.makemag')
+            mag,alfhead = io.loadraw(mchbase+'.makemag')
             nmag = len(mag) 
              
             # Match them with IDs
@@ -1133,7 +1133,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
             if catformat == 'FITS' and n_tags(mag) > 999 : 
                 logger.info('Cannot use FITS output because number of columns>999.  Using ASCII instead')
             if (catformat == 'FITS') and (n_tags(mag) < 1000):
-                mag,alfhead = loadmakemag(mchbase+'.makemag')
+                mag,alfhead = io.loadraw(mchbase+'.makemag')
                 if os.path.exists(finalfile+'.fits'): os.remove(finalfile+'.fits')
                 mag.writeto(finalfile+'.fits',overwrite=True)
                 if os.path.exists(finalfile): os.remove(finalfile)
