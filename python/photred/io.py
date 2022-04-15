@@ -1364,8 +1364,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
             rmeta = []
             if os.path.exists(rfile): 
                 # Load the resource file
-                rlines = dln.readlines(rfile)
-                rlines = [l for l in rlines if l.strip()!='' and l[0]!='#']
+                rlines = dln.readlines(rfile,comment='#',noblank=True)
                 arr = [l.split('=') for l in rlines]
                 names = [a[0] for a in arr]
                 vals = [a[1] for a in arr]
@@ -1403,8 +1402,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
             dln.touchzero(filename+'.lock')
          
         # Load the resource file
-        rlines = dln.readlines(rfile)
-        rlines = [l for l in rlines if l.strip()!='' and l[0]!='#']
+        rlines = dln.readlines(rfile,comment='#',noblank=True)
         arr = [l.split('=') for l in rlines]
         names = [a[0] for a in arr]
         vals = [a[1] for a in arr]
