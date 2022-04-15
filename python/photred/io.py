@@ -1611,3 +1611,259 @@ def fits_read_resource(filename,header=False,nowrite=False):
             return meta 
          
         return im 
+
+
+
+ 
+def photred_readfile(filename,exten=None,header=False,nowrite=False):
+    """
+    Generic file reading program for PHOTRED 
+ 
+    Parameters
+    ----------
+    filename : str
+       The name of the file to read from.  The extension 
+         and type of the file is used to figure out how 
+         to read it. 
+    exten : int, optional
+       The extension to read 
+    header : boolean, optional
+       Only return the header/metadata. 
+    nowrite : boolean, optional
+       Don't write the file if using the resource file. 
+ 
+    Returns
+    -------
+    results : numpy array or table
+       The primary data in the file 
+    meta : header or dict
+       Meta-data in the 1st extension if it exists. 
+
+    Example
+    -------
+
+    cat = photred_readfile('F4-20440011_09.als',meta) 
+ 
+    By D. Nidever, Jan 2019 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    # Check that file exists 
+    if os.path.exists(filename)==False:
+        raise ValueError(filename+' NOT FOUND')
+
+    meta = None
+     
+    # Is this a FITS file 
+    isfits = utils.file_isfits(filename) 
+     
+    # Break down the file into its components
+    exists = os.path.exists(filename)
+    fdir = os.path.dirname(filename) 
+    base = os.path.basename(filename)
+    ext = os.path.splitext(base)[-1]
+    if isfits and ext=='gz': # gzipped FITS file 
+        ext = 'fits' 
+    if isfits and ext=='fz': # fpacked FITS file 
+        ext = 'fits' 
+    if isfits: # fits file with different extension 
+        ext = 'fits' 
+     
+    # Go through the various options
+    if ext=='opt':
+        opt = readopt(filename)
+    elif ext=='coo':
+        return loadcoo(filename)
+    elif ext=='ap':
+        return loadaper(filename)
+    elif ext=='mch':
+        return loadmch(filename)
+    elif ext=='raw':
+        return loadraw(filename)
+    elif ext=='tfr':
+        return loadtfr(filename)
+    elif ext=='als' or ext=='alf':
+        return loadals(filename)
+    elif ext=='mag':
+        if isfits: 
+            if header:  # only read header
+                return fits.getheader(filename)
+            phot = Table.read(filename)
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu >= 2 : 
+                meta = fits.getdata(filename,2)
+            return phot,meta
+        else:
+            if header: #only read header
+                return dln.readlines(filename,nreadline=1)
+            phot = loadmag(filename)
+            return phot,meta
+    elif ext=='ast':
+        if isfits:
+            hdu = fitsopen(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu >= 2 : 
+                meta = fits.getdata(filename,2)
+            if header:  # only read header 
+                if meta is None:
+                    meta = fits.getheader(filename)
+                return meta
+            phot = Table.read(filename)
+            return phot,meta
+        else: 
+            if header:  # only read header
+                meta = dln.readlines(filename,nreadline=1)
+                return meta
+            phot = Table.read(filename)
+            return phot,meta
+    elif ext=='trans':
+        return read_trans(filename)
+    elif ext=='phot':
+        if isfits:
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu>=2:
+                meta = fits.getdata(filename,2)
+            if header:  # only read header 
+                if meta is None:
+                    meta = HEADFITS(filename) 
+                return meta 
+            phot = Table.read(filename)
+            return phot,meta
+        else: 
+            if header: # only read header
+                return dln.readlines(filename,nreadline=1)
+            # Get the fieldnames and fieldtypes 
+            # We need ID to be STRING not LONG
+            import pdb; pdb.set()
+            tempfile = MKTEMP('temp',outdir='/tmp')
+            lines = dln.readlines(filename,nreadline=40)
+            dln.writelines(tempfile,lines)
+            temp = Table.read(tempfile)
+            if os.path.exists(tempfile): os.remove(tempfile)
+            fieldnames = temp.colnames
+            nfieldnames = len(fieldnames) 
+            #fieldtypes = lonarr(nfieldnames) 
+            #for k in range(nfieldnames): 
+            #    fieldtypes[k] = SIZE(temp[0].(k),type) 
+            #    idind, = np.where(fieldnames == 'ID') 
+            #    fieldtypes[idind[0]] = 7 
+            #phot = IMPORTASCII(filename,fieldnames=fieldnames,fieldtypes=fieldtypes,skip=1,/noprint) 
+            return phot,meta
+                
+    elif ext=='cmb':
+        if isfits:
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu>=2:
+                meta = fits.getdata(filename,2)
+                if header:  # only read header 
+                    if meta is None:
+                        meta = fits.getheader(filename) 
+                    return meta 
+                phot = Table.read(fileame)
+                return phot,meta
+        else: 
+            if os.path.exists(filename+'.meta'):
+                meta = Table.read(filename+'.meta')
+            if header:  # only read header
+                if meta is None:
+                    meta = dln.readlines(filename,nreadline=1)
+                return meta 
+            phot = Table.read(filename)
+            return phot,meta
+                    
+    elif ext=='dered':
+        if isfits:
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu>=2:
+                meta = fits.getdata(filename,2)
+            if header:  # only read header 
+                if meta is None:
+                    meta = fits.getheader(filename) 
+                return meta 
+            phot = Table.read(filename)
+            return phot,meta
+        else: 
+            if os.path.exists(filename+'.meta'): 
+                meta = Table.read(filename+'.meta')
+            if header:  # only read header 
+                if meta is None:
+                    meta = dln.readlines(filename,nreadline=1)
+                return meta 
+            phot = Table.read(filename)
+            return phot,meta
+ 
+    elif ext=='final':
+        if isfits:
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hdu.close()
+            if nhdu >= 2 : 
+                meta = fits.getdata(filename,2)
+            if header: # only read header 
+                if meta is None:
+                    meta = fits.getheader(filename) 
+                return meta 
+            phot = Table.read(filename,1)
+            return phot,meta
+        else: 
+            if os.path.exists(filename+'.meta'): 
+                meta = Table.read(filename+'.meta')
+            if header:  # only read header 
+                if meta is None:
+                    meta = dln.readlines(filename,nreadline=1)
+                return meta 
+            phot = Table.read(filename)
+            return phot,meta
+ 
+    elif ext=='fits':
+        # Load using resource file 
+        rfilename = fdir+'/.'+base
+        if os.path.exists(rfilename):
+            return fits_read_resource(filename,header=header,nowrite=nowrite) 
+        # Regular FITS file 
+        if exten is not None:
+            if header: 
+                return fits.getheader(filename,exten) 
+            return fits.getdata(filename,exten,header=True)
+        else: 
+            # Figure out whether to read HDU0 or HDU1
+            hdu = fits.open(filename)
+            nhdu = len(hdu)
+            hd0 = hdu[0].header
+            data0 = hdu[0].data
+            if nhdu >= 1:
+                hd1 = hdu[1].header
+                data1 = hdu[1].data
+            hdu.close()
+            # Only HDU0 exists
+            if nhdu==1:
+                if header:
+                    return hd0
+                return data0,hd0
+            # Both exist, HDU0 has no data but HDU1 does
+            if hd0['NAXIS']==0 and hd1['NAXIS']>0:
+                if header: 
+                    return hd1
+                return data1,hd1
+            # Both exist, both HDU0 and HDU1 have data (meta-data in HDU1)
+            if hd0['NAXIS']>0 and hd1['NAXIS']>0:
+                meta = data1
+                # HDU1 data is NOT meta-data, use header0
+                if meta.dtype != np.str:
+                    meta = hd0 
+                if header: 
+                    return meta
+                result = data0
+                return result,meta
+                
+    else:
+        raise ValueError('Extension '+ext+' not supported')
