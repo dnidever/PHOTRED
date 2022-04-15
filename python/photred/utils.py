@@ -166,3 +166,42 @@ def pixscale(filename,head=None):
         print(error)
 
     return scale
+
+
+def file_wait(filename,wait=5,timeout=600,silent=False):
+    """
+    Wait until a file exists. 
+ 
+    Parameters
+    ----------
+    filename : str
+       Filename to check. 
+    wait : int, optional
+       Wait time between checks.  Default is 5 sec. 
+    timeout : int, optional
+       Stop trying and throw an error after this time.  Default 
+         is 600 sec. 
+    silent : boolean, optional
+       Don't print anything to the screen 
+ 
+    Returns
+    -------
+    None 
+ 
+    Example
+    -------
+
+    file_wait('file.txt')
+ 
+    By D. Nidever  April 2020 
+    Translated to Python by D. Nidever,  April 2022
+    """
+
+    # While loop 
+    t0 = time.time() 
+    while (os.path.exists(filename) == False):
+        if silent==False:
+            print(filename+' NOT FOUND.  Waiting '+str(wait)+' sec.')
+        time.sleep(wait)
+        if time.time()-t0 > timeout: 
+            raise ValueError('Timeout ('+str(timeout)+' sec) reached on '+filename)

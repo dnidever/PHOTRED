@@ -18,6 +18,7 @@ import struct
 from itertools import zip_longest
 from itertools import accumulate
 from io import StringIO
+from . import utils
 
 def make_parser(fieldwidths,fieldtypes=None):
     # https://stackoverflow.com/questions/4914008/how-to-efficiently-parse-fixed-width-files
@@ -947,3 +948,666 @@ def writeals(outfile,phot,head):
 
     # Closing the file
     f.close()
+
+ 
+def loadtfr(tfrfile):
+    """
+    This loads a DAOMATCH/DAOMASTER tfr file. 
+ 
+    Parameters
+    ----------
+    tfrfile : str
+       The TFR filename 
+ 
+    Returns
+    -------
+    files : list
+      The list of files in the TFR file 
+    tab : astropy table
+       The structure with final ID, X, Y and 
+         the index array.  The indices are 
+           FORTRAN/IRAF 1-index based. 
+ 
+    Example
+    -------
+
+    files,tab = loadtfr('ccd1001.tr')
+ 
+    By D.Nidever   August 2016 
+    Translated to Python by D. Nidever,  April @022
+    """
+     
+    # Test the file 
+    if os.path.exists(tfrfile)==False:
+        raise ValueError(tfrfile+' NOT FOUND')
+     
+    # A TFR file looks like this: 
+    # F1-00423034_01.als              99.9999   9.9999 
+    # F1-00423033_01.als              99.9999   9.9999 
+    # F1-00423035_01.als              99.9999   9.9999 
+    # F1-00423036_01.als              99.9999   9.9999 
+    # F1-00423037_01.als              99.9999   9.9999 
+    # F1-00423038_01.als              99.9999   9.9999 
+    # F1-00423039_01.als              99.9999   9.9999 
+    # F1-00423040_01.als              99.9999   9.9999 
+    # F1-00423041_01.als              99.9999   9.9999 
+    # F1-00423042_01.als              99.9999   9.9999 
+    # F1-00423043_01.als              99.9999   9.9999 
+    # F1-00423044_01.als              99.9999   9.9999 
+    # F1-00423045_01.als              99.9999   9.9999 
+    # F1-00423046_01.als              99.9999   9.9999 
+    # F1-00423047_01.als              99.9999   9.9999 
+    # F1-00423048_01.als              99.9999   9.9999 
+    # ============================== 
+    #      1 -1037.98 2452.949      0      0      0      0      0      0    340      0      0      0      0      0      0      0      0      0 
+    #      2 -1037.67 3505.380      0      0      0      0      0      0   1222      0      0      0      0      0      0      0      0      0 
+    #      3 -1036.54 3174.594      0      0      0      0      0      0    448      0      0      0      0      0      0      0      0      0 
+    #      4 -1035.85 4321.116      0      0      0      0      0      0   1263      0      0      0      0      0      0      0      0      0 
+    #      5 -1035.28 5458.115      0      0      0      0      0      0    729      0      0      0      0      0      0      0      0      0 
+    #      6 -1033.22 2134.540      0      0      0      0      0      0    838      0      0      0      0      0      0      0      0      0 
+    #      7 -1032.40 3823.881      0      0      0      0      0      0   1126      0      0      0      0      0      0      0      0      0 
+    #      8 -1031.18 5946.214      0      0      0      0      0      0   1075      0      0      0      0      0      0      0      0      0 
+    #      9 -1030.97 5823.931      0      0      0      0      0      0      0      0   1773      0      0      0      0      0      0      0 
+    #     10 -1030.16 5403.574      0      0      0      0      0      0    725      0   2157      0      0      0      0      0      0      0 
+    #     11 -1029.83 4989.178      0      0      0      0      0      0      0      0   2110      0      0      0      0      0      0      0 
+    #     12 -1029.31 5322.905      0      0      0      0      0      0      0      0    700      0      0      0      0      0      0      0 
+    #     13 -1029.17 3798.451      0      0      0      0      0      0      0      0    377      0      0      0      0      0      0      0 
+     
+    # Read in the information
+    tfrlines = dln.readlines(tfrfile)
+     
+    # Find the break in in the list 
+    brkind = dln.grep(tfrlines,'====',index=True)
+    if len(brkind) == 0:
+        raise ValueError('ERROR. No ===== break line')
+     
+    # Filenames
+    filelines = tfrlines[0:brkind[0]]
+    files = [l.split()[0] for l in filelines]
+    nfiles = len(files) 
+     
+    # Transformation info 
+    tlines = tfrlines[brkind[0]+1:] 
+    ntlines = len(tlines)
+    #fieldwidths = tuple([7,9,9]+(2*nmag+2)*[9])
+    #fieldtypes = tuple(['d','f','f']+(2*nmag+2)*['f'])
+    #parser = make_parser(fieldwidths,fieldtypes)
+    dum = tlines[0].split()
+    ncol = len(dum)
+    allid = np.zeros(ntlines,int)
+    allx = np.zeros(ntlines,float)
+    ally = np.zeros(ntlines,float)
+    index = np.zeros((ncol-3,ntlines),int)
+    nindexcol = index.shape[0]
+    for i,l in enumerate(tlines):
+        arr = l.split()
+        allid[i] = arr[0]
+        allx[i] = arr[1]
+        ally[i] = arr[2]
+        index[:,i] = arr[3:]
+     
+    # Get unique star IDs and X/Y values
+    dum,ui = np.unique(allid,return_index=True)
+    ui = np.sort(ui)
+    uid = allid[ui]
+    ux = allx[ui] 
+    uy = ally[ui] 
+    nstars = len(uid) 
+    # Create structure and stuff in ID, X, Y 
+    dt = [('id',int),('x',float),('y',float),('index',int,nfiles)]
+    tab = np.zeros(nstars,dtype=np.dtype(dt))
+    tab['id'] = uid 
+    tab['x'] = ux 
+    tab['y'] = uy 
+     
+    # Load the INDEX information 
+    nlinesperstar = ntlines // nstars 
+    
+    # Load the index information 
+    uindex = np.zeros((nfiles,nstars),int)
+    for i in range(nstars):
+        # Pull out the Nlinesperstar from INDEX for this star
+        index1 = index[:,i*nlinesperstar:(i+1)*nlinesperstar]
+        # Reformat from 2D to 1D
+        index2 = index1.reshape(nlinesperstar*nindexcol)
+        # Take only the lines we need 
+        #   there might be extra blank elements
+        uindex[:,i] = index2[0:nfiles].astype(int)
+    tab['index'] = uindex.T
+
+    return files,tab
+
+
+def daophot_imprep(fluxfile,maskfile,header=False):
+    """
+    Use the CP Instcal flux and mask files to prepare 
+    an image for DAOPHOT 
+ 
+    Parameters
+    ----------
+    fluxfile : str 
+      The filename for the CP Instcal flux file. 
+    maskfile : str
+       The filename for the CP Instcal mask file. 
+    header : boolean, optional
+       Return the header only. 
+ 
+    Returns
+    -------
+    im : numpy array
+      The DAOPHOT-prepared image array 
+    meta : header
+      The header/metadata for IM. 
+ 
+    Example
+    -------
+    
+    im,meta = daophot_imprep(fluxfile,maskfile)
+ 
+    By D. Nidever  Feb 2019 
+    Translated to Python by D. Nidever,  April 2022
+    """
+ 
+    # Create the DAOPHOT file 
+    #   taken from smashred_imprep_single.pro 
+    if header==False:
+        fhdu,fhead = fits.getdata(fluxfile,header=True)
+        mim,mhead = fits.getdata(maskfile,header=True)
+    else:
+        fhead = fits.getheader(fluxfile)
+    ccdnum = fhead['CCDNUM']
+
+    import pdb; pdb.set_trace()
+    
+    # --- Prepare the header --- 
+         
+    # add gain, rdnoise, saturation 
+    meta = fhead.copy()
+    if dln.grep(meta,'XTENS'):
+        pass
+    if strmid(meta[0],0,5) == 'XTENS' : 
+        meta[0]='SIMPLE  =                    T / file:es conform to FITS standard             ' 
+         
+    #gain = (arr[ccd-1].gaina+arr[ccd-1].gainb)*0.5 
+    #rdnoise = (arr[ccd-1].rdnoisea+arr[ccd-1].rdnoiseb)*0.5 
+    #gain = sxpar(fhead,'ARAWGAIN')
+    gainA = fhead['GAINA']
+    gainB = fhead['GAINB']
+    gain = (gainA+gainB)*0.5
+    rdnoiseA = fhead['RDNOISEA']
+    rdnoiseB = fhead['RDNOISEB']
+    rdnoise = (rdnoiseA+rdnoiseB)*0.5
+    meta['gain'] = gain
+    meta['rdnoise'] = rdnoise
+         
+    # REMOVE DUPLICATE KEYWORDS!!  They cause lots of annoying errors 
+    # EXTVER, CHECKSUM, DATASUM
+    bd, = np.where(strmid(meta,0,6) == 'EXTVER',nbd) 
+    if nbd > 1 : 
+        remove,bd[1::],meta 
+    bd, = np.where(strmid(meta,0,8) == 'CHECKSUM',nbd) 
+    if nbd > 1 : 
+        remove,bd[1::],meta 
+    bd, = np.where(strmid(meta,0,7) == 'DATASUM',nbd) 
+    if nbd > 1: 
+        remove,bd[1::],meta 
+         
+    # Add "COMMENT " before "BEGIN EXTENSION HEADER ---", it causes problems in daophot
+    bd = dln.grep(meta,'BEGIN',index=True)
+    if len(bd) > 0 : 
+        meta[bd]='COMMENT '+meta[bd] 
+         
+    if header:
+        return header 
+         
+    # --- Prepare the image --- 
+         
+    med1 = np.median(fim,axis=1) 
+    med1slp = np.diff(med1) 
+         
+    im = np.zopy(fim)
+         
+    # DAOPHOT cannot handle DOUBLE arrays (BITPIX=-64)
+    if meta['bitpix'] == -64:
+        meta['bitpix'] = -342
+        im = im.astype(np.float32)
+         
+    # Check for differences in amp background levels 
+    med1 = np.median(im[:,800:1023]) 
+    med2 = np.median(im[:,1024:1200]) 
+    err1 = dln.mad(im[:,800:1023])/np.sqrt(len(im[:,800:1023])) 
+    err2 = dln.mad(im[:,1024:1200])/np.sqrt(len(im[:,1024:1200])) 
+    err = np.sqrt(err1**2 + err2**2) 
+         
+    # Set bad pixels to saturation value 
+    # --DESDM bit masks (from Gruendl): 
+    # BADPIX_BPM 1          /* set in bpm (hot/dead pixel/column)        */ 
+    # BADPIX_SATURATE 2     /* saturated pixel                           */ 
+    # BADPIX_INTERP 4 
+    #     /* interpolated pixel                        */ 
+    # BADPIX_LOW     8      /* too little signal- i.e. poor read         */ 
+    # BADPIX_CRAY   16      /* cosmic ray pixel                          */ 
+    # BADPIX_STAR   32      /* bright star pixel                         */ 
+    # BADPIX_TRAIL  64      /* bleed trail pixel                         */ 
+    # BADPIX_EDGEBLEED 128  /* edge bleed pixel                          */ 
+    # BADPIX_SSXTALK 256    /* pixel potentially effected by xtalk from super-saturated source */ 
+    # BADPIX_EDGE   512     /* pixel flagged to exclude CCD glowing edges */ 
+    # BADPIX_STREAK 1024    /* pixel associated with satellite (airplane/meteor) streak     */ 
+    # BADPIX_FIX    2048    /* a bad pixel that was fixed                */ 
+    # --CP bit masks, Pre-V3.5.0 (PLVER) 
+    # Bit   DQ Type  PROCTYPE 
+    # 1  detector bad pixel          InstCal 
+    # 1  detector bad pixel/no data  Resampled 
+    # 1  No data                     Stacked 
+    # 2  saturated                   InstCal/Resampled 
+    # 4  interpolated                InstCal/Resampled 
+    # 16  single exposure cosmic ray InstCal/Resampled 
+    # 64  bleed trail                InstCal/Resampled 
+    # 128  multi-exposure transient  InstCal/Resampled 
+    # --CP bit masks, V3.5.0 on (after ~10/28/2014), integer masks 
+    #  1 = bad (in static bad pixel mask) 
+    #  2 = no value (for stacks) 
+    #  3 = saturated 
+    #  4 = bleed mask 
+    #  5 = cosmic ray 
+    #  6 = low weight 
+    #  7 = diff detect 
+    # You can't have combinations but the precedence as in the order 
+    # of the list (which is also the order in which the processing 
+    # discovers them).  So a pixel marked as "bad" (1) won't ever be 
+    # flagged as "diff detect" (7) later on in the processing. 
+    # 
+    # "Turn off" the "difference image masking", clear the 8th bit 
+    # 128 for Pre-V3.5.0 images and set 7 values to zero for V3.5.0 or later. 
+    if len(nodiffmaskflag) == 0 :  # set by default 
+        nodiffmaskflag = 1 
+    if nodiffmaskflag:
+        plver = fhead.get('plver')  # DESDM doesn't have this 
+        if plver is not None and plver[0:3] != 'DES': # CP data 
+            # DES, didn't have this flag, so skip
+                 
+            # V3.5.0 and on, Integer masks
+            versnum = np.array(plver[1:].split('.')).astype(int)
+            #versnum = int(strsplit(strmid(plver,1),'.',/extract)) 
+            if versnum[0] > 3 or (versnum[0] == 3 and versnum[1] >= 5): 
+                bdpix, = np.where(mim == 7)
+                if len(bdpix) > 0: 
+                    mim[bdpix] = 0 
+                     
+            # Pre-V3.5.0, Bitmasks 
+            else: 
+                bdpix, = np.where( (mim and 2**7) == 2**7)
+                if len(bdpix) > 0:  # clear 128 
+                    mim[bdpix] -= 128 
+
+         
+    # Add background back in for DES SV data
+    skybrite = meta.get('skybrite')
+    skysigma = meta.get('skybrite')
+    bunit = meta.get('bunit')
+    if bunit is None:
+        bunit = 'adu'
+    else:
+        bunit = bunit.strip()
+    if bunit == 'electrons' and nskybrite > 0: 
+        saturate = meta.get('saturate')
+        if saturate is None:
+            saturate = 65000.0 
+        gdpix, = np.where((mim == 0) & (im < saturate))
+        medim = np.median(im[gdpix]) 
+        if medim < 100: 
+            # Add sky background back in so DAOPHOT can create a proper 
+            # noise model 
+            # SKYBRITE is given in electrons as well 
+            if skybrite != 0: 
+                im[gdpix] += skybrite 
+            else: 
+                # Sometimes SKYBRITE=0, in that case use SKYSIGMA^2 
+                #  measure sigma ourselves if SKYSIGMA is not given 
+                if nskysigma > 0 and skysigma > 0: 
+                    im[gdpix] += skysigma**2 
+                else: 
+                    im[gdpix] += dln.mad(im[gdpix])**2 
+         
+    # Mask bad half of DECam chip 31
+    dateobs = meta.get('DATE-OBS')
+    if dateobs is not None:  # assume bad if no date 
+        mjd = utils.date2jd(dateobs,mjd=True) 
+    else: 
+        mjd = 58000
+    if meta.get('INSTRUME')=='DECam' and meta.get('CCDNUM')==31 and mjd>56660:
+        print('Masking bad half of DECam chip 31')
+        # X: 1-1000 okay 
+        # X: 1000-2049 bad 
+        fim[:,1000:] = 1e6 
+         
+    # Set saturated pixels to 65000.0 
+    if bunit != 'electrons':
+        saturate = meta.get('saturate')
+        if saturate is not None:   # set it slightly lower than 65000 for DAOPHOT 
+            saturate <= 64500.0 
+        else: 
+            saturate = 64500.0
+        meta['saturate'] = naturate
+        bdpix, = np.where((mim > 0.0) | (fim > 65000.0))
+        if len(bdpix) > 0: 
+            im[bdpix] = 65000.0 
+    # Allow saturation value to be larger for DES SV data in electrons 
+    else: 
+        saturate = meta.get('saturate')
+        if saturate is None:
+            saturate = 64500.0   # set it slightly lower than 65000 for DAOPHOT 
+            bdpix , = np.where((mim > 0.0) | (fim > 65000.0))
+            if len(bdpix) > 0: 
+                im[bdpix] = 65000.0
+            meta['saturate'] = saturate
+        else: 
+            bdpix, = np.where((mim > 0.0) | (fim > saturate))
+            if len(bdpix) > 0 :# set slightly higher for DAOPHOT 
+                im[bdpix] = saturate*1.01 
+            meta['saturate'] = saturate 
+         
+    return im,meta
+
+
+ 
+def fits_read_resource(filename,header=False,nowrite=False):
+    """
+    Read a FITS file by using the resource file. 
+ 
+    Parameters
+    ----------
+    filename : str
+      The FITS filename to read.  This is the actual file, not 
+        the resource file. 
+    header : boolean, optional
+      Return the header only.  The header will be returned 
+        as the output of the function. 
+    nowrite : boolean, optional
+      Only return the data and don't write the file to the disk. 
+ 
+    Returns
+    -------
+    im : numpy array
+      The 2D FITS image. 
+    meta : header
+      The header array for IM. 
+ 
+    Example
+    -------
+
+    im,meta = fits_read_resource(file,header=header,nowrite=nowrite) 
+ 
+    By D. Nidever  Feb 2019 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    t0 = time.time() 
+     
+    fdir = os.path.dirname(filename) 
+    base = os.path.basename(filename) 
+    rfile = fdir+'/.'+base 
+     
+    # Check if there's a lock file
+    lockexists = os.path.exists(filename+'.lock')
+    if os.path.exists(filename+'.lock') and (t0-os.path.getmtime(filename+'.lock'))<100:
+        print('Lock file.  Waiting')
+        while (os.path.exists(filename+'.lock') and time.time()-t0 <100.): time.sleep(5)
+         
+         
+        # If the file exists and is not empty then just use it's data 
+        #  Might need to use resource header though 
+        #============================================================ 
+        if os.path.exists(filename) and os.size(filename)>1:
+            # Check if there's a resouce header we should use 
+            # It has a resource file
+            rmeta = []
+            if os.path.exists(rfile): 
+                # Load the resource file
+                rlines = dln.readlines(rfile)
+                rlines = [l for l in rlines if l.strip()!='' and l[0]!='#']
+                arr = [l.split('=') for l in rlines]
+                names = [a[0] for a in arr]
+                vals = [a[1] for a in arr]
+                rstr = dict(zip(names,vals))
+                # There is a resource header 
+                if 'header' in rstr.keys():
+                    if rstr['header'][0] == '/': 
+                        hfile = rstr['header']
+                    else: 
+                        hfile = fdir+'/'+rstr['header']
+                    if os.path.exists(hfile)==False:
+                        raise ValueError('Local header file '+hfile+' NOT FOUND')
+                    else: 
+                        rmeta = dln.readlines(hfile)
+            # Load the regular FITS file header
+            meta = fits.getheader(filename)
+             
+            # Decide which header to use 
+            if len(rmeta) > 0: 
+                #print,'Using resource header ',hfile 
+                meta = rmeta 
+             
+            # Only return the header
+            if header:
+                return meta 
+            # Load the data in the fits file 
+            im = fits.getdata(filename)
+            return im 
+         
+        # If the file is empty then use the resource information 
+        #======================================================= 
+         
+        # Create lock file
+        if header==False:
+            dln.touchzero(filename+'.lock')
+         
+        # Load the resource file
+        rlines = dln.readlines(rfile)
+        rlines = [l for l in rlines if l.strip()!='' and l[0]!='#']
+        arr = [l.split('=') for l in rlines]
+        names = [a[0] for a in arr]
+        vals = [a[1] for a in arr]
+        rstr = dict(zip(names,vals))
+         
+        # Only the header, local 
+        # get it from the resource file or a stand-alone file
+        if header and 'header' in rstr.keys():
+            if rstr['header'][0] == '/': 
+                hfile = rstr['header']
+            else: 
+                hfile = fdir+'/'+rstr['header']
+            if os.path.exists(hfile) == False:
+                raise ValueError('Local header file '+hfile+' NOT FOUND')
+            else:
+                meta = dln.readlines(hfile)
+                return meta
+         
+         
+        # Create a temporary directory to work in
+        if header==False:
+            tid,tmpdir = tempfile.mkdtemp(prefix="rsrc")
+            os.chmod(tmpdir,0o755)
+         
+        # Get the flux file 
+        #   /mss1/archive/pipe/20170328/ct4m/2014B-0404/c4d_170329_043921_ooi_g_v1.fits.fz[39] 
+        lo = rstr['fluxfile'].find('[') 
+        hi = rstr['fluxfile'].find(']') 
+        fluxfile = rstr['fluxfile'][0:lo]
+        fext = rstr['fluxfile'][lo+1:hi-lo]
+        if header==False:
+            tfluxfile = tmpdir+'/flux.fits'
+            utils.file_wait(fluxfile)
+            out = subprocess.check_output(['funpack','-E',fext,'-O',tfluxfile,fluxfile],shell=False)
+         
+        # Construct the header from the extension and the main headers: 
+        #                       <required keywords for the extension: 
+        #                       XTENSION, BITPIX, 
+        #                               NAXIS, ...> 
+        #                       BEGIN MAIN HEADER 
+        #                       -------------------------------- 
+        #                       <PDU header keyword and history less required 
+        #                       keywords: 
+        #                               SIMPLE, BITPIX, NAXIS, ...> 
+        #                       BEGIN EXTENSION HEADER 
+        #                       --------------------------- 
+        #                       <extension header less required keywords that 
+        #                       were 
+        #                               placed at the beginning of the header. 
+        #                       END 
+        # Need PDU header with exposure information
+        mhead0 = fits.getheader(fluxfile,0)
+        if header:
+            ehead0 = fits.getheader(fluxfile,fext)
+        else:
+            ehead0 = fits.getheader(tfulxfile,0)
+        # Required keywords 
+        #XTENSION= 'IMAGE   '           /extension type 
+        #   SIMPE = T 
+        #BITPIX  =                  -32 /bits per data value 
+        #NAXIS   =                    2 /number of axes 
+        #NAXIS1  =                 2046 / 
+        #NAXIS2  =                 4094 / 
+        #PCOUNT  =                    0 /Number of group parameters 
+        #GCOUNT  =                    1 /Number of groups 
+        # Start the final header 
+        head = []
+        head = ['SIMPLE  =                    T / file:es conform to FITS standard             '] 
+        head['BITPIX'] = ehead0['BITPIX'],'bits per data value' 
+        head['NAXIS'] = ehead0['NAXIS'],'number of data axes' 
+        head['NAXIS1'] = ehead0['NAXIS1'],'length of data axis 1' 
+        head['NAXIS2'] = ehead0['NAXIS2'],'length of data axis 2' 
+        head['PCOUNT'] = 0,'Number of group parameters' 
+        head['GCOUNT'] = 1,'Number of groups' 
+        sxdelpar,head,'END'# sxaddpar adds an "END" line automatically 
+        # Remove required keywords from the main header 
+        mhead = mhead0 
+        todel = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
+        for j in range(len(todel)):
+            del mhead[todel[j]]
+        # Remove required keywords from the extension header 
+        ehead = ehead0 
+        todel = ['SIMPLE','XTENSION','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
+        for j in range(len(todel)):
+            del ehead[todel[j]]
+        # Combine them all 
+        PUSH,head,'COMMENT BEGIN MAIN HEADER ---------------------------------                     ' 
+        PUSH,head,mhead 
+        PUSH,head,'COMMENT BEGIN EXTENSION HEADER ----------------------------                     ' 
+        PUSH,head,ehead 
+        PUSH,head,'END                                                                             ' 
+        # Remove any blank lines 
+        bd , = np.where(str(head) == '')
+        if len(bd) > 0 : 
+            REMOVE,bd,head 
+         
+        # Fix/remove FPACK keywords 
+        if header:
+            head['BITPIX'] = head['ZBITPIX']
+            del head['ZBITPIX']
+            head['NAXIS1'] = head['ZNAXIS1']
+            del head['ZNAXIS']
+            del head['ZNAXIS1']            
+            head['NAXIS2'] = head['ZNAXIS2']
+            todel = ['ZNAXIS','ZNAXIS1','ZNAXIS2','ZIMAGE','ZTILE1','ZTILE2','ZCMPTYPE','ZNAME1','ZVAL1',
+                     'ZNAME2','ZVAL2','ZPCOUNt','ZGCOUNT','ZQUANTIZ','ZDITHER0','ZTENSION','TFIELDS',
+                     'TTYPE1','TFORM1','TTYPE2','TFORM2','TTYPE3','TFORM3'] 
+            for j in range(len(todel)): 
+                del head[todel[j]] 
+             
+            # DAOPHOT_IMPREP adds GAIN and RDNOISE 
+            if header:
+                gainA = head['GAINA'] 
+                gainB = head['GAINB']
+                gain = (gainA+gainB)*0.5 
+                rdnoiseA = head['RDNOISEA'] 
+                rdnoiseB = head['RDNOISEB']
+                rdnoise = (rdnoiseA+rdnoiseB)*0.5 
+                head['GAIN'] = gain 
+                head['RDNOISE'] = rdnoise 
+         
+        # This is done in daophot_imprep.pro but if we are only returning 
+        # the header then do it here 
+        if header:
+            saturate = head.get('saturate')
+            if saturate is None:  # set it slightly lower than 65000 for DAOPHOT 
+                saturate <= 64500.0 
+            else: 
+                saturate = 64500.0 
+            head['saturate'] = saturate 
+         
+        # Returning only the header
+        if header:
+            return head
+         
+         
+        # Now update the fluxfile with this new header 
+        MODFITS(tfluxfile,0,head)
+         
+        # Get the mask file 
+        lo = rstr['maskfile'].find('[') 
+        hi = rstr['maskfile'].find(')')
+        maskfile = rstr['maskfile'][0:lo]
+        mext = rstr['maskfile'][lo+1:hi-lo]
+        tmaskfile = tmpdir+'/mask.fits'
+        utils.file_wait(maskfile)
+        out = subprocess.check_output(['funpack','-E',mext,'-O',tmaskfile,maskfile],shell=False)
+         
+         
+        # Create the DAOPHOT file 
+        #   taken from smashred_imprep_single.pro
+        im,meta = daophot_imprep(tfluxfile,tmaskfile,header=header)         
+         
+        # Use the local header 
+        #   to write to the file and return 
+        if header in rstr.keys():
+            if rstr['header'][0]=='/':
+                hfile = rstr['header']
+            else: 
+                hfile = fdir+'/'+rstr['header']
+            if os.path.exists(hfile)==False:
+                raise ValueError('Local header file '+hfile+' NOT FOUND')
+            else:
+                meta = dln.readlines(hfile)
+         
+        #; Put in FPACK parameters 
+        #if keyword_set(fpack) then begin 
+        #  ; Remove all past FZ parameters 
+        #  bd = where(strmid(newhead,0,2) eq 'FZ',nbd) 
+        #  if nbd gt 0 then REMOVE,bd,newhead 
+        #  sxaddpar,newhead,'FZALGOR','RICE_1' 
+        #  sxaddpar,newhead,'FZQMETHD','SUBTRACTIVE_DITHER_1' 
+        #  sxaddpar,newhead,'FZQVALUE',8 
+        #  sxaddpar,newhead,'FZDTHRSD','CHECKSUM' 
+        #endif 
+         
+        # Write new image
+        if nowrite==False and header==False:
+            fits.HDUList(fits.PrimaryHDU(im,meta)).writeto(filename,overwrite=True)
+         
+        # Delete the lock file
+        if os.path.exists(filename+'.lock'): os.remove(filename+'.lock')
+         
+        # Fpack compress 
+        #if keyword_set(fpack) then begin 
+        #  SPAWN,['fpack',newfile],/noshell 
+        #  if file_test(newfile+'.fz') eq 0 then begin 
+        #    print,'ERROR: Failure creating '+newfile+'.fz' 
+        #    retall 
+        #  endif 
+        #  ; Delete normal FITS file 
+        #  FILE_DELETE,newfile 
+        #endif 
+         
+         
+        # Clean up
+        for f in [tfluxfile,tmaskfile]:
+            if os.path.exists(f): os.remove(f)
+         
+        dt = time.time()-t0 
+         
+        # Return header only 
+        if header:
+            return meta 
+         
+        return im 
