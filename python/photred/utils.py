@@ -205,3 +205,117 @@ def file_wait(filename,wait=5,timeout=600,silent=False):
         time.sleep(wait)
         if time.time()-t0 > timeout: 
             raise ValueError('Timeout ('+str(timeout)+' sec) reached on '+filename)
+
+
+def fitsext(files,isfpack=False,basename=False,full=False):
+    """
+    Gets the fits extension (.fits or .fits.fz) and optionaly 
+    the base name. 
+ 
+    Parameters
+    ----------
+    files : str or list
+       Scalar or array of file names. 
+    isfpack : boolean
+       Returns a boolean True if the file is a fpack compressed 
+         FITS file and False if not.  Default is False.
+    basename : boolean, optional
+       Returns the basename only.  Default is False.
+    full : boolean, optional
+       Returns an array of basename and extension.  If a 
+         single file is input then the output will a 2-element 
+         array, otherwise it is [Nfiles,2].  Default is False.
+ 
+    Returns
+    -------
+    output : str
+      The output of the program which depends on the inputs. 
+        By default this is the FITS extension (.fits or .fits.fz) 
+        and '' if none of those. 
+          isfpack   Returns a boolean True or False if the file(s)
+                       are fits.fz extensions. 
+          basename  Returns the file basename (without the 
+                       extension or directory). 
+          full      Returns the file basename and extension in 
+                       2-element or [Nfiles,2] array depending 
+                      on how many files were input. 
+ 
+    Example
+    -------
+
+    ext = fitsext('F2-04958679_01.fits.fz') 
+ 
+    By D. Nidever  August 2017 
+    Translated to Python by D. Nidever,  April 2022
+    """
+ 
+    # Cases 
+    # 1 - extension only 
+    # 2 - isfpack, boolean 1/0 
+    # 3 - basename only 
+    # 4 - full, basename and extension 
+    usecase = 1 # extension by default
+    if isfpack:
+        usecase = 2
+    if basename:
+        usecase = 3
+    if full:
+        usecase = 4 
+
+    nfiles = np.array(files).size
+    if nfiles==1 and type(files)==str:
+        files = [files]
+    
+    # Initializing the output array 
+    out = None
+    # Extension only     
+    if usecase==1:
+        out = np.zeros(nfiles,(np.str,100))
+    # isfpack, boolean 1/0 
+    elif usecase==2:
+        out = np.zeros(nfiles,bool)
+    # basename only 
+    elif usecase==3:
+        out = np.zeros(nfiles,(np.str,100))
+    # full, basename and extension
+    elif usecase==4:
+        if nfiles == 1:
+            out = np.zeros(2,(np.str,100))
+        else:
+            out = np.zeros((nfiles,2),(np.str,100))
+    else: # Not supported 
+        pass
+         
+    # Loop through the files 
+    for i in range(nfiles): 
+        file1 = os.path.basename(files[i].strip())
+             
+        # Get the extension 
+        ext = ''
+        if file1[-7:] == 'fits.fz':
+            ext = '.fits.fz'
+        elif file1[-4:]=='fits':
+            ext = '.fits' 
+             
+        # Extension only 
+        if usecase==1:
+            out[i] = ext 
+        # isfpack, boolean
+        elif usecase==2:
+            if ext == '.fits.fz':
+                out[i] = True
+        # basename only
+        elif usecase==3:
+            out[i] = file1[0:-len(ext)]
+        # full, basename and extension 
+        elif usecase==4:
+            if nfiles == 1: 
+                out[0] = file1[0:-len(ext)]
+                out[1] = ext 
+            else: 
+                out[i,0] = file1[0:-len(ext)]
+                out[i,1] = ext 
+        else:  # Not supported 
+            pass
+     
+    return out 
