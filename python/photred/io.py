@@ -13,6 +13,7 @@ import re
 from glob import glob
 from astropy.io import fits,ascii
 from astropy.table import Table
+from astropy.time import Time
 from dlnpyutils import utils as dln
 import struct
 from itertools import zip_longest
@@ -346,7 +347,7 @@ def readopt(optfile):
                 if val.isnumeric():
                     val = int(val)
                 elif val.find('.') or val.find('e') or val.find('E'):
-                    if isfloat(val):
+                    if utils.isfloat(val):
                         val = float(val)
                 opt[key] = val
     return opt
@@ -949,6 +950,8 @@ def writeals(outfile,phot,head):
     # Closing the file
     f.close()
 
+def loadtrans(transfile):
+    pass
  
 def loadtfr(tfrfile):
     """
@@ -1107,26 +1110,24 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     By D. Nidever  Feb 2019 
     Translated to Python by D. Nidever,  April 2022
     """
+
+    nodiffmaskflag = None
  
     # Create the DAOPHOT file 
     #   taken from smashred_imprep_single.pro 
     if header==False:
-        fhdu,fhead = fits.getdata(fluxfile,header=True)
+        fim,fhead = fits.getdata(fluxfile,header=True)
         mim,mhead = fits.getdata(maskfile,header=True)
     else:
         fhead = fits.getheader(fluxfile)
     ccdnum = fhead['CCDNUM']
-
-    import pdb; pdb.set_trace()
     
     # --- Prepare the header --- 
          
     # add gain, rdnoise, saturation 
     meta = fhead.copy()
-    if dln.grep(meta,'XTENS'):
-        pass
-    if strmid(meta[0],0,5) == 'XTENS' : 
-        meta[0]='SIMPLE  =                    T / file:es conform to FITS standard             ' 
+    if 'XTENSION' in meta:
+        meta[0]='SIMPLE  =                    T / file does conform to FITS standard             ' 
          
     #gain = (arr[ccd-1].gaina+arr[ccd-1].gainb)*0.5 
     #rdnoise = (arr[ccd-1].rdnoisea+arr[ccd-1].rdnoiseb)*0.5 
@@ -1139,37 +1140,34 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     rdnoise = (rdnoiseA+rdnoiseB)*0.5
     meta['gain'] = gain
     meta['rdnoise'] = rdnoise
-         
+
     # REMOVE DUPLICATE KEYWORDS!!  They cause lots of annoying errors 
     # EXTVER, CHECKSUM, DATASUM
-    bd, = np.where(strmid(meta,0,6) == 'EXTVER',nbd) 
-    if nbd > 1 : 
-        remove,bd[1::],meta 
-    bd, = np.where(strmid(meta,0,8) == 'CHECKSUM',nbd) 
-    if nbd > 1 : 
-        remove,bd[1::],meta 
-    bd, = np.where(strmid(meta,0,7) == 'DATASUM',nbd) 
-    if nbd > 1: 
-        remove,bd[1::],meta 
+    if 'extver' in meta:
+        del meta[bd[1:]]
+    if 'checksum' in meta:
+        del meta[bd[1:]]
+    if 'datasum' in meta:
+        del meta[bd[1:]]
          
     # Add "COMMENT " before "BEGIN EXTENSION HEADER ---", it causes problems in daophot
-    bd = dln.grep(meta,'BEGIN',index=True)
-    if len(bd) > 0 : 
-        meta[bd]='COMMENT '+meta[bd] 
+    if 'BEGIN' in meta:
+        beg = meta['BEGIN']
+        del meta['BEGIN']
+        meta['COMMENT'] = beg
          
     if header:
         return header 
-         
+
     # --- Prepare the image --- 
-         
     med1 = np.median(fim,axis=1) 
     med1slp = np.diff(med1) 
          
-    im = np.zopy(fim)
+    im = np.copy(fim)
          
     # DAOPHOT cannot handle DOUBLE arrays (BITPIX=-64)
     if meta['bitpix'] == -64:
-        meta['bitpix'] = -342
+        meta['bitpix'] = -32
         im = im.astype(np.float32)
          
     # Check for differences in amp background levels 
@@ -1219,7 +1217,7 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     # 
     # "Turn off" the "difference image masking", clear the 8th bit 
     # 128 for Pre-V3.5.0 images and set 7 values to zero for V3.5.0 or later. 
-    if len(nodiffmaskflag) == 0 :  # set by default 
+    if nodiffmaskflag is None:  # set by default 
         nodiffmaskflag = 1 
     if nodiffmaskflag:
         plver = fhead.get('plver')  # DESDM doesn't have this 
@@ -1228,18 +1226,15 @@ def daophot_imprep(fluxfile,maskfile,header=False):
                  
             # V3.5.0 and on, Integer masks
             versnum = np.array(plver[1:].split('.')).astype(int)
-            #versnum = int(strsplit(strmid(plver,1),'.',/extract)) 
             if versnum[0] > 3 or (versnum[0] == 3 and versnum[1] >= 5): 
-                bdpix, = np.where(mim == 7)
-                if len(bdpix) > 0: 
+                bdpix = (mim == 7)
+                if np.sum(bdpix) > 0: 
                     mim[bdpix] = 0 
-                     
             # Pre-V3.5.0, Bitmasks 
             else: 
-                bdpix, = np.where( (mim and 2**7) == 2**7)
-                if len(bdpix) > 0:  # clear 128 
+                bdpix = ( (mim & 2**7) > 0)
+                if np.sum(bdpix) > 0:  # clear 128 
                     mim[bdpix] -= 128 
-
          
     # Add background back in for DES SV data
     skybrite = meta.get('skybrite')
@@ -1249,11 +1244,11 @@ def daophot_imprep(fluxfile,maskfile,header=False):
         bunit = 'adu'
     else:
         bunit = bunit.strip()
-    if bunit == 'electrons' and nskybrite > 0: 
+    if bunit == 'electrons' and skybrite is not None:
         saturate = meta.get('saturate')
         if saturate is None:
             saturate = 65000.0 
-        gdpix, = np.where((mim == 0) & (im < saturate))
+        gdpix = ((mim==0) & (im<saturate))
         medim = np.median(im[gdpix]) 
         if medim < 100: 
             # Add sky background back in so DAOPHOT can create a proper 
@@ -1264,7 +1259,7 @@ def daophot_imprep(fluxfile,maskfile,header=False):
             else: 
                 # Sometimes SKYBRITE=0, in that case use SKYSIGMA^2 
                 #  measure sigma ourselves if SKYSIGMA is not given 
-                if nskysigma > 0 and skysigma > 0: 
+                if skysigma is not None and skysigma > 0: 
                     im[gdpix] += skysigma**2 
                 else: 
                     im[gdpix] += dln.mad(im[gdpix])**2 
@@ -1272,7 +1267,8 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     # Mask bad half of DECam chip 31
     dateobs = meta.get('DATE-OBS')
     if dateobs is not None:  # assume bad if no date 
-        mjd = utils.date2jd(dateobs,mjd=True) 
+        t = Time(dateobs, format='fits')
+        mjd = t.mjd
     else: 
         mjd = 58000
     if meta.get('INSTRUME')=='DECam' and meta.get('CCDNUM')==31 and mjd>56660:
@@ -1285,31 +1281,39 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     if bunit != 'electrons':
         saturate = meta.get('saturate')
         if saturate is not None:   # set it slightly lower than 65000 for DAOPHOT 
-            saturate <= 64500.0 
+            saturate = np.minimum(saturate,64500.0)
         else: 
             saturate = 64500.0
-        meta['saturate'] = naturate
-        bdpix, = np.where((mim > 0.0) | (fim > 65000.0))
-        if len(bdpix) > 0: 
+        meta['saturate'] = saturate
+        bdpix = ((mim > 0.0) | (fim > 65000.0))
+        if np.sum(bdpix) > 0: 
             im[bdpix] = 65000.0 
     # Allow saturation value to be larger for DES SV data in electrons 
     else: 
         saturate = meta.get('saturate')
         if saturate is None:
             saturate = 64500.0   # set it slightly lower than 65000 for DAOPHOT 
-            bdpix , = np.where((mim > 0.0) | (fim > 65000.0))
-            if len(bdpix) > 0: 
+            bdpix = ((mim > 0.0) | (fim > 65000.0))
+            if np.sum(bdpix) > 0: 
                 im[bdpix] = 65000.0
             meta['saturate'] = saturate
         else: 
-            bdpix, = np.where((mim > 0.0) | (fim > saturate))
-            if len(bdpix) > 0 :# set slightly higher for DAOPHOT 
+            bdpix = ((mim > 0.0) | (fim > saturate))
+            if np.sum(bdpix) > 0:  # set slightly higher for DAOPHOT 
                 im[bdpix] = saturate*1.01 
             meta['saturate'] = saturate 
          
     return im,meta
 
 
+def loadresource(rfile):
+    """ Load resource file"""
+    rlines = dln.readlines(rfile,comment='#',noblank=True)
+    arr = [l.split('=') for l in rlines]
+    names = [a[0].strip() for a in arr]
+    vals = [a[1].strip() for a in arr]
+    rstr = dict(zip(names,vals))
+    return rstr
  
 def fits_read_resource(filename,header=False,nowrite=False):
     """
@@ -1344,7 +1348,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
      
     t0 = time.time() 
      
-    fdir = os.path.dirname(filename) 
+    fdir = os.path.abspath(os.path.dirname(filename))
     base = os.path.basename(filename) 
     rfile = fdir+'/.'+base 
      
@@ -1355,265 +1359,229 @@ def fits_read_resource(filename,header=False,nowrite=False):
         while (os.path.exists(filename+'.lock') and time.time()-t0 <100.): time.sleep(5)
          
          
-        # If the file exists and is not empty then just use it's data 
-        #  Might need to use resource header though 
-        #============================================================ 
-        if os.path.exists(filename) and os.size(filename)>1:
-            # Check if there's a resouce header we should use 
-            # It has a resource file
-            rmeta = []
-            if os.path.exists(rfile): 
-                # Load the resource file
-                rlines = dln.readlines(rfile,comment='#',noblank=True)
-                arr = [l.split('=') for l in rlines]
-                names = [a[0] for a in arr]
-                vals = [a[1] for a in arr]
-                rstr = dict(zip(names,vals))
-                # There is a resource header 
-                if 'header' in rstr.keys():
-                    if rstr['header'][0] == '/': 
-                        hfile = rstr['header']
-                    else: 
-                        hfile = fdir+'/'+rstr['header']
-                    if os.path.exists(hfile)==False:
-                        raise ValueError('Local header file '+hfile+' NOT FOUND')
-                    else: 
-                        rmeta = dln.readlines(hfile)
-            # Load the regular FITS file header
-            meta = fits.getheader(filename)
+    # If the file exists and is not empty then just use it's data 
+    #  Might need to use resource header though 
+    #============================================================ 
+    if os.path.exists(filename) and os.path.getsize(filename)>1:
+        # Check if there's a resouce header we should use 
+        # It has a resource file
+        rmeta = []
+        if os.path.exists(rfile): 
+            # Load the resource file
+            rstr = loadresource(rfile)
+            # There is a resource header 
+            if 'header' in rstr.keys():
+                if rstr['header'][0] == '/': 
+                    hfile = rstr['header']
+                else: 
+                    hfile = fdir+'/'+rstr['header']
+                if os.path.exists(hfile)==False:
+                    raise ValueError('Local header file '+hfile+' NOT FOUND')
+                else: 
+                    rmeta = dln.readlines(hfile)
+        # Load the regular FITS file header
+        meta = fits.getheader(filename)
              
-            # Decide which header to use 
-            if len(rmeta) > 0: 
-                #print,'Using resource header ',hfile 
-                meta = rmeta 
+        # Decide which header to use 
+        if len(rmeta) > 0: 
+            #print,'Using resource header ',hfile 
+            meta = rmeta 
              
-            # Only return the header
-            if header:
-                return meta 
-            # Load the data in the fits file 
-            im = fits.getdata(filename)
-            return im 
-         
-        # If the file is empty then use the resource information 
-        #======================================================= 
-         
-        # Create lock file
-        if header==False:
-            dln.touchzero(filename+'.lock')
-         
-        # Load the resource file
-        rlines = dln.readlines(rfile,comment='#',noblank=True)
-        arr = [l.split('=') for l in rlines]
-        names = [a[0] for a in arr]
-        vals = [a[1] for a in arr]
-        rstr = dict(zip(names,vals))
-         
-        # Only the header, local 
-        # get it from the resource file or a stand-alone file
-        if header and 'header' in rstr.keys():
-            if rstr['header'][0] == '/': 
-                hfile = rstr['header']
-            else: 
-                hfile = fdir+'/'+rstr['header']
-            if os.path.exists(hfile) == False:
-                raise ValueError('Local header file '+hfile+' NOT FOUND')
-            else:
-                meta = dln.readlines(hfile)
-                return meta
-         
-         
-        # Create a temporary directory to work in
-        if header==False:
-            tid,tmpdir = tempfile.mkdtemp(prefix="rsrc")
-            os.chmod(tmpdir,0o755)
-         
-        # Get the flux file 
-        #   /mss1/archive/pipe/20170328/ct4m/2014B-0404/c4d_170329_043921_ooi_g_v1.fits.fz[39] 
-        lo = rstr['fluxfile'].find('[') 
-        hi = rstr['fluxfile'].find(']') 
-        fluxfile = rstr['fluxfile'][0:lo]
-        fext = rstr['fluxfile'][lo+1:hi-lo]
-        if header==False:
-            tfluxfile = tmpdir+'/flux.fits'
-            utils.file_wait(fluxfile)
-            out = subprocess.check_output(['funpack','-E',fext,'-O',tfluxfile,fluxfile],shell=False)
-         
-        # Construct the header from the extension and the main headers: 
-        #                       <required keywords for the extension: 
-        #                       XTENSION, BITPIX, 
-        #                               NAXIS, ...> 
-        #                       BEGIN MAIN HEADER 
-        #                       -------------------------------- 
-        #                       <PDU header keyword and history less required 
-        #                       keywords: 
-        #                               SIMPLE, BITPIX, NAXIS, ...> 
-        #                       BEGIN EXTENSION HEADER 
-        #                       --------------------------- 
-        #                       <extension header less required keywords that 
-        #                       were 
-        #                               placed at the beginning of the header. 
-        #                       END 
-        # Need PDU header with exposure information
-        mhead0 = fits.getheader(fluxfile,0)
-        if header:
-            ehead0 = fits.getheader(fluxfile,fext)
-        else:
-            ehead0 = fits.getheader(tfulxfile,0)
-        # Required keywords 
-        #XTENSION= 'IMAGE   '           /extension type 
-        #   SIMPE = T 
-        #BITPIX  =                  -32 /bits per data value 
-        #NAXIS   =                    2 /number of axes 
-        #NAXIS1  =                 2046 / 
-        #NAXIS2  =                 4094 / 
-        #PCOUNT  =                    0 /Number of group parameters 
-        #GCOUNT  =                    1 /Number of groups 
-        # Start the final header 
-        head = []
-        head = ['SIMPLE  =                    T / file:es conform to FITS standard             '] 
-        head['BITPIX'] = ehead0['BITPIX'],'bits per data value' 
-        head['NAXIS'] = ehead0['NAXIS'],'number of data axes' 
-        head['NAXIS1'] = ehead0['NAXIS1'],'length of data axis 1' 
-        head['NAXIS2'] = ehead0['NAXIS2'],'length of data axis 2' 
-        head['PCOUNT'] = 0,'Number of group parameters' 
-        head['GCOUNT'] = 1,'Number of groups' 
-        sxdelpar,head,'END'# sxaddpar adds an "END" line automatically 
-        # Remove required keywords from the main header 
-        mhead = mhead0 
-        todel = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
-        for j in range(len(todel)):
-            del mhead[todel[j]]
-        # Remove required keywords from the extension header 
-        ehead = ehead0 
-        todel = ['SIMPLE','XTENSION','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
-        for j in range(len(todel)):
-            del ehead[todel[j]]
-        # Combine them all 
-        PUSH,head,'COMMENT BEGIN MAIN HEADER ---------------------------------                     ' 
-        PUSH,head,mhead 
-        PUSH,head,'COMMENT BEGIN EXTENSION HEADER ----------------------------                     ' 
-        PUSH,head,ehead 
-        PUSH,head,'END                                                                             ' 
-        # Remove any blank lines 
-        bd , = np.where(str(head) == '')
-        if len(bd) > 0 : 
-            REMOVE,bd,head 
-         
-        # Fix/remove FPACK keywords 
-        if header:
-            head['BITPIX'] = head['ZBITPIX']
-            del head['ZBITPIX']
-            head['NAXIS1'] = head['ZNAXIS1']
-            del head['ZNAXIS']
-            del head['ZNAXIS1']            
-            head['NAXIS2'] = head['ZNAXIS2']
-            todel = ['ZNAXIS','ZNAXIS1','ZNAXIS2','ZIMAGE','ZTILE1','ZTILE2','ZCMPTYPE','ZNAME1','ZVAL1',
-                     'ZNAME2','ZVAL2','ZPCOUNt','ZGCOUNT','ZQUANTIZ','ZDITHER0','ZTENSION','TFIELDS',
-                     'TTYPE1','TFORM1','TTYPE2','TFORM2','TTYPE3','TFORM3'] 
-            for j in range(len(todel)): 
-                del head[todel[j]] 
-             
-            # DAOPHOT_IMPREP adds GAIN and RDNOISE 
-            if header:
-                gainA = head['GAINA'] 
-                gainB = head['GAINB']
-                gain = (gainA+gainB)*0.5 
-                rdnoiseA = head['RDNOISEA'] 
-                rdnoiseB = head['RDNOISEB']
-                rdnoise = (rdnoiseA+rdnoiseB)*0.5 
-                head['GAIN'] = gain 
-                head['RDNOISE'] = rdnoise 
-         
-        # This is done in daophot_imprep.pro but if we are only returning 
-        # the header then do it here 
-        if header:
-            saturate = head.get('saturate')
-            if saturate is None:  # set it slightly lower than 65000 for DAOPHOT 
-                saturate <= 64500.0 
-            else: 
-                saturate = 64500.0 
-            head['saturate'] = saturate 
-         
-        # Returning only the header
-        if header:
-            return head
-         
-         
-        # Now update the fluxfile with this new header 
-        MODFITS(tfluxfile,0,head)
-         
-        # Get the mask file 
-        lo = rstr['maskfile'].find('[') 
-        hi = rstr['maskfile'].find(')')
-        maskfile = rstr['maskfile'][0:lo]
-        mext = rstr['maskfile'][lo+1:hi-lo]
-        tmaskfile = tmpdir+'/mask.fits'
-        utils.file_wait(maskfile)
-        out = subprocess.check_output(['funpack','-E',mext,'-O',tmaskfile,maskfile],shell=False)
-         
-         
-        # Create the DAOPHOT file 
-        #   taken from smashred_imprep_single.pro
-        im,meta = daophot_imprep(tfluxfile,tmaskfile,header=header)         
-         
-        # Use the local header 
-        #   to write to the file and return 
-        if header in rstr.keys():
-            if rstr['header'][0]=='/':
-                hfile = rstr['header']
-            else: 
-                hfile = fdir+'/'+rstr['header']
-            if os.path.exists(hfile)==False:
-                raise ValueError('Local header file '+hfile+' NOT FOUND')
-            else:
-                meta = dln.readlines(hfile)
-         
-        #; Put in FPACK parameters 
-        #if keyword_set(fpack) then begin 
-        #  ; Remove all past FZ parameters 
-        #  bd = where(strmid(newhead,0,2) eq 'FZ',nbd) 
-        #  if nbd gt 0 then REMOVE,bd,newhead 
-        #  sxaddpar,newhead,'FZALGOR','RICE_1' 
-        #  sxaddpar,newhead,'FZQMETHD','SUBTRACTIVE_DITHER_1' 
-        #  sxaddpar,newhead,'FZQVALUE',8 
-        #  sxaddpar,newhead,'FZDTHRSD','CHECKSUM' 
-        #endif 
-         
-        # Write new image
-        if nowrite==False and header==False:
-            fits.HDUList(fits.PrimaryHDU(im,meta)).writeto(filename,overwrite=True)
-         
-        # Delete the lock file
-        if os.path.exists(filename+'.lock'): os.remove(filename+'.lock')
-         
-        # Fpack compress 
-        #if keyword_set(fpack) then begin 
-        #  SPAWN,['fpack',newfile],/noshell 
-        #  if file_test(newfile+'.fz') eq 0 then begin 
-        #    print,'ERROR: Failure creating '+newfile+'.fz' 
-        #    retall 
-        #  endif 
-        #  ; Delete normal FITS file 
-        #  FILE_DELETE,newfile 
-        #endif 
-         
-         
-        # Clean up
-        for f in [tfluxfile,tmaskfile]:
-            if os.path.exists(f): os.remove(f)
-         
-        dt = time.time()-t0 
-         
-        # Return header only 
+        # Only return the header
         if header:
             return meta 
+        # Load the data in the fits file 
+        im = fits.getdata(filename)
+        return im,meta
          
-        return im 
+    # If the file is empty then use the resource information 
+    #======================================================= 
+         
+    # Create lock file
+    if header==False:
+        dln.touch(filename+'.lock')
+         
+    # Load the resource file
+    rstr = loadresource(rfile)
+         
+    # Only the header, local 
+    # get it from the resource file or a stand-alone file
+    if header and 'header' in rstr.keys():
+        if rstr['header'][0] == '/': 
+            hfile = rstr['header']
+        else: 
+            hfile = fdir+'/'+rstr['header']
+        if os.path.exists(hfile) == False:
+            raise ValueError('Local header file '+hfile+' NOT FOUND')
+        else:
+            meta = dln.readlines(hfile)
+            return meta
+         
+         
+    # Create a temporary directory to work in
+    if header==False:
+        tmpdir = tempfile.mkdtemp(prefix="rsrc")
+        os.chmod(tmpdir,0o755)
+         
+    # Get the flux file 
+    #   /mss1/archive/pipe/20170328/ct4m/2014B-0404/c4d_170329_043921_ooi_g_v1.fits.fz[39] 
+    lo = rstr['fluxfile'].find('[') 
+    hi = rstr['fluxfile'].find(']') 
+    fluxfile = rstr['fluxfile'][0:lo]
+    fext = rstr['fluxfile'][lo+1:hi]
+    if header==False:
+        tfluxfile = tmpdir+'/flux.fits'
+        utils.file_wait(fluxfile)
+        out = subprocess.check_output(['funpack','-E',fext,'-O',tfluxfile,fluxfile],shell=False)
+         
+    # Construct the header from the extension and the main headers: 
+    #                       <required keywords for the extension: 
+    #                       XTENSION, BITPIX, 
+    #                               NAXIS, ...> 
+    #                       BEGIN MAIN HEADER 
+    #                       -------------------------------- 
+    #                       <PDU header keyword and history less required 
+    #                       keywords: 
+    #                               SIMPLE, BITPIX, NAXIS, ...> 
+    #                       BEGIN EXTENSION HEADER 
+    #                       --------------------------- 
+    #                       <extension header less required keywords that 
+    #                       were 
+    #                               placed at the beginning of the header. 
+    #                       END 
+    # Need PDU header with exposure information
+    mhead0 = fits.getheader(fluxfile,0)
+    if header:
+        ehead0 = fits.getheader(fluxfile,fext)
+    else:
+        ehead0 = fits.getheader(tfluxfile,0)
+    # Required keywords 
+    #XTENSION= 'IMAGE   '           /extension type 
+    #   SIMPE = T 
+    #BITPIX  =                  -32 /bits per data value 
+    #NAXIS   =                    2 /number of axes 
+    #NAXIS1  =                 2046 / 
+    #NAXIS2  =                 4094 / 
+    #PCOUNT  =                    0 /Number of group parameters 
+    #GCOUNT  =                    1 /Number of groups 
+    
+    # Start the final header 
+    head = fits.Header()
+    head['SIMPLE'] = 'T','file does conform to FITS standard'
+    head['BITPIX'] = ehead0['BITPIX'],'bits per data value' 
+    head['NAXIS'] = ehead0['NAXIS'],'number of data axes' 
+    head['NAXIS1'] = ehead0['NAXIS1'],'length of data axis 1' 
+    head['NAXIS2'] = ehead0['NAXIS2'],'length of data axis 2' 
+    head['PCOUNT'] = 0,'Number of group parameters' 
+    head['GCOUNT'] = 1,'Number of groups' 
+    # Remove required keywords from the main header 
+    mhead = mhead0 
+    todel = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
+    for j in range(len(todel)):
+        if todel[j] in mhead:
+            del mhead[todel[j]]
+    # Remove required keywords from the extension header 
+    ehead = ehead0 
+    todel = ['SIMPLE','XTENSION','BITPIX','NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','EXTEND','DATASUM','CHECKSUM','END'] 
+    for j in range(len(todel)):
+        if todel[j] in ehead:
+            del ehead[todel[j]]
+    # Combine them all 
+    head['COMMENT'] = ' BEGIN MAIN HEADER ---------------------------------                     '
+    head.extend(mhead)
+    head['COMMENT'] = 'BEGIN EXTENSION HEADER ----------------------------                     ' 
+    head.extend(ehead)
+    
+    # Fix/remove FPACK keywords 
+    if header:
+        head['BITPIX'] = head['ZBITPIX']
+        head['NAXIS1'] = head['ZNAXIS1']
+        head['NAXIS2'] = head['ZNAXIS2']
+        todel = ['ZNAXIS','ZNAXIS1','ZNAXIS2','ZIMAGE','ZTILE1','ZTILE2','ZCMPTYPE','ZNAME1','ZVAL1',
+                 'ZNAME2','ZVAL2','ZPCOUNt','ZGCOUNT','ZQUANTIZ','ZDITHER0','ZTENSION','TFIELDS',
+                 'TTYPE1','TFORM1','TTYPE2','TFORM2','TTYPE3','TFORM3'] 
+        for j in range(len(todel)): 
+            if todel[j] in head:
+                del head[todel[j]] 
+             
+        # DAOPHOT_IMPREP adds GAIN and RDNOISE 
+        if header:
+            gainA = head['GAINA'] 
+            gainB = head['GAINB']
+            gain = (gainA+gainB)*0.5 
+            rdnoiseA = head['RDNOISEA'] 
+            rdnoiseB = head['RDNOISEB']
+            rdnoise = (rdnoiseA+rdnoiseB)*0.5 
+            head['GAIN'] = gain 
+            head['RDNOISE'] = rdnoise 
+         
+    # This is done in daophot_imprep.pro but if we are only returning 
+    # the header then do it here 
+    if header:
+        saturate = head.get('saturate')
+        if saturate is not None:  # set it slightly lower than 65000 for DAOPHOT 
+            saturate = np.minumum(saturate,64500.0)
+        else: 
+            saturate = 64500.0 
+        head['saturate'] = saturate 
+         
+    # Returning only the header
+    if header:
+        return head
+         
+         
+    # Now update the fluxfile with this new header 
+    tflux = fits.getdata(tfluxfile,0)
+    os.remove(tfluxfile)
+    fits.HDUList(fits.PrimaryHDU(tflux,head)).writeto(tfluxfile,overwrite=True)
+         
+    # Get the mask file 
+    lo = rstr['maskfile'].find('[') 
+    hi = rstr['maskfile'].find(')')
+    maskfile = rstr['maskfile'][0:lo]
+    mext = rstr['maskfile'][lo+1:hi]
+    tmaskfile = tmpdir+'/mask.fits'
+    utils.file_wait(maskfile)
+    out = subprocess.check_output(['funpack','-E',mext,'-O',tmaskfile,maskfile],shell=False)
+         
+         
+    # Create the DAOPHOT file 
+    #   taken from smashred_imprep_single.pro
+    im,meta = daophot_imprep(tfluxfile,tmaskfile,header=header)         
+         
+    # Use the local header 
+    #   to write to the file and return 
+    if header in rstr.keys():
+        if rstr['header'][0]=='/':
+            hfile = rstr['header']
+        else: 
+            hfile = fdir+'/'+rstr['header']
+        if os.path.exists(hfile)==False:
+            raise ValueError('Local header file '+hfile+' NOT FOUND')
+        else:
+            meta = dln.readlines(hfile)
+              
+    # Write new image
+    if nowrite==False and header==False:
+        fits.HDUList(fits.PrimaryHDU(im,meta)).writeto(filename,overwrite=True)
+         
+    # Delete the lock file
+    if os.path.exists(filename+'.lock'): os.remove(filename+'.lock')
+                  
+    # Clean up
+    for f in [tfluxfile,tmaskfile]:
+        if os.path.exists(f): os.remove(f)
+         
+    dt = time.time()-t0 
+    
+    # Return header only 
+    if header:
+        return meta 
+         
+    return im,meta
 
 
-
- 
-def photred_readfile(filename,exten=None,header=False,nowrite=False):
+def readfile(filename,exten=None,header=False,nowrite=False):
     """
     Generic file reading program for PHOTRED 
  
@@ -1657,9 +1625,9 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
      
     # Break down the file into its components
     exists = os.path.exists(filename)
-    fdir = os.path.dirname(filename) 
+    fdir = os.path.abspath(os.path.dirname(filename))
     base = os.path.basename(filename)
-    ext = os.path.splitext(base)[-1]
+    ext = os.path.splitext(base)[1][1:]
     if isfits and ext=='gz': # gzipped FITS file 
         ext = 'fits' 
     if isfits and ext=='fz': # fpacked FITS file 
@@ -1669,7 +1637,7 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
      
     # Go through the various options
     if ext=='opt':
-        opt = readopt(filename)
+        return readopt(filename)
     elif ext=='coo':
         return loadcoo(filename)
     elif ext=='ap':
@@ -1677,7 +1645,7 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
     elif ext=='mch':
         return loadmch(filename)
     elif ext=='raw':
-        return loadraw(filename)
+        return loadraw(filename)    # STILL NEED THIS!!
     elif ext=='tfr':
         return loadtfr(filename)
     elif ext=='als' or ext=='alf':
@@ -1686,7 +1654,7 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
         if isfits: 
             if header:  # only read header
                 return fits.getheader(filename)
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             hdu = fits.open(filename)
             nhdu = len(hdu)
             hdu.close()
@@ -1696,8 +1664,8 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
         else:
             if header: #only read header
                 return dln.readlines(filename,nreadline=1)
-            phot = loadmag(filename)
-            return phot,meta
+            phot = loadmag(filename)    # STILL NEED THIS!!!!
+            return phot,meta  
     elif ext=='ast':
         if isfits:
             hdu = fitsopen(filename)
@@ -1709,16 +1677,16 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
                 if meta is None:
                     meta = fits.getheader(filename)
                 return meta
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
         else: 
             if header:  # only read header
                 meta = dln.readlines(filename,nreadline=1)
                 return meta
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
     elif ext=='trans':
-        return read_trans(filename)
+        return read_trans(filename)   # STILL NEED THIS
     elif ext=='phot':
         if isfits:
             hdu = fits.open(filename)
@@ -1730,27 +1698,17 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
                 if meta is None:
                     meta = HEADFITS(filename) 
                 return meta 
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
         else: 
             if header: # only read header
                 return dln.readlines(filename,nreadline=1)
-            # Get the fieldnames and fieldtypes 
+            phot = Table.read(filename,format='ascii')
             # We need ID to be STRING not LONG
-            import pdb; pdb.set()
-            tempfile = MKTEMP('temp',outdir='/tmp')
-            lines = dln.readlines(filename,nreadline=40)
-            dln.writelines(tempfile,lines)
-            temp = Table.read(tempfile)
-            if os.path.exists(tempfile): os.remove(tempfile)
-            fieldnames = temp.colnames
-            nfieldnames = len(fieldnames) 
-            #fieldtypes = lonarr(nfieldnames) 
-            #for k in range(nfieldnames): 
-            #    fieldtypes[k] = SIZE(temp[0].(k),type) 
-            #    idind, = np.where(fieldnames == 'ID') 
-            #    fieldtypes[idind[0]] = 7 
-            #phot = IMPORTASCII(filename,fieldnames=fieldnames,fieldtypes=fieldtypes,skip=1,/noprint) 
+            if 'ID' in phot.keys():
+                phot['ID'] = phot['ID'].astype(str)
+            else:
+                phot['id'] = phot['id'].astype(str)
             return phot,meta
                 
     elif ext=='cmb':
@@ -1764,16 +1722,16 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
                     if meta is None:
                         meta = fits.getheader(filename) 
                     return meta 
-                phot = Table.read(fileame)
+                phot = Table.read(fileame,format='ascii')
                 return phot,meta
         else: 
             if os.path.exists(filename+'.meta'):
-                meta = Table.read(filename+'.meta')
+                meta = Table.read(filename+'.meta',format='ascii')
             if header:  # only read header
                 if meta is None:
                     meta = dln.readlines(filename,nreadline=1)
                 return meta 
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
                     
     elif ext=='dered':
@@ -1787,16 +1745,16 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
                 if meta is None:
                     meta = fits.getheader(filename) 
                 return meta 
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
         else: 
             if os.path.exists(filename+'.meta'): 
-                meta = Table.read(filename+'.meta')
+                meta = Table.read(filename+'.meta',format='ascii')
             if header:  # only read header 
                 if meta is None:
                     meta = dln.readlines(filename,nreadline=1)
                 return meta 
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
  
     elif ext=='final':
@@ -1810,16 +1768,16 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
                 if meta is None:
                     meta = fits.getheader(filename) 
                 return meta 
-            phot = Table.read(filename,1)
+            phot = Table.read(filename,1,format='ascii')
             return phot,meta
         else: 
             if os.path.exists(filename+'.meta'): 
-                meta = Table.read(filename+'.meta')
+                meta = Table.read(filename+'.meta',format='ascii')
             if header:  # only read header 
                 if meta is None:
                     meta = dln.readlines(filename,nreadline=1)
                 return meta 
-            phot = Table.read(filename)
+            phot = Table.read(filename,format='ascii')
             return phot,meta
  
     elif ext=='fits':
@@ -1838,7 +1796,7 @@ def photred_readfile(filename,exten=None,header=False,nowrite=False):
             nhdu = len(hdu)
             hd0 = hdu[0].header
             data0 = hdu[0].data
-            if nhdu >= 1:
+            if nhdu > 1:
                 hd1 = hdu[1].header
                 data1 = hdu[1].data
             hdu.close()
