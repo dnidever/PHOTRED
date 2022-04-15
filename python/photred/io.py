@@ -161,25 +161,26 @@ def loadmch(mchfile):
  
     return files,trans,magoff
 
-def loadmakemag(filename):
+def loadraw(filename):
     """"
-    This loads the .makemag file output in ALLFRAME.PRO. 
-    This used to be handled by LOADRAW.PRO, but they diverged. 
-    This is basically the old version of loadraw.pro. 
+    This loads the DAOPHOT/DAOMASTER RAW file and also .mag and .makemag files.
      
     Parameters
     ----------
-    filename   The name of the .makemag file 
+    filename : str
+      The name of the .raw file.
      
     Returns
     -------
-    phot       A structure with the makemag data 
-    head       A string array with the makemag header 
+    phot : astropy table
+      A structure with the raw data.
+    head : list
+      A string array with the raw header.
      
     Example
     ------
     
-    phot,head = loadmakemag('temp.makemag')
+    phot,head = loadraw('temp.raw')
      
     By D. Nidever   Feb. 2008 (basically a copy of loadals.pro 
     Translated to Python by D. Nidever,  April 2022
@@ -187,13 +188,16 @@ def loadmakemag(filename):
      
     if os.path.exists(filename)==False:
         raise ValueError(filename+' DOES NOT EXIST')
-     
+
+    base = os.path.basename(filename)
+    ext = os.path.splitext(base)[1][1:]
+    
     # Is this an ALS or PHOT file
     with open(filename,'r') as f:
         line1 = f.readline()
         line2 = f.readline()
         line3 = f.readline()
-        
+
     # This is an ALS file
     arr1 = line1.split()
     if arr1[0]=='NL' and line3.strip()=='': 
@@ -220,13 +224,11 @@ def loadmakemag(filename):
          
             # This is a continuation line 
             if line4[0:16].strip()=='':
-                trial = line4[33:34]
+                trial = line4[33]
                 if trial == ' ': 
                     nspaces = 24 
                 else: 
                     nspaces = 25
-                instr1 = line4[nspaces:]
-                instr += instr1 
                 nstarline += 1 
                 continuation = True 
             else:
@@ -235,8 +237,10 @@ def loadmakemag(filename):
 
         
         # Now parse the long line for a single star with a formatted read 
-        #fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)' 
+        #fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)'
         nmag = int(  (len(instr)-(7+2*9+2*9)) / 9 / 2 )
+        if ext=='mag' or ext=='makemag':
+            nmag = int(  (len(instr)-(9+2*9+2*9)) / 9 / 2 )            
         ncol = nmag*2+5 
          
         # ID  X  Y  MAG1  ERR1  MAG2  ERR2 ...  CHI SHARP 
@@ -244,7 +248,7 @@ def loadmakemag(filename):
          
         # Stars in this file
         numstar = int((dln.numlines(filename)-3 )/nstarline)
-         
+
         # LOADING THE DATA 
         #------------------              
         # mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
@@ -264,6 +268,8 @@ def loadmakemag(filename):
         # .            ((DATUM(J,I), J=1,2), I=1,NFRM), SUMCHI, SUMSHP 
         #        111       FORMAT (I7, 2A9, 12F9.4:/ (25X, 12F9.4)) 
         fieldwidths = tuple([7,9,9]+(2*nmag+2)*[9])
+        if ext=='mag' or ext=='makemag':
+            fieldwidths = tuple([9,9,9]+(2*nmag+2)*[9])            
         fieldtypes = tuple(['d','f','f']+(2*nmag+2)*['f'])
         parser = make_parser(fieldwidths,fieldtypes)
         
@@ -284,7 +290,7 @@ def loadmakemag(filename):
                     #   the 34th character (index=33) should be the last digit of MAG1 (25+9=34) 
                     #   and be a number.  If there are 24 leading space then the 
                     #   34th character will right after MAG1 and be a space.
-                    trial = instr1[33:34]
+                    trial = instr1[33]
                     if trial == ' ': 
                         nspaces = 24 
                     else: 
@@ -300,10 +306,12 @@ def loadmakemag(filename):
         # Convert to astropy table
         phot = Table(phot)
         
-    # Not a raw/makemag file 
+    # Not a raw file 
     else: 
-        print('This is NOT a MAKEMAG file')
-        return None,None
+        print('This is NOT a raw file')
+        # try to load as a table
+        phot = Table.read(filename,format='ascii')
+        return phot
 
     return phot,head
 
@@ -950,8 +958,322 @@ def writeals(outfile,phot,head):
     # Closing the file
     f.close()
 
-def loadtrans(transfile):
-    pass
+    
+def loadtrans(transfile,silent=False,logfile=None):
+    """
+    Read in a photometric transformation file. 
+ 
+    Parameters
+    ----------
+    transfile : str
+      This gives the transformation information needed 
+        to calibrate the raw photometry.  Normally there 
+        is a different one of these for every night. 
+ 
+        There need to be two lines per band. 
+        FIRST line:  band name,  color name, transformation 
+        equation coefficients (zero point, airmass, color 
+        airmass*color, color^2) 
+        SECOND line: errors in the transformation equation 
+        coefficients 
+ 
+        This is an example transfile: 
+        M    M-T  -0.9990    0.1402     -0.1345    0.0000   0.0000 
+                  1.094E-02  5.037E-03  2.010E-03  0.0000   0.0000 
+        T    M-T  -0.0061    0.0489     0.0266     0.0000   0.0000 
+                  6.782E-03  3.387E-03  1.374E-03  0.0000   0.0000 
+        D    M-D  1.3251     0.1403     -0.0147    0.0000   0.0000 
+                  1.001E-02  5.472E-03  2.653E-02  0.0000   0.0000 
+ 
+        If the transfile has chip information then it should 
+        look like this: 
+        1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+                    0.0040   -0.0000    0.0001   0.0000   0.0000 
+ 
+        2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000 
+                    0.0039   -0.0000    0.0001   0.0000   0.0000 
+ 
+        3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000 
+                    0.0039   -0.0000    0.0001   0.0000   0.0000 
+ 
+        If the transfile has night and chip information then it should 
+        look like this: 
+        55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+                           0.0040   -0.0000    0.0001   0.0000   0.0000 
+ 
+        55975  2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000 
+                           0.0039   -0.0000    0.0001   0.0000   0.0000 
+ 
+        55975  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000 
+                           0.0039   -0.0000    0.0001   0.0000   0.0000 
+ 
+        The transformation information can also be input for 
+        individual file: 
+        F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+                                 0.0040   -0.0000    0.0001   0.0000   0.0000 
+ 
+        F5-00517150_44  G  G-R  -0.4284    0.1767   -0.1261   0.0000   0.0000 
+                                 0.0030    0.0020    0.0001   0.0000   0.0000 
+ 
+        F5-00517150_45  G  G-R  -0.5082    0.1801   -0.1215   0.0000   0.0000 
+                                 0.0025    0.0023    0.0001   0.0000   0.0000 
+ 
+        Each pair of lines can use a different format, i.e. the four format 
+        types can be mixed in a file.  But this is not recommended since 
+        it might be confusing what transformation to use for a given file 
+        since there could be multiple "matches". 
+ 
+    silent : boolean, optional
+      Don't print anything to the screen. 
+    logfile : str, optional
+      The name of a logfile to write messages to. 
+ 
+    Returns
+    -------
+    trans : dict
+      The transformation structure.  NIGHT and CHIP will 
+        always be included even if they are "blank". 
+ 
+    Example
+    -------
+
+    trans = loadtrans('n1.trans')
+ 
+    By D.Nidever  Feb.2013 
+    Added Night+chip format March 2015 
+    Added filename format  July 2017 
+    Translated to Python by D. Nidever,  April 2022
+    """
+     
+    if os.path.exists(transfile) == False:
+        raise ValueError(transfile+' NOT FOUND')
+    
+    # Logfile
+    # Set up logging to screen and logfile
+    logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+    logger = logging.getLogger() 
+    while logger.hasHandlers(): # some existing loggers, remove them   
+        logger.removeHandler(logger.handlers[0]) 
+    logger = logging.getLogger()
+    if logfile is not None:
+        if os.path.exists(logfile): os.remove(logfile)
+        fileHandler = logging.FileHandler(logfile)
+        fileHandler.setFormatter(logFormatter)
+        rootLogger.addHandler(fileHandler)
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+        logger.setLevel(logging.NOTSET)
+    else:
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+        logger.setLevel(logging.NOTSET)   
+     
+    ## ##################################################### 
+    ## READ THE TRANSFORMATION FILE 
+    ## Two lines per band. 
+    ## First line:  band name,  color name, transformation equation coefficients 
+    ## Second line: errors in the transformation equation coefficients 
+     
+    # If this has chip-specific transformations then the lines will be 
+    # First line:  chip,  band name, color name, trans eqns. 
+    # second line:  errors 
+    #  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+    #              0.0040   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    #  2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000 
+    #              0.0039   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    #  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000 
+    #              0.0039   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    # If the file has night and chip information then the lines will be 
+    # First line: night, chip,  band name, color name, trans eqns. 
+    # second line:  errors 
+    #  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+    #                     0.0040   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    #  55975  2  G  G-R  -0.3617    0.1713   -0.1193   0.0000   0.0000 
+    #                     0.0039   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    #  55975  3  G  G-R  -0.3457    0.1713   -0.1193   0.0000   0.0000 
+    #                     0.0039   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    # If the file has information on individual files then the lines will be 
+    # First line: filename,  band name, color name, trans eqns. 
+    # second line:  errors 
+    #  F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+    #                           0.0040   -0.0000    0.0001   0.0000   0.0000 
+    # 
+    #  F5-00517150_44  G  G-R  -0.4284    0.1767   -0.1261   0.0000   0.0000 
+    #                           0.0030    0.0020    0.0001   0.0000   0.0000 
+    # 
+    #  F5-00517150_45  G  G-R  -0.5082    0.1801   -0.1215   0.0000   0.0000 
+    #                           0.0025    0.0023    0.0001   0.0000   0.0000 
+    # 
+     
+    # What options? 
+    # 1 - single night, single chip (no NIGHT or CHIP information) 
+    # 2 - single night, multiple chips (no NIGHT but CHIP information) 
+    # 3 - multiple nights, multiple chips (NIGHT and CHIP information) 
+    # 4 - individual files 
+    optcase = -1 
+    # I DON'T THINK "optcase" IS ACTUALLY USED FOR ANYTHING ANYMORE 
+
+    dt = [('night',int),('chip',int),('file',np.str,300),('band',np.str,10),('color',np.str,10),('colband',np.str,10),
+          ('colsign',int),('zpterm',float),('amterm',float),('colterm',float),('amcolterm',float),('colsqterm',float),
+          ('zptermsig',float),('amtermsig',float),('coltermsig',float),('amcoltermsig',float),('colsqtermsig',float)]
+    nlines = dln.numlines(transfile)
+    trans = np.zeros(nlines,dtype=np.dtype(dt))
+
+    count = 0
+    with open(transfile,'r') as f:
+        while True:
+            line = f.readline().replace('\n','')
+            if line=='':  # we're at the end
+                break
+            # Blank or commented line
+            if line.strip()=='' or line[0]=='#':
+                continue
+             
+            # This is the format.  NIGHT (MJD), CHIP, BAND, COLOR, ZPTERM, AMTERM, 
+            #                       COLORTERM, AMCOLTERM, AMSQTERM 
+            #  55975  1  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+            #                     0.0040   -0.0000    0.0001   0.0000   0.0000 
+            # NIGHT and CHIP are optional. 
+            # For specific files it looks like this: 
+            #  F5-00517150_43  G  G-R  -0.4089    0.1713   -0.1193   0.0000   0.0000 
+            #                           0.0040   -0.0000    0.0001   0.0000   0.0000 
+             
+            # Are NIGHT and CHIP supplied? 
+            # ---NIGHT and CHIP--- 
+            if narr==9:         
+                # Make sure NIGHT and CHIP are numbers
+                if arr[0].isnumeric() and arr[1].isnumeric():
+                    trans['night'][count] = arr[0]
+                    trans['chip'][count] = arr[1] 
+                    arr = arr[2:] 
+                # Parsing error 
+                else: 
+                    raise ValueError('NIGHT and CHIP must be numbers.')
+                optcase = np.maximum(optcase,3)
+                 
+            # ---CHIP or FILENAME--- 
+            if narr==8:     
+                # CHIP, first value is a number
+                if arr[0].isnumeric():
+                    trans['chip'][count] = arr[0]
+                    arr = arr[1:] 
+                    optcase = np.maximum(optcase,2)
+                    # FILENAME, first value is NOT a number 
+                else: 
+                    trans['file'][count] = arr[0].strip()
+                    arr = arr[1:] 
+                    optcase = np.maximum(optcase,4)
+             
+            # ---Neither--- 
+            if narr==7:
+                # not much to do 
+                optcase = np.maximum(optcase,1)
+ 
+            # ---Not enough values--- 
+            else:
+                raise ValueError('Need at least 7 values in the TRANS line.')
+ 
+            # Parse the rest of the line 
+            trans['band'][count] = arr[0] 
+            trans['color'][count] = arr[1] 
+            trans['zpterm'][count] = arr[2] 
+            trans['amterm'][count] = arr[3] 
+            trans['colterm'][count] = arr[4] 
+            trans['amcolterm'][count] = arr[5] 
+            trans['colsqterm'][count] = arr[6] 
+ 
+            # Reading in the error line 
+            #---------------------------
+            line2 = f.readline().replace('\n','')
+            arr2 = line2.split()
+            narr2 = len(arr2) 
+ 
+            # Need at least 5 terms 
+            if narr2 < 5: 
+                raise ValueError('Need at least 5 values in the ERROR line.')
+ 
+            # Parse the error line 
+            trans['zptermsig'][count] = arr2[0] 
+            trans['amtermsig'][count] = arr2[1] 
+            trans['coltermsig'][count] = arr2[2] 
+            trans['amcoltermsig'][count] = arr2[3] 
+            trans['colsqtermsig'][count] = arr2[4] 
+
+            count += 1
+ 
+
+    # Trim extra elements
+    trans = trans[0:count]
+            
+    # Leave in NIGHT and CHIP columns even if they are "blank".  For 
+    # consistency sake 
+ 
+    # No chip information, strip CHIP 
+    #gdnight = where(trans.chip ge 0,ngdchip) 
+    #gdchip = where(trans.chip ge 0,ngdchip) 
+    #if ngdchip eq 0 then begin 
+    #  oldtrans = trans 
+    #  trans = replicate({band:'',color:'',colband:'',colsign:0,zpterm:0.0d,amterm:0.0d,colterm:0.0d,
+    #            amcolterm:0.0d,colsqterm:0.0d,zptermsig:0.0d,amtermsig:0.0d,coltermsig:0.0d,
+    #            amcoltermsig:0.0d,colsqtermsig:0.0d},n_elements(trans)) 
+    #  STRUCT_ASSIGN,oldtrans,trans 
+    #  undefine,oldtrans 
+    #endif 
+ 
+    ntrans = len(trans) 
+ 
+    # Figure out the colband and colsign for each band/chip 
+    for i in range(ntrans): 
+        band = trans['band'][i].strip()
+        col = trans['color'][i]
+        col = "".join(col.split())  # remove any spaces
+        # Splitting up the two bands
+        arr = col.split('-')
+        ind, = np.where(arr==band)
+        # colsign = 1 means band - colband 
+        if (ind[0] == 0): 
+            trans['colband'][i] = arr[1] 
+            trans['colsign'][i] = 1 
+        # colsign = 2 means colband - band 
+        elif (ind[0] == 1): 
+            trans['colband'][i] = arr[0] 
+            trans['colsign'][i] = 2 
+        elif (ind[0] == -1): 
+            trans['colband'][i] = '' 
+            trans['colsign'][i] = -1 
+ 
+    # Print the transformation equations
+    if silent==False:
+        logger.info(' TRANSFORMATION EQUATIONS')
+        logger.info('--------------------------------------------------------------------------------')
+        logger.info('  NIGHT/CHIP/FILE  BAND COLOR ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR**2 ')
+        logger.info('--------------------------------------------------------------------------------')
+        for i in range(ntrans):
+            form1 = '%10f%d6%6s%s7%10.4f%10.4f%10.4f%10.4f%10.4f'
+            form1f = '%-16s%6s%7s%10.4f%10.4f%10.4f%10.4f%10.4f'
+            # FILENAME 
+            if trans['file'][i] != '': 
+                logger.info(form1f % (trans['file'][i],'  '+trans['band'][i],trans['color'][i],trans['zpterm'][i],
+                                     trans['amterm'][i],trans['colterm'][i],trans['amcolterm'][i],trans['colsqterm'][i]))
+            # NO Filename 
+            if trans['file'][i] == '':
+                logger.info(form1 % (trans['night'][i],trans['chip'][i],'  '+trans['band'][i],trans['color'][i],trans['zpterm'][i],
+                                     trans['amterm'][i],trans['colterm'][i],trans['amcolterm'][i],trans['colsqterm'][i]))
+                form2 = '%29s%10.4f%10.4f%10.4f%10.4f%10.4f'
+                logger.info(form2 % ('',trans['zptermsig'][i],trans['amtermsig'][i],trans['coltermsig'][i],
+                                     trans['amcoltermsig'][i],trans['colsqtermsig'][i]))
+                logger.info('--------------------------------------------------------------------------------')
+                logger.info('')
+ 
+    return trans
  
 def loadtfr(tfrfile):
     """
@@ -1644,8 +1966,8 @@ def readfile(filename,exten=None,header=False,nowrite=False):
         return loadaper(filename)
     elif ext=='mch':
         return loadmch(filename)
-    elif ext=='raw':
-        return loadraw(filename)    # STILL NEED THIS!!
+    elif ext=='raw' or ext=='makemag':
+        return loadraw(filename)
     elif ext=='tfr':
         return loadtfr(filename)
     elif ext=='als' or ext=='alf':
@@ -1662,9 +1984,9 @@ def readfile(filename,exten=None,header=False,nowrite=False):
                 meta = fits.getdata(filename,2)
             return phot,meta
         else:
-            if header: #only read header
+            if header: # only read header
                 return dln.readlines(filename,nreadline=1)
-            phot = loadmag(filename)    # STILL NEED THIS!!!!
+            phot = loadraw(filename)
             return phot,meta  
     elif ext=='ast':
         if isfits:
@@ -1686,7 +2008,7 @@ def readfile(filename,exten=None,header=False,nowrite=False):
             phot = Table.read(filename,format='ascii')
             return phot,meta
     elif ext=='trans':
-        return read_trans(filename)   # STILL NEED THIS
+        return read_trans(filename)
     elif ext=='phot':
         if isfits:
             hdu = fits.open(filename)
