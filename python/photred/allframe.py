@@ -125,13 +125,13 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
     base,ext = os.path.splitext(os.path.basename(filename))
      
     # Read the .opt file
-    opt = utils.readopt(base+'.opt')
+    opt = io.readopt(base+'.opt')
     satlevel = opt['HI']
     gain = opt['GA']
     fwhm = opt['FW']
      
     # Get pixel scale
-    scale = utils.getpixscale(filename)
+    scale = utils.pixscale(filename)
     if scale is  None: # default 
         scale = 0.5 
      
@@ -216,8 +216,9 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 gd , = np.where(strmid(fields,0,1) != '#' and str(fields) != '')
                 fields = fields[gd] 
                 fields = repstr(fields,'(1)','') 
-                #fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR'] 
-                sex = IMPORTASCII(catfile,fieldnames=fields)
+                #fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
+                sex = Table.read(catfile,format='ascii')
+                #sex = IMPORTASCII(catfile,fieldnames=fields)
             else:
                 sex = Table.read(catfile)
                 if n_tags(sex) == 1: 
@@ -239,7 +240,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             # Concatenate with the ALS file to make a combined 
             # list of sources 
             coofile = base+'_all.coo'
-            if sos.path.exists(coofile): os.remove(coofile) # delete final coordinate file 
+            if os.path.exists(coofile): os.remove(coofile) # delete final coordinate file 
             nals = len(als) 
              
             # ALS file exists, concatenate 
@@ -272,7 +273,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 nall = len(all) 
                  
                 # Write to file 
-                utils.writeals(coofile,all,alshead)
+                io.writeals(coofile,all,alshead)
                  
             # First time, no ALS file yet 
             else:  
@@ -291,7 +292,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 sex2['sharp'] = 0.0 
                  
                 # Write to file 
-                utils.writeals(coofile,sex2,head)
+                io.writeals(coofile,sex2,head)
                  
                 # Initialize the structure of all SExtractor detections 
                 allsex = np.copy(sex)
@@ -404,7 +405,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 nall = len(all) 
                  
                 # Write to file 
-                utils.writeals(coofile,all,alshead)
+                io.writeals(coofile,all,alshead)
 
                  
             # First time, no ALS file yet 
@@ -428,7 +429,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 dao['sharp'] = 0.0 
                  
                 # Use the DAOPHOT FIND/PHOT data 
-                utils.writeals(coofile,dao,head)
+                io.writeals(coofile,dao,head)
          
         #----------------------------------------------------- 
         # Run ALLSTAR on all sources found so far 
@@ -877,7 +878,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     combbase = os.path.basename(combfile,'.fits')
     if fake:
         # Make .opt files, set saturation just below the mask data level
-        mkopt(combfile,va=1,hilimit=maskdatalevel-1000,error=opterror)
+        utils.mkopt(combfile,va=1,hilimit=maskdatalevel-1000,error=opterror)
         if len(opterror) > 0: 
             logger.info(opterror)
             cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup

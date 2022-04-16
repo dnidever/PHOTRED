@@ -3,8 +3,730 @@
 import os
 import time
 import numpy as np
+import glob as glob
+from astropy.io import fits
+from astropy.wcs import WCS
+from dlnpyutils import utils as dln
+from . import io
+
+def ia_trim(xshift,yshift,xsize,ysize,trimsection,vignette):
+    """ Helper function to deal with trim sections."""
+     
+    # Found this in the IMCENTROID source code: 
+    # /iraf/iraf/pkg/images/immatch/src/listmatch/t_imctroid.x 
+     
+    ## IA_TRIM -- Compute the trim section. 
+    # 
+    #procedure ia_trim (cp) 
+    # 
+    #pointer cp                      #I center structure pointer 
+    # 
+    #real    xlo, xhi, ylo, yhi, xmin, ymin 
+    #int     ixlo, ixhi, iylo, iyhi, ixlonew, ixhinew, iylonew, iyhinew, i 
+    #int     vxlo, vxhi, vylo, vyhi          # vignetted versions 
+    #bool    firsttime 
+    # 
+    #begin 
+     
+    nimages = len(xshift) 
+     
+    firsttime = 1 
+    for i in range(nimages): 
+         
+        #firsttime = true 
+        #do i = 1, NIMAGES(cp) { 
+         
+        #if (IS_INDEFR(XSHIFT(cp,i)) || IS_INDEFR(YSHIFT(cp,i))) 
+        #    next 
+         
+        ## Compute limits. 
+        #xlo = 1. + XSHIFT(cp,i) 
+        #ylo = 1. + YSHIFT(cp,i) 
+        #xhi = XSIZE(cp,i) + XSHIFT(cp,i) 
+        #yhi = YSIZE(cp,i) + YSHIFT(cp,i) 
+        xlo = 1.0 + xshift[i] 
+        ylo = 1.0 + yshift[i] 
+        xhi = xsize[i] + xshift[i] 
+        yhi = ysize[i] + yshift[i] 
+         
+        #ixlonew = int (xlo) 
+        #if (xlo > ixlonew)                  # round up 
+        #    ixlonew = ixlonew + 1 
+        ixlonew = np.ceil(xlo) 
+         
+        #ixhinew = int (xhi) 
+        #if (xhi < ixhinew)                  # round down 
+        #    ixhinew = ixhinew - 1 
+        ixhinew = np.floor(xhi) 
+         
+        #iylonew = int (ylo)                 # round up 
+        #if (ylo > iylonew) 
+        #    iylonew = iylonew + 1 
+        iylonew = np.ceil(ylo) 
+         
+        #iyhinew = int (yhi)                 # round down 
+        #if (yhi < iyhinew) 
+        #    iyhinew = iyhinew - 1 
+        iyhinew = np.floor(yhi) 
+         
+        if (firsttime): 
+            ixlo = ixlonew 
+            ixhi = ixhinew 
+            iylo = iylonew 
+            iyhi = iyhinew 
+             
+            #xmin = XSIZE(cp,i) 
+            #ymin = YSIZE(cp,i) 
+            xmin = xsize[i] 
+            ymin = ysize[i] 
+             
+            firsttime = 0 
+        else: 
+            #ixlo = max (ixlo, ixlonew) 
+            #ixhi = min (ixhi, ixhinew) 
+            #iylo = max (iylo, iylonew) 
+            #iyhi = min (iyhi, iyhinew) 
+            ixlo = np.max([ixlo,ixlonew]) 
+            ixhi = np.min([ixhi,ixhinew]) 
+            iylo = np.max([iylo,iylonew]) 
+            iyhi = np.min([iyhi,iyhinew]) 
+             
+            #xmin = min (XSIZE(cp,i), xmin) 
+            #ymin = min (YSIZE(cp,i), ymin) 
+            xmin = np.min([xsize[i], xmin]) 
+            ymin = np.min([ysize[i], ymin]) 
+     
+    ## Don't bother to complain. 
+    #if (firsttime) 
+    #    return 
+     
+    #call printf ("\n") 
+     
+    ## Vignetting is possible downstream since imshift and other tasks 
+    ## preserve the size of the input image. 
+     
+    #vxlo = max (1, min (ixlo, int(xmin))) 
+    #vxhi = max (1, min (ixhi, int(xmin))) 
+    #vylo = max (1, min (iylo, int(ymin))) 
+    #vyhi = max (1, min (iyhi, int(ymin))) 
+    vxlo = np.max([1, np.min([ixlo, int(xmin)]) ]) 
+    vxhi = np.max([1, np.min([ixhi, int(xmin)]) ]) 
+    vylo = np.max([1, np.min([iylo, int(ymin)]) ]) 
+    vyhi = np.max([1, np.min([iyhi, int(ymin)]) ]) 
+     
+    #if (vxlo != ixlo || vxhi != ixhi || vylo != iylo || vyhi != iyhi) { 
+    #    call eprintf ("#Vignette_Section = [%d:%d,%d:%d]\n") 
+    #        call pargi (vxlo) 
+    #        call pargi (vxhi) 
+    #        call pargi (vylo) 
+    #        call pargi (vyhi) 
+    #} 
+    if (vxlo != ixlo or vxhi != ixhi or vylo != iylo or vyhi != iyhi): 
+        vignette = [vxlo,vxhi,vylo,vyhi] 
+        print('Vignette_Section = [',str(vxlo,2),':',str(vxhi,2),',',str(vylo,2),':',str(vyhi,2),']')
+     
+    ## Output the trim section. 
+    #call printf ("#Trim_Section = [%d:%d,%d:%d]\n") 
+    #    call pargi (ixlo) 
+    #    call pargi (ixhi) 
+    #    call pargi (iylo) 
+    #    call pargi (iyhi) 
+    trimsection = [ixlo,ixhi,iylo,iyhi] 
+    print('Trim_Section = [',str(ixlo,2),':',str(ixhi,2),',',str(iylo,2),':',str(iyhi,2),']')
+     
+    # call flush (STDOUT) 
+
+ 
+def allframe_calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
+    """
+    Helper function to calculate weights
+    """
+     
+    sz = size(mag) 
+    ngd = sz[2] 
+    nfiles = sz[1] 
+     
+    # Make 2D arrays for fwhm, rdnoise and medsky 
+    fwhm2 = fwhm#(fltarr(ngd)+1.0) 
+    rdnoise2 = rdnoise#(fltarr(ngd)+1.0) 
+    medsky2 = medsky#(fltarr(ngd)+1.0) 
+     
+    # Computing intensity and weight for each star 
+    #C Compute the intensity from the magnitude, easy enough 
+    #            intensity=10**( (Mag(i,num(i))-25.0)/(-2.5)) 
+    #C Now compute the S/N (called the weight here) 
+    #            weight(i,n)=(intensity/(Pi*FWHM(i)**2)) / 
+    #     &      (sqrt(RDNOISE(i)**2 
+    #     &      + MEDSKY(i) + intensity/(Pi*FWHM(i)**2) ) ) 
+    #C            print*, id(i,num(i)) 
+    # magnitude zero-point: 1 star ADU == 25.0 mag 
+    intensity = 10.0**( (mag-25.0)/(-2.5) ) 
+    weight = (intensity/(!dpi*fwhm2**2.0))/ (sqrt(rdnoise2**2.0 + medsky2 + intensity/(!dpi*fwhm2**2.0) ) ) 
+    #weight(i,n)=(intensity/(Pi*FWHM(i)**2)) / (sqrt(RDNOISE(i)**2+ MEDSKY(i) + intensity/(Pi*FWHM(i)**2) ) ) 
+     
+    # You get similar results if you use: weight = 1.0/err 
+    # since magnitude errors are basically N/S 
+     
+    #C Now lets normalize the S/N (weight) for each star, take the maximimum S/N 
+    #C and normalize so that is 1 S/N(i)/maximum S/N 
+    #       do j=1,n-1 
+    #          maxweight=-99999999.98 
+    #          do i=1,FMAX 
+    #           if(weight(i,j).gt.maxweight) maxweight=weight(i,j) 
+    #          end do 
+    #           weight(1:FMAX,j)=weight(1:FMAX,j)/maxweight 
+    #C           print*,weight(1:FMAX,j),maxweight 
+    #       end do 
+     
+    maxw = np.max(weight,dim=1) 
+    maxw2 = (np.ones(nfiles))#maxw 
+    nweight = weight/maxw2 
+     
+     
+    #C Finally computed the actual weight, by summing up the normalized weights, 
+    #C and dividing thru by the sum 
+    #       do j=1,FMAX 
+    #        avgweight(j)=sum(weight(j,1:n)) 
+    #C/dble(n-1) 
+    #C        print*, avgweight(j),n 
+    #       end do 
+    #        actweight(1:FMAX)=avgweight(1:FMAX)/sum(avgweight(1:FMAX)) 
+    #C Print them out, so we can put them somewhere useful 
+    #       do j=1,FMAX 
+    #          print*,actweight(j) 
+    #       end do 
+    #       stop 
+    #       end 
+     
+    #avgweight = total(weight2,2)/ngd 
+    avgweight = np.sum(nweight,2) 
+    actweight = avgweight/np.sum(avgweight) 
+    # They sum to 1.0 
+     
+     
+    # Compute the scaling for each frame.  scale=1 for the first frame 
+    scales = fltarr(nfiles) 
+    for i in range(nfiles): 
+        ratio = reform(intensity[i,:]/intensity[0,:]) 
+        ratio_error = reform(sqrt(err[i,:]**2 + err[0,:]**2))# mag errors are ~fractional 
+        med_ratio = np.median(ratio) 
+        #wmeanerr,ratio,ratio_error,xmean,xsigma 
+        scales[i] = med_ratio 
+     
+    return scales
 
 
+def getweights_raw(tab):
+    """ 
+    This calculates weights, scales and sky values from the arrays from 
+    the DAOPHOT .raw file.  Called by allframe_getweights.pro 
+     
+    Parameters
+    ----------
+    tab         Input structure (one element per file) giving 
+                   MAG[Nstars], ERR[Nstars], FWHM, RDNOISE, MEDSKY 
+     
+    Returns
+    -------
+    out      Output structure similar to input structure but 
+                    with WEIGHTS and SCALES added. 
+     
+    Example
+    -------
+
+    out = getweights_raw(tab)
+     
+    By D.Nidever   Jan 2019, broke out functionality from allframe_getweights.pro 
+    """
+
+     
+    mag = transpose(str.mag) 
+    err = transpose(str.err) 
+    fwhm = str.fwhm 
+    rdnoise = str.rdnoise 
+    medsky = str.medsky 
+     
+    if size(mag,/n_dim) == 2: 
+        nstars = len(mag[0,:]) 
+    else: 
+        nstars=len(mag) 
+    if size(mag,/n_dim) == 2: 
+        nfiles = len(mag[:,0]) 
+    else: 
+        nfiles=1 
+     
+    # Getting the reference sources 
+    totstars = np.sum(mag < 50,1) 
+    si = np.flip(np.argsort(totstars))# get the stars with the most detections 
+    #gdrefstars = si[0:(99<(nstars-1))] 
+    gdrefstars = si[0:(49<(nstars-1))] 
+    nrefstars = len(gdrefstars) 
+    # Getting the "good" frames 
+    totframe = np.sum(mag[:,gdrefstars] < 50,2)# # of ref stars detected per frame 
+    gdframe , = np.where(totframe == nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe) 
+    # No good frames, lower number of reference stars 
+    if ngdframe == 0: 
+        gdrefstars = si[0:(29<(nstars-1))] 
+        nrefstars = len(gdrefstars) 
+        totframe = np.sum(mag[:,gdrefstars] < 50,2) 
+        gdframe , = np.where(totframe == nrefstars,ngdframe,comp=bdframe,ncomp=nbdframe) 
+    # No good frames again, say the frame with the most detections is "good" 
+    #   get weights relative to that one for the others 
+    if ngdframe == 0: 
+        # say the frame with the most detections is "good" and 
+        #  the rest are bad, get weights relative to this one frame 
+        totstarsframe = np.sum(mag < 50,2) 
+        gdframe = first_el(maxloc(totstarsframe)) 
+        bdframe = lindgen(nfiles,1) 
+        remove,gdframe,bdframe 
+        nbdframe = len(bdframe) 
+        # Get stars that are good in this frames and in ALL of the others 
+        gdrefstars , = np.where(reform(mag[gdframe,:]) < 50 and totstars == nfiles,nrefstars) 
+        #  lower threshold, at least half 
+        if nrefstars == 0 : 
+            gdrefstars , = np.where(reform(mag[gdframe,:]) < 50 and totstars > 0.5*nfiles,nrefstars) 
+        #  just the good ones 
+        if nrefstars == 0: 
+            gdrefstars , = np.where(reform(mag[gdframe,:]) < 50,nrefstars) 
+            si = np.flip(np.argsort(totstars[gdrefstars]))# order by how many other frames they are detected in 
+            gdrefstars = gdrefstars[si[0:(49>(nrefstars-1))]]# only want 50 
+            nrefstars = len(gdrefstars) 
+     
+    # Calculate the weights 
+    weights = fltarr(nfiles) 
+    scales = fltarr(nfiles) 
+    mag2 = mag[gdframe,:] & mag2 = mag2[:,gdrefstars] 
+    err2 = err[gdframe,:] & err2 = err2[:,gdrefstars] 
+    ALLFRAME_CALCWEIGHTS,mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe],         weights1,scales1 
+    weights[gdframe] = weights1 
+    scales[gdframe] = scales1 
+     
+    # If there are some "bad" frames calculate their weights 
+    #  relative to some of the "good" ones 
+    for i in range(nbdframe): 
+         
+        iframe = bdframe[i] 
+         
+        # First round of "good" stars 
+        totgdstars = np.sum(mag[gdframe,:] < 50,1)# stars in good frames 
+        igdrefstars1 , = np.where(mag[iframe,:] < 50 and totgdstars >= 5,nigdrefstars1) 
+        if nigdrefstars1 < 3 : 
+            igdrefstars1 , = np.where(mag[iframe,:] < 50 and totgdstars >= 1,nigdrefstars1) 
+        if nigdrefstars1 < 2 : 
+            goto,BOMB 
+         
+        totgdstars1 = np.sum( (mag[gdframe,:])[:,igdrefstars1] < 50,1) 
+        si1 = np.flip(np.argsort(totgdstars1))# get the best ones 
+        igdrefstars = igdrefstars1[si1[0:(49<(nigdrefstars1-1))]] 
+        nirefstars = len(igdrefstars) 
+         
+        itotframe = np.sum( (mag[gdframe,:])[:,igdrefstars] < 50,2) 
+        igdframe1 , = np.where( itotframe == nirefstars,nigdframe1) 
+         
+        # Whittle down to the best stars/frames 
+        if nigdframe1 == 0: 
+             
+            igdframe = gdframe 
+            igdrefstars = igdrefstars 
+             
+            # whittle down to best stars and frames 
+            count = 0 
+= 0 
+        while endflag == 0: 
+             
+            # sum over frames 
+            itot1 = np.sum( (mag[igdframe,:])[:,igdrefstars] < 50,1) 
+            si1 = np.argsort(itot1) 
+            # remove worst 5% stars 
+            if len(igdrefstars) > 3: 
+                bd1 = si1[0:int(np.round(len(igdrefstars)*0.05)] 
+                remove,bd1,igdrefstars 
+             
+            # sum over stars 
+            itot2 = np.sum( (mag[igdframe,:])[:,igdrefstars] < 50,2) 
+            si2 = np.argsort(itot2) 
+            # remove worst 5% frames 
+            if len(igdframe) > 1: 
+                bd2 = si2[0:int(np.round(len(igdframe)*0.05)] 
+                remove,bd2,igdframe 
+             
+            # Testing if we should end 
+            itotframe = np.sum( (mag[igdframe,:])[:,igdrefstars] < 50,2) 
+            igdframe1 , = np.where( itotframe == len(igdrefstars),nigdframe1) 
+            if nigdframe1 > 0 : 
+ 
+         
+        if endflag == 1 : 
+            igdframe=igdframe[igdframe1] 
+        if count > 50 :# not converging, end it 
+            goto,BOMB 
+         
+        count++ 
+     
+ else igdframe=gdframe[igdframe1] 
+     
+    # Get weights relative to some "good" frames 
+    indframes = [igdframe,iframe] 
+    mag3 = (mag[indframes,:])[:,igdrefstars] 
+    err3 = (err[indframes,:])[:,igdrefstars] 
+    ALLFRAME_CALCWEIGHTS,mag3,err3,fwhm[indframes],rdnoise[indframes],medsky[indframes],                       weights3,scales3 
+     
+    # Scale these relative to the original ones 
+    weights3a = weights[igdframe]# original 
+    weights3b = weights3[0:nigdframe1-1]# new 
+    wtfrac = np.median(weights3a/weights3b) 
+    scales3a = scales[igdframe]# original 
+    scales3b = scales3[0:nigdframe1-1]# new 
+    sclfrac = np.median(scales3a/scales3b) 
+    new_weights = weights3[nigdframe1] * wtfrac 
+    new_scale = scales3[nigdframe1] * sclfrac 
+    weights[iframe] = new_weights 
+    scales[iframe] = new_scale 
+     
+    #print,iframe,new_weights,new_scale 
+     
+    BOMB: 
+     
+ 
+# Fix images with bad weights likely due to no overlap 
+#  use the FLUX values to get a weight 
+bdweights , = np.where(weights <= 0.0,nbdweights,comp=gdweights,ncomp=ngdweights) 
+if nbdweights > 0: 
+    # Use fluxrate10 to get weights and flux10 to get scales 
+    # relative to "good" frame 
+    if ngdweights > 0: 
+        weights[bdweights] = str[bdweights].fluxrate10 * np.median([weights[gdweights]/str[gdweights].fluxrate10]) 
+        scales[bdweights] = str[bdweights].flux10 * np.median([scales[gdweights]/str[gdweights].flux10]) 
+        # all bad 
+    else: 
+        weights = str.fluxrate10 
+        scales = str.flux10 
+ 
+# Normalize the weights 
+weights /= np.sum(weights) 
+ 
+# Rescale SCALES so the reference frames has SCALE=1.0 
+if scales[0] > 0.0: 
+    scales /= scales[0] 
+else: 
+    scales/=max(scales) 
+ 
+# Create the output structure 
+schema = str[0] 
+struct_assign,{dum:''},schema 
+if tag_exist(schema,'weight') == 0 : 
+    schema = create_struct(schema,'weight',0.0) 
+if tag_exist(schema,'scale') == 0 : 
+    schema = create_struct(schema,'scale',0.0) 
+outstr = replicate(schema,nfiles) 
+struct_assign,str,outstr 
+    outstr['weight'] = weights 
+    outstr['scale'] = scales 
+
+
+    return outstr
+ 
+def getweights(mchfile,imager=None,logfile=None,silent=False):
+    """
+    This calculates weights, scales and sky values from DAOPHOT 
+    photometry files for images combination.  Used by ALLFRAME.PRO and 
+    other programs. 
+ 
+    You need to have run daophot, allstar, daomatch and daomaster 
+    already.  There need als, mch and raw files. 
+ 
+    Parameters
+    ----------
+    mchfile     The MCH filename 
+    imager     Imager structure with basic information 
+    logfile    A logfile to print to output to. 
+    silent     Don't print anything to the screen. 
+ 
+    Returns
+    -------
+    actweight   The array of weights. 
+    scales      The array of scales. 
+    medsky      The array of skys. 
+    raw2       The RAW photometry structure. 
+ 
+    Example
+    -------
+
+    weights,scales,sky = getweights('ccd1001.mch')
+ 
+    By D.Nidever   February 2008, broken out into its own program 4/8/15 
+    Translated to Python by D. Nidever, April 2022
+    """
+    
+    global photred,setup
+     
+    # OUTPUTS: 
+    #  actweight  The weight for each frame 
+    #  scales     The scale for each frame 
+    #  medsky     The sky value for each frame 
+     
+    tilesep = '+' 
+    #tilesep = '.' 
+    btilesep = int(byte(tilesep)) 
+     
+    # MCH file not found 
+    if os.path.exists(mchfile) == 0: 
+        print(mchfile,' NOT FOUND' 
+        return 
+     
+    if len(logfile) == 0 : 
+        logfile=-1 
+     
+    # Load the MCH file 
+    LOADMCH,mchfile,files,trans 
+    nfiles = len(files) 
+     
+    #----------------------------------- 
+    # Get the information that we need 
+     
+    # Load the opt files 
+    info = replicate({name:'',filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,mnsky:0.0,medsky:0.0,
+                      mag10:99.99,flux10:0.0,fluxrate10:0.0,weight:0.0,scale:0.0},nfiles) 
+    info.name = files 
+    for i in range(nfiles): 
+        dir = os.path.dirname(mchfile) 
+        base = os.path.basename(files[i],'.als') 
+        optfile = dir+'/'+base+'.opt' 
+        logfile1 = dir+'/'+base+'.log' 
+         
+        READCOL,optfile,name,dum,value,format='A,A,F',/silent 
+        name = str(strupcase(name),2) 
+         
+        ind_re , = np.where(name == 'RE',nind_re) 
+        info[i].rdnoise = value[ind_re[0]] 
+        ind_fw , = np.where(name == 'FW',nind_fw) 
+        info[i].fwhm = value[ind_fw[0]] 
+         
+        SPAWN,['grep','Clipped',logfile1],out,errout,/noshell 
+        #              Clipped mean and median =  187.442  187.215 
+         
+        # daophot.sh log files are clipped on Tortoise for some reason 
+        #  Get mean/median sky level 
+        if len(out) == 1 and out[0] == '': 
+            print('Getting mean/median sky levels for ',base 
+            if os.path.exists('daophot.opt') == 0 : 
+                file_copy,base+'.opt','daophot.opt'
+            cmdlines = []
+            cmdlines += ['#!/bin/sh']
+            cmdlines += ['export image=${1}']
+            cmdlines += ['daophot << END_DAOPHOT >> ${image}.find.log']
+            cmdlines += ['OPTIONS']
+            cmdlines += ['${image}.opt']
+            cmdlines += [' ']
+            cmdlines += ['ATTACH ${image}.fits']
+            cmdlines += ['FIND']
+            cmdlines += ['1,1']
+            cmdlines += ['${image}.find.temp']
+            cmdlines += ['y']
+            cmdlines += ['EXIT']
+            cmdlines += ['END_DAOPHOT']
+            tempscript = MKTEMP('dfind')# absolute filename 
+            dln.writelines(tempscript,cmdlines)
+            os.chmod(tempscripts,0o755)
+            os.remove(base+'.find.temp',/allow)
+            os.remove(base+'.find.log',/allow)
+            # Run DAOPHOT/FIND 
+            out1 = subprocess.check_output(tempscript+' '+base)
+             
+            logfile2 = base+'.find.log'
+            out = subprocess.check_output(['grep','Clipped',logfile2],shell=False)
+            #              Clipped mean and median =  187.442  187.215 
+             
+            # Delete temporary files 
+            os.remove(base+'.find.temp',/allow)
+            os.remove(tempscript,/allow_
+         
+        arr = strsplit(out[0],' ',/extract) 
+        info[i].mnsky = float(arr[5]) 
+        info[i].medsky = float(arr[6]) 
+         
+        # Get exptime and filter 
+        fitsfile = base+'.fits' 
+        if os.path.exists(fitsfile) == 0 : 
+            fitsfile+='.fz' 
+        info[i].exptime = PHOTRED_GETEXPTIME(fitsfile) 
+        info[i].filter = PHOTRED_GETFILTER(fitsfile) 
+
+     
+    # Only ONE file, return 1s 
+    if nfiles == 1: 
+        actweight = 1.0 
+        scales = 1.0 
+        medsky = info[0].medsky 
+        return 
+     
+     
+    #      program getweight 
+    #CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+    #C     Program computes weights according to signal to noise 
+    #C     Input in aperture photometry at FWHM, the readnoise, 
+    #C     and sky, and the program computes the S/N 
+    #C        S/N = I/(Pi*FWHM**2) / sqrt(RN**2 + sky + I/(Pi*FWHM**2) ) 
+    #C     This S/N is scaled for each set of stars, such that the maximum is 1 
+    #C      then the "scaled" S/N are added up, to get a "total" S/N for the frame 
+    #C      (dividing by n would give you the average, "scaled" S/N), lastly 
+    #C      all of the "total" S/N for each frame are summed, and that sum is 
+    #C      then divided into each "total" S/N to give a weight, good for use 
+    #C      in imcombine. 
+    #C      JCO -- 2000-ish 
+    #C 
+    #C      Use companion shell scripts to generate input files: 
+    #C       getweights.sh 
+    #C       rmweights.sh 
+    #C      Altered fortran (I hope) to read inpfile in format created by 
+    #C       these scripts. 
+    #C      RLB -- 06/08/2007 
+    #C 
+    #CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
+     
+    # Load the RAW file 
+    dir = os.path.dirname(mchfile) 
+    base = os.path.basename(mchfile,'.mch') 
+    rawfile = dir+'/'+base+'.raw' 
+    LOADRAW,rawfile,raw,rawhead 
+     
+    # Making mag and err arrays 
+    nstars = len(raw) 
+    tags = tag_names(raw) 
+    magind , = np.where(stregex(tags,'MAG',/boolean) == 1,nmagind) 
+    errind , = np.where(stregex(tags,'ERR',/boolean) == 1,nerrind) 
+    mag = fltarr(nfiles,nstars) 
+    err = fltarr(nfiles,nstars) 
+    for i in range(nfiles): 
+        mag[i,:] = raw.(magind[i]) 
+    for i in range(nfiles): 
+        err[i,:] = raw.(errind[i]) 
+     
+    # Calculate the magnitude and flux at the 10sigma magnitude 
+    for i in range(nfiles): 
+        gd , = np.where(mag[i,:] < 50,ngd) 
+        if ngd > 0: 
+            mag1 = mag[i,gd] 
+            snr1 = 1.087/err[i,gd] 
+            gdsnr , = np.where(abs(snr1-10.0) < 1,ngdsnr) 
+            if ngdsnr < 5 : 
+                gdsnr , = np.where(abs(snr1-10.0) < 2,ngdsnr) 
+            if ngdsnr < 5: 
+                si = np.argsort(abs(snr1-10.0)) 
+                gdsnr = si[0:99<(ngd-1)] 
+                ngdsnr = len(gdsnr) 
+            mag10 = np.median([mag1[gdsnr]]) 
+            info[i].mag10 = mag10 
+            info[i].flux10 = 10.0**( (mag10-25.0)/(-2.5) )# total counts 
+            info[i].fluxrate10 = info[i].flux10 / info[i].exptime# flux rate = counts / sec 
+     
+     
+    # Using TILES 
+    #-------------- 
+    # We are using TILES and have multiple chips/amps 
+    #   F1-00507800_39+T2.als, '+T' and two dots 
+    if len(imager) > 0: 
+        namps = imager['namps']
+    else: 
+        namps = 1 
+    if np.sum(stregex(files,'\'+tilesep+'T',/boolean)) == nfiles and    np.sum(int(byte(files[0])) == btilesep) >= 2 and namps > 1: 
+        usetiles = 1 
+         
+        # Number of unique exposures 
+        expname = strarr(nfiles) 
+        chip = strarr(nfiles) 
+        for i in range(nfiles): 
+            base1 = os.path.basename(files[i],'.als')# F1-00507800_39+T2 
+            field1 = (strsplit(base1,'-',/extract))[0]# F1 
+            expchptile = (strsplit(base1,'-',/extract))[1]# 00507800_39+T2 
+            expchp = (strsplit(expchptile,tilesep,/extract))[0]# 00507800_39 
+            expname[i] = (strsplit(expchp,imager.separator,/extract))[0] 
+            chip[i] = (strsplit(expchp,imager.separator,/extract))[1] 
+        # Unique exposures 
+        uiexp = np.uniq(expname,np.argsort(expname)) 
+        uexpname = expname[uiexp] 
+        nexp = len(uexpname) 
+         
+        # Combine all the catalogs for a given exposure 
+        # Calculate the weights 
+        expstr = replicate({mag:fltarr(nstars),err:fltarr(nstars),nfiles:0L,index:lonarr(nfiles),
+                      exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,medsky:0.0,mag10:99.99,flux10:0.0,fluxrate10:0.0},nexp) 
+        expmag = fltarr(nexp,nstars) 
+        experr = fltarr(nexp,nstars) 
+        for i in range(nexp): 
+            ind , = np.where(expname == uexpname[i],nind) 
+            expstr[i].nfiles = nind 
+            expstr[i].index[0:nind-1] = ind 
+            expstr[i].filter = info[ind[0]].filter 
+            expstr[i].exptime = info[ind[0]].exptime 
+            expstr[i].fwhm = np.median([info[ind].fwhm]) 
+            expstr[i].rdnoise = np.median([info[ind].rdnoise]) 
+            expstr[i].medsky = np.median([info[ind].medsky]) 
+            expstr[i].mag10 = np.median([info[ind].mag10]) 
+            expstr[i].flux10 = np.median([info[ind].flux10]) 
+            expstr[i].fluxrate10 = np.median([info[ind].fluxrate10]) 
+            # Combine the photometry 
+            mag1 = mag[ind,:] 
+            err1 = err[ind,:] 
+            # Multiple chips 
+            #   they shouldn't overlap, so just use the mean/median 
+            #   and that should pick up the detections 
+            if nind > 1: 
+                bd , = np.where(mag1 > 50,nbd) 
+                if nbd > 0 : 
+                    mag1[bd]=!values.f_nan 
+                if nbd > 0 : 
+                    err1[bd]=!values.f_nan 
+                expmag[i,:] = np.median(mag1,dim=1) 
+                experr[i,:] = np.median(err1,dim=1) 
+            else: 
+                expmag[i,:] = mag1 
+                experr[i,:] = err1 
+        # Replace NANs with 99.9999 
+        bdmag , = np.where(finite(expmag) == 0,nbdmag) 
+        expmag[bdmag] = 99.99 
+        experr[bdmag] = 9.99 
+        expstr.mag = transpose(expmag) 
+        expstr.err = transpose(experr) 
+        # Perform the weights and scales calculations 
+        outexpstr = getweights_raw(expstr)
+        # Give each chip the weight of its respective exposure 
+        for i in range(nexp): 
+            info[expstr[i].index[0:expstr[i].nfiles-1]].weight = outexpstr[i].weight 
+            info[expstr[i].index[0:expstr[i].nfiles-1]].scale = outexpstr[i].scale 
+         
+    # REGULAR Method 
+    #--------------- 
+    else: 
+        tab = replicate({mag:fltarr(nstars),err:fltarr(nstars),
+                         exptime:0.0,filter:'',fwhm:0.0,rdnoise:0.0,
+                         medsky:0.0,flux10:0.0,fluxrate10:0.0},nfiles) 
+        struct_assign,info,str 
+        tab['mag'] = transpose(mag) 
+        tab['err'] = transpose(err) 
+        # Perform the weights and scales calculations 
+        outstr = getweights_raw(tab)
+        info['weight'] = outstr['weight'] 
+        info['scale'] = outstr['scale']
+     
+     
+    # Print out the information 
+    if silent==False:
+        logger.info('        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE')
+        for i in range(nfiles):
+            fmt = '(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
+            data = (info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,
+                    info[i].medsky,info[i].weight,info[i].scale)
+            logger.info(fmt % data)
+     
+    # Final output 
+    actweight = info['weight']
+    scales = info['scale']
+    medsky = info['medsky']
+
+    return actweight,scales,medsky
+
+                      
 def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             satlevel=6e4,nocmbimscale=False,fake=False,usecmn=False,imager=None):
     """
@@ -135,31 +857,31 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     # Check that the mch, als, and opt files exist 
     mchtest = os.path.exists(mchfile) 
     if mchtest == 0: 
-        printlog,logf,mchfile,' NOT FOUND' 
+        logger.info(mchfile,' NOT FOUND' 
         return 
      
     # Checking RAW file 
     rawtest = os.path.exists(mchbase+'.raw') 
     if rawtest == 0: 
-        printlog,logf,mchbase+'.raw NOT FOUND' 
+        logger.info(mchbase+'.raw NOT FOUND' 
         return 
      
      
     ############################################ 
     # CHECK NECESSARY FILES 
      
-    # Load the MCH file 
-    LOADMCH,mchfile,files,trans,magoff 
+    # Load the MCH file
+    files,trans,magoff = io.loadmch(mchfile)
     nfiles = len(files) 
      
     # FAKE, check that we have all the files that we need 
-    if keyword_set(fake): 
+    if fake: 
         # weights, scale, zero, comb_psf, _shift.mch 
         chkfiles = mchbase+['.weights','.scale','.zero','_comb.psf','_comb.mch'] 
         bdfiles , = np.where(os.path.exists(chkfiles) == 0,nbdfiles) 
         if nbdfiles > 0: 
             error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ') 
-            printlog,logf,error 
+            logger.info(error 
             return 
      
      
@@ -172,15 +894,18 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
      
     # Gather information on all of the files 
     # photred_gatherfileinfo.pro can do most of this 
-    printlog,logf,'Gathering file information' 
+    logger.info('Gathering file information' 
     ntrans = len(trans[0,:]) 
-    filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),                      vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,                      background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,                      resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles) 
-    filestr.fitsfile = fitsfiles 
-    filestr.catfile = files 
-    filestr.trans = transpose(trans) 
-    filestr.magoff = magoff 
-    filestr.resampfile = outfiles 
-    filestr.resampmask = outmaskfiles 
+    filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),
+                         vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,
+                         background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,
+                         resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles) 
+    filestr['fitsfile'] = fitsfiles 
+    filestr['catfile'] = files 
+    filestr['trans'] = transpose(trans) 
+    filestr['magoff'] = magoff 
+    filestr['resampfile'] = outfiles 
+    filestr['resampmask'] = outmaskfiles 
     for i in range(nfiles): 
         im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1) 
         filestr[i].head = ptr_new(head1) 
@@ -203,11 +928,11 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     ################################################## 
     # Create default reference frame if TILE not input 
     if len(tileinp) > 0: 
-        tile=tileinp 
+        tile = tileinp 
     else: 
-        tile={type:'WCS'} 
+        tile = {'type':'WCS'} 
     if tile.type == 'WCS' and n_tags(tile) == 1: 
-        printlog,logf,'Creating TILE projection' 
+        logger.info('Creating TILE projection' 
         # The default projection is a tangent plane centered 
         # at halfway between the ra/dec min/max of all of 
         # the images.  The mean pixel scale is used. 
@@ -220,96 +945,98 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             rar = minmax(vertices_ra) 
             cenra = np.mean(rar) 
         else: 
-            rar = minmax(filestr.vertices_ra) 
+            rar = dln.minmax(filestr['vertices_ra']) 
             cenra = np.mean(rar) 
-        decr = minmax(filestr.vertices_dec) 
+        decr = dln.minmax(filestr['vertices_dec']) 
         cendec = np.mean(decr) 
         pixscale = np.mean(filestr.pixscale) 
         # Set up the tangent plane projection 
         step = pixscale/3600.0d0 
-        delta_dec = range(decr) 
-        delta_ra = range(rar)*cos(cendec/!radeg) 
-        nx = ceil(delta_ra*1.01/step) 
-        ny = ceil(delta_dec*1.01/step) 
+        delta_dec = dln.valrange(decr) 
+        delta_ra = dln.valrange(rar)*np.cos(np.deg2rad(cendec))
+        nx = np.ceil(delta_ra*1.01/step) 
+        ny = np.ceil(delta_dec*1.01/step) 
         xref = nx/2 
-        yref = ny/2 
-        MKHDR,tilehead,fltarr(5,5) 
-        SXADDPAR,tilehead,'NAXIS1',nx 
-        SXADDPAR,tilehead,'CDELT1',step 
-        SXADDPAR,tilehead,'CRPIX1',xref+1L 
-        SXADDPAR,tilehead,'CRVAL1',cenra 
-        SXADDPAR,tilehead,'CTYPE1','RA---TAN' 
-        SXADDPAR,tilehead,'NAXIS2',ny 
-        SXADDPAR,tilehead,'CDELT2',step 
-        SXADDPAR,tilehead,'CRPIX2',yref+1L 
-        SXADDPAR,tilehead,'CRVAL2',cendec 
-        SXADDPAR,tilehead,'CTYPE2','DEC--TAN' 
-        EXTAST,tilehead,tileast 
-        tileast.equinox = 2000 
+        yref = ny/2
+        tilehead = fits.Header()
+        tilehead['NAXIS1'] = nx 
+        tilehead['CDELT1'] = step 
+        tilehead['CRPIX1'] = xref+1L 
+        tilehead['CRVAL1'] = cenra 
+        tilehead['CTYPE1'] = 'RA---TAN' 
+        tilehead['NAXIS2'] = ny 
+        tilehead['CDELT2'] = step 
+        tilehead['CRPIX2'] = yref+1L 
+        tilehead['CRVAL2'] = cendec 
+        tilehead['CTYPE2'] = 'DEC--TAN' 
+        tilewcs = WCS(tilehead)
+        tileast['equinox'] = 2000 
          
-        printlog,logf,'RA range = [',str(rar[0],2),',',str(rar[1],2),'] deg' 
-        printlog,logf,'DEC range = [',str(decr[0],2),',',str(decr[1],2),'] deg' 
-        printlog,logf,'Central RA = ',str(cenra,2) 
-        printlog,logf,'Central DEC = ',str(cendec,2) 
-        printlog,logf,'NX = ',str(nx,2) 
-        printlog,logf,'NY = ',str(ny,2) 
+        logger.info('RA range = [',str(rar[0]),',',str(rar[1]),'] deg')
+        logger.info('DEC range = [',str(decr[0]),',',str(decr[1]),'] deg')
+        logger.info('Central RA = ',str(cenra))
+        logger.info('Central DEC = ',str(cendec)) 
+        logger.info('NX = ',str(nx))
+        logger.info('NY = ',str(ny))
          
         # Create the TILE structure 
-        tile = {type:'WCS',naxis:int([nx,ny]),cdelt:double([step,step]),crpix:double([xref+1L,yref+1L]),          crval:double([cenra,cendec]),ctype:['RA--TAN','DEC--TAN'],          head:tilehead,ast:tileast,xrange:[0,nx-1],yrange:[0,ny-1],nx:nx,ny:ny} 
+        tile = {'type':'WCS','naxis':int([nx,ny]),'cdelt':double([step,step]),'crpix':double([xref+1L,yref+1L]),
+                'crval':double([cenra,cendec]),'ctype':['RA--TAN','DEC--TAN'],
+                'head':tilehead,'wcs':tilewcs,'xrange':[0,nx-1],'yrange':[0,ny-1],'nx':nx,'ny':ny} 
      
     # Check that the TILE is valid 
     if allframe_validtile(tile,error=tilerror) == 0: 
         error = tilerror 
         if not keyword_set(silent) : 
-            printlog,logf,error 
+            logger.info(error 
         return 
      
     # Add HEAD/AST to TILE if needed 
     if tag_exist(tile,'HEAD') == 0: 
         MKHDR,tilehead,fltarr(5,5) 
-        SXADDPAR,tilehead,'NAXIS1',tile.naxis[0] 
-        SXADDPAR,tilehead,'CDELT1',tile.cdelt[0] 
-        SXADDPAR,tilehead,'CRPIX1',tile.crpix[0] 
-        SXADDPAR,tilehead,'CRVAL1',tile.crval[0] 
-        SXADDPAR,tilehead,'CTYPE1',tile.ctype[0] 
-        SXADDPAR,tilehead,'NAXIS2',tile.naxis[1] 
-        SXADDPAR,tilehead,'CDELT2',tile.cdelt[1] 
-        SXADDPAR,tilehead,'CRPIX2',tile.crpix[1] 
-        SXADDPAR,tilehead,'CRVAL2',tile.crval[1] 
-        SXADDPAR,tilehead,'CTYPE2',tile.ctype[1] 
-        if tag_exist(tile,'CD'): 
-            SXADDPAR,tilehead,'CD1_1',tile.cd[0,0] 
-            SXADDPAR,tilehead,'CD1_2',tile.cd[0,1] 
-            SXADDPAR,tilehead,'CD2_1',tile.cd[1,0] 
-            SXADDPAR,tilehead,'CD2_2',tile.cd[1,1] 
+        tilehead['NAXIS1'] = tile.naxis[0] 
+        tilehead['CDELT1'] = tile.cdelt[0] 
+        tilehead['CRPIX1'] = tile.crpix[0] 
+        tilehead['CRVAL1'] = tile.crval[0] 
+        tilehead['CTYPE1'] = tile.ctype[0] 
+        tilehead['NAXIS2'] = tile.naxis[1] 
+        tilehead['CDELT2'] = tile.cdelt[1] 
+        tilehead['CRPIX2'] = tile.crpix[1] 
+        tilehead['CRVAL2'] = tile.crval[1] 
+        tilehead['CTYPE2'] = tile.ctype[1] 
+        if 'CD' in tile: 
+            tilehead['CD1_1'] = tile.cd[0,0] 
+            tilehead['CD1_2'] = tile.cd[0,1] 
+            tilehead['CD2_1'] = tile.cd[1,0] 
+            tilehead['CD2_2'] = tile.cd[1,1] 
         EXTAST,tilehead,tileast 
         tileast.equinox = 2000 
         tile = CREATE_STRUCT(tile,'HEAD',tilehead,'AST',tileast) 
-    if tag_exist(tile,'AST') == 0: 
+    if 'AST' not in tile: 
         EXTAST,tile.head,tileast 
         tileast.equinox = 2000 
         tile = CREATE_STRUCT(tile,'AST',ast) 
     # Add XRANGE/YRANGE 
-    if tag_exist(tile,'XRANGE') == 0: 
+    if 'XRANGE' not in tile: 
         tile = CREATE_STRUCT(tile,'XRANGE',int([0,tile.naxis[0]-1]),'NX',tile.naxis[0]) 
-    if tag_exist(tile,'YRANGE') == 0: 
+    if 'YRANGE' not in tile: 
         tile = CREATE_STRUCT(tile,'YRANGE',int([0,tile.naxis[1]-1]),'NY',tile.naxis[1]) 
      
      
     ############################################ 
     # STEP 1: IMALIGN PREP 
      
-    printlog,logf,'------------------------' 
-    printlog,logf,'STEP 1: GETTING WEIGHTS' 
-    printlog,logf,'------------------------' 
+    logger.info('------------------------')
+    logger.info('STEP 1: GETTING WEIGHTS')
+    logger.info('------------------------')
      
     #----------------------------------- 
     # Computs Weights 
-    if not keyword_set(fake): 
-        ALLFRAME_GETWEIGHTS,mchfile,weights,scales,sky,imager=imager,logfile=logf#,raw2=raw2 
+    if fake==False:
+        weights,scales,sky = getweights(mchfile,imager=imager,logfile=logf) #,raw2=raw2 
         invscales = 1.0/scales 
-        bdscale , = np.where(scales < 1e-5 or invscales > 900,nbdscale) 
-        if nbdscale > 0: 
+        bdscale, = np.where((scales < 1e-5) | (invscales > 900))
+        if len(bdscale) > 0: 
             scales[bdscale] = 1.0 
             invscales[bdscale] = 1.0 
             weights[bdscale] = 0.0 
@@ -320,7 +1047,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         zerofile = mchbase+'.zero' 
         WRITECOL,zerofile,-sky,fmt='(F12.4)'# want to remove the background, set to 1st frame 
          
-        # FAKE, use existing ones 
+    # FAKE, use existing ones 
     else: 
         weightfile = mchbase+'.weights' 
         scalefile = mchbase+'.scale' 
@@ -331,17 +1058,17 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         READCOL,zerofile,sky,format='F',/silent 
         sky = -sky 
     # Stuff the information into the FILEINFO structure 
-    filestr.comb_weights = weights 
-    filestr.comb_scale = invscales 
-    filestr.comb_zero = -sky 
+    filestr['comb_weights'] = weights 
+    filestr['comb_scale'] = invscales 
+    filestr['comb_zero'] = -sky 
      
      
     ############################################ 
     # STEP 2: Resample the images 
      
-    printlog,logf,'---------------------------' 
-    printlog,logf,'STEP 2: Resample the images' 
-    printlog,logf,'---------------------------' 
+    logger.info('---------------------------' 
+    logger.info('STEP 2: Resample the images' 
+    logger.info('---------------------------' 
      
     CASE tile.type of 
          
@@ -401,7 +1128,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             sxaddpar,fhead,'NAXIS1',tile.nx 
             sxaddpar,fhead,'NAXIS2',tile.ny 
             sxaddpar,fhead,'BPM',filestr[i].resampmask 
-            printlog,logf,filestr[i].resampfile,' ['+str(xout[0],2)+':'+str(xout[1],2)+','+                  str(yout[0],2)+':'+str(yout[1],2)+']' 
+            logger.info(filestr[i].resampfile,' ['+str(xout[0],2)+':'+str(xout[1],2)+','+                  str(yout[0],2)+':'+str(yout[1],2)+']' 
             MWRFITS,fim,filestr[i].resampfile,fhead,/create 
             mhead = fhead 
             sxaddpar,mhead,'BITPIX',8 
@@ -421,7 +1148,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     #  left, down, right, up 
     pix_expand = [ abs(floor(min(xshift)) < 0), abs(floor(min(yshift)) < 0),                  ceil(max(xshift)) > 0 , ceil(max(yshift)) > 0 ] 
     outmaskfiles = os.path.dirname(tempfits)+'/'+os.path.basename(tempfits,'.fits')+'.mask.shft.fits' 
-    printlog,logf,'Expanding images by [',strjoin(str(pix_expand,2),','),'] pixels' 
+    logger.info('Expanding images by [',strjoin(str(pix_expand,2),','),'] pixels' 
     LOADMCH,shiftmch+'.mch',files2,trans2 
     nxf = nx+pix_expand[0]+pix_expand[2] 
     nyf = ny+pix_expand[1]+pix_expand[3] 
@@ -527,7 +1254,7 @@ for i in range(nfiles):
     PUSH,mchfinal,newline 
      
     # Printing the transformation 
-    printlog,logf,format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms 
+    logger.info(format='(A-20,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,filestr[i].magoff[0],rms 
 # Write to the new MCH file 
 combmch = mchbase+'_comb.mch' 
 WRITELINE,combmch,mchfinal 
@@ -540,9 +1267,9 @@ combmch = mchbase+'_comb.mch'
  
 ############################################ 
 # STEP 5: COMBINE IMAGES 
-printlog,logf,'-------------------' 
-printlog,logf,'STEP 5: IMCOMBINE' 
-printlog,logf,'-------------------' 
+logger.info('-------------------' 
+logger.info('STEP 5: IMCOMBINE' 
+logger.info('-------------------' 
  
 # The imcombine input file 
 resampfile = mchbase+'.resamp' 
@@ -561,15 +1288,15 @@ if not keyword_set(nocmbimscale):
 #endfor 
  
 # Combine the frames WITH scaling/offset/masking, for the bright stars 
-#printlog,logf,'Creating SCALED image' 
+#logger.info('Creating SCALED image' 
 combfile = mchbase+'_comb.fits' 
 os.remove(combfile,/allow 
 os.remove(mchbase+'_comb.bpm.pl',/allow 
 IRAF_IMCOMBINE,'@'+resampfile,combfile,combine='average',reject='avsigclip',                 weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',                 irafdir=irafdir,error=imcombineerror2,scale='@'+scalefile,zero='@'+zerofile,                 masktype='badvalue',maskvalue=0,bpmasks=mchbase+'_comb.bpm' 
  
 if len(imcombineerror2) != 0: 
-    printlog,logf,'ERROR in IRAF_IMCOMBINE' 
-    printlog,logf,imcombineerror2 
+    logger.info('ERROR in IRAF_IMCOMBINE' 
+    logger.info(imcombineerror2 
     error = imcombineerror2 
     return 
  
@@ -683,8 +1410,8 @@ os.remove(combfile,/allow
 IRAF_IMCOMBINE,'@'+resampfile,combfile,combine='average',reject='avsigclip',                 weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',                 irafdir=irafdir,error=imcombineerror2 
  
 if len(imcombineerror2) != 0: 
-    printlog,logf,'ERROR in IRAF_IMCOMBINE' 
-    printlog,logf,imcombineerror2 
+    logger.info('ERROR in IRAF_IMCOMBINE' 
+    logger.info(imcombineerror2 
     error = imcombineerror2 
     return 
  
@@ -746,9 +1473,9 @@ FITS_WRITE,combweightfile,weightmap,whead
 # We could skip the fiximage.pro step but we still need the 
 # individual bpm masks and setting the bad pixels to the background 
 # probably helps in the IMALIGN/IMCOMBINE steps. 
-printlog,logf,'' 
-printlog,logf,'"Saturating" bad pixels in the COMBINED image' 
-printlog,logf,'' 
+logger.info('' 
+logger.info('"Saturating" bad pixels in the COMBINED image' 
+logger.info('' 
  
  
 badmask = float(weightmap < 0.5) 
@@ -802,112 +1529,84 @@ for i in range(nfiles):
 if len(allcmn) > 0: 
     WRITECOL,mchbase+'_comb.cmn.lst',allcmn.id,allcmn.x,allcmn.y,allcmn.mag,allcmn.err,allcmn.sky,allcmn.skysig,             allcmn.sharp,allcmn.round,allcmn.round2,fmt='(I7,2F9.2,3F9.3,F9.2,3F9.3)' 
     WRITELINE,mchbase+'_comb.cmn.lst',[coohead1,''],/prepend# prepend the COO header 
- else printlog,logf,'No common file to combine' 
+ else logger.info('No common file to combine' 
      
     # Don't use common file 
 else: 
     # Make sure it doesn't exist otherwise it will be used 
     os.remove(mchbase+'_comb.cmn.lst',/allow 
  
-BOMB: 
- 
-if keyword_set(stp) : 
-    import pdb; pdb.set_trace() 
- 
- 
-#!/usr/bin/env python
+    BOMB: 
 
-import os
-import time
-import numpy as np
 
-#+ 
-# 
-# ALLFRAME_COMBINE_ORIG 
-# 
-# This is the old version of the code that combines images ALLFRAME. 
-# 
-# You need to have run daophot, allstar, daomatch and daomaster 
-# already.  There needs to be a fits, opt, als.opt, ap and als 
-# file for each file in the MCH file.  There also needs to be an 
-# associated RAW file for the MCH file. 
-# 
-# INPUTS: 
-#  file            The MCH filename 
-#  =nocmbimscale   Don't scale the images when combining them.  Not 
-#                    recommended, but the old way of doing it.  Bright 
-#                    stars can be missed this way. 
-#  /combtrim       Trim the combined images to the overlapping region. 
-#                    This used to be the default, but now the default 
-#                    is to keep the entire original region. 
-#  =scriptsdir     The directory that contains all of the necessary scripts. 
-#  =irafdir        The IRAF home directory. 
-#  =logfile        A logfile to print to output to. 
-#  /fake           Run for artificial star tests. 
-#  /usecmn         Use the cmn.lst file of the reference image for the 
-#                    combined image. 
-#  /stp            Stop at the end of the program 
-# 
-# OUTPUTS: 
-#  The combined image and mask: 
-#    FILEBASE.comb.fits       combined image 
-#    FILEBASE.comb.bpm.fits   bad pixel mask 
-#    FILEBASE.comb.mask.fits  SExtractor weight map (very similar to bpm) 
-#    FILEBASE.comb.mch        The transformations of the individual frames 
-#                               to the combined frame. 
-#  =maskdatalevel  The "bad" data level above the highest "good" value 
-#                    in the combined image. 
-#  =error          The error message, if there was one, else undefined 
-# 
-# USAGE: 
-#  IDL>allframe_combine_orig,'ccd1001.mch',scriptsdir='/net/home/dln5q/daophot/',finditer=2 
-# 
-# 
-# By D.Nidever   February 2008 
-# Automation of steps and scripts by J.Ostheimer and Rachael Beaton 
-#- 
+ 
+def combine_orig(filename,scriptsdir=None,logfile=None,
+                 irafdir=None,satlevel=6e4,nocmbimscale=False,
+                 trimcomb=False,fake=False,usecmn=False):
+    """
+    This is the old version of the code that combines images ALLFRAME. 
+ 
+    You need to have run daophot, allstar, daomatch and daomaster 
+    already.  There needs to be a fits, opt, als.opt, ap and als 
+    file for each file in the MCH file.  There also needs to be an 
+    associated RAW file for the MCH file. 
+ 
+    Parameters
+    ----------
+    filename : str
+       The MCH filename 
+    nocmbimscale : boolean, optional
+       Don't scale the images when combining them.  Not 
+         recommended, but the old way of doing it.  Bright 
+         stars can be missed this way. 
+    trimcomb : boolean, optional
+       Trim the combined images to the overlapping region. 
+         This used to be the default, but now the default 
+         is to keep the entire original region. 
+    scriptsdir : str
+       The directory that contains all of the necessary scripts. 
+    irafdir : str
+       The IRAF home directory. 
+    logfile : str
+       A logfile to print to output to. 
+    fake : boolean, optional
+       Run for artificial star tests. 
+    usecmn : boolean, optional
+       Use the cmn.lst file of the reference image for the 
+         combined image. 
+ 
+    Returns
+    -------
+    The combined image and mask: 
+    FILEBASE.comb.fits       combined image 
+    FILEBASE.comb.bpm.fits   bad pixel mask 
+    FILEBASE.comb.mask.fits  SExtractor weight map (very similar to bpm) 
+    FILEBASE.comb.mch        The transformations of the individual frames 
+                               to the combined frame. 
+    maskdatalevel : float
+       The "bad" data level above the highest "good" value 
+         in the combined image. 
+ 
+    Example
+    -------
+
+    maskdatalevel = combine_orig('ccd1001.mch',scriptsdir='/net/home/dln5q/daophot/',finditer=2)
  
  
-def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile=logfile,                          irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,                          trimcomb=trimcomb,fake=fake,maskdatalevel=maskdatalevel,                          xoff=xoff,yoff=yoff,usecmn=usecmn 
-     
-    COMMON photred,setup 
-     
-    undefine,error 
-     
-    # Not enough inputs 
-    nfile = len(file) 
-    if (nfile == 0): 
-        print('Syntax - allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,satlevel=satlevel,' 
-        print('                  ,nocmbimscale=nocmbimscale,error=error,logfile=logfile,' 
-        print('                  irafdir=irafdir,trimcomb=trimcomb,usecmn=usecmn,fake=fake' 
-        return 
+    By D.Nidever   February 2008 
+    Automation of steps and scripts by J.Ostheimer and Rachael Beaton 
+    Translated to Python by D. Nidever, April 2022
+    """
+ 
+              
+    global photred,setup 
+
      
     # Logfile 
     if keyword_set(logfile): 
         logf=logfile 
     else: 
         logf=-1 
-     
-    # Error Handling 
-    #------------------ 
-    # Establish error handler. When errors occur, the index of the 
-    # error is returned in the variable Error_status: 
-    CATCH, Error_status 
-     
-    #This statement begins the error handler: 
-    if (Error_status != 0): 
-        print('ALLFRAME_COMBINE_ORIG ERROR: ', !ERROR_STATE.MSG 
-        error = !ERROR_STATE.MSG 
-        CATCH, /CANCEL 
-        return 
-     
-    # Saturation level 
-    if len(satlevel) == 0 : 
-        satlevel=6e4 
-     
-    # Scaling of the images to be combined 
-    if len(nocmbimscale) == 0 : 
-        nocmbimscale=0 
      
     # Getting scripts directory and iraf directory 
     nsetup = len(setup) 
@@ -918,25 +1617,23 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
      
     # No irafdir 
     if len(scriptsdir) == 0: 
-        printlog,logf,'SCRIPTSDIR NOT INPUT' 
+        logger.info('SCRIPTSDIR NOT INPUT' 
         error = 'SCRIPTSDIR NOT INPUT' 
         return 
      
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
     #--------------------------------------------------------------- 
-    CHECK_IRAF,iraftest,irafdir=irafdir 
-    if iraftest == 0: 
-        print('IRAF TEST FAILED.  EXITING' 
-        return 
-     
+    if iraf.check(irafdir=irafdir)==False:
+        raise ValueError('IRAF TEST FAILED')
      
     # No scriptsdir 
     if len(scriptsdir) == 0: 
-        printlog,logf,'SCRIPTSDIR NOT INPUT' 
+        logger.info('SCRIPTSDIR NOT INPUT' 
         error = 'SCRIPTSDIR NOT INPUT' 
         return 
     # Check if the scripts exist in the current directory 
-    scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter.py','goodpsf.pro','allframe.opt',           'default.sex','default.param','default.nnw','default.conv'] 
+    scripts = ['getpsf.sh','photo.opt','apcor.opt','lstfilter.py','goodpsf.pro','allframe.opt',
+               'default.sex','default.param','default.nnw','default.conv'] 
     nscripts = len(scripts) 
     # Loop through the scripts 
     for i in range(nscripts): 
@@ -945,82 +1642,75 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
          
         # No file 
         if info.exists == 0 or info.size == 0: 
-            printlog,logf,scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY' 
+            logger.info(scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY' 
             error = scriptsdir+'/'+scripts[i]+' NOT FOUND or EMPTY' 
             return 
          
         # Check if the two files are the same size, if not copy it 
         if info.size != curinfo.size: 
             FILE_COPY,info.name,curinfo.name,/overwrite 
-# scripts loop 
      
      
-    printlog,logf,'Combining images in ',file 
+    logger.info('Combining images in ',filename) 
      
     # FILENAME 
-    mchfile = os.path.basename(file) 
-    mchdir = os.path.dirname(file) 
-    mchbase = os.path.basename(file,'.mch') 
+    mchfile = os.path.basename(filename) 
+    mchdir = os.path.dirname(filename) 
+    mchbase = os.path.splitext(os.path.basename(filename))[0]
      
      
-    # CD to the directory 
-    cd,current=curdir 
-    cd,mchdir 
-     
+    # CD to the directory
+    curdir = os.getcwd()
+    os.chdir(mchdir)
      
     # Check that the mch, als, and opt files exist 
-    mchtest = os.path.exists(mchfile) 
-    if mchtest == 0: 
-        printlog,logf,mchfile,' NOT FOUND' 
-        return 
+    if os.path.exists(mchfile)==False:
+        raise ValueError(mchfile+' NOT FOUND')
      
     # Checking RAW file 
-    rawtest = os.path.exists(mchbase+'.raw') 
-    if rawtest == 0: 
-        printlog,logf,mchbase+'.raw NOT FOUND' 
-        return 
+    if os.path.exists(mchbase+'.raw')==False:
+        raise ValueError(mchbase+'.raw NOT FOUND')
      
      
     ############################################ 
     # CHECK NECESSARY FILES 
      
-    # Load the MCH file 
-    LOADMCH,mchfile,files,trans 
+    # Load the MCH file
+    files,trans,magoffset = io.loadmch(mchfile)
      
     # Check that the fits, als, opt, and psf files exist 
     nfiles = len(files) 
     for i in range(nfiles): 
-        #dir = file_dirname(mchfile) 
-        base = os.path.basename(files[i],'.als') 
+        base = os.path.splitext(os.path.basename(files[i]))[0]
          
         # Checking FITS file 
         fitstest = os.path.exists(base+'.fits') 
         if fitstest == 0: 
-            printlog,logf,base+'.fits NOT FOUND' 
+            logger.info(base+'.fits NOT FOUND' 
             return 
          
         # Checking OPT file 
         opttest = os.path.exists(base+'.opt') 
         if opttest == 0: 
-            printlog,logf,base+'.opt NOT FOUND' 
+            logger.info(base+'.opt NOT FOUND' 
             return 
          
         # Checking ALS.OPT file 
         alsopttest = os.path.exists(base+'.als.opt') 
         if alsopttest == 0: 
-            printlog,logf,base+'.als.opt NOT FOUND' 
+            logger.info(base+'.als.opt NOT FOUND' 
             return 
          
         # Checking AP file 
         aptest = os.path.exists(base+'.ap') 
         if aptest == 0: 
-            printlog,logf,base+'.ap NOT FOUND' 
+            logger.info(base+'.ap NOT FOUND' 
             return 
          
         # Checking ALS file 
         alstest = os.path.exists(base+'.als') 
         if alstest == 0: 
-            printlog,logf,base+'.als NOT FOUND' 
+            logger.info(base+'.als NOT FOUND' 
             return 
          
      
@@ -1031,7 +1721,7 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         bdfiles , = np.where(os.path.exists(chkfiles) == 0,nbdfiles) 
         if nbdfiles > 0: 
             error = 'FAKE.  Some necessary files not found. '+strjoin(chkfiles[bdfiles],' ') 
-            printlog,logf,error 
+            logger.info(error 
             return 
      
      
@@ -1039,9 +1729,9 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     ############################################ 
     # STEP 1: IMALIGN PREP 
      
-    printlog,logf,'' 
-    printlog,logf,'Step A: Getting Weights' 
-    printlog,logf,'-----------------------' 
+    logger.info('')
+    logger.info('Step A: Getting Weights')
+    logger.info('-----------------------')
      
     #----------------------------------- 
     # Computs Weights 
@@ -1060,7 +1750,7 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         zerofile = mchbase+'.zero' 
         WRITECOL,zerofile,-sky,fmt='(F12.4)'# want to remove the background, set to 1st frame 
          
-        # FAKE, use existing ones 
+    # FAKE, use existing ones 
     else: 
         weightfile = mchbase+'.weights' 
         scalefile = mchbase+'.scale' 
@@ -1076,53 +1766,53 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     # Get X/Y translations using DAOMASTER 
     #  NO ROTATION ONLY SHIFTS 
     #  Need these shifts for IMSHIFT 
-    shiftmch = mchbase+'_shift' 
-    if not keyword_set(fake): 
-        print('Measuring X/Y shifts' 
+    shiftmch = mchbase+'_shift'
+    if fake==False:
+        logger.info('Measuring X/Y shifts')
         FILE_COPY,mchbase+'.mch',shiftmch+'.mch',/overwrite,/allow 
         # Make the DAOMASTER script 
-        undefine,cmdlines 
-        PUSH,cmdlines,'#!/bin/csh' 
-        PUSH,cmdlines,'set input=${1}' 
-        PUSH,cmdlines,'daomaster <<:NE' 
-        PUSH,cmdlines,'${input}.mch' 
-        PUSH,cmdlines,'1,1,1' 
-        PUSH,cmdlines,'99.' 
-        PUSH,cmdlines,'2' 
-        PUSH,cmdlines,'10' 
-        PUSH,cmdlines,'5' 
-        PUSH,cmdlines,'4' 
-        PUSH,cmdlines,'3' 
-        PUSH,cmdlines,'2' 
-        PUSH,cmdlines,'1' 
-        PUSH,cmdlines,'0' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'y' 
-        PUSH,cmdlines,'' 
-        PUSH,cmdlines,'' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'n' 
-        PUSH,cmdlines,'DONE' 
+        cmdlines = []
+        cmdlines += ['#!/bin/csh']
+        cmdlines += ['set input=${1}']
+        cmdlines += ['daomaster <<DONE']
+        cmdlines += ['${input}.mch']
+        cmdlines += ['1,1,1']
+        cmdlines += ['99.']
+        cmdlines += ['2']
+        cmdlines += ['10'] 
+        cmdlines += ['5']
+        cmdlines += ['4']
+        cmdlines += ['3']
+        cmdlines += ['2']
+        cmdlines += ['1']
+        cmdlines += ['0']
+        cmdlines += ['n']
+        cmdlines += ['n']
+        cmdlines += ['n']
+        cmdlines += ['n']
+        cmdlines += ['y']
+        cmdlines += ['']
+        cmdlines += ['']
+        cmdlines += ['n'] 
+        cmdlines += ['n']
+        cmdlines += ['n']
+        cmdlines += ['DONE']
         tempscript = MKTEMP('daomaster')# absolute filename 
-        WRITELINE,tempscript,cmdlines 
-        FILE_CHMOD,tempscript,'755'o 
+        dln.writelines(tempscript,cmdlines)
+        os.chmod(tempscript,0o755)
         # Run DAOMASTER 
         cmd2 = tempscript+' '+shiftmch 
-        SPAWN,cmd2,out2,errout2 
+        out2 = subprocess.check_output(cmd2)
         # Remove temporary DAOMASTER script 
         os.remove(tempscript,/allow_non 
-    LOADMCH,shiftmch+'.mch',files2,trans2 
+    files2,trans2,magoffset2 = io.loadmch(shiftmch+'.mch')
      
     xshift = reform(trans2[:,0]) 
     yshift = reform(trans2[:,1]) 
     xyshifts = [[xshift],[yshift]] 
-    printlog,logf,'Image shifts' 
+    logger.info('Image shifts' 
     for i in range(nfiles): 
-        printlog,logf,files[i],xshift[i],yshift[i] 
+        logger.info(files[i],xshift[i],yshift[i])
      
      
     #----------------------------------- 
@@ -1131,13 +1821,13 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     # Need an input list of fits files 
     # Need an output list of fits files 
     # Shift file 
-    base = os.path.basename(files,'.als') 
+    base = os.path.splitext(os.path.basename(files))[0]
     fitsfiles = base+'.fits' 
     outfiles = base+'.shft.fits' 
     infile = mchbase+'.inlist' 
     outfile = mchbase+'.outlist' 
     #WRITELINE,infile,fitsfiles   ; this is done below now with the temp files 
-    WRITELINE,outfile,outfiles 
+    dln.writelines(outfile,outfiles)  
     # Remove outfiles 
     os.remove(outfiles,/allow 
     # shift list 
@@ -1152,16 +1842,15 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     #  the original images. 
     tempfits = base+'.temp.fits' 
     FILE_COPY,fitsfiles,tempfits,/overwrite,/allow 
-    WRITELINE,infile,tempfits 
-     
+    dln.writelines(infile,tempfits)
      
      
     ############################################ 
     # STEP B: FIX BAD PIXELS 
-    printlog,logf,'' 
-    printlog,logf,'Step B: Fixing bad pixels' 
-    printlog,logf,'-------------------------' 
-    FIXIMAGES,'@'+infile,satlevel=satlevel#6e4 
+    logger.info('')
+    logger.info('Step B: Fixing bad pixels')
+    logger.info('-------------------------')
+    FIXIMAGES,'@'+infile,satlevel=satlevel  #6e4 
     # This also makes the FILE.mask.fits files for each image 
      
     # Find the maximum saturation level 
@@ -1180,9 +1869,9 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     # STEP C: IMALIGN 
     #  This figures out the X/Y-shifts between the images 
     #  and creates the shifted images (".shft.fits") 
-    printlog,logf,'' 
-    printlog,logf,'Step C: IMALIGN' 
-    printlog,logf,'---------------' 
+    logger.info('')
+    logger.info('Step C: IMALIGN')
+    logger.info('---------------')
     reffile = mchbase+'.fits' 
      
     # IMALIGN basically is a script that runs: 
@@ -1192,29 +1881,27 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
      
      
     # First, shift the images 
-    printlog,logf,'Shifting the images' 
-    IRAF_IMSHIFT,'@'+infile,'@'+outfile,shifts_file=shiftfile,interp_type='linear',             boundary_type='constant',constant=0,irafdir=irafdir,error=imshifterror 
+    logger.info('Shifting the images')
+    imshift('@'+infile,'@'+outfile,shifts_file=shiftfile,interp_type='linear',
+            boundary_type='constant',constant=0,irafdir=irafdir)
     if len(imshifterror) != 0: 
-        printlog,logf,'ERROR in IRAF_IMSHIFT' 
-        printlog,logf,imshifterror 
-        error = imshifterror 
+        logger.info('ERROR in IRAF_IMSHIFT')
+        logger.info(imshifterror)
+        error = imshifterror)
         return 
      
-    #stop 
-     
     # Trim the images 
-    if keyword_set(trimcomb): 
-         
+    if trimcomb: 
         # Calculate the trim section 
-        hd = PHOTRED_READFILE(reffile,/header) 
-        xsize = lonarr(nfiles)+sxpar(hd,'NAXIS1',/silent) 
-        ysize = lonarr(nfiles)+sxpar(hd,'NAXIS2',/silent) 
+        hd = io.readfile(reffile,header=True) 
+        xsize = lonarr(nfiles)+hd['NAXIS1']
+        ysize = lonarr(nfiles)+hd['NAXIS2']
         IA_TRIM,xshift,yshift,xsize,ysize,trimsection 
         xoff = trimsection[0]-1 
         yoff = trimsection[2]-1 
          
         # Trim the shifted images 
-        printlog,logf,'Trimming the shifted images' 
+        logger.info('Trimming the shifted images')
         xstart = trimsection[0]-1 
         ximport pdb; pdb.set_trace() = trimsection[1]-1 
         ystart = trimsection[2]-1 
@@ -1227,17 +1914,17 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         # could also use IRAF_IMCOPY here instead 
          
          
-        # Don't trim the images 
+    # Don't trim the images 
     else: 
-        hd = PHOTRED_READFILE(reffile,/header) 
-        xsize = sxpar(hd,'NAXIS1',/silent) 
-        ysize = sxpar(hd,'NAXIS2',/silent) 
+        hd = io.readfile(reffile,header=True) 
+        xsize = hd['NAXIS1']
+        ysize = hd['NAXIS2']
         trimsection = [1,xsize,1,ysize] 
         xoff = 0 
         yoff = 0 
      
-    # Delete the temporary FITS files 
-    os.remove(tempfits,/allow 
+    # Delete the temporary FITS files
+    if os.path.exists(tempfits): os.remove(tempfits)
      
      
      
@@ -1248,46 +1935,47 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     #     using the shifts from IRAF_IMALIGN 
     # 2. trim the masks 
     # 3. combine the masks 
-    printlog,logf,'' 
-    printlog,logf,'Step D: Making Bad Pixel Mask' 
-    printlog,logf,'-----------------------------' 
+    logger.info('')
+    logger.info('Step D: Making Bad Pixel Mask')
+    logger.info('-----------------------------')
      
     # Make lists 
     maskfiles = os.path.dirname(tempfits)+'/'+os.path.basename(tempfits,'.fits')+'.mask.fits' 
     outmaskfiles = os.path.dirname(tempfits)+'/'+os.path.basename(tempfits,'.fits')+'.mask.shft.fits' 
     maskinfile = mchbase+'.maskinlist' 
     maskoutfile = mchbase+'.maskoutlist' 
-    maskshiftsfile = mchbase+'.maskshifts' 
-    WRITELINE,maskinfile,maskfiles 
-    WRITELINE,maskoutfile,outmaskfiles 
-    os.remove(outmaskfiles,/allow 
-    strxyshifts = strarr(nfiles) 
+    maskshiftsfile = mchbase+'.maskshifts'
+    dln.writelines(maskinfile,maskfiles)
+    dln.writelines(maskoutfile,outmaskfiles)
+    for f in outmaskfiles:
+        if os.path.exists(f): os.remove(f)
+    strxyshifts = np.zeros(nfiles,(np.str,500))
     for i in range(nfiles): 
-        strxyshifts[i] = strjoin(reform(xyshifts[i,:]),'  ') 
-    WRITELINE,maskshiftsfile,strxyshifts 
-     
+        strxyshifts[i] = '  '.join(xyshifts[i,:])
+    dln.writelines(maskshiftsfile,strxyshifts)
+              
     # Run IMSHIFT 
     #  set boundary to 0=BAD 
-    printlog,logf,'Shifting masks' 
-    undefine,iraflines 
-    push,iraflines,'print("")'# first line will be ignored 
-    push,iraflines,'cd '+curdir 
-    push,iraflines,'images' 
-    push,iraflines,'imgeom' 
-    push,iraflines,'imshift("@'+maskinfile+'","@'+maskoutfile+'",shifts_file="'+maskshiftsfile+'",'+               'interp_type="linear",boundary_typ="constant",constant=0)' 
-    push,iraflines,'logout' 
+    logger.info('Shifting masks')
+    iraflines = []
+    iraflines += ['print("")']  # first line will be ignored 
+    iraflines += ['cd '+curdir]
+    iraflines += ['images']
+    iraflines += ['imgeom']
+    iraflines += ['imshift("@'+maskinfile+'","@'+maskoutfile+'",shifts_file="'+maskshiftsfile+'",'+               'interp_type="linear",boundary_typ="constant",constant=0)']
+    iraflines += ['logout']
     imshiftscript = curdir+'/'+mchbase+'.imshift' 
-    WRITELINE,imshiftscript,iraflines 
-    IRAF_RUN,imshiftscript,irafdir,out=out,/silent,error=iraferror 
+    dln.writelines(imshiftscript,iraflines)
+    out = run(imshiftscript,irafdir,silent=True)
     if len(iraferror) != 0: 
-        printlog,logf,'ERROR in running IMSHIFT with IRAF_RUN' 
-        printlog,logf,iraferror 
+        logger.info('ERROR in running IMSHIFT with IRAF_RUN')
+        logger.info(iraferror)
         error = iraferror 
         return 
      
     # Trim 
     if keyword_set(trimcomb): 
-        printlog,logf,'Trimming masks' 
+        logger.info('Trimming masks' 
         xstart = trimsection[0]-1# should be same as xoff 
         ximport pdb; pdb.set_trace() = trimsection[1]-1 
         ystart = trimsection[2]-1# should be same as yoff 
@@ -1306,7 +1994,7 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
             MWRFITS,newim,outmaskfiles[i],head,/create,/silent 
      
     # Combining masks 
-    printlog,logf,'Combining masks' 
+    logger.info('Combining masks' 
     undefine,bpm 
     for i in range(nfiles): 
         im = PHOTRED_READFILE(outmaskfiles[i],head) 
@@ -1330,13 +2018,13 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
      
     ############################################ 
     # STEP E: COMBINE IMAGES 
-    printlog,logf,'' 
-    printlog,logf,'Step E: IMCOMBINE' 
-    printlog,logf,'-----------------' 
+    logger.info('')
+    logger.info('Step E: IMCOMBINE')
+    logger.info('-----------------')
      
     # SCALE the images for combining 
-    #------------------------------- 
-    if not keyword_set(nocmbimscale): 
+    #-------------------------------
+    if nocmbimscale==False:
          
         # Put BPM mask names in file headers 
         #  these will be used by IMCOMBINE 
@@ -1346,15 +2034,15 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
             MODFITS,outfiles[i],0,head 
          
         # Combine the frames WITH scaling/offset/masking, for the bright stars 
-        #printlog,logf,'Creating SCALED image' 
+        #logger.info('Creating SCALED image' 
         combfile = mchbase+'_comb.fits' 
         os.remove(combfile,/allow 
         os.remove(mchbase+'_comb.bpm.pl',/allow 
         IRAF_IMCOMBINE,'@'+outfile,combfile,combine='average',reject='avsigclip',                 weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',                 irafdir=irafdir,error=imcombineerror2,scale='@'+scalefile,zero='@'+zerofile,                 masktype='badvalue',maskvalue=0,bpmasks=mchbase+'_comb.bpm' 
          
         if len(imcombineerror2) != 0: 
-            printlog,logf,'ERROR in IRAF_IMCOMBINE' 
-            printlog,logf,imcombineerror2 
+            logger.info('ERROR in IRAF_IMCOMBINE' 
+            logger.info(imcombineerror2 
             error = imcombineerror2 
             return 
          
@@ -1459,8 +2147,8 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         combweightfile = mchbase+'_comb.mask.fits' 
         MWRFITS,weightmap,combweightfile,whead,/create 
          
-        # NO SCALING of the images for combining 
-        #--------------------------------------- 
+    # NO SCALING of the images for combining 
+    #--------------------------------------- 
     else: 
          
         combfile = mchbase+'_comb.fits' 
@@ -1468,8 +2156,8 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         IRAF_IMCOMBINE,'@'+outfile,combfile,combine='average',reject='avsigclip',                 weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',                 irafdir=irafdir,error=imcombineerror2 
          
         if len(imcombineerror2) != 0: 
-            printlog,logf,'ERROR in IRAF_IMCOMBINE' 
-            printlog,logf,imcombineerror2 
+            logger.info('ERROR in IRAF_IMCOMBINE' 
+            logger.info(imcombineerror2 
             error = imcombineerror2 
             return 
          
@@ -1531,9 +2219,9 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
         # We could skip the fiximage.pro step but we still need the 
         # individual bpm masks and setting the bad pixels to the background 
         # probably helps in the IMALIGN/IMCOMBINE steps. 
-        printlog,logf,'' 
-        printlog,logf,'"Saturating" bad pixels in the COMBINED image' 
-        printlog,logf,'' 
+        logger.info('')
+        logger.info('"Saturating" bad pixels in the COMBINED image')
+        logger.info('') 
          
          
         badmask = float(weightmap < 0.5) 
@@ -1548,8 +2236,8 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
     sxaddpar,combhead,'AFTILTYP','ORIG' 
     MODFITS,combfile,0,combhead 
      
-    # Delete the shifted images 
-    READLINE,outfile,shiftedfiles 
+    # Delete the shifted images
+    shiftedfiles = dln.readlines(outfile)
     os.remove(shiftedfiles,/allow,/quiet 
      
     # Delete mask files 
@@ -1561,15 +2249,13 @@ def allframe_combine_orig,file,stp=stp,scriptsdir=scriptsdir,error=error,logfile
      
     # Using CMN.LST of reference frame if it exists 
     if os.path.exists(mchbase+'.cmn.lst') and keyword_set(usecmn): 
-        print('Using reference image COMMON SOURCE file' 
+        logger.info('Using reference image COMMON SOURCE file')
         FILE_COPY,mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow 
      
     # CD back to the original directory 
     cd,curdir 
-     
+    os.chdir(curdir)
+              
     BOMB: 
-     
-    if keyword_set(stp) : 
-        import pdb; pdb.set_trace() 
      
  
