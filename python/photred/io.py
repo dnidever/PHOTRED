@@ -311,6 +311,14 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     Translated to Python by D. Nidever, April 2022
     """
 
+    # This is what the "filters" file looks like:
+    # 'M Washington c6007'    M
+    # 'M Washington k1007'    M
+    # 'M'                     M
+    # 'I c6028'               T
+    # 'I Nearly-Mould k1005'  T
+    # 'T'                     T
+
     global setup
     
     nfiles = dln.size(filename)
@@ -406,8 +414,8 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
         filtname = str(filtname[0]) 
      
      
-    # Match filter 
-    ind = first_el(where(strcmp(longnames,filtname,fold_case=fold_case) == 1,nind)) 
+    # Match filter
+    ind, = np.where(np.char.array(longnames).lower()==filtname.lower())    
      
     # Match found 
     if nind > 0:     
@@ -449,22 +457,22 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             newshortname = filtname.split()[0]
              
             # Is this already a "short" filter name
-            
-            ind = first_el(where(strcmp(shortnames,newshortname,fold_case=fold_case) == 1,nind)) 
+            # string comparison
+            ind, = np.where(np.char.array(shortnames).lower()==newshortname.lower())
              
             # Yes, already a "short" name 
             # Append integer until unique 
-            if nind > 0: 
+            if len(ind) > 0: 
                 #newshortname = newshortname+'_' 
                 # Loop until we have a unique name 
                 flag = 0 
                 integer = 1 
                 while (flag == 0): 
-                    sinteger = str(integer) 
-                    ind = first_el(where(strcmp(shortnames,newshortname+sinteger),fold_case=fold_case == 1,nind)) 
+                    sinteger = str(integer)
+                    ind, = np.where(np.char.array(shortnames).lower()==(newshortname+sinteger).lower())                    
                      
                     # Unique 
-                    if nind == 0: 
+                    if len(ind) == 0: 
                         newshortname = newshortname+sinteger 
                         flag = 1 
                     # Not unique, increment integer 
@@ -483,7 +491,9 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             newshortname = newshortname.replace('__','_')
             # Add new filter to the "filters" file 
             newline = "'"+filtname+"'     "+newshortname
-            dln.writelines('filters',newline,append=True)
+            with open('filters','wa') as f:
+                f.write(newline)
+            #dln.writelines('filters',newline,append=True)
             #WRITELINE,'filters',newline,/append 
             print('Adding new filter name to "filters" list')
             print('Filter ID string:  ',filtname)
@@ -495,22 +505,18 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
                 # Reload filters
                 lines = dln.readlines('filters')
                 lines = [l.strip() for l in lines]
-                gd, = np.where(np.char.array(lines) != '')
+                lines = np.char.array(lines)
+                gd, = np.where(lines != '')
                 ngd = len(gd)
-                lines = lines[gd] 
-                arr = strsplitter(lines,"'",/extract) 
-                arr = str(arr,2) 
-                # Should be 2xN 
-                # Removing blank lines 
-                longnames = reform(arr[0,:]) 
-                shortnames = reform(arr[1,:]) 
+                lines = lines[gd]
+                longnames = [l.split("'")[1] for l in lines]
+                shortnames = [l.split("'")[2].strip() for l in lines]                
                  
-                ui = np.uniq(shortnames) 
-                snames = shortnames[ui]# unique short names 
-                nui = len(ui) 
-                numnames = str(lindgen(nui)+1,2)# numbers for the unique short names 
+                snames,ui = np.unique(shortnames,return_index=True)
+                nui = len(ui)
+                numnames = (np.arange(nui)+1).astype(str)  # numbers for the unique short names 
                  
-                gg , = np.where(snames == newshortname,ngg)# which short name 
+                gg, = np.where(snames == newshortname)  # which short name 
                 numname = numnames[gg[0]] 
                 return numname 
              
