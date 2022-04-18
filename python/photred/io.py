@@ -43,6 +43,483 @@ def make_parser(fieldwidths,fieldtypes=None):
         parse.fmtstring = ' '.join('{}{}'.format(a[0],a[1]) for a in zip(fieldwidths,fieldtypes))
     return parse
 
+def getgain(filename=None,head=None):
+    """
+    This gets the GAIN information from a FITS files 
+ 
+    Parameters
+    ----------
+    filename : str, optional
+       FITS filename 
+    head : header, optional
+      Use this header array instead of reading FITS file. 
+
+    Returns
+    -------
+    gain : float
+      The gain in e/ADU 
+       If the gain is not found in the header then None
+       is returned. 
+    keyword : str
+      The actual header keyword used. 
+ 
+    Example
+    -------
+    
+    gain,keyword = getgain(filename)
+ 
+    By D.Nidever  May 2008 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    if filename is None and head is None:
+        raise ValueError('filename or head must be input')
+    nfiles = dln.size(filename)
+    
+    # Can't use input HEAD if multiple fits files input 
+    if nfiles > 1:
+        head = None
+     
+    # More than one name input 
+    if nfiles > 1:
+        gain = np.zeros(nfiles,float)
+        keyword = np.zeros(nfiles,(np.str,50))
+        for i in range(nfiles): 
+            gain1,keyword1 = getgain(filename[i])
+            gain[i] = gain1
+            keyword[i] = keyword1
+        return gain,keyword
+     
+    # No header input, read from fits file 
+    if head is None:
+        # Check that the file exists
+        if os.path.exists(filename)==False:
+            raise ValueError(filename+' NOT FOUND')
+        if filename[-7:]=='fits.fz':
+            head = readfile(filename,1,header=True)
+        else:
+            head = readfile(filename,header=True)        
+     
+    gain = head.get('GAIN')
+    egain = head.get('EGAIN')   # imacs 
+     
+    # Use GAIN 
+    if gain is not None:
+        keyword = 'GAIN' 
+    # Use EGAIN 
+    if gain is None and egain is not None:
+        gain = egain 
+        keyword = 'EGAIN' 
+             
+    # No GAIN 
+    if gain is None and egain is None:
+        print('NO GAIN FOUND')
+        gain = None
+        keyword = None
+
+    return gain,keyword
+
+
+def getrdnoise(filename=None,head=None):
+    """
+    This gets the RDNOISE information from a FITS files 
+ 
+    Parameters
+    ----------
+    filename : str, optional
+       FITS filename 
+    head : header, optional
+      Use this header array instead of reading FITS file. 
+
+    Returns
+    -------
+    rdnoise : float
+      The rdnoise in electrons/read
+       If the rdnoise is not found in the header then None
+       is returned. 
+    keyword : str
+      The actual header keyword used. 
+ 
+    Example
+    -------
+    
+    rdnoise,keyword = getrdnoise(filename)
+ 
+    By D.Nidever  May 2008 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    if filename is None and head is None:
+        raise ValueError('filename or head must be input')
+    nfiles = dln.size(filename)
+    
+    # Can't use input HEAD if multiple fits files input 
+    if nfiles > 1:
+        head = None
+     
+    # More than one name input 
+    if nfiles > 1:
+        rdnoise = np.zeros(nfiles,float)
+        keyword = np.zeros(nfiles,(np.str,50))
+        for i in range(nfiles): 
+            rdnoise1,keyword1 = getrdnoise(filename[i])
+            rdnoise[i] = rdnoise1
+            keyword[i] = keyword1
+        return rdnoise,keyword
+     
+    # No header input, read from fits file 
+    if head is None:
+        # Check that the file exists
+        if os.path.exists(filename)==False:
+            raise ValueError(filename+' NOT FOUND')
+        if filename[-7:]=='fits.fz':
+            head = readfile(filename,1,header=True)
+        else:
+            head = readfile(filename,header=True)        
+
+    rdnoise = head.get('RDNOISE')                
+    readnois = head.get('READNOIS')   # swope
+    enoise = head.get('ENOISE')   #    imacs
+    
+    # Use RDNOISE
+    if rdnoise is not None:
+        readnoise = rdnoise
+        keyword = 'RDNOISE' 
+    # Use READNOIS
+    if rdnoise is None and readnois is not None:
+        readdnoise = readnois
+        keyword = 'READNOIS'
+    # Use ERDNOISE
+    if rdnoise is None and readnois is None and enoise is not None:
+        readnoise = enoise
+        keyword = 'ENOISE' 
+        
+    # No RDNOISE 
+    if rdnoise is None and readnois is None and enoise is None:
+        print('NO READNOISE FOUND')
+        readnoise = None
+        keyword = None
+
+    return readnoise,keyword
+
+
+def getexptime(filename=None,head=None):
+    """
+    This gets the EXPTIME information from a FITS files 
+ 
+    Parameters
+    ----------
+    filename : str, optional
+       FITS filename 
+    head : header, optional
+      Use this header array instead of reading FITS file. 
+
+    Returns
+    -------
+    exptime : float
+      The exposure time information in seconds.
+       If the exptime is not found in the header then None
+       is returned. 
+ 
+    Example
+    -------
+    
+    exptime = getexptime(filename)
+ 
+    By D.Nidever  May 2008 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    if filename is None and head is None:
+        raise ValueError('filename or head must be input')
+    nfiles = dln.size(filename)
+    
+    # Can't use input HEAD if multiple fits files input 
+    if nfiles > 1:
+        head = None
+     
+    # More than one name input 
+    if nfiles > 1:
+        exptime = np.zeros(nfiles,float)
+        for i in range(nfiles): 
+            exptime[i] = getexptime(filename[i])
+        return exptime
+     
+    # No header input, read from fits file 
+    if head is None:
+        # Check that the file exists
+        if os.path.exists(filename)==False:
+            raise ValueError(filename+' NOT FOUND')
+        if filename[-7:]=='fits.fz':
+            head = readfile(filename,1,header=True)
+        else:
+            head = readfile(filename,header=True)        
+
+    exptime = head.get('EXPTIME')                
+    
+    # No EXPTIME 
+    if exptime is None:
+        print('NO EXPTIME FOUND')
+
+    return exptime
+
+ 
+def getfilter(filename=None,head=None,numeric=False,noupdate=False,
+              silent=False,filtname=None,fold_case=False):
+    """
+    This gets filter information for an image 
+    using the "filter" file. 
+    The "short" filter names that are returned 
+    are not necessarily "unique".  The filter names 
+    "I c6028", "T", "T2" all have a short filter 
+    name of "T". 
+ 
+    If a filter is not found in the filter list "filters" 
+    then a new short name is created for it (based on the 
+    first word in the string) and added to the list. 
+ 
+    Parameters
+    ----------
+    filename : str, optional
+       FITS filename 
+    head : header, optional
+       Use this header array instead of reading FITS file. 
+    numeric : boolean, optional
+       Return a numeric value instead of letter.  Default is False.
+    filtname : str or list, optional
+       Input the filter name explicitly instead of giving the 
+              FITS filename. 
+    noupdate : boolean, optional
+       Don't update the "filters" file if the filter is not found.
+         Default is to update.
+    fold_case : boolean, optional
+       Ignore case. The default is for it to be case sensitive. 
+    silent : boolean, optional
+       Don't print anything to the screen.  Default is False.
+ 
+    Returns
+    -------
+    The short filter name is output. 
+ 
+    Example
+    -------
+
+    filter = getfilter(fitsfile,numeric=numeric,noupdate=noupdate, 
+                                 filtname=filtname,fold_case=fold_case)
+ 
+    By D.Nidever  February 2008 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    global setup
+    
+    nfiles = dln.size(filename)
+    nfiltname = dln.size(filtname)
+    # Not enough inputs
+    if filename is None and filtname is None:
+        raise ValueError('Need filename or filtname')
+     
+    # Can't use input HEAD if multiple fits files or filter names input 
+    if (nfiles > 1 or nfiltname > 1): 
+        head = None 
+     
+    # More than one FITS filename input 
+    if (nfiles > 1): 
+        filters = np.zeros(nfiles,(np.str,50))
+        for i in range(nfile): 
+            filters[i] = photred_getfilter(filename[i],numeric=numeric,
+                                           noupdate=noupdate,fold_case=fold_case) 
+        return filters 
+     
+    # More than one filter name input 
+    # ONLY if no FITS filename input 
+    if (nfiles == 0 and nfiltname > 1): 
+        filters = np.zeros(nfiltname,(np.str,50))
+        for i in range(nfiltname): 
+            filters[i] = getfilter(filtname=filtname[i],numeric=numeric,
+                                   noupdate=noupdate,silent=silent,fold_case=fold_case) 
+        return filters 
+     
+     
+    # Does the "filters" file exist? 
+    if os.path.exists('filters')==False:
+        scriptsdir = setup['SCRIPTSDIR']
+        if scriptsdir is None:
+            if silent==False:
+                print('NO SCRIPTSDIR')
+            return ''
+        if os.path.exists('filters'): os.remove('filters')
+        shutil.copyfile(scriptsdir+'/filters','.')
+     
+    # Load the filters
+    lines = dln.readlines('filters')
+    gd, = np.where(str(lines,2) != '',ngd) 
+    if len(gd) == 0: 
+        if silent==False:
+            print('NO FILTERS')
+        return '' 
+    lines = lines[gd]
+    arr = strsplitter(lines,"'",/extract) 
+    arr = str(arr,2) 
+    # Should be 2xN 
+    # Removing blank lines 
+    longnames = reform(arr[0,:]) 
+    shortnames = reform(arr[1,:]) 
+     
+    # Get the filter information from the header 
+    if (nfile > 0): 
+        # Header NOT input, read FITS files 
+        if len(head) == 0: 
+            # Does it have the ".fits" of ".fits.fz" ending
+            ext = os.path.basename(os.path.splitext(filename))[1]
+            if ext != '.fits' and filename[-7:] != 'fits.fz': 
+                if silent==False:
+                    print(filename+' IS NOT A FITS FILE')
+                return '' 
+             
+            # Make sure the file exists 
+            if os.path.exists(filename)==False:
+                if silent==False:
+                    print(filename' NOT FOUND')
+                return '' 
+             
+            # Read the header 
+            if filename[-7:] == 'fits.fz': 
+                head = readfile(filename,exten=1,header=True)
+            else: 
+                head = readfile(filename,header=True)
+         
+        # Problem with header
+        if head is None:
+            if silent==False:
+                print(filename+' - Problem loading FITS header')
+            return '' 
+         
+        filtname = head.get('FILTER')
+        if filtname is None:
+            if silent==False:
+                print('NO FILTER INFORMATION IN '+filename+' HEADER')
+            return '' 
+         
+    # Get the filter name from "filtname" 
+    else: 
+        filtname = str(filtname[0]) 
+     
+     
+    # Match filter 
+    ind = first_el(where(strcmp(longnames,filtname,fold_case=fold_case) == 1,nind)) 
+     
+    # Match found 
+    if nind > 0:     
+        filt = shortnames[ind[0]] 
+         
+        # Numeric value 
+        if numeric: 
+            snames,ui = np.unique(shortnames,return_index=True)  # unique short names
+            nui = len(ui)
+            numnames = (np.arange(nui)+1).astype(str) # numbers for the unique short names 
+            gg, = np.where(snames == filt)   # which short name 
+            numname = numnames[gg[0]] 
+            return numname 
+         
+        return filt
+         
+    # No match found 
+    else:
+        if silent==False:
+            print('NO FILTER MATCH')
+         
+        # Add it to the "filters" file 
+        if noupdate==False:
+             
+            # The IRAF task is called "ccdsubset" 
+            ## CCDSUBSET -- Return the CCD subset identifier. 
+            ## 
+            ## 1. Get the subset string and search the subset record file for the ID string. 
+            ## 2. If the subset string is not in the record file define a default ID string 
+            ##    based on the first word of the subset string.  If the first word is not 
+            ##    unique append a integer to the first word until it is unique. 
+            ## 3. Add the new subset string and identifier to the record file. 
+            ## 4. Since the ID string is used to generate image names replace all 
+            ##    nonimage name characters with '_'. 
+            ## 
+            ## It is an error if the record file cannot be created or written when needed. 
+             
+            # Get first word of the ID string 
+            newshortname = filtname.split()[0]
+             
+            # Is this already a "short" filter name
+            
+            ind = first_el(where(strcmp(shortnames,newshortname,fold_case=fold_case) == 1,nind)) 
+             
+            # Yes, already a "short" name 
+            # Append integer until unique 
+            if nind > 0: 
+                #newshortname = newshortname+'_' 
+                # Loop until we have a unique name 
+                flag = 0 
+                integer = 1 
+                while (flag == 0): 
+                    sinteger = str(integer) 
+                    ind = first_el(where(strcmp(shortnames,newshortname+sinteger),fold_case=fold_case == 1,nind)) 
+                     
+                    # Unique 
+                    if nind == 0: 
+                        newshortname = newshortname+sinteger 
+                        flag = 1 
+                    # Not unique, increment integer 
+                    else: 
+                        integer += 1
+                     
+             
+            # Make sure the variable is okay 
+            #newshortname = IDL_VALIDNAME(newshortname,/convert_all) 
+             
+            # Make sure it doesn't have any weird characters 
+            # such as '*', '!', '$'
+            newshortname = newshortname.replace('*','_')
+            newshortname = newshortname.replace('!','_')
+            newshortname = newshortname.replace('$','_')
+            newshortname = newshortname.replace('__','_')
+            # Add new filter to the "filters" file 
+            newline = "'"+filtname+"'     "+newshortname
+            dln.writelines('filters',newline,append=True)
+            #WRITELINE,'filters',newline,/append 
+            print('Adding new filter name to "filters" list')
+            print('Filter ID string:  ',filtname)
+            print('Filter short name: ',newshortname)
+             
+             
+            # Numeric value 
+            if numeric:
+                # Reload filters
+                lines = dln.readlines('filters')
+                lines = [l.strip() for l in lines]
+                gd, = np.where(np.char.array(lines) != '')
+                ngd = len(gd)
+                lines = lines[gd] 
+                arr = strsplitter(lines,"'",/extract) 
+                arr = str(arr,2) 
+                # Should be 2xN 
+                # Removing blank lines 
+                longnames = reform(arr[0,:]) 
+                shortnames = reform(arr[1,:]) 
+                 
+                ui = np.uniq(shortnames) 
+                snames = shortnames[ui]# unique short names 
+                nui = len(ui) 
+                numnames = str(lindgen(nui)+1,2)# numbers for the unique short names 
+                 
+                gg , = np.where(snames == newshortname,ngg)# which short name 
+                numname = numnames[gg[0]] 
+                return numname 
+             
+        # Don't update 
+        else: 
+            print('NO FILTER MATCH')
+            return '' 
+
+
 def loadsetup(fake=False,setupdir=None,std=False):
     """
 
