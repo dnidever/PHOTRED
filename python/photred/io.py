@@ -335,8 +335,8 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     if (nfiles > 1): 
         filters = np.zeros(nfiles,(np.str,50))
         for i in range(nfile): 
-            filters[i] = photred_getfilter(filename[i],numeric=numeric,
-                                           noupdate=noupdate,fold_case=fold_case) 
+            filters[i] = getfilter(filename[i],numeric=numeric,
+                                   noupdate=noupdate,fold_case=fold_case) 
         return filters 
      
     # More than one filter name input 
@@ -360,26 +360,22 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
         shutil.copyfile(scriptsdir+'/filters','.')
      
     # Load the filters
-    lines = dln.readlines('filters')
-    gd, = np.where(str(lines,2) != '',ngd) 
+    lines = dln.readlines('filters',noblank=True)
+    gd, = np.where(np.char.array(lines).strip() != '') 
     if len(gd) == 0: 
         if silent==False:
             print('NO FILTERS')
         return '' 
-    lines = lines[gd]
-    arr = strsplitter(lines,"'",/extract) 
-    arr = str(arr,2) 
-    # Should be 2xN 
-    # Removing blank lines 
-    longnames = reform(arr[0,:]) 
-    shortnames = reform(arr[1,:]) 
+    lines = np.char.array(lines)[gd]
+    longnames = [l.split("'")[1] for l in lines]
+    shortnames = [l.split("'")[2].strip() for l in lines]
      
     # Get the filter information from the header 
-    if (nfile > 0): 
+    if (nfiles > 0): 
         # Header NOT input, read FITS files 
-        if len(head) == 0: 
+        if head is None:
             # Does it have the ".fits" of ".fits.fz" ending
-            ext = os.path.basename(os.path.splitext(filename))[1]
+            ext = os.path.splitext(os.path.basename(filename))[1]
             if ext != '.fits' and filename[-7:] != 'fits.fz': 
                 if silent==False:
                     print(filename+' IS NOT A FITS FILE')
@@ -388,7 +384,7 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             # Make sure the file exists 
             if os.path.exists(filename)==False:
                 if silent==False:
-                    print(filename' NOT FOUND')
+                    print(filename+' NOT FOUND')
                 return '' 
              
             # Read the header 
@@ -411,14 +407,14 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
          
     # Get the filter name from "filtname" 
     else: 
-        filtname = str(filtname[0]) 
+        filtname = str(filtname[0]).strip()
      
      
     # Match filter
     ind, = np.where(np.char.array(longnames).lower()==filtname.lower())    
      
     # Match found 
-    if nind > 0:     
+    if len(ind) > 0:     
         filt = shortnames[ind[0]] 
          
         # Numeric value 
@@ -526,31 +522,32 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             return '' 
 
 
-def loadsetup(fake=False,setupdir=None,std=False):
+def readsetup(fake=False,setupdir=None,std=False):
     """
 
     Parameters
     ----------
-    fake      Load the fakered.setup file. 
-    setupdir  The directory in which to look for the setup file. 
+    fake : boolean, optional
+       Read the fakered.setup file. 
+    setupdir : str, optional
+       The directory in which to look for the setup file. 
  
     Returns
     -------
-    setup      The setup file.  It is a string array with 
-                 dimensions of 2xN_parameters.  READPAR can be 
-                 used to read the parameters. 
+    setup : dict
+      The setup information.  It is a dictionary.
 
     Example
     -------
 
-    setup = loadsetup()
+    setup = readsetup()
  
     By D.Nidever  March 2008 
     Translated to Python by D. Nidever,  April 2022
     """
  
     if setupdir is None:  # default setup directory 
-        setupdir = '.' 
+        setupdir = os.path.abspath('.')
      
     # Type of setup file 
     setupfile = 'photred'
@@ -559,7 +556,7 @@ def loadsetup(fake=False,setupdir=None,std=False):
     if fake:
         setupfile = 'fakered' 
      
-    # LOAD THE SETUP FILE 
+    # READ THE SETUP FILE 
     #-------------------- 
     # This is a 2xN array.  First colume are the keywords 
     # and the second column are the values. 
@@ -573,8 +570,11 @@ def loadsetup(fake=False,setupdir=None,std=False):
      
     # Read the setup file
     lines = dln.readlines(setupfiles[0],comment='#')
-    nlines = len(files)
-     
+    if lines is not None:
+        nlines = len(lines)
+    else:
+        raise ValueError('setup file is empty')
+
     # Process the lines
     setup = {}
     if nlines > 0:
@@ -592,7 +592,7 @@ def loadsetup(fake=False,setupdir=None,std=False):
 
     return setup
 
-def loadmch(mchfile):
+def readmch(mchfile):
     """
     This loads a DAOMATCH/DAOMASTER mch file 
      
@@ -609,7 +609,7 @@ def loadmch(mchfile):
     Example
     -------
 
-    files,trans,magoff = loadmch('ccd1001.mch')
+    files,trans,magoff = readmch('ccd1001.mch')
      
     By D.Nidever   February 2008 
     Translated to Python by D. Nidever,  April 2022
@@ -644,9 +644,9 @@ def loadmch(mchfile):
  
     return files,trans,magoff
 
-def loadraw(filename):
+def readraw(filename):
     """"
-    This loads the DAOPHOT/DAOMASTER RAW file and also .mag and .makemag files.
+    This reads the DAOPHOT/DAOMASTER RAW file and also .mag and .makemag files.
      
     Parameters
     ----------
@@ -663,9 +663,9 @@ def loadraw(filename):
     Example
     ------
     
-    phot,head = loadraw('temp.raw')
+    phot,head = readraw('temp.raw')
      
-    By D. Nidever   Feb. 2008 (basically a copy of loadals.pro 
+    By D. Nidever   Feb. 2008 (basically a copy of readals.pro 
     Translated to Python by D. Nidever,  April 2022
     """
      
@@ -701,7 +701,7 @@ def loadraw(filename):
         line4 = '1'
         while (endflag != 1) and line4 != '':
             line4 = f.readline().replace("\n", "")
-         
+
             # If there are too many frames/columns then these 
             # go on separate lines and lead with 27 blank spaces 
          
@@ -712,13 +712,14 @@ def loadraw(filename):
                     nspaces = 24 
                 else: 
                     nspaces = 25
+                instr1 = line4[nspaces:]
+                instr += instr1 
                 nstarline += 1 
                 continuation = True 
             else:
                 endflag = 1 
         f.close()
 
-        
         # Now parse the long line for a single star with a formatted read 
         #fmt = '(I7,2A9,'+strtrim(2*nmag+2,2)+'F9.4)'
         nmag = int(  (len(instr)-(7+2*9+2*9)) / 9 / 2 )
@@ -732,7 +733,7 @@ def loadraw(filename):
         # Stars in this file
         numstar = int((dln.numlines(filename)-3 )/nstarline)
 
-        # LOADING THE DATA 
+        # READING THE DATA 
         #------------------              
         # mastable is where everything is stored, id, x, y, unsolved magnitudes, chi, sharp
         dt = [('id',int),('x',float),('y',float)]
@@ -792,7 +793,7 @@ def loadraw(filename):
     # Not a raw file 
     else: 
         print('This is NOT a raw file')
-        # try to load as a table
+        # try to read as a table
         phot = Table.read(filename,format='ascii')
         return phot
 
@@ -842,53 +843,6 @@ def readopt(optfile):
                         val = float(val)
                 opt[key] = val
     return opt
-
-def readpar(array,keyword):
-    """
-    This allows you to get a parameter value from 
-    a 2xN array of keyword/value pairs. 
-    This is similar to getting keyword values from 
-    headers with SXPAR.PRO. 
-    
-    Parameters
-    ----------
-    array    A 2xN array of keyword-value pairs 
-    keyword  A keyword string for which to return the value. 
-            Case insensitive. 
- 
-    Returns
-    -------
-    value    The value corresponding to the input keyword 
-              is output.  If none is found then '0' is returned. 
-              If the keyword exists in array but has not value 
-              then an empty string '' is returned. 
-    count   The number of parameters found by READPAR.  count=0 
-              if the parameter was not found. 
-
-    Example
-    -------
-
-    value = readpar(setup,'MOSAIC') 
- 
-    By D. Nidever    Oct. 2007 
-    Translated to Python by D. Nidever,  April 2022
-    """
-    
-    #sz = size(array)
-    #if sz[0] != 2 or sz[1] != 2: # must be 2xN 
-    #    return None
-    #if size(array,/type) != 7: # must be string 
-    #    return None 
-     
-    # Looking for keyword 
-    keyword2 = strlowcase(str(keyword[0],2)) 
-    keys = reform(array[0,:]) 
-    values = reform(array[1,:])
-    gd, = dln.grep(keys==keyword2)
-    if len(gd)==0:
-        return None
-    value = str(values[gd[0]])  # returning the first value 
-    return value
 
 def mkopt(base=None,meta=None,VA=1,LO=7.0,TH=3.5,LS=0.2,HS=1.0,LR=-1.0,HR=1.0,
           WA=-2,AN=-6,EX=5,PE=0.75,PR=5.0,CR=2.5,CE=6.0,MA=50.0,RED=1.0,WA2=0.0,
@@ -1099,9 +1053,9 @@ def mkopt(base=None,meta=None,VA=1,LO=7.0,TH=3.5,LS=0.2,HS=1.0,LR=-1.0,HR=1.0,
 
     logger.info("Created "+optfile+" and "+alsoptfile)
 
-def loadals(filename,silent=False):
+def readals(filename,silent=False):
     """
-    This loads the ALLSTAR photometry file (.als).
+    This reads the ALLSTAR photometry file (.als).
  
     Parameters
     ----------
@@ -1120,7 +1074,7 @@ def loadals(filename,silent=False):
     Example
     -------
     
-    phot,head = loadals('obj2153_1.als')
+    phot,head = readals('obj2153_1.als')
  
     By D. Nidever   January 2007 
     Translated to Python by D. Nidever,  April 2022
@@ -1175,9 +1129,9 @@ def loadals(filename,silent=False):
     return phot,head
      
 
-def loadcoo(filename,silent=False):
+def readcoo(filename,silent=False):
     """
-    This loads the DAOPHOT coordinates file (.coo).
+    This reads the DAOPHOT coordinates file (.coo).
 
     Parameters
     ----------
@@ -1196,7 +1150,7 @@ def loadcoo(filename,silent=False):
     Example
     -------
     
-    phot,head = loadcoo('obj2153_1.coo')
+    phot,head = readcoo('obj2153_1.coo')
  
     By D. Nidever   January 2007 
     Translated to Python by D. Nidever,  April 2022
@@ -1250,9 +1204,9 @@ def loadcoo(filename,silent=False):
     return tab,head
      
 
-def loadaper(filename,silent=False):
+def readaper(filename,silent=False):
     """
-    This loads the DAOPHOT aperture photometry file (.ap).
+    This reads the DAOPHOT aperture photometry file (.ap).
  
     Parameters
     ----------
@@ -1271,7 +1225,7 @@ def loadaper(filename,silent=False):
     Example
     -------
     
-    phot,head = loadaper('obj2153_1.ap')
+    phot,head = readaper('obj2153_1.ap')
  
     By D. Nidever   January 2007 
     Translated to Python by D. Nidever,  April 2022
@@ -1327,7 +1281,7 @@ def loadaper(filename,silent=False):
         #  3 lines per star except the last one
         numstar = int((dln.numlines(filename)-3 )/3)
          
-        # LOADING THE DATA 
+        # READING THE DATA 
         #------------------              
         dt = [('id',int),('x',float),('y',float)]
         for m in np.arange(nmag): dt += [('mag'+str(m+1),float)]
@@ -1442,7 +1396,7 @@ def writeals(outfile,phot,head):
     f.close()
 
     
-def loadtrans(transfile,silent=False,logfile=None):
+def readtrans(transfile,silent=False,logfile=None):
     """
     Read in a photometric transformation file. 
  
@@ -1520,7 +1474,7 @@ def loadtrans(transfile,silent=False,logfile=None):
     Example
     -------
 
-    trans = loadtrans('n1.trans')
+    trans = readtrans('n1.trans')
  
     By D.Nidever  Feb.2013 
     Added Night+chip format March 2015 
@@ -1609,16 +1563,22 @@ def loadtrans(transfile,silent=False,logfile=None):
           ('zptermsig',float),('amtermsig',float),('coltermsig',float),('amcoltermsig',float),('colsqtermsig',float)]
     nlines = dln.numlines(transfile)
     trans = np.zeros(nlines,dtype=np.dtype(dt))
+    trans['night'] = -1
+    trans['chip'] = -1
 
     count = 0
     with open(transfile,'r') as f:
         while True:
-            line = f.readline().replace('\n','')
+            line = f.readline()
             if line=='':  # we're at the end
                 break
             # Blank or commented line
             if line.strip()=='' or line[0]=='#':
                 continue
+            line = line.replace('\n','')
+
+            arr = line.split()
+            narr = len(arr)
              
             # This is the format.  NIGHT (MJD), CHIP, BAND, COLOR, ZPTERM, AMTERM, 
             #                       COLORTERM, AMCOLTERM, AMSQTERM 
@@ -1643,7 +1603,7 @@ def loadtrans(transfile,silent=False,logfile=None):
                 optcase = np.maximum(optcase,3)
                  
             # ---CHIP or FILENAME--- 
-            if narr==8:     
+            elif narr==8:     
                 # CHIP, first value is a number
                 if arr[0].isnumeric():
                     trans['chip'][count] = arr[0]
@@ -1656,7 +1616,7 @@ def loadtrans(transfile,silent=False,logfile=None):
                     optcase = np.maximum(optcase,4)
              
             # ---Neither--- 
-            if narr==7:
+            elif narr==7:
                 # not much to do 
                 optcase = np.maximum(optcase,1)
  
@@ -1719,7 +1679,7 @@ def loadtrans(transfile,silent=False,logfile=None):
         col = trans['color'][i]
         col = "".join(col.split())  # remove any spaces
         # Splitting up the two bands
-        arr = col.split('-')
+        arr = np.char.array(col.split('-'))
         ind, = np.where(arr==band)
         # colsign = 1 means band - colband 
         if (ind[0] == 0): 
@@ -1740,27 +1700,27 @@ def loadtrans(transfile,silent=False,logfile=None):
         logger.info('  NIGHT/CHIP/FILE  BAND COLOR ZERO-POINT  AIRMASS   COLOR     AIR*COL   COLOR**2 ')
         logger.info('--------------------------------------------------------------------------------')
         for i in range(ntrans):
-            form1 = '%10f%d6%6s%s7%10.4f%10.4f%10.4f%10.4f%10.4f'
+            form1 = '%10d%6d%6s%7s%10.4f%10.4f%10.4f%10.4f%10.4f'
             form1f = '%-16s%6s%7s%10.4f%10.4f%10.4f%10.4f%10.4f'
             # FILENAME 
             if trans['file'][i] != '': 
                 logger.info(form1f % (trans['file'][i],'  '+trans['band'][i],trans['color'][i],trans['zpterm'][i],
                                      trans['amterm'][i],trans['colterm'][i],trans['amcolterm'][i],trans['colsqterm'][i]))
             # NO Filename 
-            if trans['file'][i] == '':
+            else:
                 logger.info(form1 % (trans['night'][i],trans['chip'][i],'  '+trans['band'][i],trans['color'][i],trans['zpterm'][i],
                                      trans['amterm'][i],trans['colterm'][i],trans['amcolterm'][i],trans['colsqterm'][i]))
-                form2 = '%29s%10.4f%10.4f%10.4f%10.4f%10.4f'
-                logger.info(form2 % ('',trans['zptermsig'][i],trans['amtermsig'][i],trans['coltermsig'][i],
-                                     trans['amcoltermsig'][i],trans['colsqtermsig'][i]))
-                logger.info('--------------------------------------------------------------------------------')
-                logger.info('')
+            form2 = '%29s%10.4f%10.4f%10.4f%10.4f%10.4f'
+            logger.info(form2 % ('',trans['zptermsig'][i],trans['amtermsig'][i],trans['coltermsig'][i],
+                                 trans['amcoltermsig'][i],trans['colsqtermsig'][i]))
+        logger.info('--------------------------------------------------------------------------------')
+        logger.info('')
  
     return trans
  
-def loadtfr(tfrfile):
+def readtfr(tfrfile):
     """
-    This loads a DAOMATCH/DAOMASTER tfr file. 
+    This reads a DAOMATCH/DAOMASTER tfr file. 
  
     Parameters
     ----------
@@ -1779,7 +1739,7 @@ def loadtfr(tfrfile):
     Example
     -------
 
-    files,tab = loadtfr('ccd1001.tr')
+    files,tab = readtfr('ccd1001.tr')
  
     By D.Nidever   August 2016 
     Translated to Python by D. Nidever,  April @022
@@ -1882,6 +1842,7 @@ def loadtfr(tfrfile):
         #   there might be extra blank elements
         uindex[:,i] = index2[0:nfiles].astype(int)
     tab['index'] = uindex.T
+    tab = Table(tab)
 
     return files,tab
 
@@ -2111,11 +2072,11 @@ def daophot_imprep(fluxfile,maskfile,header=False):
     return im,meta
 
 
-def loadresource(rfile):
-    """ Load resource file"""
+def readresource(rfile):
+    """ Read resource file"""
     rlines = dln.readlines(rfile,comment='#',noblank=True)
     arr = [l.split('=') for l in rlines]
-    names = [a[0].strip() for a in arr]
+    names = [a[0].strip().lower() for a in arr]
     vals = [a[1].strip() for a in arr]
     rstr = dict(zip(names,vals))
     return rstr
@@ -2163,17 +2124,16 @@ def fits_read_resource(filename,header=False,nowrite=False):
         print('Lock file.  Waiting')
         while (os.path.exists(filename+'.lock') and time.time()-t0 <100.): time.sleep(5)
          
-         
     # If the file exists and is not empty then just use it's data 
     #  Might need to use resource header though 
     #============================================================ 
     if os.path.exists(filename) and os.path.getsize(filename)>1:
         # Check if there's a resouce header we should use 
         # It has a resource file
-        rmeta = []
+        rmeta = None
         if os.path.exists(rfile): 
-            # Load the resource file
-            rstr = loadresource(rfile)
+            # Read the resource file
+            rstr = readresource(rfile)
             # There is a resource header 
             if 'header' in rstr.keys():
                 if rstr['header'][0] == '/': 
@@ -2184,18 +2144,18 @@ def fits_read_resource(filename,header=False,nowrite=False):
                     raise ValueError('Local header file '+hfile+' NOT FOUND')
                 else: 
                     rmeta = dln.readlines(hfile)
-        # Load the regular FITS file header
+        # Read the regular FITS file header
         meta = fits.getheader(filename)
              
         # Decide which header to use 
-        if len(rmeta) > 0: 
+        if rmeta is not None:
             #print,'Using resource header ',hfile 
             meta = rmeta 
              
         # Only return the header
         if header:
             return meta 
-        # Load the data in the fits file 
+        # Read the data in the fits file 
         im = fits.getdata(filename)
         return im,meta
          
@@ -2206,8 +2166,8 @@ def fits_read_resource(filename,header=False,nowrite=False):
     if header==False:
         dln.touch(filename+'.lock')
          
-    # Load the resource file
-    rstr = loadresource(rfile)
+    # Read the resource file
+    rstr = readresource(rfile)
          
     # Only the header, local 
     # get it from the resource file or a stand-alone file
@@ -2219,7 +2179,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
         if os.path.exists(hfile) == False:
             raise ValueError('Local header file '+hfile+' NOT FOUND')
         else:
-            meta = dln.readlines(hfile)
+            meta = fits.Header.fromfile(hfile,sep='\n',endcard=False,padding=False)
             return meta
          
          
@@ -2338,7 +2298,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
     # Now update the fluxfile with this new header 
     tflux = fits.getdata(tfluxfile,0)
     os.remove(tfluxfile)
-    fits.HDUList(fits.PrimaryHDU(tflux,head)).writeto(tfluxfile,overwrite=True)
+    fits.PrimaryHDU(tflux,head).writeto(tfluxfile,overwrite=True)
          
     # Get the mask file 
     lo = rstr['maskfile'].find('[') 
@@ -2353,10 +2313,10 @@ def fits_read_resource(filename,header=False,nowrite=False):
     # Create the DAOPHOT file 
     #   taken from smashred_imprep_single.pro
     im,meta = daophot_imprep(tfluxfile,tmaskfile,header=header)         
-         
+
     # Use the local header 
     #   to write to the file and return 
-    if header in rstr.keys():
+    if 'header' in rstr.keys():
         if rstr['header'][0]=='/':
             hfile = rstr['header']
         else: 
@@ -2364,8 +2324,8 @@ def fits_read_resource(filename,header=False,nowrite=False):
         if os.path.exists(hfile)==False:
             raise ValueError('Local header file '+hfile+' NOT FOUND')
         else:
-            meta = dln.readlines(hfile)
-              
+            meta = fits.Header.fromfile(hfile,sep='\n',endcard=False,padding=False)
+
     # Write new image
     if nowrite==False and header==False:
         fits.HDUList(fits.PrimaryHDU(im,meta)).writeto(filename,overwrite=True)
@@ -2444,17 +2404,17 @@ def readfile(filename,exten=None,header=False,nowrite=False):
     if ext=='opt':
         return readopt(filename)
     elif ext=='coo':
-        return loadcoo(filename)
+        return readcoo(filename)
     elif ext=='ap':
-        return loadaper(filename)
+        return readaper(filename)
     elif ext=='mch':
-        return loadmch(filename)
+        return readmch(filename)
     elif ext=='raw' or ext=='makemag':
-        return loadraw(filename)
+        return readraw(filename)
     elif ext=='tfr':
-        return loadtfr(filename)
+        return readtfr(filename)
     elif ext=='als' or ext=='alf':
-        return loadals(filename)
+        return readals(filename)
     elif ext=='mag':
         if isfits: 
             if header:  # only read header
@@ -2469,7 +2429,7 @@ def readfile(filename,exten=None,header=False,nowrite=False):
         else:
             if header: # only read header
                 return dln.readlines(filename,nreadline=1)
-            phot = loadraw(filename)
+            phot = readraw(filename)
             return phot,meta  
     elif ext=='ast':
         if isfits:
@@ -2491,7 +2451,7 @@ def readfile(filename,exten=None,header=False,nowrite=False):
             phot = Table.read(filename,format='ascii')
             return phot,meta
     elif ext=='trans':
-        return read_trans(filename)
+        return readtrans(filename)
     elif ext=='phot':
         if isfits:
             hdu = fits.open(filename)
@@ -2586,7 +2546,7 @@ def readfile(filename,exten=None,header=False,nowrite=False):
             return phot,meta
  
     elif ext=='fits':
-        # Load using resource file 
+        # Read using resource file 
         rfilename = fdir+'/.'+base
         if os.path.exists(rfilename):
             return fits_read_resource(filename,header=header,nowrite=nowrite) 
