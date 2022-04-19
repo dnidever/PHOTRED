@@ -1199,7 +1199,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         xb = np.arange(tile['nx']).reshape(-1,1) + np.zeros(tile['ny'],float).reshape(-1,1)
         yb = np.zeros(tile['nx'],float).reshape(-1,1) + np.arange(tile['ny']).reshape(-1,1)
         wcs1 = WCS(tile['head'])
-        rab,decb = wcs.pixel_to_world(xb,yb,0)
+        rab,decb = wcs.pixel_to_world(xb,yb)
          
         # Loop through the files 
         for i in range(nfiles):
@@ -1215,7 +1215,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
              
             # Get X/Y range for this image in the final coordinate system
             wcs1 = WCS(tile['head'])
-            vx,vy = wcs.world_to_pixel(filedict[i]['vertices_ra'],filedict[i]['vertices_dec'],0)
+            vx,vy = wcs.world_to_pixel(filedict[i]['vertices_ra'],filedict[i]['vertices_dec'])
             #HEAD_ADXY,tile.head,filedict[i].vertices_ra,filedict[i].vertices_dec,vx,vy,/deg 
             xout = [np.floor(np.min(vx))-2 > tile['xrange'][0], np.ceil(np.max(vx))+2 < tile['xrange'][1]] 
             xoutrel = xout-tile['xrange'][0]  # relative to xrange[0] 
