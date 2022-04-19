@@ -13,6 +13,7 @@ import re
 from glob import glob
 from astropy.io import fits,ascii
 from astropy.table import Table
+from astropy.wcs import WCS
 from astropy.time import Time
 from dlnpyutils import utils as dln
 import struct
@@ -263,6 +264,101 @@ def getexptime(filename=None,head=None):
 
     return exptime
 
+def getpixscale(filename,head=None):
+    """
+    Get the pixel scale for an image. 
+ 
+    Parameters
+    ----------
+    file    FITS filename 
+    =head   The image header for which to determine the pixel scale. 
+    /stp    Stop at the end of the program. 
+ 
+    Returns
+    -------
+    scale   The pixel scale of the image in arcsec/pix. 
+    =error  The error if one occurred. 
+ 
+    Example
+    -------
+
+    scale = getpixscale('ccd1001.fits')
+ 
+    BY D. Nidever   February 2008 
+    Translated to Python by D. Nidever,  April 2022
+    """
+
+    scale = None  # bad until proven good 
+
+     
+    # No header input, read from fits file 
+    fpack = 0 
+    if head is None:
+        # Check that the file exists
+        if os.path.exists(filename)==False:
+            raise ValueError(filename+' NOT FOUND')
+
+        # Open the file
+        #hdu = fits.open(filename)
+        
+        # Fpack or regular fits
+        if filename[-7:]=='fits.fz':
+            fpack = 1 
+            exten = 1 
+        else: 
+            fpack = 0 
+            exten = 0 
+         
+        # Read the header
+        if head is None:
+            head = readfile(filename,exten=exten,header=True) 
+         
+        # Fix NAXIS1/2 in header 
+        if fpack == 1:
+            head['NAXIS1'] = head['ZNAXIS1']
+            head['NAXIS2'] = head['ZNAXIS2']            
+
+    # Does the image have a SCALE parameter
+    if head.get('scale') is not None:
+        scale = head['scale']
+    # Does the image have a PIXSCALE parameter 
+    if scale is None:
+        pixscale = head.get('pixscale')
+        if pixscale is not None:
+            scale = pixscale
+    # Does the image have a PIXSCALE1 parameter 
+    if scale is None: 
+        pixscale1 = head.get('pixscale1')
+        if pixscale1 is not None:
+            scale = pixscale1
+     
+    # Try the WCS 
+    if scale is None:
+        try:
+            wcs = WCS(head)
+             
+            # Get the coordinates for two positions 
+            #  separated by 1 pixel 
+            #head_xyad,head,0.0,0.0,ra1,dec1,/degree 
+            #head_xyad,head,1.0,0.0,ra2,dec2,/degree 
+            #dist = sphdist(ra1,dec1,ra2,dec2,/deg)*3600. 
+            #scale = dist
+            c1 = wcs.pixel_to_world(0,0)
+            c2 = wcs.pixel_to_world(1,0)            
+            dist = c1.separation(c2).arcsec
+            scale = dist
+            
+            if scale == 0.0: 
+                scale = None 
+        except:
+            raise ValueError('No WCS in header')
+                
+    # Couldn't determine the pixel scale 
+    if scale == None:
+        error = 'WARNING! COULD NOT DETERMINE THE PIXEL SCALE' 
+        print(error)
+
+    return scale
  
 def getfilter(filename=None,head=None,numeric=False,noupdate=False,
               silent=False,filtname=None,fold_case=False):
@@ -2143,7 +2239,7 @@ def fits_read_resource(filename,header=False,nowrite=False):
                 if os.path.exists(hfile)==False:
                     raise ValueError('Local header file '+hfile+' NOT FOUND')
                 else: 
-                    rmeta = dln.readlines(hfile)
+                    rmeta = fits.Header.fromfile(hfile,sep='\n',endcard=False,padding=False)
         # Read the regular FITS file header
         meta = fits.getheader(filename)
              
