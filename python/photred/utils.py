@@ -319,3 +319,47 @@ def fitsext(files,isfpack=False,basename=False,full=False):
             pass
      
     return out 
+
+
+def trans_coo(xin,yin,par):
+    """ Apply the transformation to X/Y"""
+
+    A = par[0]
+    B = par[1]
+    C = par[2]
+    D = par[3]
+    E = par[4]
+    F = par[5]
+    
+    # from ccdpck.txt
+    #              x(1) = A + C*x(n) + E*y(n)
+    #              y(1) = B + D*x(n) + F*y(n)
+
+    # Apply transformation
+    xout = A + C*xin + E*yin
+    yout = B + D*xin + F*yin
+    
+    return xout,yout
+
+
+def trans_coo_dev(par,x1=x1,y1=y1,x2=x2,y2=y2):
+
+    # Rotate coordinates(2) to coordinate system 1
+    # and return deviates
+
+    newx2,newy2 = trans_coo(x2,y2,par)
+
+    diff = np.sqrt( (x1-newx2)**2 + (y1-newy2)**2 )
+
+    # Do robust outlier rejection
+    std = dln.mad(diff)
+    med = dln.median(diff)
+    bd, = np.where(diff > (med+3.0*std))
+    if len(bd)>0:
+        diff[bd] = 0.0
+
+    return diff
+
+
+
+

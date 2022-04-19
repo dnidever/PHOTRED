@@ -129,7 +129,7 @@ def run(scriptname,irafdir=None,silent=False):
     Example
     -------
 
-    out = iraf_run(scriptname,irafdir)
+    out = run(scriptname,irafdir)
  
     By D.Nidever  August 2007 
     Similar to a perl script written by Armin Rest 
@@ -492,15 +492,15 @@ def imalign(input,reference,coords,output,shifts='',boxsize=7,
     return xoff,yoff,trans,trimimages
 
  
-def iraf_imcombine(input,output,headers='',bpmasks='',rejmask='',
-                   nrejmasks='',expmasks='',sigma='',logfile='STDOUT',
-                   combine='average',reject='none',project='no',outtype='real',
-                   outlimits='',offsets='none',masktype='none',
-                   maskvalue=0.0,blank=0.0,scale='non',zero='none',weight='none',
-                   statsec='',expname='',lthreshold='INDEF',hthreshold='INDEF',
-                   nlow=1,nhigh=1,nkeep=1,mclip='yes',lsigma=3.0,hsigma=3.0,
-                   rdnoise=0.0,gain=1.0,snoise=0.0,sigscale=0.1,pclip=-0.5,
-                   grow=0.0,irafdir=None):
+def imcombine(input,output,headers='',bpmasks='',rejmask='',
+              nrejmasks='',expmasks='',sigma='',logfile='STDOUT',
+              combine='average',reject='none',project='no',outtype='real',
+              outlimits='',offsets='none',masktype='none',
+              maskvalue=0.0,blank=0.0,scale='non',zero='none',weight='none',
+              statsec='',expname='',lthreshold='INDEF',hthreshold='INDEF',
+              nlow=1,nhigh=1,nkeep=1,mclip='yes',lsigma=3.0,hsigma=3.0,
+              rdnoise=0.0,gain=1.0,snoise=0.0,sigscale=0.1,pclip=-0.5,
+              grow=0.0,irafdir=None):
     """
     This runs IRAF's IMCOMBINE that combines images 
  

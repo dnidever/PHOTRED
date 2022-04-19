@@ -138,7 +138,7 @@ def ia_trim(xshift,yshift,xsize,ysize,trimsection,vignette):
     # call flush (STDOUT) 
 
  
-def allframe_calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
+def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
     """
     Helper function to calculate weights
     """
