@@ -40,27 +40,24 @@ def check(irafdir=None,silent=False):
 
     test = False  # bad to start with 
      
-    # Check that we have all the required programs 
-    progs = ['maketemp','writeline','undefine'] 
-    progtest = prog_test(progs) 
-    if min(progtest) == 0 : 
-        return 
-     
     # Input IRAF directory 
+    diriraf = None
     if irafdir is not None:
-        diriraf = glob(irafdir)
-        dirtest = os.path.exists(diriraf) 
-        if dirtest == False:
+        diriraf = os.path.expanduser(irafdir)
+        if len(glob(diriraf))==0:
             if silent==False:
                 print('DIRECTORY '+str(irafdir)+' DOES NOT EXIST.  TRYING ~/iraf/ INSTEAD.')
             diriraf = None
-     
+            
     # No IRAF directory yet 
     if diriraf is None:
-        diriraf = glob('~/iraf/')
+        diriraf = os.path.expanduser('~/iraf/')
+        if len(glob(diriraf))==0:
+            raise ValueError('NO IRAF DIRECTORY. RETURNING')
+        diriraf = dln.first_el(diriraf)
         dirtest = os.path.exists(diriraf) 
         if dirtest == False:
-            raise ValueError('NO IRAF DIERECTORY. RETURNING')
+            raise ValueError('NO IRAF DIRECTORY. RETURNING')
          
     curdir = os.getcwd()
                            
@@ -69,21 +66,23 @@ def check(irafdir=None,silent=False):
     cmd += ['print("")']   # adorta: FIRST LINE WILL BE IGNORED!! 
     cmd += ['print("hello world")']
     cmd += ['logout']
-    cmdfile = maketemp('temp','.cl')
+    tid,cmdfile = tempfile.mkstemp(suffix='.cl',prefix="temp")
     dln.writelines(cmdfile,cmd)
      
     # Goto the IRAF directory 
     os.chdir(diriraf)
                       
     # Running IRAF 
-    out = subprocess.check_output('cl < '+curdir+'/'+cmdfile)
-     
+    out = subprocess.check_output('cl < '+cmdfile,shell=True)
+    if type(out) is bytes:
+        out = out.decode()
+    out = out.split('\n')  # split into lines
+
     # Return to original directory 
     os.chdir(curdir)
                       
     # Erasing the temporary files
     if os.path.exists(cmdfile): os.remove(cmdfile)
-     
      
     # See if it printed the message
     gd = dln.grep(out,'hello world',index=True)
@@ -92,7 +91,7 @@ def check(irafdir=None,silent=False):
      
     # Explain how to fix the login.cl file 
     if test == False and silent==False:
-        print('Running IRAF from IDL failed!')
+        print('Running IRAF from Python failed!')
         print('Please edit your login.cl file so that it:es not')
         print('print anything to the screen on IRAF startup.')
         print('The most likely cause are the 9 lines after')
@@ -138,10 +137,11 @@ def run(scriptname,irafdir=None,silent=False):
 
     # Important directories 
     if irafdir is None:
-        irafdir = '~/iraf/'
+        irafdir = os.path.expanduser('~/iraf/')
     irafdir = glob(irafdir)
-    if nirafdir == 0:
+    if len(irafdir) == 0:
         raise ValueError('NO IRAF DIRECTORY')
+    irafdir = dln.first_el(irafdir)
     curdir = os.getcwd()
               
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
@@ -159,8 +159,11 @@ def run(scriptname,irafdir=None,silent=False):
         print('Executing script: ',scriptname)
      
     # Execute the script 
-    out = subprocess.check_output('cl < '+scriptname)
-     
+    out = subprocess.check_output('cl < '+scriptname,shell=True)
+    if type(out) is bytes:
+        out = out.decode()
+    out = out.split('\n')  # split into lines
+
     # Print the output to the screen
     if silent==False:
         for l in out: print(l)
@@ -347,10 +350,11 @@ def imalign(input,reference,coords,output,shifts='',boxsize=7,
      
     # Important directories 
     if irafdir is None:
-        irafdir = '~/iraf/'
+        irafdir = os.path.expanduser('~/iraf/')
     irafdir = glob(irafdir)
-    if irafdir=='':
+    if len(irafdir)==0:
         raise ValueError('NO IRAF DIRECTORY')
+    irafdir = dln.first_el(irafdir)
     curdir = os.getcwd()
      
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
@@ -410,8 +414,11 @@ def imalign(input,reference,coords,output,shifts='',boxsize=7,
     os.chdir(irafdir)
      
     # Running IRAF 
-    out = subprocess.check_output('cl < '+cmdfile)
-     
+    out = subprocess.check_output('cl < '+cmdfile,shell=True)
+    if type(out) is bytes:
+        out = out.decode()
+    out = out.split('\n')   # split into lines
+
     # IMALIGN can fail if it doesn't find any matching sources in 
     # the images. 
      
@@ -906,10 +913,11 @@ def imcombine(input,output,headers='',bpmasks='',rejmask='',
      
     # Important directories 
     if irafdir is None:
-        irafdir = '~/iraf/'
+        irafdir = os.path.expanduser('~/iraf/')
     irafdir = glob(irafdir)
-    if nirafdir == 0:
+    if len(irafdir) == 0:
         raise ValueError('NO IRAF DIRECTORY')
+    irafdir = dln.first_el(irafdir)
     curdir = os.getcwd()
               
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
@@ -1008,7 +1016,10 @@ def imcombine(input,output,headers='',bpmasks='',rejmask='',
     os.chdir(irafdir)
                       
     # Running IRAF 
-    out = subprocess.check_output('cl < '+cmdfile)
+    out = subprocess.check_output('cl < '+cmdfile,shell=True)
+    if type(out) is bytes:
+        out = out.decode()
+    out = out.split('\n')   # split into lines
      
     #print,out 
      
@@ -1146,10 +1157,11 @@ def imshift(input,output,xshift,yshift,shifts_file=None,interp_type='spline3',
 
     # Important directories 
     if irafdir is None:
-        irafdir = '~/iraf/'
+        irafdir = os.path.expanduser('~/iraf/')
     irafdir = glob(irafdir)
-    if nirafdir == 0:
+    if len(irafdir) == 0:
         raise ValueError('NO IRAF DIRECTORY')
+    irafdir = dln.first_el(irafdir)
     curdir = os.getcwd()
               
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
@@ -1224,7 +1236,11 @@ def imshift(input,output,xshift,yshift,shifts_file=None,interp_type='spline3',
     os.chdir(irafdir)
      
     # Running IRAF 
-    out = subprocess.check_outut('cl < '+cmdfile)
+    out = subprocess.check_outut('cl < '+cmdfile,shell=True)
+
+    if type(out) is bytes:
+        out = out.decode()
+    out = out.split('\n')   # split into lines
      
     if verbose:
         for l in out: print(l)

@@ -70,104 +70,6 @@ def file_isfits(filename):
     hdu.close()
     return True
 
-
-def pixscale(filename,head=None):
-    """
-    Get the pixel scale for an image. 
- 
-    Parameters
-    ----------
-    file    FITS filename 
-    =head   The image header for which to determine the pixel scale. 
-    /stp    Stop at the end of the program. 
- 
-    Returns
-    -------
-    scale   The pixel scale of the image in arcsec/pix. 
-    =error  The error if one occurred. 
- 
-    Example
-    -------
-
-    scale = pixscale('ccd1001.fits')
- 
-    BY D. Nidever   February 2008 
-    Translated to Python by D. Nidever,  April 2022
-    """
-
-    scale = None  # bad until proven good 
-
-     
-    # No header input, read from fits file 
-    fpack = 0 
-    if head is None:
-        # Check that the file exists
-        if os.path.exists(filename)==False:
-            raise ValueError(filename+' NOT FOUND')
-
-        # Open the file
-        hdu = fits.open(filename)
-        
-        # Fpack or regular fits
-        if filename[-7:]=='fits.fz':
-            fpack = 1 
-            exten = 1 
-        else: 
-            fpack = 0 
-            exten = 0 
-         
-        # Read the header
-        if head is None:
-            head = readfile(filename,exten=exten,header=True) 
-         
-        # Fix NAXIS1/2 in header 
-        if fpack == 1:
-            head['NAXIS1'] = head['ZNAXIS1']
-            head['NAXIS2'] = head['ZNAXIS2']            
-     
-    # Does the image have a SCALE parameter
-    if head.get('scale') is not None:
-        scale = head['scale']
-    # Does the image have a PIXSCALE parameter 
-    if scale is None:
-        pixscale = head.get('pixscale')
-        if pixscale is not None:
-            scale = pixscale
-    # Does the image have a PIXSCALE1 parameter 
-    if scale is None: 
-        pixscale1 = head.get('pixscale1')
-        if npixscale1 is not None:
-            scale = pixscale1
-     
-    # Try the WCS 
-    if scale is None:
-        try:
-            wcs = WCS(head)
-             
-            # Get the coordinates for two positions 
-            #  separated by 1 pixel 
-            #head_xyad,head,0.0,0.0,ra1,dec1,/degree 
-            #head_xyad,head,1.0,0.0,ra2,dec2,/degree 
-            #dist = sphdist(ra1,dec1,ra2,dec2,/deg)*3600. 
-            #scale = dist
-            ra1,dec1 = wcs.pixel_to_world(0,0,0)
-            ra2,dec2 = wcs.pixel_to_world(1,0,0)            
-            dist = dln.sphdist(ra1,dec1,ra1,dec1)*3600
-            scale = dist
-            
-            if scale == 0.0: 
-                scale = None 
-        except:
-            raise ValueError('No WCS in header')
-                
-    # Couldn't determine the pixel scale 
-    if scale == None:
-        error = 'WARNING! COULD NOT DETERMINE THE PIXEL SCALE' 
-        print(error)
-
-    return scale
-
-
 def file_wait(filename,wait=5,timeout=600,silent=False):
     """
     Wait until a file exists. 
@@ -342,7 +244,7 @@ def trans_coo(xin,yin,par):
     return xout,yout
 
 
-def trans_coo_dev(par,x1=x1,y1=y1,x2=x2,y2=y2):
+def trans_coo_dev(par,x1=None,y1=None,x2=None,y2=None):
 
     # Rotate coordinates(2) to coordinate system 1
     # and return deviates
