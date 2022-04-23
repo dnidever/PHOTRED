@@ -152,8 +152,8 @@ endif else begin
 endelse
         
 ; The last thing to do is check that Xa is included into Ia:
-if ( (Xa < max( [min(x1), min(x2)] )) or $
-     (Xa > min( [max(x1), max(x2)] )) ) then begin
+if ( (Xa lt max( [min(x1), min(x2)] )) or $
+     (Xa gt min( [max(x1), max(x2)] )) ) then begin
   return, 0  ; intersection is out of bound
 endif else begin
   return, 1
