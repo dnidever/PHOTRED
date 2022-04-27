@@ -44,6 +44,78 @@ def make_parser(fieldwidths,fieldtypes=None):
         parse.fmtstring = ' '.join('{}{}'.format(a[0],a[1]) for a in zip(fieldwidths,fieldtypes))
     return parse
 
+def fileinfo(files):
+    """
+    Gather information about files like their corner coordinates, etc. 
+    This is used by the various tiling-related programs. 
+ 
+    Parameters
+    ----------
+    files : str or list
+      The FITS file names. 
+ 
+    Returns
+    -------
+    info : table
+       The structure with information for each file. 
+ 
+    Example
+    -------
+
+    info = fileinfo(files)
+ 
+    By D.Nidever  Jan. 2017 
+    Translated to Python by D. Nidever,  April 2022
+    """
+
+    nfiles = np.array(files).size
+    if nfiles==1 and (type(files)==str or type(files)==np.str or type(files)==np.str_):
+        files = [files]
+
+    # Create structure 
+    dt = [('file',(np.str,300)),('exists',bool),('size',int),('nx',int),('ny',int),('filter',(np.str,50)),('exptime',float),
+          ('dateobs',(np.str,30)),('mjd',float),('pixscale',float),('cenra',float),('cendec',float),
+          ('vertices_ra',(float,4)),('vertices_dec',(float,4))]
+    info = np.zeros(nfiles,dtype=np.dtype(dt))
+    # File loop 
+    for i in range(nfiles): 
+        info['exists'][i] = os.path.exists(files[i])
+        if info['exists'][i]==False:
+            continue
+        if files[i][-7:]=='fits.fz':
+            head = readfile(files[i],exten=1,header=Tre)
+            # Fix the NAXIS1/NAXIS2 in the header 
+            head['NAXIS1'] = head['ZNAXIS1']
+            head['NAXIS2'] = head['ZNAXIS2']
+        else: 
+            head = readfile(files[i],header=True)
+        info['nx'][i] = head['NAXIS1'] 
+        info['ny'][i] = head['NAXIS2']
+        info['file'][i] = files[i] 
+        try:
+            info['filter'][i] = getfilter(files[i],noupdate=True,silent=True)
+        except:
+            info['filter'][i] = head['filter']
+        info['exptime'][i] = head['exptime']
+        info['dateobs'][i] = head['date-obs'] 
+        info['mjd'][i] = utils.date2jd(info['dateobs'][i],mjd=True) 
+        wcs = WCS(head)
+        pcoo = wcs.pixel_to_world([info['nx'][i],info['nx'][i]+1],[info['ny'][i],info['ny'][i]+1])
+        pixscale = 3600*pcoo[0].separation(pcoo[1]).deg
+        info['pixscale'][i] = pixscale 
+        coo = wcs.pixel_to_world(info['nx'][i]//2,info['ny'][i]//2)
+        cenra1 = coo.ra.deg
+        cendec1 = coo.dec.deg
+        info['cenra'][i] = cenra1 
+        info['cendec'][i] = cendec1 
+        vcoo = wcs.pixel_to_world([0,info['nx'][i]-1,info['nx'][i]-1,0],[0,0,info['ny'][i]-1,info['ny'][i]-1])
+        vra = vcoo.ra.deg
+        vdec = vcoo.dec.deg
+        info['vertices_ra'][i] = vra 
+        info['vertices_dec'][i] = vdec
+
+    return info
+
 def getgain(filename=None,head=None):
     """
     This gets the GAIN information from a FITS files 

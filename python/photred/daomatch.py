@@ -203,11 +203,13 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
     # Only one file, can't match 
     if nfiles == 1: 
         raise ValueError('ONLY ONE FILE INPUT.  No matching, simply creating .mch and .raw file')
+
+    import pdb; pdb.set_trace()
      
     # Current directory
     curdir = os.getcwd()
      
-    fdir = os.path.dirname(files[0])
+    fdir = os.path.abspath(os.path.dirname(files[0]))
     os.path.chdir(fdir)
      
     files2 = [os.path.splitext(os.path.basename(f))[0] for f in files]
@@ -377,7 +379,7 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
                     xout,yout = utils.trans_coo(als['x'][gdals[ind2]],als['y'][gdals[ind2]],trans) 
                     trans[0] += np.median(refals['x'][gdref[ind1]]-xout) 
                     trans[1] += np.median(refals['y'][gdref[ind1]]-yout) 
-                 else:
+                else:
                     trans = np.array([xmed, ymed, 1.0, 0.0, 0.0, 1.0])
                      
                 # Fit full six parameters if there are enough stars 
@@ -401,8 +403,8 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
             if count1 > 0: 
                 xdiff1 = refals[gdref[ind1a]].x-als[gdals[ind2a]].x 
                 ydiff1 = refals[gdref[ind1a]].y-als[gdals[ind2a]].y 
-                xmed1 = np.median([xdiff1],/even) 
-                ymed1 = np.median([ydiff1],/even) 
+                xmed1 = np.median(xdiff1) 
+                ymed1 = np.median(ydiff1) 
                 # redo the search
                 ind1,ind2,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals]+xmed1,als['y'][gdals]+ymed1,20)
                 count = len(ind1) 
@@ -682,7 +684,7 @@ def daomaster_tile(mchbase):
             f.write(fmt % (raw['id'][i],raw['x'][i],raw['y'][i],tfr[i,:]))
 
 
-def daomatch_tile(files,tilestr,groupstr,mchbase,verbose=True,logfile=None,
+def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
              maxshift=5000,fake=False):
     """
     This is very similar to the DAOMATCH.PRO program that 
@@ -740,14 +742,16 @@ def daomatch_tile(files,tilestr,groupstr,mchbase,verbose=True,logfile=None,
     if nfiles == 1: 
         raise ValueError('ONLY ONE FILE INPUT.  No matching, simply creating .mch and .raw file')
      
+    import pdb; pdb.set_trace()
+
     # Current directory
     curdir = os.getcwd()
-     
-    fdir = os.path.dirname(files[0])
-    os.path.chdir(fdir)
+    fdir = os.path.abspath(os.path.dirname(files[0]))
+    os.chdir(fdir)
 
     bases = [os.path.splitext(os.path.basename(f))[0] for f in files]
-     
+    bases = np.char.array(bases)
+
     # FAKE, running for artificial star tests 
     if fake: 
         # Check that MCH file exists 
@@ -845,18 +849,25 @@ def daomatch_tile(files,tilestr,groupstr,mchbase,verbose=True,logfile=None,
          
         # The output is: 
         # filename, xshift, yshift, 4 trans, mag offset, magoff sigma 
-        format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)' 
+        #format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)' 
         # In daomaster.f the translations are 10 digits with at most 4 
         # decimal places (with a leading space), the transformation 
         # coefficients are 12 digits with at most 9 decimal places. 
         # Need a leading space to separate the numbers. 
-        strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),
-                      str(string(trans[2:5],format='(F30.9)'),2)] 
-        newline = STRING("'",filestr[i].catfile,"'", strans, 0.0, rms, format=format) 
+        strans = ['%30.4f' % trans[0], '%30.4f' % trans[1], '%30.9f' % trans[2], '%30.9f' % trans[3],
+                  '%30.9f' % trans[4], '%30.9f' % trans[5]]
+        #strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),
+        #              str(string(trans[2:5],format='(F30.9)'),2)] 
+        #newline = STRING("'",filestr[i].catfile,"'", strans, 0.0, rms, format=format) 
+        fmt = '%2s%-30s%1s%10s%10s%12s%12s%12s%12s%9.3f%8.4s'
+        data = filestr['catfile'][i],"'", trans[0],trans[1],trans[2],trans[3],trans[3],trans[4], trans[5], 0.0, rms,
+        newlin = fmt % data
         mchfinal += [newline]
          
         # Printing the transformation 
-        print(format='(A-22,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,0.0,rms)
+        if verbose:
+            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (filestr['catfile'][i],trans,0.0,rms))
+        #print(format='(A-22,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,0.0,rms)
      
     # Write to the new MCH file 
     mchbase = bases[0] 

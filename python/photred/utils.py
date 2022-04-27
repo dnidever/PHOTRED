@@ -12,6 +12,7 @@ import logging
 import re
 from glob import glob
 from astropy.io import fits,ascii
+from astropy.time import Time
 from astropy.table import Table
 from dlnpyutils import utils as dln
 import struct
@@ -165,7 +166,7 @@ def fitsext(files,isfpack=False,basename=False,full=False):
         usecase = 4 
 
     nfiles = np.array(files).size
-    if nfiles==1 and type(files)==str:
+    if nfiles==1 and (type(files)==str or type(files)==np.str or type(files)==np.str_):
         files = [files]
     
     # Initializing the output array 
@@ -222,6 +223,13 @@ def fitsext(files,isfpack=False,basename=False,full=False):
      
     return out 
 
+def date2jd(dateobs,mjd=False):
+    """ Converte DATE-OBS to JD or MJD."""
+    t = Time(dateobs, format='fits')
+    if mjd:
+        return t.mjd
+    else:
+        return t.jd
 
 def trans_coo(xin,yin,par):
     """ Apply the transformation to X/Y"""
@@ -261,7 +269,3 @@ def trans_coo_dev(par,x1=None,y1=None,x2=None,y2=None):
         diff[bd] = 0.0
 
     return diff
-
-
-
-
