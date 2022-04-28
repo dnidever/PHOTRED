@@ -220,6 +220,9 @@ def fitsext(files,isfpack=False,basename=False,full=False):
                 out[i,1] = ext 
         else:  # Not supported 
             pass
+
+    if nfiles==1 and out.ndim==1:
+        out = out[0]
      
     return out 
 
@@ -231,8 +234,11 @@ def date2jd(dateobs,mjd=False):
     else:
         return t.jd
 
-def trans_coo(xin,yin,par):
+def trans_coo(xdata,*par):
     """ Apply the transformation to X/Y"""
+
+    xin = xdata[0]
+    yin = xdata[1]
 
     A = par[0]
     B = par[1]
@@ -252,20 +258,43 @@ def trans_coo(xin,yin,par):
     return xout,yout
 
 
-def trans_coo_dev(par,x1=None,y1=None,x2=None,y2=None):
+def trans_coo_dev(xdata,*par):
 
     # Rotate coordinates(2) to coordinate system 1
     # and return deviates
+    x1,y1 = xdata[0]
+    x2,y2 = xdata[1]
 
-    newx2,newy2 = trans_coo(x2,y2,par)
+    newx2,newy2 = trans_coo([x2,y2],*par)
 
     diff = np.sqrt( (x1-newx2)**2 + (y1-newy2)**2 )
 
     # Do robust outlier rejection
     std = dln.mad(diff)
-    med = dln.median(diff)
-    bd, = np.where(diff > (med+3.0*std))
-    if len(bd)>0:
+    med = np.median(diff)
+    bd = (diff > (med+3.0*std))
+    if np.sum(bd)>0:
         diff[bd] = 0.0
 
-    return diff
+    return diff.flatten()
+
+def trans_coo_outlier(xdata,*par):
+
+    # Rotate coordinates(2) to coordinate system 1
+    # and return deviates
+    x1,y1 = xdata[0]
+    x2,y2 = xdata[1]
+
+    newx2,newy2 = trans_coo([x2,y2],*par)
+
+    diff = np.sqrt( (x1-newx2)**2 + (y1-newy2)**2 )
+
+    # Do robust outlier rejection
+    std = dln.mad(diff)
+    med = np.median(diff)
+    bd = (diff > (med+3.0*std))
+    if np.sum(bd)>0:
+        newx2[bd] = x1[bd]
+        newy2[bd] = y1[bd]
+
+    return np.append(newx2,newy2)

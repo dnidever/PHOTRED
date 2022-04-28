@@ -73,12 +73,17 @@ def fileinfo(files):
         files = [files]
 
     # Create structure 
-    dt = [('file',(np.str,300)),('exists',bool),('size',int),('nx',int),('ny',int),('filter',(np.str,50)),('exptime',float),
+    dt = [('file',(np.str,300)),('dir',(np.str,300)),('base',(np.str,100)),('ext',(np.str,10)),('exists',bool),
+          ('size',int),('nx',int),('ny',int),('filter',(np.str,50)),('exptime',float),
           ('dateobs',(np.str,30)),('mjd',float),('pixscale',float),('cenra',float),('cendec',float),
           ('vertices_ra',(float,4)),('vertices_dec',(float,4))]
     info = np.zeros(nfiles,dtype=np.dtype(dt))
     # File loop 
     for i in range(nfiles): 
+        info['file'][i] = files[i]
+        info['dir'][i] = os.path.dirname(os.path.abspath(files[i]))
+        info['base'][i] = utils.fitsext(files[i],basename=True)
+        info['ext'][i] = utils.fitsext(files[i])
         info['exists'][i] = os.path.exists(files[i])
         if info['exists'][i]==False:
             continue
@@ -114,7 +119,7 @@ def fileinfo(files):
         info['vertices_ra'][i] = vra 
         info['vertices_dec'][i] = vdec
 
-    return info
+    return Table(info)
 
 def getgain(filename=None,head=None):
     """
@@ -488,6 +493,11 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     # 'T'                     T
 
     global setup
+
+    try:
+        dum = len(setup)
+    except:
+        setup = None
     
     nfiles = dln.size(filename)
     nfiltname = dln.size(filtname)
@@ -519,11 +529,11 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
      
     # Does the "filters" file exist? 
     if os.path.exists('filters')==False:
+        if setup is None:
+            raise ValueError('No setup file')
         scriptsdir = setup['SCRIPTSDIR']
         if scriptsdir is None:
-            if silent==False:
-                print('NO SCRIPTSDIR')
-            return ''
+            raise ValueError('NO SCRIPTSDIR')
         if os.path.exists('filters'): os.remove('filters')
         shutil.copyfile(scriptsdir+'/filters','.')
      
@@ -531,9 +541,7 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     lines = dln.readlines('filters',noblank=True)
     gd, = np.where(np.char.array(lines).strip() != '') 
     if len(gd) == 0: 
-        if silent==False:
-            print('NO FILTERS')
-        return '' 
+        raise ValueError('NO FILTERS')
     lines = np.char.array(lines)[gd]
     longnames = [l.split("'")[1] for l in lines]
     shortnames = [l.split("'")[2].strip() for l in lines]
@@ -545,15 +553,11 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             # Does it have the ".fits" of ".fits.fz" ending
             ext = os.path.splitext(os.path.basename(filename))[1]
             if ext != '.fits' and filename[-7:] != 'fits.fz': 
-                if silent==False:
-                    print(filename+' IS NOT A FITS FILE')
-                return '' 
+                raise ValueError(filename+' IS NOT A FITS FILE')
              
             # Make sure the file exists 
             if os.path.exists(filename)==False:
-                if silent==False:
-                    print(filename+' NOT FOUND')
-                return '' 
+                raise ValueError(filename+' NOT FOUND')
              
             # Read the header 
             if filename[-7:] == 'fits.fz': 
@@ -569,9 +573,7 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
          
         filtname = head.get('FILTER')
         if filtname is None:
-            if silent==False:
-                print('NO FILTER INFORMATION IN '+filename+' HEADER')
-            return '' 
+            raise ValueError('NO FILTER INFORMATION IN '+filename+' HEADER')
          
     # Get the filter name from "filtname" 
     else: 

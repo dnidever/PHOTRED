@@ -741,8 +741,6 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
     # Only one file, can't match 
     if nfiles == 1: 
         raise ValueError('ONLY ONE FILE INPUT.  No matching, simply creating .mch and .raw file')
-     
-    import pdb; pdb.set_trace()
 
     # Current directory
     curdir = os.getcwd()
@@ -768,42 +766,43 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
     fitsfiles = bases+'.fits' 
     bdfits, = np.where(dln.exists(fitsfiles)==False)
     if len(bdfits)>0: 
-        fitsfiles[bdfits] += '.fz'
-    filestr = utils.gatherfileinfo(fitsfiles)
+        for b in bdfits:
+            fitsfiles[bd] += '.fz'
+    info = io.fileinfo(fitsfiles)
     ntrans = 6
-    filestr['catfile'] = 100*' '
-    filestr['resamptrans'] = np.zeros(ntrans,float)
-    filestr['resamptransrms'] = 0.0
-    #add_tag,filestr,'resamptrans',dblarr(ntrans),filestr 
-    filestr['catfile'] = np.char.array(bases)+'.als' 
+    info['catfile'] = 100*' '
+    info['resamptrans'] = np.zeros((nfiles,ntrans),float)
+    info['resamptransrms'] = 0.0
+    info['catfile'] = np.char.array(bases)+'.als' 
      
     # Creating MCH file in the tile coordinate system
     mchfinal = []
     for i in range(nfiles): 
         # Get the header
-        if filestr['file'][i][-7:]=='fits.fz':
-            fhead = io.readfile(filestr['file'][i],exten=1,header=True)
+        if info['file'][i][-7:]=='fits.fz':
+            fhead = io.readfile(info['file'][i],exten=1,header=True)
             # Fix the NAXIS1/2 in the header
             fhead['NAXIS1'] = fhead['ZNAXIS1']
             fhead['NAXIS2'] = fhead['ZNAXIS2']  
         else:
-            fhead = io.readfile(filestr['file'][i],header=True)            
+            fhead = io.readfile(info['file'][i],header=True)            
          
         # Convert X/Y of this system into the combined reference frame 
         #  The pixel values are 1-indexed like DAOPHOT uses. 
         #  Use a 2D grid of points in the image and the WCS to get 
         #  the transformation. 
         ngridbin = 50 
-        nxgrid = filestr['nx'][i] / ngridbin 
-        nygrid = filestr['ny'][i] / ngridbin 
-        xgrid = (np.arange(nxgrid)*ngridbin+1)#replicate(1,nygrid) 
-        ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1)
+        nxgrid = info['nx'][i] // ngridbin 
+        nygrid = info['ny'][i] // ngridbin 
+        xgrid = (np.arange(nxgrid)*ngridbin+1).reshape(-1,1) + np.zeros(nygrid,int).reshape(1,-1)
+        ygrid = np.zeros(nxgrid,int).reshape(-1,1) + (np.arange(nygrid)*ngridbin+1).reshape(1,-1)
+
         fwcs = WCS(fhead)
-        ragrid,decgrid = fwcs.pixel_to_world(xgrid-1,ygrid-1)
-        wcs = WCS(tilehead)
-        refxgrid,refygrid = wcs.world_to_pixel(ragrid,decgrid)
-        #HEAD_XYAD,fhead,xgrid-1,ygrid-1,ragrid,decgrid,/deg 
-        #HEAD_ADXY,tilestr.head,ragrid,decgrid,refxgrid,refygrid,/deg 
+        coogrid = fwcs.pixel_to_world(xgrid-1,ygrid-1)
+        ragrid = coogrid.ra.deg
+        decgrid = coogrid.dec.deg
+        wcs = WCS(tilestr['head'])
+        refxgrid,refygrid = wcs.world_to_pixel(coogrid)
         refxgrid += 1  # convert 0-indexed to 1-indexed 
         refygrid += 1 
         # Convert to tile X/Y values 
@@ -818,9 +817,9 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
         # Fit rotation with linear fits if enough points
         slp1 = dln.mediqrslope(ygrid,xdiff)  # fit rotation term
         slp1rms = dln.mad(xdiff-ygrid*slp1)
-        slp2 = dln.mediqrsope(xgrid,ydiff)
+        slp2 = dln.mediqrslope(xgrid,ydiff)
         slp2rms = dln.mad(ydiff-xgrid*slp2)
-        theta = dln.wtmean([-slp1,slp2],[slp1rms,slp2rms])
+        theta = dln.wtmean(np.array([-slp1,slp2]),np.array([slp1rms,slp2rms]))
         #coef1 = robust_poly_fitq(ygrid,xdiff,1)# fit rotation term 
         #coef1b = dln_poly_fit(ygrid,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap) 
         #coef2 = robust_poly_fitq(xgrid,ydiff,1)# fit rotation term 
@@ -831,21 +830,27 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
         # [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)] 
         trans = np.array([xmed, ymed, 1.0-theta**2, theta, -theta, 1.0-theta**2])
         # Adjust Xoff, Yoff with this transformation 
-        xout,yout = utils.trans_coo(xgrid,ygrid,trans) 
+        xout,yout = utils.trans_coo([xgrid,ygrid],*trans) 
         trans[0] += np.median(refxgrid-xout)
         trans[1] += np.median(refygrid-yout)
-         
+
+        # trans rotates xgrid/ygrid to refxgrid/ygrid
+
         # Fit full six parameters if there are enough stars 
         #fa = {x1:(refxgrid)(*),y1:(refygrid)(*),x2:(xgrid)(*),y2:(ygrid)(*)} 
         #initpar = trans 
         #fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,
         # bestnorm=chisq,:f=dof, autoderivative=1, /quiet) 
         # trans = fpar 
-         
-        diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid) 
-        rms = sqrt(np.mean(diff**2.)) 
-        filestr['resamptrans'][i] = trans 
-        filestr['resamptransrms'][i] = rms 
+        xdata = [[refxgrid,refygrid],[xgrid,ygrid]]
+        null = np.zeros(refxgrid.size,float)
+        fpar,cov = curve_fit(utils.trans_coo_dev,xdata,null,p0=trans)
+        trans = fpar
+        transerr = np.sqrt(np.diag(cov))
+        diff = utils.trans_coo_dev(xdata,*fpar)
+        rms = np.sqrt(np.mean(diff**2.)) 
+        info['resamptrans'][i] = trans 
+        info['resamptransrms'][i] = rms 
          
         # The output is: 
         # filename, xshift, yshift, 4 trans, mag offset, magoff sigma 
@@ -856,19 +861,16 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
         # Need a leading space to separate the numbers. 
         strans = ['%30.4f' % trans[0], '%30.4f' % trans[1], '%30.9f' % trans[2], '%30.9f' % trans[3],
                   '%30.9f' % trans[4], '%30.9f' % trans[5]]
-        #strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),
-        #              str(string(trans[2:5],format='(F30.9)'),2)] 
-        #newline = STRING("'",filestr[i].catfile,"'", strans, 0.0, rms, format=format) 
-        fmt = '%2s%-30s%1s%10s%10s%12s%12s%12s%12s%9.3f%8.4s'
-        data = filestr['catfile'][i],"'", trans[0],trans[1],trans[2],trans[3],trans[3],trans[4], trans[5], 0.0, rms,
-        newlin = fmt % data
+        strans = [' '+s.strip() for s in strans]
+        fmt = '%2s%-30s%1s%10.10s%10.10s%12.12s%12.12s%12.12s%12.12s%9.3f%8.4s'
+        data = "'",info['catfile'][i],"'",*strans, 0.0, rms,
+        newline = fmt % data
         mchfinal += [newline]
          
         # Printing the transformation 
         if verbose:
-            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (filestr['catfile'][i],trans,0.0,rms))
-        #print(format='(A-22,2A10,4A12,F9.3,F8.4)',filestr[i].catfile,strans,0.0,rms)
-     
+            print('%-22s%10.10s%10.10s%12.12s%12.12s%12.12s%12.12s%9.3f%8.4f' % (info['catfile'][i],*strans,0.0,rms))
+
     # Write to the new MCH file 
     mchbase = bases[0] 
     mchfile = mchbase+'.mch'
