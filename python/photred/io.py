@@ -692,16 +692,18 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
             return '' 
 
 
-def readsetup(fake=False,setupdir=None,std=False):
+def readsetup(setupdir=None,fake=False,std=False):
     """
 
     Parameters
     ----------
-    fake : boolean, optional
-       Read the fakered.setup file. 
     setupdir : str, optional
        The directory in which to look for the setup file. 
- 
+    fake : boolean, optional
+       Read the fakered.setup file. 
+    std : boolean, optional
+       Read the stdred.setup file. 
+
     Returns
     -------
     setup : dict
@@ -734,9 +736,9 @@ def readsetup(fake=False,setupdir=None,std=False):
     setupfiles = glob(setupdir+'/'+setupfile+'.*setup')
     nsetupfiles = len(setupfiles)
     if (nsetupfiles < 1): 
-        raise ValueError('NO '+strupcase(setupfile)+' SETUP FILE')
+        raise ValueError('NO '+str(setupfile)+' SETUP FILE')
     if (nsetupfiles > 1):
-        raise ValueError('MORE THAN ONE '+strupcase(setupfile)+' SETUP FILE FOUND')
+        raise ValueError('MORE THAN ONE '+str(setupfile)+' SETUP FILE FOUND')
      
     # Read the setup file
     lines = dln.readlines(setupfiles[0],comment='#')

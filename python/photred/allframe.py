@@ -14,7 +14,7 @@ from glob import glob
 from astropy.io import fits,ascii
 from astropy.table import Table
 from dlnpyutils import utils as dln
-from . import utils,io
+from . import utils,io,iraf
 
 
 def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
@@ -645,6 +645,10 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     """
      
     global setup 
+    try:
+        dum = len(setup)
+    except:
+        setup = None
 
     # Set up logging to screen and logfile
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
@@ -657,7 +661,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
         if os.path.exists(logfile): os.remove(logfile)
         fileHandler = logging.FileHandler(logfile)
         fileHandler.setFormatter(logFormatter)
-        rootLogger.addHandler(fileHandler)
+        logger.addHandler(fileHandler)
         consoleHandler = logging.StreamHandler()
         consoleHandler.setFormatter(logFormatter)
         logger.addHandler(consoleHandler)
@@ -667,10 +671,10 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
         consoleHandler.setFormatter(logFormatter)
         logger.addHandler(consoleHandler)
         logger.setLevel(logging.NOTSET)      
-    
+
     # Get the setup information
     if setup is None:
-        setup = io.loadsetup(setupdir)
+        setup = io.readsetup(setupdir)
         if setup is None:
             raise ValueError('No setup file found')
          
@@ -687,8 +691,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
          
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
     #--------------------------------------------------------------- 
-    check_iraf(iraftest,irafdir=irafdir)
-    if iraftest == 0: 
+    if iraf.check(irafdir=irafdir)==False:
         raise ValueError('IRAF TEST FAILED.')
 
     # Check if the scripts exist in the current directory 

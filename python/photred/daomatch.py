@@ -716,7 +716,7 @@ def daomaster_tile(mchbase,info,tile,group,verbose=False):
             f.write(fmt % (raw['id'][i],raw['x'][i],raw['y'][i],*list(tfr[i,:])))
 
 
-def daomatch_tile(files,tile,group,mchbase=None,verbose=True,logfile=None,
+def daomatch_tile(files,tile,group,mchbase=None,verbose=False,logfile=None,
                   maxshift=5000,fake=False):
     """
     This is very similar to the DAOMATCH.PRO program that 
@@ -743,7 +743,7 @@ def daomatch_tile(files,tile,group,mchbase=None,verbose=True,logfile=None,
        Run for artificial stars.  The MCH file should be input 
          and daomaster run to create raw/tfr files. 
     verbose : bool, optional
-       Verbose output.  Default is True.
+       Verbose output.  Default is False.
  
     Returns
     -------
@@ -799,7 +799,7 @@ def daomatch_tile(files,tile,group,mchbase=None,verbose=True,logfile=None,
     bdfits, = np.where(dln.exists(fitsfiles)==False)
     if len(bdfits)>0: 
         for b in bdfits:
-            fitsfiles[bd] += '.fz'
+            fitsfiles[b] += '.fz'
     info = io.fileinfo(fitsfiles)
     ntrans = 6
     info['catfile'] = 100*' '
