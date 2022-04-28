@@ -77,7 +77,6 @@ def daomaster(mchbase):
     # Make the DAOMASTER script 
     #--------------------------
     cmdlines = []
-
     cmdlines += ['#!/bin/csh']
     cmdlines += ['set input=${1}']
     cmdlines += ['daomaster <<DONE']
@@ -298,13 +297,13 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
         if (len(gdref) < 100): 
             gdref, = np.where((np.abs(refals['sharp'])<1.5) & (refals['chi']<3.0) & (refals['mag']<50.0) & (refals['err']<0.5))
         if (len(gdref) < 100):
-            gdref , = np.where((np.abs(refals['sharp'])<1.5) & (refals['chi']<3.0) & (refals['mag']<50.0) & (refals['err']<1.0))
+            gdref, = np.where((np.abs(refals['sharp'])<1.5) & (refals['chi']<3.0) & (refals['mag']<50.0) & (refals['err']<1.0))
         if (len(gdref) == 0): 
             raise ValueError('NO good reference stars '+files[0])
         # Cuts for ALS 
         gdals, = np.where((np.abs(als['sharp'])<1.0) & (als['chi']<2.0) & (als['mag']<50.0) & (als['err']<0.2))
         if (len(gdals) < 100): 
-            gdals , = np.where((np.abs(als['sharp'])<1.5) & (als['chi']<3.0) & (als['mag']<50.0) & (als['err']<0.5))
+            gdals, = np.where((np.abs(als['sharp'])<1.5) & (als['chi']<3.0) & (als['mag']<50.0) & (als['err']<0.5))
         if (len(gdals) < 100): 
             gdals, = np.where((np.abs(als['sharp'])<1.5) & (als['chi']<3.0) & (als['mag']<50.0) & (als['err']<1.0))
         if (len(gdals) == 0): 
@@ -337,7 +336,7 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
             #head_xyad,head1,refals.x-1,refals.y-1,a1,d1,/deg 
             #head_xyad,head2,als.x-1,als.y-1,a2,d2,/deg 
 
-            ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0)
+            ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,sphere=False)
             count = len(ind1)
             #SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph
              
@@ -346,11 +345,11 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
                 print('No matches, trying looser cuts')
                 gdref, = np.where((refals['mag']<50.0) & (refals['err']<1.0))
                 gdals, = np.where((als['mag']<50.0) & (als['err']<1.0))
-                ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0)
+                ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,sphere=False)
                 count = len(ind1)
                 #SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],1.0,ind1,ind2,count=count,/sph 
                 if count < 3:
-                    ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],3.0)
+                    ind1,ind2,dist = coords.xmatch(a1[gdref],d1[gdref],a2[gdals],d2[gdals],3.0,sphere=False)
                     count = len(ind1)                                  
                     #SRCMATCH,a1[gdref],d1[gdref],a2[gdals],d2[gdals],3.0,ind1,ind2,count=count,/sph 
              
@@ -397,7 +396,7 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
              
         # No good matches, try srcmatch with "small" shifts 
         if (count < 1):
-            ind1a,ind2a,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals],als['y'][gdals],100)
+            ind1a,ind2a,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals],als['y'][gdals],100,sphere=False)
             count = len(ind1)                                                            
             #SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x,als[gdals].y,100,ind1a,ind2a,count=count1 
             if count1 > 0: 
@@ -406,11 +405,11 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
                 xmed1 = np.median(xdiff1) 
                 ymed1 = np.median(ydiff1) 
                 # redo the search
-                ind1,ind2,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals]+xmed1,als['y'][gdals]+ymed1,20)
+                ind1,ind2,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals]+xmed1,als['y'][gdals]+ymed1,20,sphere=False)
                 count = len(ind1) 
                 #SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,20,ind1,ind2,count=count 
                 if count == 0:
-                    ind1,ind2,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals]+xmed1,als['y'][gdals]+ymed1,100)
+                    ind1,ind2,dist = coords.xmatch(refals['x'][gdref],refals['y'][gdref],als['x'][gdals]+xmed1,als['y'][gdals]+ymed1,100,sphere=False)
                     count = len(ind1) 
                     #SRCMATCH,refals[gdref].x,refals[gdref].y,als[gdals].x+xmed1,als[gdals].y+ymed1,100,ind1,ind2,count=count 
                 xdiff = refals['x'][gdref[ind1]]-als['x'][gdals[ind2]]
@@ -433,13 +432,13 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
         # The output is: 
         # filename, xshift, yshift, 4 trans, FRAD (from als file), 0.0 
         fmt = '%2s%-30s%1s%10.2f%10.2f%10.5f%10.5f%10.5f%10.5f%10.3f%10.3f'
-        data = "'",files[i],"'",trans, frad, 0.0
+        data = "'",files[i],"'",*trans, frad, 0.0
         newline = fmt % data
         mchfinal += [newline]
              
         # Printing the transformation 
         if verbose: 
-            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (files[i],trans))
+            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (files[i],*trans))
          
     # Writing the final mchfile
     dln.writelines(mchbase+'.mch',mchfinal)
@@ -463,13 +462,44 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
         print('')
         print('Final DAOMASTER Transformations:')
         for i in range(nfiles):
-            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (files[i],trans[i,:]))
+            print('%-20s%10.4f%10.4f%12.8f%12.8f%12.8f%12.8f' % (files[i],*list(trans[i,:])))
                   
     # Back to the original directory
     os.chdir(curdir)
     
 
-def daomaster_tile(mchbase):
+def daomaster_tile(mchbase,info,tile,group,verbose=False):
+    """
+    Perform cross-matching of the various ALS catalogs
+    and write out the .mch, tfr and .raw files that
+    daomaster would create.
+ 
+    Parameters
+    ----------
+    mchbase : str
+       The base name of the main mch file.
+    info : catalog
+       Catalog of information about the fits and als files.
+    tile : dict
+       The tiling scheme information.
+    groups : dict
+       Grouping information.
+    verbose : bool, optional
+       Verbose output.  Default is True.
+ 
+    Returns
+    -------
+    An MCH, TFR and RAW file with basename of the first file. 
+ 
+    Example
+    -------
+
+    daomaster_tile(mchbase,info,tile,group)
+  
+    By D. Nidever   December 2006  
+    Translated to Python by D. Nidever, April 2022
+
+    """
 
     ###################### 
     # Create the RAW file 
@@ -477,6 +507,8 @@ def daomaster_tile(mchbase):
     # I can't use daomaster because it won't work for non-overlapping 
     # images, and it always makes the first image the reference. 
 
+    nfiles = len(info)
+    bases = np.char.array(info['base'])
      
     # Create the Schema
     dt = [('id',int),('x',float),('y',float)]
@@ -500,7 +532,7 @@ def daomaster_tile(mchbase):
     raw = Table(raw)
     for i in range(nfiles):
         raw['mag'+str(i+1)] = 99.99
-        raw['err'+str(i+1)] = 9999        
+        raw['err'+str(i+1)] = 9.99
     raw['chi'] = 99.99
     raw['sharp'] = 99.99    
     rawcols = raw.colnames
@@ -514,13 +546,13 @@ def daomaster_tile(mchbase):
             print(str(i+1)+' '+bases[i])
          
         # Get the header
-        if filestr['file'][i][-7:]=='fits.fz':
-            fhead = io.readfile(filestr['file'][i],exten=1,header=True)
+        if info['file'][i][-7:]=='fits.fz':
+            fhead = io.readfile(info['file'][i],exten=1,header=True)
             # Fix the NAXIS1/2 in the header
             fhead['NAXIS1'] = fhead['ZNAXIS1']
             fhead['NAXIS2'] = fhead['ZNAXIS2']            
         else:
-            fhead = io.readfile(filestr['file'][i],header=True)
+            fhead = io.readfile(info['file'][i],header=True)
 
         # Load the ALS file
         als,alshead = io.readals(bases[i]+'.als')
@@ -531,16 +563,16 @@ def daomaster_tile(mchbase):
          
         # Convert to tile coordinates
         fwcs = WCS(fhead)
-        ra,dec = fwcs.pixel_to_world(als['x']-1,als['y']-1)
-        wcs = WCS(tilehead)
-        xref,yref = wcs.world_to_pixel(ra,dec)
-        #HEAD_XYAD,fhead,als.x-1,als.y-1,ra,dec,/deg 
-        #HEAD_ADXY,tilestr.head,ra,dec,xref,yref,/deg 
-        xref += 1# convert 0-indexed to 1-indexed 
+        coo = fwcs.pixel_to_world(als['x']-1,als['y']-1)
+        ra = coo.ra.deg
+        dec = coo.dec.deg
+        wcs = WCS(tile['head'])
+        xref,yref = wcs.world_to_pixel(coo)
+        xref += 1 # convert 0-indexed to 1-indexed 
         yref += 1 
         # Convert to tile group X/Y values 
-        xref -= groupstr['x0']
-        yref -= groupstr['y0']
+        xref -= group['x0']
+        yref -= group['y0']
          
         # Get mag/err columns
         magcol = 'mag'+str(i+1)
@@ -565,12 +597,12 @@ def daomaster_tile(mchbase):
         # Second and later images, crossmatch 
         else: 
             # Cross-match
-            ind1,ind2,dist = coords.xmatch(raw['x'][0:count],raw['y'][0:count],xref,yref,2)
-            count = len(ind1)
+            ind1,ind2,dist = coords.xmatch(raw['x'][0:count],raw['y'][0:count],xref,yref,2,sphere=False)
+            nmatch = len(ind1)
             #SRCMATCH,raw[0:count-1].x,raw[0:count-1].y,xref,yref,2,ind1,ind2,count=nmatch
             if verbose:
                 print(str(nmatch)+' matches')
-             
+
             # Some matches, add data to existing records for these sources 
             if nmatch > 0: 
                 raw[magcol][ind1] = als['mag'][ind2]
@@ -595,11 +627,15 @@ def daomaster_tile(mchbase):
             if nals > 0: 
                 # Add more elements to RAW and TFR 
                 if count+nals > len(raw): 
-                    raw = add_elements(raw,np.maximum(100000,nals))
+                    if verbose:
+                        print('Adding more elements')
+                    raw = dln.add_elements(np.array(raw),np.maximum(100000,nals))
+                    raw = Table(raw)
                     oldtfr = tfr 
+                    del tfr
                     tfr = np.zeros((len(raw),nfiles),int)
                     tfr[0:len(oldtfr),:] = oldtfr
-                    oldtfr = None
+                    del oldtfr
                 if verbose:
                     print('Adding '+str(nals)+' leftover sources')
                 raw['id'][count:count+nals] = np.arange(nals)+1+count 
@@ -617,11 +653,10 @@ def daomaster_tile(mchbase):
     raw = raw[0:count] 
     tfr = tfr[0:count,:]
     # Calculate average chi/sharp 
-    raw['chi'] /= np.maximum(raw.nobs,1)
-    raw['sharp'] /= np.maximum(raw.nobs,1)
+    raw['chi'] /= np.maximum(raw['nobs'],1)
+    raw['sharp'] /= np.maximum(raw['nobs'],1)
     nraw = len(raw)
-                  
-     
+                       
      
     # Write out the RAW file 
     #-----------------------
@@ -640,18 +675,18 @@ def daomaster_tile(mchbase):
             magarr[:,i*2] = raw[magcol]
             magarr[:,i*2+1] = raw[errcol]
         # Only 12 mag/err/chi/sharp columns per row
-        nrows = np.ceil((nfiles*2+2)/12.)
+        nrows = int(np.ceil((nfiles*2+2)/12.))
         # Loop over raw elements 
         for i in range(nraw): 
             # The floating point numbers, MAG, ERR, CHI, SHARP 
             arr = np.copy(magarr[i,:])
-            arr = np.append(arr,magraw['chi'][i])
+            arr = np.append(arr,raw['chi'][i])
             arr = np.append(arr,raw['sharp'][i])
             narr = len(arr) 
             # Loop over rows for this object 
             for j in range(nrows): 
                 if narr>12:
-                    thisarr = arr[0:11] 
+                    thisarr = arr[0:12]
                     arr = arr[12:] 
                     narr = len(arr) 
                 else: 
@@ -660,14 +695,11 @@ def daomaster_tile(mchbase):
                     narr = 0 
                 if j==0:
                     fmt = '%7d%9.3f%9.3f'+(len(thisarr)*'%9.4f')+'\n'
-                    f.write(fmt % (raw[i].id,raw[i].x,raw[i].y,thisarr))
-                    #format = '(I7,2F9.3,'+str(len(thisarr),2)+'F9.4)' 
-                    #printf,unit,raw[i].id,raw[i].x,raw[i].y,thisarr,format=format 
+                    f.write(fmt % (raw['id'][i],raw['x'][i],raw['y'][i],*thisarr))
                 else: 
                    # 27 leading spaces
                    fmt = '%25s'+(len(thisarr)*'%9.4f')+'\n'
-                   #format = '(A25,'+str(len(thisarr),2)+'F9.4)' 
-                   f.write(fmt % thisarr)
+                   f.write(fmt % ('',*thisarr))
      
      
     # Write out TFR file 
@@ -679,13 +711,13 @@ def daomaster_tile(mchbase):
             #printf,unit,'',bases[i]+'.als',99.9999,9.9999,format='(A1,A-30,F9.4,F9.4)' 
         f.write(' ==============================\n')
         #format = '(I7,F9.2,F9.2,'+str(nfiles,2)+'I7)'
-        fmt = '%7d%9.2f%9.2f'+(nfiles*'%7d\n')
+        fmt = '%7d%9.2f%9.2f'+(nfiles*'%7d')+'\n'
         for i in range(nraw): 
-            f.write(fmt % (raw['id'][i],raw['x'][i],raw['y'][i],tfr[i,:]))
+            f.write(fmt % (raw['id'][i],raw['x'][i],raw['y'][i],*list(tfr[i,:])))
 
 
-def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
-             maxshift=5000,fake=False):
+def daomatch_tile(files,tile,group,mchbase=None,verbose=True,logfile=None,
+                  maxshift=5000,fake=False):
     """
     This is very similar to the DAOMATCH.PRO program that 
     matches stars and finds the transformation but it does 
@@ -697,9 +729,9 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
        Array of ALS files,  The first file will be used 
          as the reference.  If /fake set then the first ALS file 
          in "files" should already have an associated MCH file. 
-    tilestr : dict
-       The tiling scheme structure. 
-    groupstr : dict
+    tile : dict
+       The tiling scheme information.
+    groups : dict
        Grouping information.
     mchbase : str
        The base name of the main mch file.
@@ -801,13 +833,13 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
         coogrid = fwcs.pixel_to_world(xgrid-1,ygrid-1)
         ragrid = coogrid.ra.deg
         decgrid = coogrid.dec.deg
-        wcs = WCS(tilestr['head'])
+        wcs = WCS(tile['head'])
         refxgrid,refygrid = wcs.world_to_pixel(coogrid)
         refxgrid += 1  # convert 0-indexed to 1-indexed 
         refygrid += 1 
         # Convert to tile X/Y values 
-        refxgrid -= groupstr['x0']
-        refygrid -= groupstr['y0']
+        refxgrid -= group['x0']
+        refygrid -= group['y0']
          
         # Now fit the transformation 
         xdiff = refxgrid-xgrid 
@@ -877,8 +909,8 @@ def daomatch_tile(files,tilestr,groupstr,mchbase=None,verbose=True,logfile=None,
     dln.writelines(mchfile,mchfinal)
 
     # Create the raw and tfr files
-    daomaster_tile(mchbase)
+    daomaster_tile(mchbase,info,tile,group,verbose=verbose)
      
     # Back to the original directory
-    cd.chdir(curdir)
+    os.chdir(curdir)
      
