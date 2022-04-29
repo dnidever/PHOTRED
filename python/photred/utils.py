@@ -14,6 +14,7 @@ from glob import glob
 from astropy.io import fits,ascii
 from astropy.time import Time
 from astropy.table import Table
+from astropy.wcs import WCS
 from dlnpyutils import utils as dln
 import struct
 from itertools import zip_longest
@@ -298,3 +299,58 @@ def trans_coo_outlier(xdata,*par):
         newy2[bd] = y1[bd]
 
     return np.append(newx2,newy2)
+ 
+def validtile(tile):
+    """
+    This double-checks if the TILE structure is valid. 
+ 
+    Parameters
+    ----------
+    tile : dict
+      The tile structure 
+ 
+    Returns
+    -------
+    check : boolean
+      1-if the tile is good and 0-if there is 
+        a problem with it or it doesn't exist. 
+ 
+    Example
+    -------
+
+    check = validtile(tile) 
+ 
+    By D. Nidever  Oct 2016 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    # Must be a dictionary
+    if type(tile) != dict:
+        return 0
+     
+    # Must have TYPE column 
+    if 'type' not in tile.keys():
+        return 0
+     
+    # Do we have enough information for each type 
+    if tile['type'].lower()=='orig':
+        return 1 
+    elif tile['type'].lower()=='wcs':
+        # wcs exists 
+        if 'wcs' in tile.keys():
+            # wcs must be a WCS object
+            if type(tile['wcs']) != WCS:
+                return 0         
+        # NO wcs, check other needed values 
+        else: 
+            # Need NAXIS, CRVAL, CRPIX, CTYPE, CDELT 
+            for k in ['naxis','crval','crpix','ctype','cdelt']:
+                if k not in tile.keys():
+                    return 0
+    # Need XRANGE, YRANGE 
+    if 'xrange' not in tile.keys():
+        return 0
+    if 'yrange' not in tile.keys():
+        return 0 
+ 
+    return 1 

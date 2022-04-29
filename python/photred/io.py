@@ -15,12 +15,18 @@ from astropy.io import fits,ascii
 from astropy.table import Table
 from astropy.wcs import WCS
 from astropy.time import Time
+from astropy.utils.exceptions import AstropyWarning
+import warnings
 from dlnpyutils import utils as dln
 import struct
 from itertools import zip_longest
 from itertools import accumulate
 from io import StringIO
 from . import utils
+
+# Ignore these warnings
+warnings.simplefilter('ignore', category=AstropyWarning)
+#warnings.filterwarnings(action="ignore", message=r'FITSFixedWarning:*')
 
 def make_parser(fieldwidths,fieldtypes=None):
     # https://stackoverflow.com/questions/4914008/how-to-efficiently-parse-fixed-width-files
@@ -817,7 +823,7 @@ def readmch(mchfile):
     return files,trans,magoff
 
 def readraw(filename):
-    """"
+    """
     This reads the DAOPHOT/DAOMASTER RAW file and also .mag and .makemag files.
      
     Parameters
@@ -2081,18 +2087,18 @@ def daophot_imprep(fluxfile,maskfile,header=False):
 
     # REMOVE DUPLICATE KEYWORDS!!  They cause lots of annoying errors 
     # EXTVER, CHECKSUM, DATASUM
-    if 'extver' in meta:
-        del meta[bd[1:]]
-    if 'checksum' in meta:
-        del meta[bd[1:]]
-    if 'datasum' in meta:
-        del meta[bd[1:]]
+    #if 'extver' in meta:
+    #    del meta[bd[1:]]
+    #if 'checksum' in meta:
+    #    del meta[bd[1:]]
+    #if 'datasum' in meta:
+    #    del meta[bd[1:]]
          
     # Add "COMMENT " before "BEGIN EXTENSION HEADER ---", it causes problems in daophot
-    if 'BEGIN' in meta:
-        beg = meta['BEGIN']
-        del meta['BEGIN']
-        meta['COMMENT'] = beg
+    #if 'BEGIN' in meta:
+    #    beg = meta['BEGIN']
+    #    del meta['BEGIN']
+    #    meta['COMMENT'] = beg
          
     if header:
         return header 
@@ -2163,8 +2169,8 @@ def daophot_imprep(fluxfile,maskfile,header=False):
             # DES, didn't have this flag, so skip
                  
             # V3.5.0 and on, Integer masks
-            versnum = np.array(plver[1:].split('.')).astype(int)
-            if versnum[0] > 3 or (versnum[0] == 3 and versnum[1] >= 5): 
+            versnum = np.array(plver[1:].split('.'))
+            if int(versnum[0]) > 3 or (int(versnum[0]) == 3 and int(versnum[1]) >= 5): 
                 bdpix = (mim == 7)
                 if np.sum(bdpix) > 0: 
                     mim[bdpix] = 0 
@@ -2173,7 +2179,7 @@ def daophot_imprep(fluxfile,maskfile,header=False):
                 bdpix = ( (mim & 2**7) > 0)
                 if np.sum(bdpix) > 0:  # clear 128 
                     mim[bdpix] -= 128 
-         
+
     # Add background back in for DES SV data
     skybrite = meta.get('skybrite')
     skysigma = meta.get('skybrite')

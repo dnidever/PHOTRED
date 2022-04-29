@@ -4,16 +4,23 @@ import os
 import time
 import numpy as np
 import glob as glob
+import shutil
+import warnings
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.convolution import convolve,Box2DKernel
+from astropy.utils.exceptions import AstropyWarning
 from dlnpyutils import utils as dln,coords
-from . import io
+from . import utils,io,iraf
+
+# Ignore these warnings
+#warnings.filterwarnings(action="ignore", message=r'FITSFixedWarning:*')
+warnings.simplefilter('ignore', category=AstropyWarning)
 
 def ia_trim(xshift,yshift,xsize,ysize,trimsection,vignette):
     """ Helper function to deal with trim sections."""
      
-    # Found this in the IMCENTROID source code: 
+   # Found this in the IMCENTROID source code: 
     # /iraf/iraf/pkg/images/immatch/src/listmatch/t_imctroid.x 
      
     ## IA_TRIM -- Compute the trim section. 
@@ -493,7 +500,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
         logfile=-1 
      
     # Load the MCH file
-    files,trans,magoff = io.loadmch(mchfile)
+    files,trans,magoff = io.readmch(mchfile)
     nfiles = len(files) 
      
     #----------------------------------- 
@@ -604,7 +611,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
     fdir = os.path.dirname(mchfile) 
     base = os.path.splitext(os.path.basename(mchfile))[0]
     rawfile = fdir+'/'+base+'.raw'
-    raw,rawhead = io.loadraw(rawfile)
+    raw,rawhead = io.readraw(rawfile)
      
     # Making mag and err arrays 
     nstars = len(raw) 
@@ -851,7 +858,7 @@ def fiximages(input,satlevel=50000.0,nofix=False):
             fits.PrimaryHDU(mask,head).writeto(maskname,overwrite=True)
          
                       
-def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
+def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
             satlevel=6e4,nocmbimscale=False,fake=False,usecmn=False,imager=None):
     """
     This combines/stacks images for ALLFRAME. 
@@ -898,7 +905,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     maskdatalevel : float
        The "bad" data level above the highest "good" value 
          in the combined image. 
-    filestr : table
+    fileinfo : table
        Information on all of the files used for the 
          stacked iamge. 
  
@@ -916,15 +923,17 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
 
     global photred,setup 
 
-    # Logfile 
-    if keyword_set(logfile): 
-        logf=logfile 
-    else: 
-        logf=-1 
+    try:
+        dum = len(setup)
+    except:
+        setup = None
+
+    # Set up logging to screen and logfile
+    if logger is None:
+        logger = dln.basiclogger()
      
     # Getting scripts directory and iraf directory 
-    nsetup = len(setup) 
-    if nsetup > 0: 
+    if setup is not None:
         scriptsdir = setup['SCRIPTSDIR']
         irafdir = setup['IRAFDIR']
      
@@ -937,7 +946,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
      
     # Run CHECK_IRAF.PRO to make sure that you can run IRAF from IDL 
     #--------------------------------------------------------------- 
-    if check_iraf(iraftest,irafdir=irafdir)==False:
+    if iraf.check(irafdir=irafdir)==False:
         raise ValueError('IRAF TEST FAILED.  EXITING')
 
     # Check if the scripts exist in the current directory 
@@ -947,13 +956,13 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     # Loop through the scripts 
     for i in range(nscripts): 
         exists = os.path.exists(scriptsdir+'/'+scripts[i])
-        if exits:
-            size = os.path.size(scriptsdir+'/'+scripts[i])
+        if exists:
+            size = os.path.getsize(scriptsdir+'/'+scripts[i])
         else:
             size = 0
         curexists = os.path.exists(scripts[i])
         if curexists:
-            cursize = os.path.size(scripts[i])
+            cursize = os.path.getsize(scripts[i])
         else:
             cursize = 0
          
@@ -962,7 +971,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             raise ValueError(scriptsdir+'/'+scripts[i],' NOT FOUND or EMPTY')
          
         # Check if the two files are the same size, if not copy it 
-        if isize != cursize:
+        if size != cursize:
             if os.path.exists(scripts[i]): os.remove(scripts[i])
             shutil.copyfile(scriptsdir+'/'+scripts[i],scripts[i])
      
@@ -990,7 +999,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     # CHECK NECESSARY FILES 
      
     # Load the MCH file
-    files,trans,magoff = io.loadmch(mchfile)
+    files,trans,magoff = io.readmch(mchfile)
     nfiles = len(files) 
      
     # FAKE, check that we have all the files that we need 
@@ -1012,35 +1021,39 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     # photred_gatherfileinfo.pro can do most of this 
     logger.info('Gathering file information')
     ntrans = len(trans[0,:])
-    filedict = nfiles * {'fitsfile':'','catfile':'','nx':0,'ny':0,'trans':np.zeros(ntrans,float),'magoff':np.zeros(2),
-                         'head':None,'vertices_ra':np.zeros(4,float),'vertices_dec':np.zeros(4,float),
-                         'pixscale':0.0,'saturate':0.0,'background':0.0,'comb_zero':0.0,'comb_scale':0.0,
-                         'comb_weights':0.0,'resampfile':'','resampmask':'','resamptrans':np.zeros(ntrans,float),
-                         'resamptransrms':0.0}
+    fileinfo1 = {'fitsfile':'','catfile':'','nx':0,'ny':0,'trans':np.zeros(ntrans,float),'magoff':np.zeros(2),
+                 'head':None,'vertices_ra':np.zeros(4,float),'vertices_dec':np.zeros(4,float),
+                 'pixscale':0.0,'saturate':0.0,'background':0.0,'comb_zero':0.0,'comb_scale':0.0,
+                 'comb_weights':0.0,'resampfile':'','resampmask':'','resamptrans':np.zeros(ntrans,float),
+                 'resamptransrms':0.0}
+    fileinfo = nfiles*[None]
     for i in range(nfiles):
-        filedict[i]['fitsfile'] = fitsfiles 
-        filedict[i]['catfile'] = files 
-        filedict[i]['trans'] = transpose(trans) 
-        filedict[i]['magoff'] = magoff 
-        filedict[i]['resampfile'] = outfiles 
-        filedict[i]['resampmask'] = outmaskfiles
-        im1,head1 = io.readfile(filedict[i]['fitsfile'])
-        filedict[i]['head'] = head1
-        filedict[i]['nx'] = head1['NAXIS1'] 
-        filedict[i]['ny'] = head1['NAXIS2']
+        fileinfo[i] = fileinfo1.copy()
+        fileinfo[i]['fitsfile'] = fitsfiles[i]
+        fileinfo[i]['catfile'] = files[i]
+        fileinfo[i]['trans'] = trans[i,:]
+        fileinfo[i]['magoff'] = magoff[i,:]
+        fileinfo[i]['resampfile'] = outfiles[i] 
+        fileinfo[i]['resampmask'] = outmaskfiles[i]
+        im1,head1 = io.readfile(fileinfo[i]['fitsfile'])
+        fileinfo[i]['head'] = head1
+        fileinfo[i]['nx'] = head1['NAXIS1'] 
+        fileinfo[i]['ny'] = head1['NAXIS2']
         wcs1 = WCS(head1)
-        vra,vdec = wcs1.pixel_to_world([0,filedict[i]['nx']-1,filedict[i]['nx']-1,0],[0,0,filedict[i]['ny']-1,filedict[i]['ny']-1],0)
-        filedict[i]['vertices_ra'] = vra 
-        filedict[i]['vertices_dec'] = vdec
-        pixscale = utils.getpixscale('',head=head1)
-        filedict['pixscale'][i] = pixscale 
+        vcoo = wcs1.pixel_to_world([0,fileinfo[i]['nx']-1,fileinfo[i]['nx']-1,0],[0,0,fileinfo[i]['ny']-1,fileinfo[i]['ny']-1])
+        vra = vcoo.ra.deg
+        vdec = vcoo.dec.deg
+        fileinfo[i]['vertices_ra'] = vra 
+        fileinfo[i]['vertices_dec'] = vdec
+        pixscale = io.getpixscale('',head=head1)
+        fileinfo[i]['pixscale'] = pixscale 
         saturate = head1.get('SATURATE')
         if saturate is None:
             saturate = 50000 
-        filedict[i]['saturate'] = saturate 
-        gdpix, = np.where(im1 < saturate)
+        fileinfo[i]['saturate'] = saturate 
+        gdpix = (im1 < saturate)
         background = np.median(im1[gdpix]) 
-        filedict[i]['background'] = background 
+        fileinfo[i]['background'] = background 
      
      
     ################################################## 
@@ -1053,19 +1066,19 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         # at halfway between the ra/dec min/max of all of 
         # the images.  The mean pixel scale is used. 
         #  near RA=0 line 
-        if dln.valrange(filedict['vertices_ra']) > 180: 
-            vertices_ra = filedict['vertices_ra']
+        if dln.valrange(fileinfo['vertices_ra']) > 180: 
+            vertices_ra = fileinfo['vertices_ra']
             over, = np.where(vertices_ra > 180)
             if len(over)>0: 
                 vertices_ra[over]-=360 
             rar = dln.minmax(vertices_ra) 
             cenra = np.mean(rar) 
         else: 
-            rar = dln.minmax(filedict['vertices_ra']) 
+            rar = dln.minmax(fileinfo['vertices_ra']) 
             cenra = np.mean(rar) 
-        decr = dln.minmax(filedict['vertices_dec']) 
+        decr = dln.minmax(fileinfo['vertices_dec']) 
         cendec = np.mean(decr) 
-        pixscale = np.mean(filedict['pixscale']) 
+        pixscale = np.mean(fileinfo['pixscale']) 
         # Set up the tangent plane projection 
         step = pixscale/3600.0
         delta_dec = dln.valrange(decr) 
@@ -1101,11 +1114,11 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
                 'head':tilehead,'wcs':tilewcs,'xrange':[0,nx-1],'yrange':[0,ny-1],'nx':nx,'ny':ny} 
      
     # Check that the TILE is valid 
-    if allframe_validtile(tile)==False:
+    if utils.validtile(tile)==False:
         raise ValueError('Tile ERROR')
      
     # Add HEAD/AST to TILE if needed 
-    if tag_exist(tile,'HEAD') == 0: 
+    if 'head' not in tile.keys():
         MKHDR,tilehead,fltarr(5,5) 
         tilehead['NAXIS1'] = tile.naxis[0] 
         tilehead['CDELT1'] = tile.cdelt[0] 
@@ -1177,9 +1190,9 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         #READCOL,zerofile,sky,format='F',/silent 
         sky = -sky 
     # Stuff the information into the FILEINFO structure 
-    filedict['comb_weights'] = weights 
-    filedict['comb_scale'] = invscales 
-    filedict['comb_zero'] = -sky 
+    fileinfo['comb_weights'] = weights 
+    fileinfo['comb_scale'] = invscales 
+    fileinfo['comb_zero'] = -sky 
      
      
     ############################################ 
@@ -1203,20 +1216,20 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
          
         # Loop through the files 
         for i in range(nfiles):
-            im1,head1 = io.readfile(filedict[i]['fitsfile'])
+            im1,head1 = io.readfile(fileinfo[i]['fitsfile'])
              
             # Make the mask 
-            mask = bytarr(filedict[i].nx,filedict[i].ny)+1 
-            gdpix , = np.where(im1 < filedict[i].saturate,ngdpix,comp=bdpix,ncomp=nbdpix) 
+            mask = bytarr(fileinfo[i].nx,fileinfo[i].ny)+1 
+            gdpix , = np.where(im1 < fileinfo[i].saturate,ngdpix,comp=bdpix,ncomp=nbdpix) 
             # 0-bad, 1-good 
             if nbdpix > 0: 
                 mask[bdpix] = 0 
-                im1[bdpix] = filedict[i]['background']
+                im1[bdpix] = fileinfo[i]['background']
              
             # Get X/Y range for this image in the final coordinate system
             wcs1 = WCS(tile['head'])
-            vx,vy = wcs.world_to_pixel(filedict[i]['vertices_ra'],filedict[i]['vertices_dec'])
-            #HEAD_ADXY,tile.head,filedict[i].vertices_ra,filedict[i].vertices_dec,vx,vy,/deg 
+            vx,vy = wcs.world_to_pixel(fileinfo[i]['vertices_ra'],fileinfo[i]['vertices_dec'])
+            #HEAD_ADXY,tile.head,fileinfo[i].vertices_ra,fileinfo[i].vertices_dec,vx,vy,/deg 
             xout = [np.floor(np.min(vx))-2 > tile['xrange'][0], np.ceil(np.max(vx))+2 < tile['xrange'][1]] 
             xoutrel = xout-tile['xrange'][0]  # relative to xrange[0] 
             nxout = xout[1]-xout[0]+1 
@@ -1229,11 +1242,11 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             xx,yy = adxyinterp(head1,rr,dd,nstep=10)
              
             # The x/y position to bilinear need to be in the original system, ~1sec 
-            rim = BILINEAR(im1,xx,yy,missing=filedict[i].background) 
+            rim = BILINEAR(im1,xx,yy,missing=fileinfo[i].background) 
             rmask = BILINEAR(mask,xx,yy,missing=0) 
              
             # Contruct final image
-            fim = np.zeros((tile['nx'],tile['ny']),float)+filedict[i]['saturate']
+            fim = np.zeros((tile['nx'],tile['ny']),float)+fileinfo[i]['saturate']
             fim[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rim 
             #fmask = bytarr(tile.nx,tile.ny)
             fmask = np.zeros((tile['nx'],tile['ny']),bool)
@@ -1252,15 +1265,15 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             PUTAST,fhead,tile['ast']
             fhead['NAXIS1'] = tile['nx']
             fhead['NAXIS2'] = tile['ny']
-            fhead['BPM'] = filedict[i]['resampmask']
-            logger.info(filedict[i].resampfile,' ['+str(xout[0],2)+':'+str(xout[1],2)+','+                  str(yout[0],2)+':'+str(yout[1],2)+']')
-            fits.PrimaryHDU(fim,fhead).writeto(filedict[i]['resampfile'],overwrite=True)
-            #MWRFITS,fim,filedict[i].resampfile,fhead,/create 
+            fhead['BPM'] = fileinfo[i]['resampmask']
+            logger.info(fileinfo[i].resampfile,' ['+str(xout[0],2)+':'+str(xout[1],2)+','+                  str(yout[0],2)+':'+str(yout[1],2)+']')
+            fits.PrimaryHDU(fim,fhead).writeto(fileinfo[i]['resampfile'],overwrite=True)
+            #MWRFITS,fim,fileinfo[i].resampfile,fhead,/create 
             mhead = fhead.copy()
             mhead['BITPIX'] = 8 
             del mhead['BPM']
-            fits.PrimaryHDU(fmaskmhead).writeto(filedict[i]['resampmask'],overwrite=True)
-            #MWRFITS,fmask,filedict[i].resampmask,mhead,/create 
+            fits.PrimaryHDU(fmaskmhead).writeto(fileinfo[i]['resampmask'],overwrite=True)
+            #MWRFITS,fmask,fileinfo[i].resampmask,mhead,/create 
             # this takes about ~37-50 sec for a 2kx4k image. 
             #  now it takes ~5 sec for a 2kx4k image 
  
@@ -1277,7 +1290,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
                        np.maximum(np.ceil(np.max(xshift)),0), np.maximum(np.ceil(np.max(yshift)),0) ]
         outmaskfiles = [os.path.dirname(f)+'/'+os.path.splitext(os.path.basename(f))[0]+'.mask.shft.fits' for f in tempfits]
         logger.info('Expanding images by [',strjoin(str(pix_expand,2),','),'] pixels')
-        files2,trans2,magoff2 = io.loadmch(shiftmch+'.mch')
+        files2,trans2,magoff2 = io.readmch(shiftmch+'.mch')
         nxf = nx+pix_expand[0]+pix_expand[2] 
         nyf = ny+pix_expand[1]+pix_expand[3]
         xx1 = np.arange(nx).reshape(-1,1) + np.zeros(ny,float).rshape(-1,1)
@@ -1326,15 +1339,15 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             # Convert X/Y of this system into the combined reference frame 
             #  The pixel values are 1-indexed like DAOPHOT uses. 
             ngridbin = 50 
-            nxgrid = filedict[i].nx / ngridbin 
-            nygrid = filedict[i].ny / ngridbin
+            nxgrid = fileinfo[i].nx / ngridbin 
+            nygrid = fileinfo[i].ny / ngridbin
             xgrid = (np.arange(nxgrid)*ngridbin+1).reshape(-1,1) + np.zeros(nygrid,float).reshape(-1,1)
             ygrid = np.zeros(nxgrid,float).reshape(-1,1) + (np.arange(nygrid)*ngridbin+1).reshape(-1,1)
             #xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid) 
             #ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1) 
-            #HEAD_XYAD,(*filedict[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
+            #HEAD_XYAD,(*fileinfo[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
             #HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
-            wcs1 = WCS(filedict[i]['head'])
+            wcs1 = WCS(fileinfo[i]['head'])
             ragrid,decgrid = wcs1.pixel_to_world(xgrid-1,ygrid-1,0)
             refxgrid,refygrid = wcs1.world_to_pixel(ragrid,decgrid,0)
             refxgrid += 1    # convert 0-indexed to 1-indexed 
@@ -1371,8 +1384,8 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
      
             diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid) 
             rms = np.sqrt(np.mean(diff**2)) 
-            filedict[i]['resamptrans'] = trans 
-            filedict[i]['resamptransrms'] = rms 
+            fileinfo[i]['resamptrans'] = trans 
+            fileinfo[i]['resamptransrms'] = rms 
      
             # The output is: 
             # filename, xshift, yshift, 4 trans, mag offset, magoff sigma 
@@ -1382,11 +1395,11 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
             # coefficients are 12 digits with at most 9 decimal places. 
             # Need a leading space to separate the numbers. 
             strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),                 str(string(trans[2:5],format='(F30.9)'),2)] 
-            newline = STRING("'",filedict[i]['catfile'],"'", strans, filedict[i]['magoff'][0], rms, format=format) 
+            newline = STRING("'",fileinfo[i]['catfile'],"'", strans, fileinfo[i]['magoff'][0], rms, format=format) 
             mchfinal += [newline]
      
         # Printing the transformation 
-        logger.info('(A-20,2A10,4A12,F9.3,F8.4)' % (filedict[i]['catfile'],strans,filedict[i]['magoff'][0],rms))
+        logger.info('(A-20,2A10,4A12,F9.3,F8.4)' % (fileinfo[i]['catfile'],strans,fileinfo[i]['magoff'][0],rms))
         # Write to the new MCH file 
         combmch = mchbase+'_comb.mch'
         dln.writelines(combmch,mchfinal)
@@ -1405,7 +1418,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
  
     # The imcombine input file 
     resampfile = mchbase+'.resamp' 
-    WRITELINE,resampfile,filedict.resampfile 
+    WRITELINE,resampfile,fileinfo.resampfile 
  
     # SCALE the images for combining 
     #------------------------------- 
@@ -1615,9 +1628,9 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
     MODFITS,combfile,0,combhead 
  
     # Delete the resampled images
-    for f in filedict['resampfile']:
+    for f in fileinfo['resampfile']:
         if os.path.exists(f): os.remove(f)
-    for f in filedict['resampmask']:
+    for f in fileinfo['resampmask']:
         if os.path.exists(f): os.remove(f)        
  
     # Make the common source file for the combined image 
@@ -1627,7 +1640,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         # Loop through the files and convert to coordinates to the comined file 
         allcmn = []
         for i in range(nfiles): 
-            cmnfile1 = os.path.basename(filedict[i].fitsfile,'.fits')+'.cmn.lst' 
+            cmnfile1 = os.path.basename(fileinfo[i].fitsfile,'.fits')+'.cmn.lst' 
             if os.path.exists(cmnfile1) == 1:
                 cmn1 = Table.read(cmnfile1,format='ascii')
                 #cmn1 = IMPORTASCII(cmnfile1,fieldnames=['id','x','y','mag','err','sky','skysig','sharp','round','round2'],
@@ -1636,7 +1649,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
                 coohead1 = cmnlines1[0:1] 
                 ncmn1 = len(cmn1) 
                 # Get coordinates on the resampled/combined image grid 
-                newx,newy = trans_coo(cmn1['x'],cmn1['y'],filedict[i]['resamptrans']) 
+                newx,newy = trans_coo(cmn1['x'],cmn1['y'],fileinfo[i]['resamptrans']) 
                 cmn1['x'] = newx 
                 cmn1['y'] = newy 
                 if len(allcmn) == 0: 
@@ -1665,6 +1678,7 @@ def combine(filename,tile=None,scriptsdir=None,logfile=None,irafdir=None,
         # Make sure it doesn't exist otherwise it will be used
         if os.path.exist(mchbase+'_comb.cmn.lst'): os.remove(mchbase+'_comb.cmn.lst')
 
+    return maskdatalevel,fileinfo
 
  
 def combine_orig(filename,scriptsdir=None,logfile=None,
@@ -1713,11 +1727,13 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
     maskdatalevel : float
        The "bad" data level above the highest "good" value 
          in the combined image. 
+    fileinfo : catalog
+       Information about all of the files.
  
     Example
     -------
 
-    maskdatalevel = combine_orig('ccd1001.mch',scriptsdir='/net/home/dln5q/daophot/',finditer=2)
+    maskdatalevel,fileinfo = combine_orig('ccd1001.mch',scriptsdir='/net/home/dln5q/daophot/',finditer=2)
  
  
     By D.Nidever   February 2008 
@@ -1805,7 +1821,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
     # CHECK NECESSARY FILES 
      
     # Load the MCH file
-    files,trans,magoffset = io.loadmch(mchfile)
+    files,trans,magoffset = io.readmch(mchfile)
      
     # Check that the fits, als, opt, and psf files exist 
     nfiles = len(files) 
@@ -1911,7 +1927,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
         out2 = subprocess.check_output(cmd2)
         # Remove temporary DAOMASTER script
         if os.path.exists(tempscript): os.remove(tempscript)
-    files2,trans2,magoffset2 = io.loadmch(shiftmch+'.mch')
+    files2,trans2,magoffset2 = io.readmch(shiftmch+'.mch')
      
     xshift = trans2[:,0] 
     yshift = trans2[:,1]
@@ -2344,3 +2360,5 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
     # CD back to the original directory
     os.chdir(curdir)
  
+
+    return maskdatalevel,fileinfo,xoff,yoff

@@ -11,11 +11,16 @@ import tempfile
 import logging
 import re
 from glob import glob
+import warnings
 from astropy.io import fits,ascii
 from astropy.table import Table
+from astropy.utils.exceptions import AstropyWarning
 from dlnpyutils import utils as dln
-from . import utils,io,iraf
+from . import utils,io,iraf,combine as comb
 
+# Filtering warnings
+warnings.simplefilter('ignore', category=AstropyWarning)
+#warnings.filterwarnings(action="ignore", message=r'FITSFixedWarning:*')
 
 def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
              detectprog='sextractor',logfile=None,maskfile=None):
@@ -645,6 +650,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     """
      
     global setup 
+
     try:
         dum = len(setup)
     except:
@@ -703,7 +709,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     for i in range(nscripts): 
         exists = os.path.exists(scriptsdir+'/'+scripts[i])
         if exists:
-            size = os.stat(scripts[i])
+            size = os.stat(scriptsdir+'/'+scripts[i])
         else:
             size = 0
         curexists = os.path.exists(scripts[i])
@@ -728,6 +734,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
         raise ValueError('No allframe found')
      
     # Combination settings and inputs
+    cmborig = False
     if tile is None:
         cmborig = True
     else:
@@ -741,7 +748,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     logger.info('')
     logger.info('')
     logger.info('=====================================')
-    logger.info('RUNNING ALLFRAME on ',infile)
+    logger.info('RUNNING ALLFRAME on '+str(infile))
     logger.info('=====================================')
     logger.info('')
     logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))                        
@@ -749,12 +756,12 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     # FILENAME 
     mchfile = os.path.basename(infile) 
     mchdir = os.path.dirname(infile) 
-    mchbase = os.path.basename(infile,'.mch') 
+    mchbase = os.path.splitext(os.path.basename(infile))[0]
 
     # CD to the directory
     curdir = os.getcwd()
     os.chdir(mchdir)
-          
+
     # Check that the mch, als, and opt files exist
     for f in [mchfile,mchbase+'.raw']:
         if os.path.exists(f)==False:
@@ -765,7 +772,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     # CHECK NECESSARY FILES 
      
     # Load the MCH file
-    files,trans = io.readfile(mchfile)
+    files,trans,magoff = io.readfile(mchfile)
      
     # Check that the fits, als, opt, and psf files exist 
     nfiles = len(files) 
@@ -782,7 +789,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
             out = subprocess.run(['funpack',base+'.fits.fz'],shell=False)     
         # Checking OPT file
         for e in ['opt','als.opt','ap','als','log','psf']:
-            if os.path.exists(base+'.'+e):
+            if os.path.exists(base+'.'+e)==False:
                 raise ValueError(base+'.'+e+' NOT FOUND')
         # REMOVE ALF if it exists 
         if os.path.exists(base+'.alf'): 
@@ -795,7 +802,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
  
  
     # FAKE, check that we have all the files that we need
-    if fakse:
+    if fake:
         # In early versions of ALLFRAME _comb.mch was called _shift.mch 
         #  Use new name with link 
         if os.path.exists(mchbase+'_comb.mch')==False and os.path.exists(mchbase+'_shift.mch'): 
@@ -812,7 +819,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     #------------------------------------ 
     # Using a temporary working directory 
     #------------------------------------ 
-    if len(workdir) > 0: 
+    if workdir is not None:
         # Create a temporary directory in WORKDIR 
         if os.path.exists(workdir)==False:
             os.makedirs(workdir)
@@ -851,15 +858,15 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))
     # Use the original combine code
     if cmborig:
-        comb.combine_orig(infile,fake=fake,scriptsdir=scriptsdir,error=error,logfile=logfile,
-                           irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,trimcomb=trimcomb,
-                           maskdatalevel=maskdatalevel,xoff=xoff,yoff=yoff)
+        maskdatalevel,xoff,yoff = comb.combine_orig(infile,fake=fake,scriptsdir=scriptsdir,logger=logger,
+                                                    irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,
+                                                    trimcomb=trimcomb)
         combmch = mchbase+'.mch' 
     # New combine code 
     else:
-        comb.combine(infile,tile=tile,fake=fake,scriptsdir=scriptsdir,error=error,logfile=logfile,
-                     irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,
-                     maskdatalevel=maskdatalevel,filestr=filestr,imager=imager)
+        maskdatalevel,fileinfo = comb.combine(infile,tile=tile,fake=fake,scriptsdir=scriptsdir,logger=logger,
+                                              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,
+                                              imager=imager)
         xoff = 0.0 
         yoff = 0.0 
         combmch = mchbase+'_comb.mch' 
