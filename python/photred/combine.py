@@ -6,10 +6,13 @@ import numpy as np
 import glob as glob
 import shutil
 import warnings
+import subprocess
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.table import Table
 from astropy.convolution import convolve,Box2DKernel
 from astropy.utils.exceptions import AstropyWarning
+from astropy.coordinates import SkyCoord
 from dlnpyutils import utils as dln,coords
 from . import utils,io,iraf
 
@@ -145,22 +148,23 @@ def ia_trim(xshift,yshift,xsize,ysize,trimsection,vignette):
     # call flush (STDOUT) 
 
  
-def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
+def calcweights(mag,err,fwhm,rdnoise,medsky):
     """
     Helper function to calculate weights
     """
 
     shape = mag.shape
-    nfiles = shape[0]
-    ngd = shape[1]
+    if mag.ndim==1:
+        nfiles = len(mag)
+        ngd = 1
+    else:
+        nfiles = shape[0]
+        ngd = shape[1]
      
     # Make 2D arrays for fwhm, rdnoise and medsky
     fwhm2 = fwhm.reshape(-1,1) + np.ones(ngd,float).reshape(1,-1)
-    rdnoise2 = rednoise.reshape(-1,1) + np.ones(ngd,float).reshape(1,-1)
+    rdnoise2 = rdnoise.reshape(-1,1) + np.ones(ngd,float).reshape(1,-1)
     medsky2 = medsky.reshape(-1,1) + np.ones(ngd,float).reshape(1,-1)
-    #fwhm2 = fwhm#(fltarr(ngd)+1.0) 
-    #rdnoise2 = rdnoise#(fltarr(ngd)+1.0) 
-    #medsky2 = medsky#(fltarr(ngd)+1.0) 
      
     # Computing intensity and weight for each star 
     #C Compute the intensity from the magnitude, easy enough 
@@ -173,7 +177,6 @@ def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
     # magnitude zero-point: 1 star ADU == 25.0 mag 
     intensity = 10.0**( (mag-25.0)/(-2.5) ) 
     weight = (intensity/(np.pi*fwhm2**2.0))/ (np.sqrt(rdnoise2**2 + medsky2 + intensity/(np.pi*fwhm2**2) ) ) 
-    #weight(i,n)=(intensity/(Pi*FWHM(i)**2)) / (sqrt(RDNOISE(i)**2+ MEDSKY(i) + intensity/(Pi*FWHM(i)**2) ) ) 
      
     # You get similar results if you use: weight = 1.0/err 
     # since magnitude errors are basically N/S 
@@ -189,9 +192,8 @@ def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
     #C           print*,weight(1:FMAX,j),maxweight 
     #       end do 
      
-    maxw = np.max(weight,axis=1)
-    maxw2 = np.ones(nfiles,float).reshape(1,-1) + maxw.reshape(-1,1)
-    #maxw2 = (fltarr(nfiles)+1.0)#maxw
+    maxw = np.max(weight,axis=0)
+    maxw2 = np.ones(nfiles,float).reshape(-1,1) + maxw.reshape(1,-1)
     nweight = weight/maxw2 
      
      
@@ -210,14 +212,13 @@ def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
     #       stop 
     #       end 
      
-    #avgweight = total(weight2,2)/ngd 
-    avgweight = np.sum(nweight,axis=2) 
+    avgweight = np.sum(nweight,axis=1) 
     actweight = avgweight/np.sum(avgweight) 
     # They sum to 1.0 
      
      
     # Compute the scaling for each frame.  scale=1 for the first frame 
-    scales = fltarr(nfiles) 
+    scales = np.zeros(nfiles,float)
     for i in range(nfiles): 
         ratio = intensity[i,:]/intensity[0,:]
         ratio_error = np.sqrt(err[i,:]**2 + err[0,:]**2)  # mag errors are ~fractional 
@@ -225,7 +226,7 @@ def calcweights(mag,err,fwhm,rdnoise,medsky,actweight,scales):
         #wmeanerr,ratio,ratio_error,xmean,xsigma 
         scales[i] = med_ratio 
      
-    return scales
+    return actweight,scales
 
 
 def getweights_raw(tab):
@@ -264,24 +265,23 @@ def getweights_raw(tab):
     else: 
         nstars = len(mag)
         nfiles = 1
-     
+
     # Getting the reference sources 
-    totstars = np.sum(mag < 50,axis=1) 
+    totstars = np.sum(mag < 50,axis=0) 
     si = np.flip(np.argsort(totstars))# get the stars with the most detections 
-    #gdrefstars = si[0:(99<(nstars-1))] 
-    gdrefstars = si[0:np.minimum(nstars,49)] 
+    gdrefstars = si[0:np.minimum(nstars,50)] 
     nrefstars = len(gdrefstars) 
     # Getting the "good" frames 
-    totframe = np.sum(mag[:,gdrefstars] < 50,axis=2)# # of ref stars detected per frame 
+    totframe = np.sum(mag[:,gdrefstars] < 50,axis=1) # of ref stars detected per frame 
     gdframe, = np.where(totframe == nrefstars)
     ngdframe = len(gdframe)
     bdframe, = np.where(totframe != nrefstars)
     nbdframe = len(bdframe)
     # No good frames, lower number of reference stars 
     if ngdframe == 0: 
-        gdrefstars = si[0:np.minimum(nstars,29)] 
+        gdrefstars = si[0:np.minimum(nstars,30)] 
         nrefstars = len(gdrefstars) 
-        totframe = np.sum(mag[:,gdrefstars] < 50,axis=2) 
+        totframe = np.sum(mag[:,gdrefstars] < 50,axis=1) 
         gdframe, = np.where(totframe == nrefstars)
         ngdframe = len(gdframe)
         bdframe, = np.where(totframe != nrefstars)
@@ -292,33 +292,34 @@ def getweights_raw(tab):
     if ngdframe == 0: 
         # say the frame with the most detections is "good" and 
         #  the rest are bad, get weights relative to this one frame 
-        totstarsframe = np.sum(mag < 50,axis=2) 
-        gdframe = np.argmax(totstarsframe)[0]
-        bdframe = lindgen(nfiles,1) 
-        remove,gdframe,bdframe
+        totstarsframe = np.sum(mag < 50,axis=1) 
+        gdframe = np.argmax(totstarsframe)
+        gdframe = np.array([gdframe])
+        ngdframe = 1
+        bdframe = np.arange(nfiles)
         bdframe = np.delete(bdframe,gdframe)
         nbdframe = len(bdframe) 
         # Get stars that are good in this frames and in ALL of the others 
-        gdrefstars, = np.where((mag[gdframe,:] < 50) & (totstars == nfiles))
+        gdrefstars, = np.where((mag[gdframe[0],:] < 50) & (totstars == nfiles))
         nrefstars = len(gdrefstars)
         #  lower threshold, at least half 
         if nrefstars == 0: 
-            gdrefstars, = np.where((mag[gdframe,:] < 50) & (totstars > 0.5*nfiles))
+            gdrefstars, = np.where((mag[gdframe[0],:] < 50) & (totstars > 0.5*nfiles))
             nrefstars = len(gdrefstars)
         #  just the good ones 
         if nrefstars == 0: 
-            gdrefstars, = np.where(mag[gdframe,:] < 50)
+            gdrefstars, = np.where(mag[gdframe[0],:] < 50)
             nrefstars = len(gdrefstars)
-            si = np.flip(np.argsort(totstars[gdrefstars]))# order by how many other frames they are detected in 
-            gdrefstars = gdrefstars[si[0:(49>(nrefstars-1))]]# only want 50 
+            si = np.flip(np.argsort(totstars[gdrefstars]))      # order by how many other frames they are detected in 
+            gdrefstars = gdrefstars[si[0:np.minimum(50,nrefstars-1)]]   # only want 50 
             nrefstars = len(gdrefstars) 
      
     # Calculate the weights
     weights = np.zeros(nfiles,float)
-    scale = np.zeros(nfiles,float)
+    scales = np.zeros(nfiles,float)
     mag2 = mag[gdframe,:]
-    mag2 = mag2[:,gdrefstars]
     err2 = err[gdframe,:]
+    mag2 = mag2[:,gdrefstars]
     err2 = err2[:,gdrefstars]
     weights1,scales1 = calcweights(mag2,err2,fwhm[gdframe],rdnoise[gdframe],medsky[gdframe])
     weights[gdframe] = weights1 
@@ -330,7 +331,7 @@ def getweights_raw(tab):
         iframe = bdframe[i] 
          
         # First round of "good" stars 
-        totgdstars = np.sum(mag[gdframe,:] < 50,axis=1)# stars in good frames 
+        totgdstars = np.sum(mag[gdframe,:] < 50,axis=0)# stars in good frames 
         igdrefstars1, = np.where((mag[iframe,:] < 50) & (totgdstars >= 5))
         nigdrefstars1 = len(igdrefstars1)
         if nigdrefstars1 < 3: 
@@ -339,12 +340,12 @@ def getweights_raw(tab):
         if nigdrefstars1 < 2: 
             continue
          
-        totgdstars1 = np.sum(mag[gdframe,:][:,igdrefstars1] < 50,axis=1) 
+        totgdstars1 = np.sum(mag[gdframe,:][:,igdrefstars1] < 50,axis=0) 
         si1 = np.flip(np.argsort(totgdstars1))# get the best ones 
         igdrefstars = igdrefstars1[si1[0:(49<(nigdrefstars1-1))]] 
         nirefstars = len(igdrefstars)
          
-        itotframe = np.sum(mag[gdframe,:][:,igdrefstars] < 50,axis=2) 
+        itotframe = np.sum(mag[gdframe,:][:,igdrefstars] < 50,axis=1) 
         igdframe1, = np.where(itotframe == nirefstars)
         nigdframe1 = len(igdframe1)
          
@@ -357,7 +358,7 @@ def getweights_raw(tab):
             count = 0
             while endflag==0:  
                 # sum over frames 
-                itot1 = np.sum(mag[igdframe,:][:,igdrefstars] < 50,axis=1) 
+                itot1 = np.sum(mag[igdframe,:][:,igdrefstars] < 50,axis=0) 
                 si1 = np.argsort(itot1) 
                 # remove worst 5% stars 
                 if len(igdrefstars) > 3: 
@@ -366,7 +367,7 @@ def getweights_raw(tab):
                     igdrefstars = np.delete(igdrefstars,bd1)
                               
                 # sum over stars 
-                itot2 = np.sum( mag[igdframe,:][:,igdrefstars] < 50,axis=2) 
+                itot2 = np.sum( mag[igdframe,:][:,igdrefstars] < 50,axis=1) 
                 si2 = np.argsort(itot2) 
                 # remove worst 5% frames 
                 if len(igdframe) > 1: 
@@ -375,7 +376,7 @@ def getweights_raw(tab):
                     igdframe = np.delete(igdframe,bd2)
              
                 # Testing if we should end 
-                itotframe = np.sum( (mag[igdframe,:])[:,igdrefstars] < 50,axis=2) 
+                itotframe = np.sum( (mag[igdframe,:])[:,igdrefstars] < 50,axis=1) 
                 igdframe1, = np.where(itotframe == len(igdrefstars))
                 nigdframe1 = len(igdframe1)
                 if nigdframe1 > 0:
@@ -391,17 +392,17 @@ def getweights_raw(tab):
             igdframe = gdframe[igdframe1] 
      
         # Get weights relative to some "good" frames 
-        indframes = [igdframe,iframe] 
-        mag3 = (mag[indframes,:])[:,igdrefstars] 
-        err3 = (err[indframes,:])[:,igdrefstars] 
+        indframes = np.append(igdframe,iframe)
+        mag3 = mag[indframes,:][:,igdrefstars] 
+        err3 = err[indframes,:][:,igdrefstars] 
         weights3,scales3 = calcweights(mag3,err3,fwhm[indframes],rdnoise[indframes],medsky[indframes])
      
         # Scale these relative to the original ones 
-        weights3a = weights[igdframe]# original 
-        weights3b = weights3[0:nigdframe1-1]# new 
+        weights3a = weights[igdframe]           # original 
+        weights3b = weights3[0:nigdframe1]      # new 
         wtfrac = np.median(weights3a/weights3b) 
-        scales3a = scales[igdframe]# original
-        scales3b = scales3[0:nigdframe1-1]# new 
+        scales3a = scales[igdframe]             # original
+        scales3b = scales3[0:nigdframe1  ]      # new 
         sclfrac = np.median(scales3a/scales3b) 
         new_weights = weights3[nigdframe1] * wtfrac 
         new_scale = scales3[nigdframe1] * sclfrac 
@@ -438,7 +439,7 @@ def getweights_raw(tab):
         scales /= np.max(scales) 
  
     # Create the output structure
-    out = np.copy(tab)
+    out = tab.copy()
     if 'weight' not in out.colnames:
         out['weight'] = 0.0
     if 'scale' not in out.colnames:
@@ -449,21 +450,26 @@ def getweights_raw(tab):
     return out
 
                               
-def getweights(mchfile,imager=None,logfile=None,silent=False):
+def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
     """
     This calculates weights, scales and sky values from DAOPHOT 
-    photometry files for images combination.  Used by ALLFRAME.PRO and 
-    other programs. 
+    photometry files for image combination.  Used by combine and allframe.
  
     You need to have run daophot, allstar, daomatch and daomaster 
     already.  There need als, mch and raw files. 
  
     Parameters
     ----------
-    mchfile     The MCH filename 
-    imager     Imager structure with basic information 
-    logfile    A logfile to print to output to. 
-    silent     Don't print anything to the screen. 
+    mchfile : str
+       The MCH filename 
+    imager : dict
+       Imager structure with basic information 
+    setup : dict
+       The setup information contained in the photred.setup file.
+    logger : logging object, optional
+       A logging object to use for printing.
+    silent : bool, optional
+       Don't print anything to the screen.   Default is False.
  
     Returns
     -------
@@ -480,9 +486,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
     By D.Nidever   February 2008, broken out into its own program 4/8/15 
     Translated to Python by D. Nidever, April 2022
     """
-    
-    global photred,setup
-     
+
     # OUTPUTS: 
     #  actweight  The weight for each frame 
     #  scales     The scale for each frame 
@@ -490,14 +494,14 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
      
     tilesep = '+' 
     #tilesep = '.' 
-    btilesep = int(byte(tilesep)) 
-     
+    #btilesep = int(byte(tilesep)) 
+
     # MCH file not found 
     if os.path.exists(mchfile) == False:
         raise ValueError(mchfile+' NOT FOUND')
-     
-    if len(logfile) == 0 : 
-        logfile=-1 
+
+    if logger is None:
+        logger = dln.basiclogger()
      
     # Load the MCH file
     files,trans,magoff = io.readmch(mchfile)
@@ -507,25 +511,24 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
     # Get the information that we need 
      
     # Load the opt files
-    dt = [('name',(np.str,200)),('filter',(np.str,10)),('exptime',0.0),('fwhm',0.0),('rdnoise',0.0),
+    dt = [('name',(np.str,200)),('filter',(np.str,10)),('exptime',float),('fwhm',float),('rdnoise',float),
           ('mnsky',float),('medsky',float),('mag10',float),('flux10',float),('fluxrate10',float),
           ('weight',float),('scale',float)]
     info = np.zeros(nfiles,dtype=np.dtype(dt))
     info['name'] = files 
     for i in range(nfiles): 
-        fdir = os.path.dirname(mchfile) 
+        fdir = os.path.abspath(os.path.dirname(mchfile))
         base = os.path.splitext(os.path.basename(files[i]))[0]
         optfile = fdir+'/'+base+'.opt' 
         logfile1 = fdir+'/'+base+'.log' 
 
         opt = io.readopt(optfile)
-        #READCOL,optfile,name,dum,value,format='A,A,F',/silent 
-        #name = str(strupcase(name),2) 
-         
         info['rdnoise'][i] = opt['RE']
         info['fwhm'][i] = opt['FW']
          
-        out = subprocess.check_output(['grep','Clipped',logfile1],shell=False)
+        loglines1 = dln.readlines(logfile1)
+        out = dln.grep(loglines1,'Clipped')
+        #out = subprocess.check_output(['grep','Clipped',logfile1],shell=False)
         #              Clipped mean and median =  187.442  187.215 
          
         # daophot.sh log files are clipped on Tortoise for some reason 
@@ -557,7 +560,9 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
             out1 = subprocess.check_output(tempscript+' '+base)
              
             logfile2 = base+'.find.log'
-            out = subprocess.check_output(['grep','Clipped',logfile2],shell=False)
+            loglines2 = dln.readlines(logfile2)
+            out = dln.grep(loglines2,'Clipped')
+            #out = subprocess.check_output(['grep','Clipped',logfile2],shell=False)
             #              Clipped mean and median =  187.442  187.215 
              
             # Delete temporary files
@@ -572,16 +577,17 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
         fitsfile = base+'.fits' 
         if os.path.exists(fitsfile)==False: 
             fitsfile+='.fz' 
-        info['exptime'][i] = utils.getexptime(fitsfile) 
-        info['filter'][i] = utils.getfilter(fitsfile) 
+        info['exptime'][i] = io.getexptime(fitsfile) 
+        info['filter'][i] = io.getfilter(fitsfile,setup=setup) 
 
+    info = Table(info)  # convert to astropy table
      
     # Only ONE file, return 1s 
     if nfiles == 1: 
         actweight = 1.0 
         scales = 1.0 
-        medsky = info[0].medsky 
-        return 
+        medsky = info['medsky'][0]
+        return actweight,scales,medsky
      
      
     #      program getweight 
@@ -608,7 +614,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
     #CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC 
      
     # Load the RAW file 
-    fdir = os.path.dirname(mchfile) 
+    fdir = os.path.abspath(os.path.dirname(mchfile))
     base = os.path.splitext(os.path.basename(mchfile))[0]
     rawfile = fdir+'/'+base+'.raw'
     raw,rawhead = io.readraw(rawfile)
@@ -616,14 +622,11 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
     # Making mag and err arrays 
     nstars = len(raw) 
     tags = raw.colnames
-    #magind , = np.where(stregex(tags,'MAG',/boolean) == 1,nmagind) 
-    #errind , = np.where(stregex(tags,'ERR',/boolean) == 1,nerrind) 
     mag = np.zeros((nfiles,nstars),float)
     err = np.zeros((nfiles,nstars),float)
     for i in range(nfiles): 
-        mag[i,:] = raw['MAG'+str(i+1)]
-    for i in range(nfiles): 
-        err[i,:] = raw['ERR'+str(i+1)] 
+        mag[i,:] = raw['mag'+str(i+1)]
+        err[i,:] = raw['err'+str(i+1)] 
      
     # Calculate the magnitude and flux at the 10sigma magnitude 
     for i in range(nfiles): 
@@ -652,8 +655,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
         namps = imager['namps']
     else: 
         namps = 1
-
-    if len(dln.grep(files,'\\'+tilesep+'T'))==nfiles and (np.sum(int(byte(files[0])) == btilesep) >= 2) and (namps > 1): 
+    if len(dln.grep(files,'\\'+tilesep+'T'))==nfiles and (np.sum(np.char.array(list(files[0]))==tilesep) >= 2) and (namps > 1): 
         usetiles = 1 
          
         # Number of unique exposures 
@@ -675,6 +677,7 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
               ('exptime',float),('filter',(np.str,10)),('fwhm',float),('rdnoise',float),
               ('medsky',float),('mag10',float),('flux10',float),('fluxrate10',float)]
         expstr = np.zeros(nexp,dtype=np.dtype(dt))
+        expstr = Table(expstr)
         expstr['mag10'] = 99.99
         expmag = np.zeros((nexp,nstars),float)
         experr = np.zeros((nexp,nstars),float)        
@@ -703,8 +706,8 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
                 if len(bd)>0: 
                     mag1[bd] = np.inf
                     err1[bd] = np.inf
-                expmag[i,:] = np.median(mag1,axis=1) 
-                experr[i,:] = np.median(err1,axis=1) 
+                expmag[i,:] = np.median(mag1,axis=0) 
+                experr[i,:] = np.median(err1,axis=0) 
             else: 
                 expmag[i,:] = mag1 
                 experr[i,:] = err1 
@@ -729,10 +732,12 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
               ('exptime',float),('filter',(np.str,10)),('fwhm',float),('rdnoise',float),
               ('medsky',float),('flux10',float),('fluxrate10',float)]
         tab = np.zeros(nfiles,dtype=np.dtype(dt))
+        tab = Table(tab)
         for n in tab.colnames:
-            tab[n] = info[n]
-        tab['mag'] = transpose(mag) 
-        tab['err'] = transpose(err) 
+            if n in info.colnames:
+                tab[n] = info[n]
+        tab['mag'] = mag
+        tab['err'] = err
         # Perform the weights and scales calculations 
         outstr = getweights_raw(tab)
         info['weight'] = outstr['weight'] 
@@ -745,8 +750,8 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
         for i in range(nfiles):
             #fmt = '(A-23,A4,F6.1,F6.2,F6.2,F8.1,F7.3,F7.3)'
             fmt = '%-23s%4s%6.1f%6.2f%6.2f%8.1f%7.3f%7.3f'
-            data = (info[i].name,info[i].filter,info[i].exptime,info[i].fwhm,info[i].rdnoise,
-                    info[i].medsky,info[i].weight,info[i].scale)
+            data = (info['name'][i],info['filter'][i],info['exptime'][i],info['fwhm'][i],info['rdnoise'][i],
+                    info['medsky'][i],info['weight'][i],info['scale'][i])
             logger.info(fmt % data)
      
     # Final output 
@@ -756,6 +761,122 @@ def getweights(mchfile,imager=None,logfile=None,silent=False):
 
     return actweight,scales,medsky
 
+ 
+def adxyinterp(wcs,rr,dd,nstep=10,xyad=False):
+    """
+    Instead of transforming the entire large 2D RA/DEC 
+    arrays to X/Y do a sparse grid and perform linear 
+    interpolation to the full size. 
+ 
+    Parameters
+    ----------
+    head : header
+       The FITS header with the WCS. 
+    rr : numpy array
+       The 2D RA array. 
+    dd  : numpy array
+       The 2D DEC array. 
+    nstep : int, optional
+       The undersampling to use, default nstep=10. 
+    xyad : bool, optional
+       Perform X/Y->RA/DEC conversion instead. 
+          In this case the meaning of the coordinate 
+          arrays are flipped, i.e. rr/dd<->xx/yy 
+ 
+    Returns
+    -------
+    xx : numpy array
+       The 2D X array. 
+    yy : numpy array
+       The 2D Y array. 
+ 
+    Example
+    -------
+
+    xx,yy = adxyinterp(head,ra,dec,nstep=10)
+            
+    By D. Nidever  Oct. 2016 
+    Translated to Python by D. Nidever, April 2022
+    """
+
+    nx,ny = rr.shape
+    nxs = (nx-1)//nstep + 1 
+    nys = (ny-1)//nstep + 1 
+     
+    # Small dimensions, just transform the full grid 
+    if nx <= nstep or ny <= nstep: 
+        if xyad==False:
+            coo = SkyCoord(ra=rr,dec=dd,unit='deg')
+            xx,yy = wcs.world_to_pixel(coo)
+        else:
+            coo = wcs.pixel_to_world(rr,dd)
+            xx = coo.ra.deg
+            yy = coo.dec.deg
+
+    # Subsample the RA/DEC arrays 
+    rrs = rr[0:nx:nstep,0:ny:nstep] 
+    dds = dd[0:nx:nstep,0:ny:nstep] 
+    if xyad==False:
+        coo = SkyCoord(ra=rrs,dec=dds,unit='deg')
+        xx,yy = wcs.world_to_pixel(coo)
+    else:
+        coo = wcs.pixel_to_world(rrs,dds)
+        xx = coo.ra.deg
+        yy = coo.dec.deg
+     
+    # Start final arrays 
+    xx = np.zeros((nx,ny),float)
+    yy = np.zeros((nx,ny),float)
+     
+    # Use CONGRID to perform the linear interpolation 
+    #   congrid normally does nx_out/nx_in scaling 
+    #   if /minus_one set it does (nx_out-1)/(nx_in-1) 
+    ixx = CONGRID(xxs,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
+    iyy = CONGRID(yys,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
+    xx[0:nxs*nstep,0:nys*nstep] = ixx 
+    yy[0:nxs*nstep,0:nys*nstep] = iyy 
+     
+    # Deal with right edge 
+    if (nxs-1)*nstep+1 < nx: 
+        # Make a short grid in X at the right edge 
+        rrs_rt = rr[nx-nstep:nx:nstep,0:ny:nstep] 
+        dds_rt = dd[nx-nstep:nx:nstep,0:ny:nstep] 
+        if not keyword_set(xyad): 
+            HEAD_ADXY,head,rrs_rt,dds_rt,xxs_rt,yys_rt,/deg 
+        else: 
+            HEAD_XYAD,head,rrs_rt,dds_rt,xxs_rt,yys_rt,/deg 
+        ixx_rt = CONGRID(xxs_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
+        iyy_rt = CONGRID(yys_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
+        xx[nx-nstep:nx,0:nys*nstep] = ixx_rt 
+        yy[nx-nstep:nx,0:nys*nstep] = iyy_rt 
+    # Deal with top edge 
+    if (nys-1)*nstep+1 < ny: 
+        # Make a short grid in Y at the top edge 
+        rrs_tp = rr[0:nx:nstep,ny-nstep:ny:nstep] 
+        dds_tp = dd[0:nx:nstep,ny-nstep:ny:nstep] 
+        if not keyword_set(xyad): 
+            HEAD_ADXY,head,rrs_tp,dds_tp,xxs_tp,yys_tp,/deg 
+        else: 
+            HEAD_XYAD,head,rrs_tp,dds_tp,xxs_tp,yys_tp,/deg 
+        ixx_tp = CONGRID(xxs_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
+        iyy_tp = CONGRID(yys_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
+        xx[0:nxs*nstep,ny-nstep:ny] = ixx_tp 
+        yy[0:nxs*nstep,ny-nstep:ny] = iyy_tp 
+    # Deal with top/right corner 
+    if (nxs-1)*nstep+1 < nx and (nys-1)*nstep+1 < ny: 
+        # Make a short grid in X and Y at the top-right corner 
+        rrs_tr = rr[nx-nstep:nx:nstep,ny-nstep:ny:nstep] 
+        dds_tr = dd[nx-nstep:nx:nstep,ny-nstep:ny:nstep] 
+        if not keyword_set(xyad): 
+            HEAD_ADXY,head,rrs_tr,dds_tr,xxs_tr,yys_tr,/deg 
+        else: 
+            HEAD_XYAD,head,rrs_tr,dds_tr,xxs_tr,yys_tr,/deg 
+        ixx_tr = CONGRID(xxs_tr,nstep+1,nstep+1,/interp,/minus_one) 
+        iyy_tr = CONGRID(yys_tr,nstep+1,nstep+1,/interp,/minus_one) 
+        xx[nx-nstep:nx,ny-nstep:ny] = ixx_tr 
+        yy[nx-nstep:nx,ny-nstep:ny] = iyy_tr 
+
+    return xx,yy
 
 def fiximages(input,satlevel=50000.0,nofix=False):
     """
@@ -858,7 +979,7 @@ def fiximages(input,satlevel=50000.0,nofix=False):
             fits.PrimaryHDU(mask,head).writeto(maskname,overwrite=True)
          
                       
-def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
+def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=None,
             satlevel=6e4,nocmbimscale=False,fake=False,usecmn=False,imager=None):
     """
     This combines/stacks images for ALLFRAME. 
@@ -874,6 +995,8 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
        The MCH filename
     tile : dict
        Tile information on the sky.
+    setup : dict
+       The information contained in the photred.setup file.
     nocmbimscale : boolean, optional
        Don't scale the images when combining them.  Not 
         recommended, but the old way of doing it.  Bright 
@@ -884,8 +1007,8 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
        The IRAF home directory. 
     satlevel : float, optional
        Saturation level.  Default is 6e4.
-    logfile : str
-       A logfile to print to output to. 
+    logger : logging object
+       A logging object to use for printing to the screen.
     fake : boolean, optiona
        Run for artificial star tests.  Default is False.
     usecmn : boolean, optional
@@ -921,21 +1044,14 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
     Translated to Python by D. Nidever,  April 2022
     """ 
 
-    global photred,setup 
-
-    try:
-        dum = len(setup)
-    except:
-        setup = None
-
     # Set up logging to screen and logfile
     if logger is None:
         logger = dln.basiclogger()
      
     # Getting scripts directory and iraf directory 
     if setup is not None:
-        scriptsdir = setup['SCRIPTSDIR']
-        irafdir = setup['IRAFDIR']
+        scriptsdir = setup['scriptsdir']
+        irafdir = setup['irafdir']
      
     # No irafdir 
     if irafdir is None:
@@ -1116,37 +1232,36 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
     # Check that the TILE is valid 
     if utils.validtile(tile)==False:
         raise ValueError('Tile ERROR')
-     
+
     # Add HEAD/AST to TILE if needed 
     if 'head' not in tile.keys():
-        MKHDR,tilehead,fltarr(5,5) 
-        tilehead['NAXIS1'] = tile.naxis[0] 
-        tilehead['CDELT1'] = tile.cdelt[0] 
-        tilehead['CRPIX1'] = tile.crpix[0] 
-        tilehead['CRVAL1'] = tile.crval[0] 
-        tilehead['CTYPE1'] = tile.ctype[0] 
-        tilehead['NAXIS2'] = tile.naxis[1] 
-        tilehead['CDELT2'] = tile.cdelt[1] 
-        tilehead['CRPIX2'] = tile.crpix[1] 
-        tilehead['CRVAL2'] = tile.crval[1] 
-        tilehead['CTYPE2'] = tile.ctype[1] 
-        if 'CD' in tile: 
-            tilehead['CD1_1'] = tile.cd[0,0] 
-            tilehead['CD1_2'] = tile.cd[0,1] 
-            tilehead['CD2_1'] = tile.cd[1,0] 
-            tilehead['CD2_2'] = tile.cd[1,1] 
-        EXTAST,tilehead,tileast 
-        tileast['equinox'] = 2000 
-        tile = CREATE_STRUCT(tile,'HEAD',tilehead,'AST',tileast) 
-    if 'AST' not in tile: 
-        EXTAST,tile.head,tileast 
-        tileast.equinox = 2000 
-        tile = CREATE_STRUCT(tile,'AST',ast) 
+        tilehead = fits.Header()
+        tilehead['NAXIS1'] = tile['naxis'][0] 
+        tilehead['CDELT1'] = tile['cdelt'][0] 
+        tilehead['CRPIX1'] = tile['crpix'][0] 
+        tilehead['CRVAL1'] = tile['crval'][0] 
+        tilehead['CTYPE1'] = tile['ctype'][0] 
+        tilehead['NAXIS2'] = tile['naxis'][1] 
+        tilehead['CDELT2'] = tile['cdelt'][1] 
+        tilehead['CRPIX2'] = tile['crpix'][1] 
+        tilehead['CRVAL2'] = tile['crval'][1] 
+        tilehead['CTYPE2'] = tile['ctype'][1] 
+        if 'cd' in tile: 
+            tilehead['CD1_1'] = tile['cd'][0,0] 
+            tilehead['CD1_2'] = tile['cd'][0,1] 
+            tilehead['CD2_1'] = tile['cd'][1,0] 
+            tilehead['CD2_2'] = tile['cd'][1,1] 
+        tile['head'] = tilehead
+        tile['wcs'] = WCS(tilehead)
+    if 'wcs' not in tile: 
+        tile['wcs'] = WCS(tilehead)
     # Add XRANGE/YRANGE 
-    if 'XRANGE' not in tile: 
-        tile = CREATE_STRUCT(tile,'XRANGE',int([0,tile.naxis[0]-1]),'NX',tile.naxis[0]) 
-    if 'YRANGE' not in tile: 
-        tile = CREATE_STRUCT(tile,'YRANGE',int([0,tile.naxis[1]-1]),'NY',tile.naxis[1]) 
+    if 'xrange' not in tile: 
+        tile['xrange'] = [0,tile['naxis'][0]-1]
+        tile['nx'] = tile['naxis'][0]
+    if 'yrange' not in tile: 
+        tile['yrange'] = [0,tile['naxis'][1]-1]
+        tile['ny'] = tile['naxis'][1]
      
      
     ############################################ 
@@ -1159,7 +1274,7 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
     #----------------------------------- 
     # Computs Weights 
     if fake==False:
-        weights,scales,sky = getweights(mchfile,imager=imager,logfile=logf) #,raw2=raw2 
+        weights,scales,sky = getweights(mchfile,imager=imager,logger=logger,setup=setup)
         invscales = 1.0/scales 
         bdscale, = np.where((scales < 1e-5) | (invscales > 900))
         if len(bdscale) > 0: 
@@ -1167,13 +1282,13 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
             invscales[bdscale] = 1.0 
             weights[bdscale] = 0.0 
         weightfile = mchbase+'.weights'
-        weights = dln.fread(weightfile,'F10.6')
+        dln.writelines(weightfile,weights)
         #WRITECOL,weightfile,weights,fmt='(F10.6)' 
         scalefile = mchbase+'.scale'
-        invscales = dln.fread(scalefile,'F10.6')
+        dln.writelines(scalefile,invscales)
         #WRITECOL,scalefile,invscales,fmt='(F10.6)'# want to scale it UP 
         zerofile = mchbase+'.zero'
-        sky = -dln.fread(zerofile,'F12.4')
+        dln.writelines(zerofile,-sky)
         #WRITECOL,zerofile,-sky,fmt='(F12.4)'# want to remove the background, set to 1st frame 
          
     # FAKE, use existing ones 
@@ -1190,9 +1305,10 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
         #READCOL,zerofile,sky,format='F',/silent 
         sky = -sky 
     # Stuff the information into the FILEINFO structure 
-    fileinfo['comb_weights'] = weights 
-    fileinfo['comb_scale'] = invscales 
-    fileinfo['comb_zero'] = -sky 
+    for i in range(nfiles):
+        fileinfo[i]['comb_weights'] = weights[i]
+        fileinfo[i]['comb_scale'] = invscales[i]
+        fileinfo[i]['comb_zero'] = -sky[i] 
      
      
     ############################################ 
@@ -1209,36 +1325,44 @@ def combine(filename,tile=None,scriptsdir=None,logger=None,irafdir=None,
         #xb = (lindgen(tile.nx)+tile.xrange[0])#replicate(1,tile.ny) 
         #yb = replicate(1,tile.nx)#(lindgen(tile.ny)+tile.yrange[0]) 
         #HEAD_XYAD,tile.head,xb,yb,rab,decb,/deg
-        xb = np.arange(tile['nx']).reshape(-1,1) + np.zeros(tile['ny'],float).reshape(-1,1)
-        yb = np.zeros(tile['nx'],float).reshape(-1,1) + np.arange(tile['ny']).reshape(-1,1)
-        wcs1 = WCS(tile['head'])
-        rab,decb = wcs.pixel_to_world(xb,yb)
-         
+        xb = (np.arange(tile['nx'])+tile['xrange'][0]).reshape(-1,1) + np.zeros(tile['ny'],float).reshape(1,-1)
+        yb = np.zeros(tile['nx'],float).reshape(-1,1) + (np.arange(tile['ny'])+tile['yrange'][0]).reshape(1,-1)
+        wcs = WCS(tile['head'])
+        bcoo = wcs.pixel_to_world(xb,yb)
+        rab = bcoo.ra.deg
+        decb = bcoo.dec.deg
+
         # Loop through the files 
         for i in range(nfiles):
             im1,head1 = io.readfile(fileinfo[i]['fitsfile'])
-             
             # Make the mask 
-            mask = bytarr(fileinfo[i].nx,fileinfo[i].ny)+1 
-            gdpix , = np.where(im1 < fileinfo[i].saturate,ngdpix,comp=bdpix,ncomp=nbdpix) 
-            # 0-bad, 1-good 
-            if nbdpix > 0: 
-                mask[bdpix] = 0 
+            mask = np.ones((fileinfo[i]['ny'],fileinfo[i]['nx']),bool)
+            gdpix = (im1 < fileinfo[i]['saturate'])
+            bdpix = (im1 >= fileinfo[i]['saturate'])
+            # False-bad, True-good 
+            if np.sum(bdpix) > 0: 
+                mask[bdpix] = False 
                 im1[bdpix] = fileinfo[i]['background']
              
             # Get X/Y range for this image in the final coordinate system
-            wcs1 = WCS(tile['head'])
-            vx,vy = wcs.world_to_pixel(fileinfo[i]['vertices_ra'],fileinfo[i]['vertices_dec'])
+            vx,vy = wcs.world_to_pixel(SkyCoord(ra=fileinfo[i]['vertices_ra'],dec=fileinfo[i]['vertices_dec'],unit='deg'))
             #HEAD_ADXY,tile.head,fileinfo[i].vertices_ra,fileinfo[i].vertices_dec,vx,vy,/deg 
-            xout = [np.floor(np.min(vx))-2 > tile['xrange'][0], np.ceil(np.max(vx))+2 < tile['xrange'][1]] 
+            xout = [np.maximum(np.floor(np.min(vx))-2, tile['xrange'][0]+1),
+                    np.minimum(np.ceil(np.max(vx))+2, tile['xrange'][1]+1)] 
+            xout = np.array(xout)
             xoutrel = xout-tile['xrange'][0]  # relative to xrange[0] 
-            nxout = xout[1]-xout[0]+1 
-            yout = [np.floor(np.min(vy))-2 > tile['yrange'][0], np.ceil(np.max(vy))+2 < tile['yrange'][1]] 
+            xoutrel = xoutrel.astype(int)
+            nxout = int(xout[1]-xout[0]+1)
+            yout = [np.maximum(np.floor(np.min(vy))-2, tile['yrange'][0]+1),
+                    np.minimum(np.ceil(np.max(vy))+2, tile['yrange'][1]+1)] 
+            yout = np.array(yout)
             youtrel = yout-tile['yrange'][0]  # relative to yrange[0] 
+            youtrel = youtrel.astype(int)
             nyout = yout[1]-yout[0]+1 
+            nyout = int(nyout)
             rr = rab[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
             dd = decb[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
-            ALLFRAME_ADXYINTERP,head1,rr,dd,xx,yy,nstep=10
+            #ALLFRAME_ADXYINTERP,head1,rr,dd,xx,yy,nstep=10
             xx,yy = adxyinterp(head1,rr,dd,nstep=10)
              
             # The x/y position to bilinear need to be in the original system, ~1sec 
@@ -1742,7 +1866,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
     """
  
               
-    global photred,setup 
+    global setup 
 
      
     # Logfile 

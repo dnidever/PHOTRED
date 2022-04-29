@@ -443,7 +443,7 @@ def getpixscale(filename,head=None):
 
     return scale
  
-def getfilter(filename=None,head=None,numeric=False,noupdate=False,
+def getfilter(filename=None,setup=None,head=None,numeric=False,noupdate=False,
               silent=False,filtname=None,fold_case=False):
     """
     This gets filter information for an image 
@@ -461,6 +461,8 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     ----------
     filename : str, optional
        FITS filename 
+    setup : dict
+       The setup information contained in the photred.setup file.
     head : header, optional
        Use this header array instead of reading FITS file. 
     numeric : boolean, optional
@@ -497,13 +499,6 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     # 'I c6028'               T
     # 'I Nearly-Mould k1005'  T
     # 'T'                     T
-
-    global setup
-
-    try:
-        dum = len(setup)
-    except:
-        setup = None
     
     nfiles = dln.size(filename)
     nfiltname = dln.size(filtname)
@@ -537,11 +532,11 @@ def getfilter(filename=None,head=None,numeric=False,noupdate=False,
     if os.path.exists('filters')==False:
         if setup is None:
             raise ValueError('No setup file')
-        scriptsdir = setup['SCRIPTSDIR']
+        scriptsdir = setup['scriptsdir']
         if scriptsdir is None:
             raise ValueError('NO SCRIPTSDIR')
         if os.path.exists('filters'): os.remove('filters')
-        shutil.copyfile(scriptsdir+'/filters','.')
+        shutil.copyfile(scriptsdir+'/filters','./filters')
      
     # Load the filters
     lines = dln.readlines('filters',noblank=True)

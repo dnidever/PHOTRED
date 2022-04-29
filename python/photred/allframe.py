@@ -575,9 +575,9 @@ def cleanup(mchbase,files,fpack,mchdir,workdir,tempdir):
  
 
 
-def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextractor',
-             logfile=None,finditer=2,irafdir=None,satlevel=6e4,
-             nocmbimscale=False,trimcomb=False,usecmn=False,fake=False,
+def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
+             detectprog='sextractor',logfile=None,finditer=2,irafdir=None,
+             satlevel=6e4,nocmbimscale=False,trimcomb=False,usecmn=False,fake=False,
              catformat='ASCII',imager=None,workdir=None,geocoef=None):
     """
     This runs ALLFRAME on images 
@@ -612,6 +612,8 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
        Trim the combined images to the overlapping region. 
          This used to be the default, but now the default 
          is to keep the entire original region. 
+    setup : dict, optional
+       The information contained in the photred.setup file.
     setupdir : str, optional
        The original base directory which contains photred.setup. 
     scriptsdir : str, optional
@@ -648,13 +650,6 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     Automation of steps and scripts by J.Ostheimer and Rachael Beaton 
     Translated to Python by D. Nidever   April 2022
     """
-     
-    global setup 
-
-    try:
-        dum = len(setup)
-    except:
-        setup = None
 
     # Set up logging to screen and logfile
     logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
@@ -683,7 +678,7 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
         setup = io.readsetup(setupdir)
         if setup is None:
             raise ValueError('No setup file found')
-         
+
     # FIND iterations 
     finditer = np.minimum(finditer, 10)  # maximum 10. 
          
@@ -859,14 +854,15 @@ def allframe(infile,tile=None,setupdir=None,scriptsdir=None,detectprog='sextract
     # Use the original combine code
     if cmborig:
         maskdatalevel,xoff,yoff = comb.combine_orig(infile,fake=fake,scriptsdir=scriptsdir,logger=logger,
-                                                    irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,
-                                                    trimcomb=trimcomb)
+                                                    setup=setup,irafdir=irafdir,satlevel=satlevel,
+                                                    nocmbimscale=nocmbimscale,trimcomb=trimcomb)
+                                                    
         combmch = mchbase+'.mch' 
     # New combine code 
     else:
         maskdatalevel,fileinfo = comb.combine(infile,tile=tile,fake=fake,scriptsdir=scriptsdir,logger=logger,
-                                              irafdir=irafdir,satlevel=satlevel,nocmbimscale=nocmbimscale,
-                                              imager=imager)
+                                              setup=setup,irafdir=irafdir,satlevel=satlevel,
+                                              nocmbimscale=nocmbimscale,imager=imager)
         xoff = 0.0 
         yoff = 0.0 
         combmch = mchbase+'_comb.mch' 
