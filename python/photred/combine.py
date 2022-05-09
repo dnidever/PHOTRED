@@ -13,6 +13,7 @@ from astropy.table import Table
 from astropy.convolution import convolve,Box2DKernel
 from astropy.utils.exceptions import AstropyWarning
 from astropy.coordinates import SkyCoord
+from scipy.interpolate import RectBivariateSpline
 from dlnpyutils import utils as dln,coords
 from . import utils,io,iraf
 
@@ -762,7 +763,7 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
     return actweight,scales,medsky
 
  
-def adxyinterp(wcs,rr,dd,nstep=10,xyad=False):
+def adxyinterp(head,rr,dd,nstep=10,xyad=False):
     """
     Instead of transforming the entire large 2D RA/DEC 
     arrays to X/Y do a sparse grid and perform linear 
@@ -802,12 +803,13 @@ def adxyinterp(wcs,rr,dd,nstep=10,xyad=False):
     nx,ny = rr.shape
     nxs = (nx-1)//nstep + 1 
     nys = (ny-1)//nstep + 1 
+
+    wcs = WCS(head)
      
     # Small dimensions, just transform the full grid 
     if nx <= nstep or ny <= nstep: 
         if xyad==False:
-            coo = SkyCoord(ra=rr,dec=dd,unit='deg')
-            xx,yy = wcs.world_to_pixel(coo)
+            xx,yy = wcs.world_to_pixel(SkyCoord(ra=rr,dec=dd,unit='deg'))
         else:
             coo = wcs.pixel_to_world(rr,dd)
             xx = coo.ra.deg
@@ -817,12 +819,11 @@ def adxyinterp(wcs,rr,dd,nstep=10,xyad=False):
     rrs = rr[0:nx:nstep,0:ny:nstep] 
     dds = dd[0:nx:nstep,0:ny:nstep] 
     if xyad==False:
-        coo = SkyCoord(ra=rrs,dec=dds,unit='deg')
-        xx,yy = wcs.world_to_pixel(coo)
+        xxs,yys = wcs.world_to_pixel(SkyCoord(ra=rrs,dec=dds,unit='deg'))
     else:
-        coo = wcs.pixel_to_world(rrs,dds)
-        xx = coo.ra.deg
-        yy = coo.dec.deg
+        coos = wcs.pixel_to_world(rrs,dds)
+        xxs = coos.ra.deg
+        yys = coos.dec.deg
      
     # Start final arrays 
     xx = np.zeros((nx,ny),float)
@@ -831,50 +832,88 @@ def adxyinterp(wcs,rr,dd,nstep=10,xyad=False):
     # Use CONGRID to perform the linear interpolation 
     #   congrid normally does nx_out/nx_in scaling 
     #   if /minus_one set it does (nx_out-1)/(nx_in-1) 
-    ixx = CONGRID(xxs,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
-    iyy = CONGRID(yys,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
-    xx[0:nxs*nstep,0:nys*nstep] = ixx 
-    yy[0:nxs*nstep,0:nys*nstep] = iyy 
+
+    xx0,yy0 = np.arange(xxs.shape[0]),np.arange(xxs.shape[1])
+    xx1 = np.arange((nxs-1)*nstep+1)/((nxs-1)*nstep)*(xxs.shape[0]-1)
+    yy1 = np.arange((nys-1)*nstep+1)/((nys-1)*nstep)*(xxs.shape[1]-1)
+    ixx = RectBivariateSpline(xx0,yy0,xxs,kx=1,ky=1)(xx1,yy1)
+    iyy = RectBivariateSpline(xx0,yy0,yys,kx=1,ky=1)(xx1,yy1)
+    xx[0:(nxs-1)*nstep+1,0:(nys-1)*nstep+1] = ixx 
+    yy[0:(nxs-1)*nstep+1,0:(nys-1)*nstep+1] = iyy 
+    #ixx = CONGRID(xxs,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
+    #iyy = CONGRID(yys,(nxs-1)*nstep+1,(nys-1)*nstep+1,/interp,/minus_one) 
      
     # Deal with right edge 
     if (nxs-1)*nstep+1 < nx: 
         # Make a short grid in X at the right edge 
-        rrs_rt = rr[nx-nstep:nx:nstep,0:ny:nstep] 
-        dds_rt = dd[nx-nstep:nx:nstep,0:ny:nstep] 
-        if not keyword_set(xyad): 
-            HEAD_ADXY,head,rrs_rt,dds_rt,xxs_rt,yys_rt,/deg 
+        rrs_rt = rr[nx-nstep-1:nx:nstep,0:ny:nstep] 
+        dds_rt = dd[nx-nstep-1:nx:nstep,0:ny:nstep] 
+        if xyad==False:
+            xxs_rt,yys_rt = wcs.world_to_pixel(SkyCoord(ra=rrs_rt,dec=dds_rt,unit='deg'))
         else: 
-            HEAD_XYAD,head,rrs_rt,dds_rt,xxs_rt,yys_rt,/deg 
-        ixx_rt = CONGRID(xxs_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
-        iyy_rt = CONGRID(yys_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
-        xx[nx-nstep:nx,0:nys*nstep] = ixx_rt 
-        yy[nx-nstep:nx,0:nys*nstep] = iyy_rt 
+            coo_rt = wcs.pixel_to_world(rrs_rt,dds_rt)
+            xxs_rt = coo_rt.ra.deg
+            yys_rt = coo_rt.dec.deg
+
+        xx0_rt,yy0_rt = np.arange(xxs_rt.shape[0]),np.arange(xxs_rt.shape[1])
+        xx1_rt = np.arange(nstep+1)/nstep*(xxs_rt.shape[0]-1)
+        yy1_rt = np.arange((nys-1)*nstep+1)/((nys-1)*nstep)*(xxs_rt.shape[1]-1)
+        ixx_rt = RectBivariateSpline(xx0_rt,yy0_rt,xxs_rt,kx=1,ky=1)(xx1_rt,yy1_rt)
+        iyy_rt = RectBivariateSpline(xx0_rt,yy0_rt,yys_rt,kx=1,ky=1)(xx1_rt,yy1_rt)
+        xx[nx-nstep-1:nx,0:(nys-1)*nstep+1] = ixx_rt
+        yy[nx-nstep-1:nx,0:(nys-1)*nstep+1] = iyy_rt 
+        #ixx_rt = CONGRID(xxs_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
+        #iyy_rt = CONGRID(yys_rt,nstep+1,nys*nstep+1,/interp,/minus_one) 
+        #xx[nx-nstep-1:nx-1,0:(nys-1)*nstep] = ixx_rt
+        #yy[nx-nstep-1:nx-1,0:(nys-1)*nstep] = iyy_rt
+
     # Deal with top edge 
     if (nys-1)*nstep+1 < ny: 
         # Make a short grid in Y at the top edge 
-        rrs_tp = rr[0:nx:nstep,ny-nstep:ny:nstep] 
-        dds_tp = dd[0:nx:nstep,ny-nstep:ny:nstep] 
-        if not keyword_set(xyad): 
-            HEAD_ADXY,head,rrs_tp,dds_tp,xxs_tp,yys_tp,/deg 
+        rrs_tp = rr[0:nx:nstep,ny-nstep-1:ny:nstep] 
+        dds_tp = dd[0:nx:nstep,ny-nstep-1:ny:nstep] 
+        if xyad==False:
+            xxs_tp, yys_tp = wcs.world_to_pixel(SkyCoord(ra=rrs_tp,dec=dds_tp,unit='deg'))
         else: 
-            HEAD_XYAD,head,rrs_tp,dds_tp,xxs_tp,yys_tp,/deg 
-        ixx_tp = CONGRID(xxs_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
-        iyy_tp = CONGRID(yys_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
-        xx[0:nxs*nstep,ny-nstep:ny] = ixx_tp 
-        yy[0:nxs*nstep,ny-nstep:ny] = iyy_tp 
+            coo_tp = wcs.pixel_to_world(rrs_tp,dds_tp)
+            xxs_tp = coo_tp.ra.deg
+            yys_tp = coo_tp.dec.deg
+
+        xx0_tp,yy0_tp = np.arange(xxs_tp.shape[0]),np.arange(xxs_tp.shape[1])
+        xx1_tp = np.arange((nxs-1)*nstep+1)/((nxs-1)*nstep)*(xxs_tp.shape[0]-1)
+        yy1_tp = np.arange(nstep+1)/nstep*(xxs_tp.shape[1]-1)
+        ixx_tp = RectBivariateSpline(xx0_tp,yy0_tp,xxs_tp,kx=1,ky=1)(xx1_tp,yy1_tp)
+        iyy_tp = RectBivariateSpline(xx0_tp,yy0_tp,yys_tp,kx=1,ky=1)(xx1_tp,yy1_tp)
+        xx[0:(nxs-1)*nstep+1,ny-nstep-1:ny] = ixx_tp 
+        yy[0:(nxs-1)*nstep+1,ny-nstep-1:ny] = iyy_tp 
+        #ixx_tp = CONGRID(xxs_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
+        #iyy_tp = CONGRID(yys_tp,nxs*nstep+1,nstep+1,/interp,/minus_one) 
+        #xx[0:(nxs-1)*nstep,ny-nstep-1:ny-1] = ixx_tp
+        #yy[0:(nxs-1)*nstep,ny-nstep-1:ny-1] = iyy_tp
+
     # Deal with top/right corner 
     if (nxs-1)*nstep+1 < nx and (nys-1)*nstep+1 < ny: 
         # Make a short grid in X and Y at the top-right corner 
-        rrs_tr = rr[nx-nstep:nx:nstep,ny-nstep:ny:nstep] 
-        dds_tr = dd[nx-nstep:nx:nstep,ny-nstep:ny:nstep] 
-        if not keyword_set(xyad): 
-            HEAD_ADXY,head,rrs_tr,dds_tr,xxs_tr,yys_tr,/deg 
+        rrs_tr = rr[nx-nstep-1:nx:nstep,ny-nstep-1:ny:nstep] 
+        dds_tr = dd[nx-nstep-1:nx:nstep,ny-nstep-1:ny:nstep] 
+        if xyad==False:
+            xxs_tr, yys_tr = wcs.world_to_pixel(SkyCoord(ra=rrs_tr,dec=dds_tr,unit='deg'))
         else: 
-            HEAD_XYAD,head,rrs_tr,dds_tr,xxs_tr,yys_tr,/deg 
-        ixx_tr = CONGRID(xxs_tr,nstep+1,nstep+1,/interp,/minus_one) 
-        iyy_tr = CONGRID(yys_tr,nstep+1,nstep+1,/interp,/minus_one) 
-        xx[nx-nstep:nx,ny-nstep:ny] = ixx_tr 
-        yy[nx-nstep:nx,ny-nstep:ny] = iyy_tr 
+            coo_tr = wcs.pixel_to_world(rrs_tr,dds_tr)
+            xxs_tr = coo_tr.ra.deg
+            yys_tr = coo_tr.dec.deg
+
+        xx0_tr,yy0_tr = np.arange(xxs_tr.shape[0]),np.arange(xxs_tr.shape[1])
+        xx1_tr = np.arange(nstep+1)/nstep*(xxs_tr.shape[0]-1)
+        yy1_tr = np.arange(nstep+1)/nstep*(xxs_tr.shape[1]-1)
+        ixx_tr = RectBivariateSpline(xx0_tr,yy0_tr,xxs_tr,kx=1,ky=1)(yy1_tr,xx1_tr)
+        iyy_tr = RectBivariateSpline(xx0_tr,yy0_tr,yys_tr,kx=1,ky=1)(yy1_tr,xx1_tr)
+        xx[nx-nstep-1:nx,ny-nstep-1:ny] = ixx_tr
+        yy[nx-nstep-1:nx,ny-nstep-1:ny] = iyy_tr
+        #ixx_tr = CONGRID(xxs_tr,nstep+1,nstep+1,/interp,/minus_one) 
+        #iyy_tr = CONGRID(yys_tr,nstep+1,nstep+1,/interp,/minus_one) 
+        #xx[nx-nstep-1:nx-1,ny-nstep-1:ny-1] = ixx_tr
+        #yy[nx-nstep-1:nx-1,ny-nstep-1:ny-1] = iyy_tr
 
     return xx,yy
 
@@ -1347,27 +1386,32 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             # Get X/Y range for this image in the final coordinate system
             vx,vy = wcs.world_to_pixel(SkyCoord(ra=fileinfo[i]['vertices_ra'],dec=fileinfo[i]['vertices_dec'],unit='deg'))
             #HEAD_ADXY,tile.head,fileinfo[i].vertices_ra,fileinfo[i].vertices_dec,vx,vy,/deg 
-            xout = [np.maximum(np.floor(np.min(vx))-2, tile['xrange'][0]+1),
-                    np.minimum(np.ceil(np.max(vx))+2, tile['xrange'][1]+1)] 
+            xout = [np.maximum(np.floor(np.min(vx))-2, tile['xrange'][0]),
+                    np.minimum(np.ceil(np.max(vx))+2, tile['xrange'][1]-1)+1] 
             xout = np.array(xout)
             xoutrel = xout-tile['xrange'][0]  # relative to xrange[0] 
             xoutrel = xoutrel.astype(int)
-            nxout = int(xout[1]-xout[0]+1)
-            yout = [np.maximum(np.floor(np.min(vy))-2, tile['yrange'][0]+1),
-                    np.minimum(np.ceil(np.max(vy))+2, tile['yrange'][1]+1)] 
+            nxout = int(xout[1]-xout[0])
+            yout = [np.maximum(np.floor(np.min(vy))-2, tile['yrange'][0]),
+                    np.minimum(np.ceil(np.max(vy))+2, tile['yrange'][1]-1)+1] 
             yout = np.array(yout)
             youtrel = yout-tile['yrange'][0]  # relative to yrange[0] 
             youtrel = youtrel.astype(int)
-            nyout = yout[1]-yout[0]+1 
-            nyout = int(nyout)
+            nyout = int(yout[1]-yout[0])
             rr = rab[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
             dd = decb[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
             #ALLFRAME_ADXYINTERP,head1,rr,dd,xx,yy,nstep=10
             xx,yy = adxyinterp(head1,rr,dd,nstep=10)
-             
+
             # The x/y position to bilinear need to be in the original system, ~1sec 
-            rim = BILINEAR(im1,xx,yy,missing=fileinfo[i].background) 
-            rmask = BILINEAR(mask,xx,yy,missing=0) 
+            rim = np.zeros(xx.shape,float)+fileinfo[i]['background']
+            rmask = np.zeros(xx.shape,bool)
+            good = ((xx>=0) & (xx<=im1.shape[0]-1) & (yy>=0) & (yy<=im1.shape[1]-1))
+            if np.sum(good)>0:
+                rim[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),im1,kx=1,ky=1).ev(xx[good],yy[good])
+                rmask[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),mask,kx=1,ky=1).ev(xx[good],yy[good])
+            #rim = BILINEAR(im1,xx,yy,missing=fileinfo[i].background) 
+            #rmask = BILINEAR(mask,xx,yy,missing=0) 
              
             # Contruct final image
             fim = np.zeros((tile['nx'],tile['ny']),float)+fileinfo[i]['saturate']
@@ -1377,26 +1421,29 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             fmask[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rmask 
              
             # Contruct the final header 
-            fhead = np.copy(head1)
+            fhead = head1.copy()
             # Delete any previous WCS keywords
             for n in ['CRVAL1','CRVAL2','CRPIX1','CRPIX2','CDELT1','CDELT2','CTYPE1','CTYPE2','CD1_1','CD1_2','CD2_1','CD2_2']:
-                del fhead[n]
-            pvnames = dln.grep(fhead.cards,'PV[0-9]_+[0-9]')
+                if n in fhead:
+                    del fhead[n]
+            cards = [f[0] for f in fhead.cards]
+            pvnames = dln.grep(cards,'PV[0-9]_+[0-9]')
             #pvind, = np.where(stregex(strmid(fhead,0,5),'PV[0-9]_+[0-9]',/boolean) == 1,npvind)
             for p in pvnames:
                 del fhead[p]
             # Add the new WCS 
-            PUTAST,fhead,tile['ast']
+            whead = wcs.to_header()
+            fhead.extend(whead)
             fhead['NAXIS1'] = tile['nx']
             fhead['NAXIS2'] = tile['ny']
             fhead['BPM'] = fileinfo[i]['resampmask']
-            logger.info(fileinfo[i].resampfile,' ['+str(xout[0],2)+':'+str(xout[1],2)+','+                  str(yout[0],2)+':'+str(yout[1],2)+']')
+            logger.info('%d  %s [%d:%d,%d:%d] ' % (i+1,fileinfo[i]['resampfile'],xout[0],xout[1],yout[0],yout[1]))
             fits.PrimaryHDU(fim,fhead).writeto(fileinfo[i]['resampfile'],overwrite=True)
             #MWRFITS,fim,fileinfo[i].resampfile,fhead,/create 
             mhead = fhead.copy()
             mhead['BITPIX'] = 8 
             del mhead['BPM']
-            fits.PrimaryHDU(fmaskmhead).writeto(fileinfo[i]['resampmask'],overwrite=True)
+            fits.PrimaryHDU(fmask.astype(np.uint8),mhead).writeto(fileinfo[i]['resampmask'],overwrite=True)
             #MWRFITS,fmask,fileinfo[i].resampmask,mhead,/create 
             # this takes about ~37-50 sec for a 2kx4k image. 
             #  now it takes ~5 sec for a 2kx4k image 
@@ -1417,7 +1464,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         files2,trans2,magoff2 = io.readmch(shiftmch+'.mch')
         nxf = nx+pix_expand[0]+pix_expand[2] 
         nyf = ny+pix_expand[1]+pix_expand[3]
-        xx1 = np.arange(nx).reshape(-1,1) + np.zeros(ny,float).rshape(-1,1)
+        xx1 = np.arange(nx).reshape(-1,1) + np.zeros(ny,float).rshape(-1,1) 
         yy1 = np.zeros(nx,float).reshape(-1,1) + np.arange(ny).reshape(-1,1)
         #xx1 = lindgen(nx)#replicate(1,ny) 
         #yy1 = replicate(1,nx)#lindgen(ny) 
