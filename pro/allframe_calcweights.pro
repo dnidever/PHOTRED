@@ -84,8 +84,6 @@ endfor
 ;print,'Scales: ',scales
 ;print,'Sky: ',medsky
 
-;stop
-
 if keyword_set(stp) then stop
 
 end

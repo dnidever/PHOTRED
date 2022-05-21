@@ -14,6 +14,7 @@ from astropy.convolution import convolve,Box2DKernel
 from astropy.utils.exceptions import AstropyWarning
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RectBivariateSpline
+from scipy.optimize import curve_fit
 from dlnpyutils import utils as dln,coords
 from . import utils,io,iraf
 
@@ -1450,7 +1451,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
  
      
     # --- Pixel based --- 
-    if tile['type']=='PIXEL':
+    elif tile['type']=='PIXEL':
     
         # Expand the images to sizes that will allow all of the shifts
         hd1 = io.readfile(fitsfiles[0],header=True)
@@ -1504,23 +1505,23 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
  
  
     # Creating new MCH file for the combined file 
-    if not keyword_set(fake): 
+    if fake==False:
         print('Deriving new transformation equations for the resampled coordinate system')
         for i in range(nfiles): 
             # Convert X/Y of this system into the combined reference frame 
             #  The pixel values are 1-indexed like DAOPHOT uses. 
             ngridbin = 50 
-            nxgrid = fileinfo[i].nx / ngridbin 
-            nygrid = fileinfo[i].ny / ngridbin
-            xgrid = (np.arange(nxgrid)*ngridbin+1).reshape(-1,1) + np.zeros(nygrid,float).reshape(-1,1)
-            ygrid = np.zeros(nxgrid,float).reshape(-1,1) + (np.arange(nygrid)*ngridbin+1).reshape(-1,1)
+            nxgrid = fileinfo[i]['nx'] // ngridbin 
+            nygrid = fileinfo[i]['ny'] // ngridbin
+            xgrid = (np.arange(nxgrid)*ngridbin+1).reshape(-1,1) + np.zeros(nygrid,float).reshape(1,-1)
+            ygrid = np.zeros(nxgrid,float).reshape(-1,1) + (np.arange(nygrid)*ngridbin+1).reshape(1,-1)
             #xgrid = (lindgen(nxgrid)*ngridbin+1)#replicate(1,nygrid) 
             #ygrid = replicate(1,nxgrid)#(lindgen(nygrid)*ngridbin+1) 
             #HEAD_XYAD,(*fileinfo[i].head),xgrid-1,ygrid-1,ragrid,decgrid,/deg
             #HEAD_ADXY,tile.head,ragrid,decgrid,refxgrid,refygrid,/deg
             wcs1 = WCS(fileinfo[i]['head'])
-            ragrid,decgrid = wcs1.pixel_to_world(xgrid-1,ygrid-1,0)
-            refxgrid,refygrid = wcs1.world_to_pixel(ragrid,decgrid,0)
+            coogrid = wcs1.pixel_to_world(xgrid-1,ygrid-1)
+            refxgrid,refygrid = wcs1.world_to_pixel(coogrid)
             refxgrid += 1    # convert 0-indexed to 1-indexed 
             refygrid += 1 
               
@@ -1530,47 +1531,68 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             xmed = np.median([xdiff]) 
             ymed = np.median([ydiff]) 
             # Fit rotation with linear fits if enough points 
-            coef1 = robust_poly_fitq(ygrid,xdiff,1)   # fit rotation term 
-            coef1b = dln_poly_fit(ygrid,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err) #,/bootstrap) 
-            coef2 = robust_poly_fitq(xgrid,ydiff,1)   # fit rotation term 
-            coef2b = dln_poly_fit(xgrid,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err) #,/bootstrap) 
-            #theta = mean([-coef1[1],coef2[1]]) 
-            theta,thetaerr = dln.wtmean([-coef1[1],coef2[1]],[coef1err[1],coef2err[1]])
-     
+            slp1 = dln.mediqrslope(ygrid,xdiff)  # fit rotation term
+            slp1rms = dln.mad(xdiff-ygrid*slp1)
+            slp2 = dln.mediqrslope(xgrid,ydiff)
+            slp2rms = dln.mad(ydiff-xgrid*slp2) 
+            #coef1 = robust_poly_fitq(ygrid,xdiff,1)   # fit rotation term 
+            #coef1b = dln.poly_fit(ygrid,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err) #,/bootstrap) 
+            #coef2 = robust_poly_fitq(xgrid,ydiff,1)   # fit rotation term 
+            #coef2b = dln.poly_fit(xgrid,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err) #,/bootstrap) 
+            ##theta = mean([-coef1[1],coef2[1]]) 
+            #theta,thetaerr = dln.wtmean([-coef1[1],coef2[1]],[coef1err[1],coef2err[1]])
+            theta = dln.wtmean(np.array([-slp1,slp2]),np.array([slp1rms,slp2rms]))
+
             # [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)] 
             #trans = [xmed, ymed, 1.0, 0.0, 0.0, 1.0] 
-            trans = [xmed, ymed, 1.0-theta**2, theta, -theta, 1.0-theta**2] 
+            trans = np.array([xmed, ymed, 1.0-theta**2, theta, -theta, 1.0-theta**2])
             # Adjust Xoff, Yoff with this transformation 
-            xyout = trans_coo(xgrid,ygrid,trans) 
-            trans[0] += np.median([refxgrid - xyout[0,:]]) 
-            trans[1] += np.median([refygrid - xyout[1,:]]) 
+            #xyout = trans_coo(xgrid,ygrid,trans) 
+            xout,yout = utils.trans_coo([xgrid,ygrid],*trans)
+            trans[0] += np.median(refxgrid-xout) 
+            trans[1] += np.median(refygrid-yout) 
      
             # Fit full six parameters if there are enough stars 
-            fa = {'x1':refxgrid.flatten(),'y1':refygrid.flatten(),'x2':xgrid.flatten(),'y2':ygrid.flatten()} 
-            initpar = trans
-            fpar,perror = curve_fit(trans_coo_dev,initpar)
+            xdata = [[refxgrid,refygrid],[xgrid,ygrid]]
+            null = np.zeros(refxgrid.size,float)
+            fpar,cov = curve_fit(utils.trans_coo_dev,xdata,null,p0=trans)
+            trans = fpar
+            transerr = np.sqrt(np.diag(cov))
+            diff = utils.trans_coo_dev(xdata,*fpar)
+            rms = np.sqrt(np.mean(diff**2.))
+
+            #fa = {'x1':refxgrid.flatten(),'y1':refygrid.flatten(),'x2':xgrid.flatten(),'y2':ygrid.flatten()} 
             #fpar = MPFIT('trans_coo_dev',initpar,functargs=fa, perror=perror, niter=iter, status=status,
             #             bestnorm=chisq,:f=dof, autoderivative=1, /quiet) 
-            trans = fpar 
+            #trans = fpar 
      
-            diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid) 
-            rms = np.sqrt(np.mean(diff**2)) 
+            #diff = trans_coo_dev(fpar,x1=refxgrid,y1=refygrid,x2=xgrid,y2=ygrid) 
+            #rms = np.sqrt(np.mean(diff**2)) 
             fileinfo[i]['resamptrans'] = trans 
             fileinfo[i]['resamptransrms'] = rms 
      
             # The output is: 
             # filename, xshift, yshift, 4 trans, mag offset, magoff sigma 
-            format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)' 
+            #format = '(A2,A-30,A1,2A10,4A12,F9.3,F8.4)' 
             # In daomaster.f the translations are 10 digits with at most 4 
             # decimal places (with a leading space), the transformation 
             # coefficients are 12 digits with at most 9 decimal places. 
             # Need a leading space to separate the numbers. 
-            strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),                 str(string(trans[2:5],format='(F30.9)'),2)] 
-            newline = STRING("'",fileinfo[i]['catfile'],"'", strans, fileinfo[i]['magoff'][0], rms, format=format) 
+            #strans = ' '+[str(string(trans[0:1],format='(F30.4)'),2),                 str(string(trans[2:5],format='(F30.9)'),2)] 
+            #newline = STRING("'",fileinfo[i]['catfile'],"'", strans, fileinfo[i]['magoff'][0], rms, format=format) 
+            #mchfinal += [newline]
+            
+            strans = ['%30.4f' % trans[0], '%30.4f' % trans[1], '%30.9f' % trans[2], '%30.9f' % trans[3],
+                      '%30.9f' % trans[4], '%30.9f' % trans[5]]
+            strans = [' '+s.strip() for s in strans]
+            fmt = '%2s%-30s%1s%10.10s%10.10s%12.12s%12.12s%12.12s%12.12s%9.3f%8.4s'
+            data = "'",fileinfo[i]['catfile'],"'",*strans, 0.0, rms,
+            newline = fmt % data
             mchfinal += [newline]
-     
+
         # Printing the transformation 
-        logger.info('(A-20,2A10,4A12,F9.3,F8.4)' % (fileinfo[i]['catfile'],strans,fileinfo[i]['magoff'][0],rms))
+        #logger.info('(A-20,2A10,4A12,F9.3,F8.4)' % (fileinfo[i]['catfile'],strans,fileinfo[i]['magoff'][0],rms))
+        logger.info('%-22s%10.10s%10.10s%12.12s%12.12s%12.12s%12.12s%9.3f%8.4f' % (fileinfo[i]['catfile'],*strans,fileinfo[i]['magoff'][0],rms))
         # Write to the new MCH file 
         combmch = mchbase+'_comb.mch'
         dln.writelines(combmch,mchfinal)
@@ -1589,11 +1611,12 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
  
     # The imcombine input file 
     resampfile = mchbase+'.resamp' 
-    WRITELINE,resampfile,fileinfo.resampfile 
+    dln.writelines(resampfile,fileinfo['resampfile'])
+    #WRITELINE,resampfile,fileinfo.resampfile 
  
     # SCALE the images for combining 
     #------------------------------- 
-    if not keyword_set(nocmbimscale): 
+    if nocmbimscale==False:
  
         # Put BPM mask names in file headers 
         #  these will be used by IMCOMBINE 
@@ -1671,7 +1694,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         
         # Fix the rdnoise 
         # The final RDNOISE is essentially: comb_rdnoise = sqrt(total((weights*rdnoise*scale)^2)) 
-        rdnoisearr = fltarr(nfiles) 
+        rdnoisearr = np.zeros(nfiles,float)
         for i in range(nfiles): 
             rdnoisearr1,key = io.getrdnoise(base[i]+'.fits')
             rdnoisearr[i] = rdnoisearr1
@@ -1693,7 +1716,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         gain,gainkey = io.getgain(combfile)
         comb_sky = np.sum((weights*np.sqrt(np.maximum(sky,0)/gain)/scales)**2)*gain 
         # the "scales" array here is actually 1/scale 
-        combim += float(comb_sky)# keep it float 
+        combim += float(comb_sky)   # keep it float 
         
  
         # set the maximum to a "reasonable" level 
@@ -1705,8 +1728,8 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             # rdnoise does NOT get modified since it's in electrons 
             # we just need to modify the gain which takes you from ADUs to electrons 
  
-        maskdatalevel = np.max(combim) + 10000# set "bad" data level above the highest "good" value 
-        combim2 = combim*(1-badmask) + maskdatalevel*badmask# set bad pixels to maskdatalevel
+        maskdatalevel = np.max(combim) + 10000    # set "bad" data level above the highest "good" value 
+        combim2 = combim*(1-badmask) + maskdatalevel*badmask   # set bad pixels to maskdatalevel
         combhead['SATURATE'] = maskdatalevel
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True) # fits_write can create an empty PDU 
         
@@ -1748,14 +1771,14 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         # So the final sky level should be 
         # final sky = total((weights*scale*sqrt(sky/gain))^2)*gain 
         gain,gainkey = utils.getgain(combfile)
-        comb_sky = np.sum((weights*sqrt(sky/gain))**2)*gain 
+        comb_sky = np.sum((weights*np.sqrt(sky/gain))**2)*gain 
         # the "scales" array here is actually 1/scale 
         combim += comb_sky 
  
  
         # set the maximum to a "reasonable" level 
         # Rescale the image and increase the gain 
-        if max(combim) > 50000: 
+        if np.max(combim) > 50000: 
             rescale = 50000./np.max(combim) 
             combim = combim*rescale
             combhead[gainkey] = gain/rescale
@@ -1788,14 +1811,15 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
  
  
         badmask = float(weightmap < 0.5) 
-        maskdatalevel = np.max(combim) + 10000# set "bad" data level above the highest "good" value 
-        combim2 = combim*(1.0-badmask) + maskdatalevel*badmask# set bad pixels to 100,000 
+        maskdatalevel = np.max(combim) + 10000  # set "bad" data level above the highest "good" value 
+        combim2 = combim*(1.0-badmask) + maskdatalevel*badmask  # set bad pixels to 100,000 
         combhead['SATURATE'] = maskdatalevel 
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True)
  
     # Add TILETYPE to the combined image
     combhead = io.readfile(combfile,header=True)
     combhead['AFTILTYP'] = tile['type']
+    import pdb; pdb.set_trace()
     MODFITS,combfile,0,combhead 
  
     # Delete the resampled images
@@ -1820,7 +1844,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
                 coohead1 = cmnlines1[0:1] 
                 ncmn1 = len(cmn1) 
                 # Get coordinates on the resampled/combined image grid 
-                newx,newy = trans_coo(cmn1['x'],cmn1['y'],fileinfo[i]['resamptrans']) 
+                newx,newy = utils.trans_coo([cmn1['x'],cmn1['y']],*fileinfo[i]['resamptrans']) 
                 cmn1['x'] = newx 
                 cmn1['y'] = newy 
                 if len(allcmn) == 0: 
@@ -1830,7 +1854,8 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
                     ind1,ind2,dist = coords.xmatch(allcmn['x'],allcmn['y'],cmn1['x'],cmn1['y'],2.0)
                     if len(ind1)>0:
                         if nmatch < ncmn1: 
-                            remove,ind2,cmn1 
+                            cmn1 = np.delete(cmn1,ind2)
+                            #remove,ind2,cmn1 
                         else: 
                             undefine,cmn1 
                     if len(cmn1) > 0 : 
