@@ -364,30 +364,39 @@ def daomatch(files,usewcs=True,verbose=True,logfile=None,
                     slp1rms = dln.mad(xdiff-als['y'][gdals[ind2]]*slp1)
                     #coef1 = robust_poly_fitq(als[gdals[ind2]].y,xdiff,1)# fit rotation term 
                     #coef1b = dln_poly_fit(als[gdals[ind2]].y,xdiff,1,measure_errors=xdiff*0+0.1,sigma=coef1err,/bootstrap)
-                    slp2 = dln.mediqrsope(als['x'][gdals[ind2]],ydiff)
+                    slp2 = dln.mediqrslope(als['x'][gdals[ind2]],ydiff)
                     slp2rms = dln.mad(ydiff-als['x'][gdals[ind2]]*slp2)                    
                     #coef2 = robust_poly_fitq(als[gdals[ind2]].x,ydiff,1)# fit rotation term 
                     #coef2b = dln_poly_fit(als[gdals[ind2]].x,ydiff,1,measure_errors=ydiff*0+0.1,sigma=coef2err,/bootstrap) 
                     #theta = mean([-coef1[1],coef2[1]]) 
                     #WMEANERR,[-coef1[1],coef2[1]],[coef1err[1],coef2err[1]],theta,thetaerr 
-                    theta = dln.wtmean([-slp1,slp2],[slp1rms,slp2rms])
+                    theta = dln.wtmean(np.array([-slp1,slp2]),np.array([slp1rms,slp2rms]))
                     
                     # [xoff, yoff, cos(th), sin(th), -sin(th), cos(th)] 
                     trans = np.array([xmed, ymed, 1.0-theta**2, theta, -theta, 1.0-theta**2])
                     # Adjust Xoff, Yoff with this transformation 
-                    xout,yout = utils.trans_coo(als['x'][gdals[ind2]],als['y'][gdals[ind2]],trans) 
+                    xout,yout = utils.trans_coo([als['x'][gdals[ind2]],als['y'][gdals[ind2]]],*trans) 
                     trans[0] += np.median(refals['x'][gdref[ind1]]-xout) 
                     trans[1] += np.median(refals['y'][gdref[ind1]]-yout) 
                 else:
                     trans = np.array([xmed, ymed, 1.0, 0.0, 0.0, 1.0])
                      
                 # Fit full six parameters if there are enough stars 
-                if count > 10: 
-                    fa = {'x1':refals['x'][gdref[ind1]],'y1':refals['y'][gdref[ind1]],
-                          'x2':als['x'][gdals[ind2]],'y2':als['y'][gdals[ind2]]}
-                    initpar = np.copy(trans)
-                    fpar,cov = curve_fit(trans_coo_dev,xdata,ydata,initpar)
+                if count > 10:
+                    xdata = [[refals['x'][gdref[ind1]],refals['y'][gdref[ind1]]],
+                             [als['x'][gdals[ind2]],als['y'][gdals[ind2]]]]
+                    null = np.zeros(xdata[0][0].size,float)
+                    fpar,cov = curve_fit(utils.trans_coo_dev,xdata,null,p0=trans)
                     trans = fpar
+                    transerr = np.sqrt(np.diag(cov))
+                    diff = utils.trans_coo_dev(xdata,*fpar)
+                    rms = np.sqrt(np.mean(diff**2.))
+                    trans = fpar
+                    #fa = {'x1':refals['x'][gdref[ind1]],'y1':refals['y'][gdref[ind1]],
+                    #      'x2':als['x'][gdals[ind2]],'y2':als['y'][gdals[ind2]]}
+                    #initpar = np.copy(trans)
+                    #fpar,cov = curve_fit(trans_coo_dev,xdata,ydata,initpar)
+                    #trans = fpar
              
         # Match stars with X/Y coordinates 
         if (count < 1): 
