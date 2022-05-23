@@ -9,7 +9,7 @@ from astropy.io import fits
 from dlnpyutils import utils as dln
 from glob import glob
  
-def check(irafdir=None,silent=False):
+def check(irafdir=None,verbose=True):
     """
     This program checks that you can run IRAF from IDL. 
  
@@ -20,8 +20,8 @@ def check(irafdir=None,silent=False):
          where login.cl should be located.  If 
          this is not entered then it assumes that 
          ~/iraf/ is the IRAF directory. 
-    silent : boolean, optional
-       Don't print anything to the screen. 
+    verbose : boolean, optional
+       Print to the screen. 
  
     Returns
     -------
@@ -45,7 +45,7 @@ def check(irafdir=None,silent=False):
     if irafdir is not None:
         diriraf = os.path.expanduser(irafdir)
         if len(glob(diriraf))==0:
-            if silent==False:
+            if verbose:
                 print('DIRECTORY '+str(irafdir)+' DOES NOT EXIST.  TRYING ~/iraf/ INSTEAD.')
             diriraf = None
             
@@ -90,7 +90,7 @@ def check(irafdir=None,silent=False):
         test = True 
      
     # Explain how to fix the login.cl file 
-    if test == False and silent==False:
+    if test == False and verbose:
         print('Running IRAF from Python failed!')
         print('Please edit your login.cl file so that it:es not')
         print('print anything to the screen on IRAF startup.')
@@ -104,7 +104,7 @@ def check(irafdir=None,silent=False):
     return test
               
 
-def run(scriptname,irafdir=None,silent=False):
+def run(scriptname,irafdir=None,verbose=True):
     """
     This runs an IRAF script. 
     
@@ -115,13 +115,13 @@ def run(scriptname,irafdir=None,silent=False):
          It must end with "logout". 
     irafdir : str, optional
        The IRAF home directory. 
-    silent : boolean, optional
-       Don't print anything to the screen 
+    verbose : boolean, optional
+       Print to the screen 
  
     Returns
     -------
     The IRAF script will be executed and the output printed 
-    the screen (unless /silent is set). 
+    the screen (unless verbose=False is set). 
     out : list
         The IRAF output 
  
@@ -153,7 +153,7 @@ def run(scriptname,irafdir=None,silent=False):
     os.chdir(irafdir)
      
     # Message to the screen 
-    if silent==False:
+    if verbose:
         print('Running IRAF...')
         print('with IRAF home directory: ',irafdir)
         print('Executing script: ',scriptname)
@@ -165,7 +165,7 @@ def run(scriptname,irafdir=None,silent=False):
     out = out.split('\n')  # split into lines
 
     # Print the output to the screen
-    if silent==False:
+    if verbose:
         for l in out: print(l)
      
     # Go back to original directory

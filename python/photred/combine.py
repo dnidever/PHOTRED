@@ -7,6 +7,7 @@ import glob as glob
 import shutil
 import warnings
 import subprocess
+import tempfile
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.table import Table
@@ -1020,7 +1021,8 @@ def fiximages(input,satlevel=50000.0,nofix=False):
          
                       
 def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=None,
-            satlevel=6e4,nocmbimscale=False,fake=False,usecmn=False,imager=None):
+            satlevel=6e4,nocmbimscale=False,fake=False,usecmn=False,imager=None,
+            verbose=True):
     """
     This combines/stacks images for ALLFRAME. 
  
@@ -1507,6 +1509,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
     # Creating new MCH file for the combined file 
     if fake==False:
         print('Deriving new transformation equations for the resampled coordinate system')
+        mchfinal = []
         for i in range(nfiles): 
             # Convert X/Y of this system into the combined reference frame 
             #  The pixel values are 1-indexed like DAOPHOT uses. 
@@ -1611,7 +1614,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
  
     # The imcombine input file 
     resampfile = mchbase+'.resamp' 
-    dln.writelines(resampfile,fileinfo['resampfile'])
+    dln.writelines(resampfile,[f['resampfile'] for f in fileinfo])
     #WRITELINE,resampfile,fileinfo.resampfile 
  
     # SCALE the images for combining 
@@ -1644,12 +1647,12 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         lines += ['cd '+curdir]
         lines += ['imcopy '+mchbase+'_comb.bpm.pl '+mchbase+'_comb.bpm.fits']
         lines += ['logout']
-        tid,tempfile = tempfile.mkstemp(prefix="tiraf")  # absolute filename
-        dln.writelines(tempfile,lines)
-        out = iraf.run(tempfile,irafdir,silent=silent)
+        tid,tmpfile = tempfile.mkstemp(prefix="tiraf")  # absolute filename
+        dln.writelines(tmpfile,lines)
+        out = iraf.run(tmpfile,irafdir,verbose=verbose)
  
         # Delete temporary scripts and PL file
-        for f in [tempfile,mchbase+'_comb.bpm.pl']:
+        for f in [tmpfile,mchbase+'_comb.bpm.pl']:
             if os.path.exists(f): os.remove(f)
  
  
@@ -1716,12 +1719,12 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         gain,gainkey = io.getgain(combfile)
         comb_sky = np.sum((weights*np.sqrt(np.maximum(sky,0)/gain)/scales)**2)*gain 
         # the "scales" array here is actually 1/scale 
-        combim += float(comb_sky)   # keep it float 
+        combim += comb_sky.astype(float)   # keep it float 
         
  
         # set the maximum to a "reasonable" level 
         # Rescale the image and increase the gain 
-        if max(combim) > 50000: 
+        if np.max(combim) > 50000: 
             rescale = 50000./np.max(combim) 
             combim = combim*rescale
             combhead[gainkey] = gain/rescale
@@ -1735,7 +1738,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         
         # Create the weight map for Sextractor using the BPM output by IMCOMBINE 
         #  bad only if bad in ALL images 
-        weightmap = -2.0*float(badmask == 1) + 1.0 
+        weightmap = -2.0*(badmask == 1).astype(float) + 1.0 
         combweightfile = mchbase+'_comb.mask.fits' 
         fits.PrimaryHDU(weightmap,whead).writeto(combweightfile,overwrite=True)
         
@@ -1793,7 +1796,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         # weight map, -1 is bad, +1 is good 
         # "bpm" is the SUM of the bad pixel masks 
         # consider a pixel bad that is bad in ANY image 
-        weightmap = -2.0*float(bpm < nfiles) + 1. 
+        weightmap = -2.0*(bpm < nfiles).astype(float) + 1. 
         combweightfile = mchbase+'_comb.mask.fits'
         fits.PrimaryHDU(weightmap,whead).writeto(combweightfile,overwrite=True)
  
@@ -1819,14 +1822,14 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
     # Add TILETYPE to the combined image
     combhead = io.readfile(combfile,header=True)
     combhead['AFTILTYP'] = tile['type']
-    import pdb; pdb.set_trace()
-    MODFITS,combfile,0,combhead 
+    tempim = fits.getdata(combfile)
+    fits.PrimaryHDU(tempim,combhead).writeto(combfile,overwrite=True)
+    #MODFITS,combfile,0,combhead 
  
     # Delete the resampled images
-    for f in fileinfo['resampfile']:
-        if os.path.exists(f): os.remove(f)
-    for f in fileinfo['resampmask']:
-        if os.path.exists(f): os.remove(f)        
+    for f in fileinfo:
+        if os.path.exists(f['resampfile']): os.remove(f['resampfile'])
+        if os.path.exists(f['resampmask']): os.remove(f['resampmask'])        
  
     # Make the common source file for the combined image 
     #--------------------------------------------------- 
@@ -2279,7 +2282,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
     iraflines += ['logout']
     imshiftscript = curdir+'/'+mchbase+'.imshift' 
     dln.writelines(imshiftscript,iraflines)
-    out = run(imshiftscript,irafdir,silent=True)
+    out = run(imshiftscript,irafdir,verbose=False)
      
     # Trim 
     if trimcomb: 
@@ -2361,12 +2364,12 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
         lines += ['cd '+curdir]
         lines += ['imcopy '+mchbase+'_comb.bpm.pl '+mchbase+'_comb.bpm.fits']
         lines += ['logout']
-        tempfile = mktemp('tiraf') 
-        dln.writelines(tempfile,lines)
-        out = iraf.run(tempfile,irafdir,silent=silent)
+        tmpfile = mktemp('tiraf') 
+        dln.writelines(tmpfile,lines)
+        out = iraf.run(tmpfile,irafdir,verbose=verbose)
          
         # Delete temporary scripts and PL file
-        for f in [tempfile,mchbase+'_comb.bpm.pl']:
+        for f in [tmpfile,mchbase+'_comb.bpm.pl']:
             if os.path.exists(f): os.remove(f)
          
          
