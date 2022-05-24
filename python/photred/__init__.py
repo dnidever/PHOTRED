@@ -1,4 +1,4 @@
-__all__ = ["utils","io","allframe","combine","iraf","daomatch"]
+__all__ = ["utils","io","allframe","combine","iraf","daomatch","imfwhm"]
 __version__ = '1.0.0'
 
 from . import (utils,io,allframe)
