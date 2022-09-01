@@ -1017,6 +1017,127 @@ def readopt(optfile):
                 opt[key] = val
     return opt
 
+
+# Make meta-data dictionary for an image:
+def makemeta(fluxfile=None,header=None):
+    '''
+    This creates a meta-data dictionary for an exposure that is used by many
+    of the photometry programs.  Either the filename or the header must be input.
+    Note that sometimes in multi-extension FITS (MEF) files the information needed
+    is both in the primary header and the extension header.  In that case it is best
+    to combine them into one header and input that to makemeta().  This can easily
+    be accomplished like this:
+      
+       head0 = fits.getheader("image1.fits",0)
+       head = fits.getheader("image1.fits",1)
+       head.extend(head0,unique=True)
+       meta = makemeta(header=head)
+
+    Parameters
+    ----------
+    fluxfile : str, optional
+             The filename of the FITS image.
+    header : str, optional
+           The header of the image.
+
+    Returns
+    -------
+    meta : astropy header
+        The meta-data dictionary which is an astropy header with additional
+        keyword/value pairs added.
+
+    Example
+    -------
+
+    Create the meta-data dictionary for `image.fits`
+
+    .. code-block:: python
+
+        meta = makemeta("image.fits")
+
+    Create the meta-data dictionary from `head`.
+
+    .. code-block:: python
+
+        meta = makemeta(header=head)
+
+    '''
+
+    # You generally need BOTH the PDU and extension header
+    # To get all of this information
+
+    if (fluxfile is None) & (header is None):
+        print("No fluxfile or headerinput")
+        return
+    # Initialize meta using the header
+    if fluxfile is not None:
+        header = fits.getheader(fluxfile,0)
+    meta = header
+
+    #- INSTCODE -
+    if "DTINSTRU" in meta.keys():
+        if meta["DTINSTRU"] == 'mosaic3':
+            meta["INSTCODE"] = 'k4m'
+        elif meta["DTINSTRU"] == '90prime':
+            meta["INSTCODE"] = 'ksb'
+        elif meta["DTINSTRU"] == 'decam':
+            meta["INSTCODE"] = 'c4d'
+        else:
+            print("Cannot determine INSTCODE type")
+            return
+    else:
+        print("No DTINSTRU found in header.  Cannot determine instrument type")
+        return
+
+    #- RDNOISE -
+    if "RDNOISE" not in meta.keys():
+        # Check DECam style rdnoise
+        if "RDNOISEA" in meta.keys():
+            rdnoisea = meta["RDNOISEA"]
+            rdnoiseb = meta["RDNOISEB"]
+            rdnoise = (rdnoisea+rdnoiseb)*0.5
+            meta["RDNOISE"] = rdnoise
+        # Check other names
+        if meta.get('RDNOISE') is None:
+            for name in ['READNOIS','ENOISE']:
+                if name in meta.keys(): meta['RDNOISE']=meta[name]
+        # Bok
+        if meta['INSTCODE'] == 'ksb':
+            meta['RDNOISE']= [6.625, 7.4, 8.2, 7.1][meta['CCDNUM']-1]
+        if meta.get('RDNOISE') is None:
+            print('No RDNOISE found')
+            return
+    #- GAIN -
+    if "GAIN" not in meta.keys():
+        try:
+            gainmap = { 'c4d': lambda x: 0.5*(x.get('GAINA')+x.get('GAINB')),
+                        'k4m': lambda x: x.get('GAIN'),
+                        'ksb': lambda x: [1.3,1.5,1.4,1.4][x.get['CCDNUM']-1] }  # bok gain in HDU0, use list here
+            gain = gainmap[meta["INSTCODE"]](meta)
+            meta["GAIN"] = gain
+        except:
+            gainmap_avg = { 'c4d': 3.9845419, 'k4m': 1.8575, 'ksb': 1.4}
+            gain = gainmap_avg[meta["INSTCODE"]]
+            meta["GAIN"] = gain
+    #- CPFWHM -
+    # FWHM values are ONLY in the extension headers
+    cpfwhm_map = { 'c4d': 1.5 if meta.get('FWHM') is None else meta.get('FWHM')*0.27, 
+                   'k4m': 1.5 if meta.get('SEEING1') is None else meta.get('SEEING1'),
+                   'ksb': 1.5 if meta.get('SEEING1') is None else meta.get('SEEING1') }
+    cpfwhm = cpfwhm_map[meta["INSTCODE"]]
+    meta['CPFWHM'] = cpfwhm
+    #- PIXSCALE -
+    if "PIXSCALE" not in meta.keys():
+        pixmap = { 'c4d': 0.27, 'k4m': 0.258, 'ksb': 0.45 }
+        try:
+            meta["PIXSCALE"] = pixmap[meta["INSTCODE"]]
+        except:
+            w = WCS(meta)
+            meta["PIXSCALE"] = np.max(np.abs(w.pixel_scale_matrix))
+
+    return meta
+
+
 def mkopt(base=None,meta=None,VA=1,LO=7.0,TH=3.5,LS=0.2,HS=1.0,LR=-1.0,HR=1.0,
           WA=-2,AN=-6,EX=5,PE=0.75,PR=5.0,CR=2.5,CE=6.0,MA=50.0,RED=1.0,WA2=0.0,
           fitradius_fwhm=1.0,HI=None,RD=None,GA=None,FW=None,logger=None):
