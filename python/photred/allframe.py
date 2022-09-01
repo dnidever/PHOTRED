@@ -866,11 +866,6 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
         xoff = 0.0 
         yoff = 0.0 
         combmch = mchbase+'_comb.mch' 
-        #  There was an error in combination 
-        if len(error) > 0: 
-            logger.info(error)
-            cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
-            return            
         combfile = mchbase+'_comb.fits' 
         combweightfile = mchbase+'_comb.mask.fits'
  
@@ -881,14 +876,10 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     logger.info('STEP 2: Getting PSF for Combined Image')
     logger.info('----------------------------------------') 
     logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))
-    combbase = os.path.basename(combfile,'.fits')
-    if fake:
+    combbase = os.path.splitext(os.path.basename(combfile))[0]
+    if fake==False:
         # Make .opt files, set saturation just below the mask data level
-        utils.mkopt(combfile,va=1,hilimit=maskdatalevel-1000,error=opterror)
-        if len(opterror) > 0: 
-            logger.info(opterror)
-            cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
-            return
+        io.mkopt(combfile,va=1,hilimit=maskdatalevel-1000)
         #MKOPT,combfile,satlevel=maskdatalevel-1000 
         # THIS IS NOW DONE IN ALLFRAME_COMBINE/ALLFRAME_COMBINE_ORIG.PRO ABOVE 
         # Using CMN.LST of reference frame if it exists 
@@ -904,7 +895,8 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     # FAKE, use existing comb.psf file 
     else: 
         logger.info('Using existing '+combbase+'.psf file and running ALLSTAR.')
-        out = subprocess.run('./allstar.sh '+combbase)
+        os.chmod('allstar.sh',0o755)
+        out = subprocess.run('./allstar.sh '+combbase,shell=True)
         logger.info(' ')
  
  

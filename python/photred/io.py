@@ -1145,6 +1145,9 @@ def mkopt(base=None,meta=None,VA=1,LO=7.0,TH=3.5,LS=0.2,HS=1.0,LR=-1.0,HR=1.0,
     optfile = base+".opt"
     alsoptfile = base+".als.opt"
 
+    if meta is None and (GA is None or RD is None or FW is None or HI is None):
+        meta = fits.getheader(base)
+
     # Get frame specific parameters from meta if necessary
     if GA is None: GA = meta['gain']
     if RD is None: RD = meta['rdnoise']

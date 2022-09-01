@@ -1875,7 +1875,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
     # Don't use common file 
     else: 
         # Make sure it doesn't exist otherwise it will be used
-        if os.path.exist(mchbase+'_comb.cmn.lst'): os.remove(mchbase+'_comb.cmn.lst')
+        if os.path.exists(mchbase+'_comb.cmn.lst'): os.remove(mchbase+'_comb.cmn.lst')
 
     return maskdatalevel,fileinfo
 
