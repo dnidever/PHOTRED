@@ -676,5 +676,5 @@ def mmm(sky_vector, highbad=None,debug=False,readnoise=None,
         print( '% MMM: Number of unrejected sky elements: '+str(nsky)+'    Number of iterations: '+str(niter)) 
         print( '% MMM: Mode, Sigma, Skew of sky vector:'+str(skymod)+','+str(sigma)+','+str(skew))
  
-    return skymod, sigma, skew
+    return skymod, sigma, skew, nsky
  

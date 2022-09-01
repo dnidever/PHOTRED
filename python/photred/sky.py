@@ -7,7 +7,7 @@ from . import utils
 
 
 def getsky(image,silent=False,circlerad=False,meanback=False,highbad=None,
-           histback=False,nan=False):
+           readnoise=None,integer=False,histback=False,nan=False):
     """
            Determine the sky level in an image 
      EXPLANATION: 
@@ -180,13 +180,11 @@ def getsky(image,silent=False,circlerad=False,meanback=False,highbad=None,
 
     skyvec = skyvec[0:jj] 
 
-    meanback = True
-         
     if meanback: 
         skymode, skysig, subs = utils.meanclip(skyvec)
         nsky = len(subs) 
     else:
-        MMM, skyvec, skymode, skysig, _EXTRA = _extra, nsky = nsky 
+        skymode,skysig,skynew,nsky = utils.mmm(skyvec,readnoise=readnoise,integer=integer,highbad=highbad)
              
     # Use histogram around median to get mode 
     if histback:
