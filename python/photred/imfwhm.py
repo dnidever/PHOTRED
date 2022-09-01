@@ -3,8 +3,9 @@
 import os
 import time
 import numpy as np
+from astropy.io import fits
 from dlnpyutils import utils as dln
-from . import io
+from . import utils,io,sky
  
 def get_subim(im,xind,yind,hwidth,sky=0.0):
      
@@ -140,10 +141,10 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             print('One file input and one image (=im) input.  Using the input image')
         nfiles = 1 
         files = 'Input Image' 
-        inpim = im0
+        inpim = im
         
     # Multiple files AND image input with =im 
-    if (nfiles > 1 and im0 is not None):
+    if (nfiles > 1 and im is not None):
         print('Multiple files AND one image (=im) input.  Using the multiple files')
         im = 0
      
@@ -215,12 +216,15 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 continue
              
             # Computing sky level and sigma
-            skymode,skysig1 = getsky(img,highbad=satlim*0.95,verbose=False)
+            skymode,skysig1 = sky.getsky(img,highbad=satlim*0.95,silent=True)
             if skysig1 < 0.0: 
                 skysig1 = dln.mad(img[gdpix])
             if skysig1 < 0.0: 
                 skysig1 = dln.mad(img) 
             maxim = np.max(img) 
+
+            import pdb; pdb.set_trace()
+
              
             #-- Compute background image -- 
              
@@ -230,10 +234,11 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             bdpix = (backgim_large > satlim*0.95) 
             if np.sum(bdpix) > 0: 
                 backgim_large[bdpix] = np.nan 
-            sm = np.minimum(np.minimum(400,(nx/2.0)),(ny/2.0))
+            sm = np.minimum(np.minimum(400,(nx//2)),(ny//2))
             #backgim_large = dln.smooth(backgim_large,[sm,sm],/edge_truncate,/nan,missing=skymode) 
-            backgim_large = dln.smooth(backgim_large,[sm,sm],missing=skymode) 
-             
+            backgim_large = dln.smooth(backgim_large,sm,fillvalue=skymode) 
+            backgim_large[~np.isfinite(backgim_large)] = skymode
+
             # Second pass, use clipping, and first estimate of background 
             backgim1 = img.copy()
             # Setting hi/low pixels to NaN, they won't be used for the smoothing 

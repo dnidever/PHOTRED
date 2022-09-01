@@ -122,11 +122,11 @@ def getsky(image,silent=False,circlerad=False,meanback=False,highbad=None,
             raise ValueError('ERROR - The CIRCLERAD keyword only applies to a 2-d square array')
  
     if checkbad: 
-        mask = np.ones(image.shape)
+        mask = np.ones(image.shape,bool)
         if highbad is not None:
-            mask = mask and (image < highbad) 
+            mask = mask & (image < highbad) 
         if nan: 
-            mask = mask and finite(image) 
+            mask = mask & np.isfinite(image) 
         if circlerad: 
             if circlerad == 1: 
                 rad = nrow/2 

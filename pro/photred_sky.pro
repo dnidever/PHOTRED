@@ -141,7 +141,7 @@ pro photred_sky,image,skymode,skysig, SILENT=silent, CIRCLERAD = circlerad, $
  skyvec = make_array(maxsky+500,type=size(image,/type))
  ;skyvec = make_array(maxsky+200,type=size(image,/type))
      nstep = (nrow/istep)
- 
+
     jj = 0
     index0 = istep*lindgen(nstep) 
     if nstep GT 1 then begin 
