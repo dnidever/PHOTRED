@@ -3,7 +3,8 @@
 import os
 import time
 import numpy as np
-
+from dlnpyutils import utils as dln
+from . import io
  
 def get_subim(im,xind,yind,hwidth,sky=0.0):
      
@@ -37,8 +38,6 @@ def get_subim(im,xind,yind,hwidth,sky=0.0):
      
     return subim 
      
-  
-#-------------------------------------------------------- 
  
 def get_fluxcenter(subim): 
      
@@ -54,7 +53,6 @@ def get_fluxcenter(subim):
      
     return xind,yinb
  
-#-------------------------------------------------------- 
  
 def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
            skymode=None,skysig=None,backgim=None,nsigdetect=8,
@@ -125,19 +123,19 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
     nfiles = 0
     inpim = None
     if im is not None:
-        im0 = im
+        inpim = im
     else:
-        im = None
+        inpim = None
     if head is not None:
         head0 = head
     else:
         head0 = None
     if inpfiles is not None:
         files = dln.loadinput(inpfiles)
-        count = len(files)
+        nfiles = len(files)
      
     # Using the input image
-    if im0 is not None and nfiles <= 1:
+    if im is not None and nfiles <= 1:
         if nfiles == 1: 
             print('One file input and one image (=im) input.  Using the input image')
         nfiles = 1 
@@ -154,17 +152,17 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
     allellip = np.zeros(nfiles,float)+np.inf
      
     # Detection threshoold
-    nsigdetect = np.maximimum(nsigdetect,0)
+    nsigdetect = np.maximum(nsigdetect,0)
       
     # Opening output file
     if outfile is not None:
         fout = open(outfile,'w')
-     
+
     # Looping through the files 
     for f in range(nfiles):         
         fwhm = 99.99 # bad until proven good 
         ellipticity = 99.99 
-         
+
         # Loading image from file
         if inpim is None:
             # Test that file exists
@@ -172,26 +170,25 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 if verbose:
                     print(files[f]+' NOT FOUND')
                     continue
-            im,head = io.readfile(files[f],exten=exten)
+            img,head = io.readfile(files[f],exten=exten)
              
         # Using input image 
         else:    
             files = 'Input Image' 
-            im = inpim
+            img = inpim.copy()
             if head0 is not None: # input header, otherwise make fake header 
                 head = head0 
             else:
                 head = fits.Header()
-                #mkhdr,head,im 
-             
+
         # We have an image 
-        if (im is not None):
+        if (img is not None):
             # Need float 
-            im = im.astype(float)             
+            img = img.astype(float)             
             # Image size
-            ny,nx = im.shape()
+            ny,nx = img.shape
             # Saturation limit 
-            satlim = np.max(im)  # starting point 
+            satlim = np.max(img)  # starting point 
             nsaturate = 0
             if head is not None:
                 saturate = head.get('SATURATE')
@@ -203,14 +200,14 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 print('satlim = %.1f' % satlim)
              
             # Set NAN/Inf pixels to above the saturation limit 
-            bdnan = (~np.isfinite(im))
-            if nps.um(bdnan) > 0: 
-                im[bdnan] = satlim+5000. 
+            bdnan = (~np.isfinite(img))
+            if np.sum(bdnan) > 0: 
+                img[bdnan] = satlim+5000. 
              
             # Not enough "good" pixels 
             # sometimes "bad" pixels are exactly 0.0 
-            gdpix, = np.where((im < satlim*0.90) & (im != 0.0))
-            if len(gdpix) < 2:
+            gdpix = ((img < satlim*0.90) & (img != 0.0))
+            if np.sum(gdpix) < 2:
                 if verbose:
                     print(files[f]+' NOT ENOUGH GOOD PIXELS')
                 fwhm = 99.99 
@@ -218,45 +215,48 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 continue
              
             # Computing sky level and sigma
-            skymode,skysig1 = getsky(im,highbad=satlim*0.95,verbose=False)
+            skymode,skysig1 = getsky(img,highbad=satlim*0.95,verbose=False)
             if skysig1 < 0.0: 
-                skysig1 = dln.mad(im[gdpix])
+                skysig1 = dln.mad(img[gdpix])
             if skysig1 < 0.0: 
-                skysig1 = dln.mad(im) 
-            maxim = np.max(im) 
+                skysig1 = dln.mad(img) 
+            maxim = np.max(img) 
              
             #-- Compute background image -- 
              
             # First pass, no clipping (except for saturated pixels) 
-            backgim_large = im 
+            backgim_large = img.copy()
             # Set saturated pixels to NaN so they won't be used in the smoothing 
             bdpix = (backgim_large > satlim*0.95) 
             if np.sum(bdpix) > 0: 
                 backgim_large[bdpix] = np.nan 
             sm = np.minimum(np.minimum(400,(nx/2.0)),(ny/2.0))
-            backgim_large = dln.smooth(backgim_large,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            #backgim_large = dln.smooth(backgim_large,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            backgim_large = dln.smooth(backgim_large,[sm,sm],missing=skymode) 
              
             # Second pass, use clipping, and first estimate of background 
-            backgim1 = im 
+            backgim1 = img.copy()
             # Setting hi/low pixels to NaN, they won't be used for the smoothing 
             #bd = where(abs(im-skymode) gt 2.0*skysig1,nbd) 
             bd1 = (np.abs(backgim1-backgim_large) > 3.0*skysig1)
-            if lnp.sum(bd1) > 0: 
+            if np.sum(bd1) > 0: 
                 backgim1[bd1] = np.nan
-            sm = np.minimum(np.minimum((400, (nx/2.0)),(ny/2.0))
-            backgim1 = dln.smooth(backgim1,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            sm = np.minimum(np.minimum(400, nx/2.0),ny/2.0)
+            #backgim1 = dln.smooth(backgim1,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            backgim1 = dln.smooth(backgim1,[sm,sm],missing=skymode) 
              
             # Third pass, use better estimate of background 
-            backgim2 = im 
+            backgim2 = img.copy()
             # Setting hi/low pixels to NaN, they won't be used for the smoothing 
             #bd = where(abs(im-skymode) gt 2.0*skysig1,nbd) 
             bd2 = (np.abs(backgim2-backgim1) > 3.0*skysig1) 
             if len(bd2) > 0: 
                 backgim2[bd2] = np.inf
-            sm = (400 < (nx/2.0) ) < (ny/2.0) 
-            backgim2 = dln.smooth(backgim2,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            sm = np.minimum(np.minimum(400,nx/2.0),ny/2.0)
+            #backgim2 = dln.smooth(backgim2,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+            backgim2 = dln.smooth(backgim2,[sm,sm],missing=skymode) 
              
-            backgim = backgim2 
+            backgim = backgim2.copy()
              
             # Setting left-over NaNs to the skymode 
             b = n(~np.isfinite(backgim)) 
@@ -264,18 +264,18 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 backgim[b] = skymode 
              
             # Creating background subtracted image 
-            im2 = im - backgim 
+            img2 = img - backgim 
              
             # Mask out bad pixels, set to background 
-            bpmask = (im2 >= (0.9*satlim)).astype(float)  # making bad pixel mask 
+            bpmask = (img2 >= (0.9*satlim)).astype(float)  # making bad pixel mask 
             bpmask_orig = bpmask 
-            satpix = (im2 >= 0.9*satlim) 
+            satpix = (img2 >= 0.9*satlim) 
             if np.sum(satpix) > 0 : 
-                im2[satpix] = backgim[satpix]
+                img2[satpix] = backgim[satpix]
              
             # Computing sky level and sigma AGAIN with 
             #  background subtracted image
-            skymode2,skysig = getsky(im2highbad=satlim*0.95,verbose=False)
+            skymode2,skysig = getsky(img2,highbad=satlim*0.95,verbose=False)
             if verbose:
                 print('skymode = %.2f skysig = %.2f' % (skymode,skysig))
              
@@ -284,7 +284,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             gy = np.zeros(5).reshape(-1,1) + np.arange(5).reshape(1,-1)
             gkernel = np.exp(-0.5*( (gx-2.0)**2.0 + (gy-2.0)**2.0 )/1.0**2.0 ) 
             gkernel = gkernel/np.sum(gkernel) 
-            smim = CONVOL(im2,gkernel) #,/center,/edge_truncate) 
+            smim = CONVOL(img2,gkernel) #,/center,/edge_truncate) 
              
             # Getting maxima points 
             diffx1 = smim-shift(smim,1,0) 
@@ -294,7 +294,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
              
             # Get the gain (electrons/ADU)
             gain = head.get('GAIN')
-            if gain is not None:
+            if gain is None:
                 # use scatter in background and Poisson statistic 
                 # to calculate gain empirically 
                 # Nadu = Ne/gain 
@@ -305,40 +305,44 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 # of course we should remove the RDNOISE in quadrature from the empirical scatter 
                 rdnoise = head.get('RDNOISE')  # normally in electrons
                 if rdnoise is not None:
-                    rdnoise_adu=0.0 
+                    rdnoise_adu = 0.0 
                 if nrdnoise > 0 and ngain > 0 : 
-                    rdnoise_adu=rdnoise/gain 
+                    rdnoise_adu = rdnoise/gain 
                 skyscatter = np.sqrt( skysig**2 - rdnoise_adu**2) 
                 gain = np.median(backgim)/skyscatter**2 
-            if gain < 0 : 
+            if gain < 0: 
                 gain = 1.0
             if verbose:
-                print('gain = %.2f' gain )
+                print('gain = %.2f' % gain)
              
             # Make the SIGMA map 
             #sigmap = sqrt(backgim>1) > skysig 
-            sigmap = np.maximum(np.sqrt(np.maximum(im/gain,1)), skysig)
+            sigmap = np.maximum(np.sqrt(np.maximum(img/gain,1)), skysig)
             sigmap = sigmap*(1.0-bpmask) + bpmask*65000. 
              
              
             # Getting the "stars" 
             # Must be a maximum, 8*sig above the background, but 1/2 the maximum (saturation) 
             niter = 0 
-            detection: 
-            if niter > 0 :# restore bpmask since we modify it below to specify these pixels as "done" 
-                bpmask=bpmask_orig 
-            diffth = 0.0#skysig  ; sigmap 
-            ind , = np.where((diffx1 > diffth) & (diffx2 > diffth) & (diffy1 > diffth) & (diffy2 > diffth) &
-                               (im2 > (nsig*sigmap)) & (im < 0.5*satlim))
-            # No "stars" found, try lower threshold 
-            if nind < 2 and niter < 5: 
-                nsig *= 0.7  # smaller drop 
-                if verbose:
-                    print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
+            detendflag = False
+            while (detendflag==False):
+                if niter > 0 :# restore bpmask since we modify it below to specify these pixels as "done" 
+                    bpmask = bpmask_orig.copy()
+                diffth = 0.0#skysig  ; sigmap 
+                ind, = np.where((diffx1 > diffth) & (diffx2 > diffth) & (diffy1 > diffth) & (diffy2 > diffth) &
+                                (im2 > (nsig*sigmap)) & (im < 0.5*satlim))
+                # No "stars" found, try lower threshold 
+                if nind < 2 and niter < 5: 
+                    nsig *= 0.7  # smaller drop 
+                    if verbose:
+                        print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
+                    detendflag = False
+                else:
+                    detendflag = True
                 niter += 1 
-                goto,detection 
+
             # No "stars" found, giving up 
-            if nind < 2 and niter >= 5:
+            if nind < 2:
                 if verbose:
                     print(files[f]+' NO STARS FOUND. GIVING UP!')
                 fwhm = 99.99 
@@ -346,7 +350,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 continue
             if verbose:
                 print(str(nind)+' initial peaks found')
-            ind2 = array_indices(im,ind) 
+            ind2 = array_indices(img,ind) 
             xind = reform(ind2[0,:]) 
             yind = reform(ind2[1,:]) 
              
@@ -361,15 +365,15 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             peaktab = Table(peaktab)
              
             # Loop through the peaks 
-            for i in np.arange(nind): 
+            for i in range(nind): 
                 # Checking neighboring pixels 
                 # Must >50% of central pixel 
-                cen = im2[yind[i],xind[i]] 
-                xlo = np.maximum((xind[i]-1),0)
-                xhi = np.minimum(xind[i]+1),nx)
-                ylo = np.maximum((yind[i]-1),0)
-                yhi = np.minimum((yind[i]+1),ny)
-                nbrim = im2[ylo:yhi,xlo:xhi] 
+                cen = img2[yind[i],xind[i]] 
+                xlo = np.maximum(xind[i]-1,0)
+                xhi = np.minimum(xind[i]+1,nx)
+                ylo = np.maximum(yind[i]-1,0)
+                yhi = np.minimum(yind[i]+1,ny)
+                nbrim = img2[ylo:yhi,xlo:xhi] 
                 lofrac = np.min(nbrim/cen) 
                 nbelow = np.sum((nbrim/np.max(nbrim) <= minfrac).astype(float))
                 #nbelowarr[i] = nbelow 
@@ -381,7 +385,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 nbadpix = np.sum(bpmask2) 
                  
                 # Smaller image 
-                subims = get_subim(im2,xind[i],yind[i],5) 
+                subims = get_subim(img2,xind[i],yind[i],5) 
                 maxsubims = np.max(subims) 
                  
                 maxnbrim = np.max(nbrim)   # maximum within +/-1 pixels 
@@ -394,7 +398,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 background = backgim[yind[i],xind[i]] 
                  
                 # Getting Large image 
-                subimL = get_subim(im2,xind[i],yind[i],offL,background) 
+                subimL = get_subim(img2,xind[i],yind[i],offL,background) 
                  
                 # Local background in image 
                 #backgarr[i] = median(subimL) 
@@ -406,8 +410,8 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 # Getting flux center 
                 xcen,ycen = get_fluxcenter(subimS)
                  
-                xcen2 = int(np.round(xcen-offS)  # wrt center 
-                ycen2 = int(np.round(ycen-offS)  # wrt center 
+                xcen2 = int(np.round(xcen-offS))  # wrt center 
+                ycen2 = int(np.round(ycen-offS))  # wrt center 
                  
                 # Getting flux-centered small image 
                 subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS) 
@@ -463,10 +467,10 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 peaktab['round'][i] = rnd
                  
                 # Making these pixels "bad pixels" so they won't be used again 
-                xlo = np.maximum((xind[i]+xcen2-offS),0)
-                xhi = np.minimum(((xind[i]+xcen2+offS),nx)
-                ylo = np.maximum((yind[i]+ycen2-offS),0)
-                yhi = np.minimum((yind[i]+ycen2+offS),ny)
+                xlo = np.maximum(xind[i]+xcen2-offS,0)
+                xhi = np.minimum(xind[i]+xcen2+offS,nx)
+                ylo = np.maximum(yind[i]+ycen2-offS,0)
+                yhi = np.minimum(yind[i]+ycen2+offS,ny)
                 bpmask[ylo:yhi,xlo:xhi] = 1.0 
          
         # Getting the good ones: 
@@ -496,11 +500,11 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
          
         # Fit Gaussians to the good sources 
         #------------------------------------
-        ny,nx = im.shape)
+        ny,nx = img.shape
         x = np.arange(nx) 
         y = np.arange(ny)
         gdt = [('x',float),('y',float),('pars',(float,7)),('chisq',float),('dof',int),('status',int),
-               ('fwhm',float),('elip',float),('round',float),('sharp'f,loat)]
+               ('fwhm',float),('elip',float),('round',float),('sharp',float)]
         gtab = np.zeros(ngd,dtype=np.dtype(gdt))
         gtab = Table(gtab)
         gtab['x'] = peaktab['xcen'][gd]
@@ -509,11 +513,11 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             peaktab1 = peaktab[gd[i]] 
             ix = gtab['x'][i]
             iy = gtab['y'][i]
-            xlo = np.maximum((int(np.round(ix)-10),0)
-            xhi = np.minimum((int(np.round(ix)+10),nx)
-            ylo = np.maximum((int(np.round(iy)-10),0)
-            yhi = np.minimum((int(np.round(iy)+10)ny)
-            subim = im2[ylo:yhi,xlo:xhi]  # use background subtracted image 
+            xlo = np.maximum(int(np.round(ix)-10),0)
+            xhi = np.minimum(int(np.round(ix)+10),nx)
+            ylo = np.maximum(int(np.round(iy)-10),0)
+            yhi = np.minimum(int(np.round(iy)+10),ny)
+            subim = img2[ylo:yhi,xlo:xhi]  # use background subtracted image 
             xarr = x[xlo:xhi] 
             yarr = y[ylo:yhi] 
              
@@ -527,10 +531,11 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             #parinfo[5].limits=[-1,1]+iy 
             parinfo[5].limits = [np.min(yarr),np.max(yarr)] 
             estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peak1['backg']), 0.5),
-                         np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']2.35, 0.5), ix, iy, 0.0] 
-            fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,
-                              parinfo=parinfo,status=status) 
+                         np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']/2.35, 0.5), ix, iy, 0.0] 
+            #fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,
+            #                  parinfo=parinfo,status=status) 
             gtab['status'][i] = status 
+            pars,cov = curve_fit()
             if status > 0: 
                 gtab['x'][i] = ix 
                 gtab['y'][i] = iy 
@@ -613,7 +618,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             gd = gd[okay] 
             ngd = nokay 
             gtab2 = gtab[okay] 
-         else:
+        else:
             ngd = 0 
         if verbpse:
             print(str(ngd)+' sources passed the Gaussian fitting cuts')
