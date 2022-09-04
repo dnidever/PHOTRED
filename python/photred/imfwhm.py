@@ -4,7 +4,11 @@ import os
 import time
 import numpy as np
 from astropy.io import fits
+from astropy.convolution import convolve
+from astropy.table import Table
 from dlnpyutils import utils as dln
+#import matplotlib.pyplot as plt
+from skimage import measure
 from . import utils,io,sky
  
 def get_subim(im,xind,yind,hwidth,sky=0.0):
@@ -16,7 +20,7 @@ def get_subim(im,xind,yind,hwidth,sky=0.0):
     ny,nx = im.shape
      
     # Initializing the subimage
-    subim = np.zeros(2*hwidth+1,2*hwidth+1,float) + sky
+    subim = np.zeros((2*hwidth+1,2*hwidth+1),float) + sky
      
     # Checking that we're getting any part of the image 
     # The center can be off the edge 
@@ -49,12 +53,303 @@ def get_fluxcenter(subim):
     # X value. Similar for Y
     ny,nx = subim.shape
     mask = (subim >= 0.0).astype(float)  # mask out negative pixels
-    xind = np.sum( np.sum(subim*mask,axis=2)*np.arange(nx) )/np.sum(subim*mask) 
-    yind = np.sum( np.sum(subim*mask,axis=1)*np.arange(ny) )/np.sum(subim*mask) 
+    xind = np.sum( np.sum(subim*mask,axis=1)*np.arange(nx) )/np.sum(subim*mask) 
+    yind = np.sum( np.sum(subim*mask,axis=0)*np.arange(ny) )/np.sum(subim*mask) 
      
-    return xind,yinb
- 
- 
+    return xind,yind
+
+def background(img,satlim=60000):
+    """ Generate background image."""
+
+    ny,nx = img.shape
+
+    # Not enough "good" pixels 
+    # sometimes "bad" pixels are exactly 0.0 
+    gdpix = ((img < satlim*0.90) & (img != 0.0))
+    
+    # Computing sky level and sigma
+    skymode,skysig = sky.getsky(img,highbad=satlim*0.95,silent=True)
+    if skysig < 0.0: 
+        skysig = dln.mad(img[gdpix])
+    if skysig < 0.0: 
+        skysig = dln.mad(img) 
+    
+    # First pass, no clipping (except for saturated pixels) 
+    backgim_large = img.copy()
+    # Set saturated pixels to NaN so they won't be used in the smoothing 
+    bdpix = (backgim_large > satlim*0.95) 
+    if np.sum(bdpix) > 0: 
+        backgim_large[bdpix] = np.nan 
+    sm = np.minimum(np.minimum(400,(nx//2)),(ny//2))
+    if sm % 2 == 0: sm += 1
+    #backgim_large = dln.smooth(backgim_large,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+    backgim_large = dln.smooth(backgim_large,sm,fillvalue=skymode) 
+    backgim_large[~np.isfinite(backgim_large)] = skymode
+            
+    # Second pass, use clipping, and first estimate of background 
+    backgim1 = img.copy()
+    # Setting hi/low pixels to NaN, they won't be used for the smoothing 
+    bd1 = (np.abs(backgim1-backgim_large) > 3.0*skysig)
+    if np.sum(bd1) > 0: 
+        backgim1[bd1] = np.nan
+    sm = np.minimum(np.minimum(400, nx//2),ny//2)
+    if sm % 2 == 0: sm += 1            
+    #backgim1 = dln.smooth(backgim1,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+    backgim1 = dln.smooth(backgim1,sm,fillvalue=skymode) 
+            
+    # Third pass, use better estimate of background 
+    backgim2 = img.copy()
+    # Setting hi/low pixels to NaN, they won't be used for the smoothing 
+    bd2 = (np.abs(backgim2-backgim1) > 3.0*skysig) 
+    if len(bd2) > 0: 
+        backgim2[bd2] = np.inf
+    sm = np.minimum(np.minimum(400,nx//2),ny//2)
+    if sm % 2 == 0: sm += 1            
+    #backgim2 = dln.smooth(backgim2,[sm,sm],/edge_truncate,/nan,missing=skymode) 
+    backgim2 = dln.smooth(backgim2,sm,fillvalue=skymode) 
+             
+    backgim = backgim2
+             
+    # Setting left-over NaNs to the skymode 
+    bd = (~np.isfinite(backgim))
+    if np.sum(bd)>0 : 
+        backgim[bd] = skymode
+
+    return backgim, skymode, skysig
+
+def detection(img,bpmask,sigmap,backgim=0,nsig=8,satlim=60000,verbose=False):
+    """ Detect sources in image and measure their properties."""
+
+    ny,nx = img.shape
+    
+    # Getting maxima points 
+    diffx1 = img-np.roll(img,1,axis=1)
+    diffx2 = img-np.roll(img,-1,axis=1)
+    diffy1 = img-np.roll(img,1,axis=0)
+    diffy2 = img-np.roll(img,-1,axis=0)
+
+    # Detect the peaks
+    # Must be a maximum, 8*sig above the background, but 1/2 the maximum (saturation) 
+    niter = 0 
+    detectflag = False
+    while (detectflag==False):
+        if niter > 0: # restore bpmask since we modify it below to specify these pixels as "done" 
+            bpmask = bpmask_orig.copy()
+        diffth = 0.0  # skysig  ; sigmap 
+        yind,xind = np.where((diffx1 > diffth) & (diffx2 > diffth) & (diffy1 > diffth) & (diffy2 > diffth) &
+                             (img > (nsig*sigmap)) & (img < 0.5*satlim))
+        nind = len(yind)
+        # No "stars" found, try lower threshold 
+        if nind < 2 and niter < 5: 
+            nsig *= 0.7  # smaller drop 
+            if verbose:
+                print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
+            detectflag = False
+        else:
+            detectflag = True
+        niter += 1 
+                
+    # No "stars" found, giving up 
+    if nind < 2:
+        return []
+    if verbose:
+        print(str(nind)+' initial peaks found')
+
+    offL = 50  # 1/2 width of large subimage 
+    offS = 10  # 1/2 width of small subimage 
+    minfrac = 0.5  # minimum fraction that neighbors need to be of the central pixel 
+             
+    # Creating peak structure
+    dt = [('backg',float),('flux',float),('fwhm',float),('xcen',float),('ycen',float),
+          ('round',float),('max',float),('elip',float),('nbelow',float)]
+    peaktab = np.zeros(nind,dtype=np.dtype(dt))
+    peaktab = Table(peaktab)
+             
+    # Loop through the peaks 
+    for i in range(nind): 
+        # Checking neighboring pixels 
+        # Must >50% of central pixel 
+        cen = img[yind[i],xind[i]] 
+        xlo = np.maximum(xind[i]-1,0)
+        xhi = np.minimum(xind[i]+1,nx)
+        ylo = np.maximum(yind[i]-1,0)
+        yhi = np.minimum(yind[i]+1,ny)
+        nbrim = img[ylo:yhi,xlo:xhi] 
+        lofrac = np.min(nbrim/cen) 
+        nbelow = np.sum((nbrim/np.max(nbrim) <= minfrac).astype(float))
+        #nbelowarr[i] = nbelow 
+        peaktab['nbelow'][i] = nbelow 
+        #cenvalarr[i] = cen 
+                
+        # Checking the bad pixel mask 
+        bpmask2 = get_subim(bpmask,xind[i],yind[i],offS) 
+        nbadpix = np.sum(bpmask2) 
+                 
+        # Smaller image 
+        subims = get_subim(img,xind[i],yind[i],5) 
+        maxsubims = np.max(subims) 
+                 
+        maxnbrim = np.max(nbrim)   # maximum within +/-1 pixels 
+                 
+        # Good so far 
+        #  -No saturated pixels 
+        #  -Not a cosmic ray 
+        #  -Must be the maximum within +/-5 pix 
+        #  -Not close to the edge 
+        background = backgim[yind[i],xind[i]] 
+                 
+        # Getting Large image 
+        subimL = get_subim(img,xind[i],yind[i],offL,background) 
+                 
+        # Local background in image 
+        #backgarr[i] = median(subimL) 
+        peaktab['backg'][i] = np.median(subimL) 
+                 
+        # Getting small image 
+        subimS = get_subim(subimL,offL,offL,offS) 
+                 
+        # Getting flux center 
+        xcen,ycen = get_fluxcenter(subimS)
+                 
+        xcen2 = int(np.round(xcen-offS))  # wrt center 
+        ycen2 = int(np.round(ycen-offS))  # wrt center 
+                 
+        # Getting flux-centered small image 
+        subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS) 
+        maxsubim = np.max(subim) 
+                 
+        # What is the flux and magnitude 
+        #fluxarr[i] = total(subimS-median(subimL)) 
+        peaktab['flux'][i] = np.sum(subimS-np.median(subimL)) 
+        #magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
+                 
+        # Getting the contours
+        #  if multiple contours, get the one closest to our measured centroid
+        contours = measure.find_contours(subim, maxsubim*0.5)
+        pdiff = np.zeros(len(contours),float)
+        for c in range(len(contours)):
+            cont = contours[c]
+            ymnpath = np.mean(cont[:,0])
+            xmnpath = np.mean(cont[:,1])
+            pdiff[c] = np.sqrt((xmnpath-xcen)**2+(ymnpath-ycen)**2)
+        pbestind = np.argmin(pdiff)
+        cont = contours[pbestind]
+        xpath = cont[:,1]
+        ypath = cont[:,0]
+        xmnpath = np.mean(xpath) 
+        ymnpath = np.mean(ypath)
+                
+        peaktab['xcen'][i] = xcen + (xind[i]-offS) 
+        peaktab['ycen'][i] = ycen + (yind[i]-offS) 
+                 
+        # Calculating the FWHM 
+        dist = np.sqrt((xpath-xmnpath)**2.0 + (ypath-ymnpath)**2.0) 
+        fwhm1 = 2.0 * np.mean(dist) 
+                 
+        # Measuring "ellipticity" 
+        # DLN 5/9/16, added 2x factor to make it close 
+        #  to "real" ellipticity (1-a/b) 
+        elip = 2*np.std(dist-fwhm1)/fwhm1 
+        peaktab['elip'][i] = elip 
+                 
+        # Putting it in the structure 
+        peaktab['fwhm'][i] = fwhm1 
+        peaktab['max'][i] = maxsubim 
+                 
+        # Computing the "round" factor 
+        # round = difference of the heights of the two 1D Gaussians 
+        #         ------------------------------------------------- 
+        #                 average of the two 1D Gaussians 
+        # 
+        # Where the 1D Gaussians are of the marginal sums, i.e. sum 
+        # along either the x or y dimensions 
+        # round~0 is good 
+        # round<0 object elongated in x-direction 
+        # round>0 object elongated in y-direction 
+        htx = np.max(np.sum(subim,axis=0)) 
+        hty = np.max(np.sum(subim,axis=1)) 
+        rnd = (hty-htx)/np.mean([htx,hty]) 
+                 
+        peaktab['round'][i] = rnd
+                 
+        # Making these pixels "bad pixels" so they won't be used again 
+        xlo = np.maximum(xind[i]+xcen2-offS,0)
+        xhi = np.minimum(xind[i]+xcen2+offS,nx)
+        ylo = np.maximum(yind[i]+ycen2-offS,0)
+        yhi = np.minimum(yind[i]+ycen2+offS,ny)
+        bpmask[ylo:yhi,xlo:xhi] = 1.0 
+
+    return peaktab
+
+
+def gausspeakfit(img,peaktab):
+    """ Fit Gaussians to sources in image."""
+
+    ny,nx = img.shape
+    x = np.arange(nx) 
+    y = np.arange(ny)
+    gdt = [('x',float),('y',float),('pars',(float,7)),('chisq',float),('dof',int),('status',int),
+           ('fwhm',float),('elip',float),('round',float),('sharp',float)]
+    gtab = np.zeros(ngd,dtype=np.dtype(gdt))
+    gtab = Table(gtab)
+    gtab['x'] = peaktab['xcen']
+    gtab['y'] = peaktab['ycen']
+    for i in range(ngd): 
+        peaktab1 = peaktab[i] 
+        ix = gtab['x'][i]
+        iy = gtab['y'][i]
+        xlo = np.maximum(int(np.round(ix)-10),0)
+        xhi = np.minimum(int(np.round(ix)+10),nx)
+        ylo = np.maximum(int(np.round(iy)-10),0)
+        yhi = np.minimum(int(np.round(iy)+10),ny)
+        subim = img2[ylo:yhi,xlo:xhi]  # use background subtracted image 
+        xarr = x[xlo:xhi] 
+        yarr = y[ylo:yhi] 
+             
+        parinfo = replicate({limited:[0,0],limits:[0,0],fixed:0},7) 
+        parinfo[1].limited=[1,1] 
+        parinfo[1].limits=[0,np.max(subim)*2]# only positive peaks 
+        parinfo[4].limited=[1,1]# constrain X and Y 
+        #parinfo[4].limits=[-1,1]+ix 
+        parinfo[4].limits = [np.min(xarr),np.max(xarr)] 
+        parinfo[5].limited=[1,1] 
+        #parinfo[5].limits=[-1,1]+iy 
+        parinfo[5].limits = [np.min(yarr),np.max(yarr)] 
+        estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peak1['backg']), 0.5),
+                     np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']/2.35, 0.5), ix, iy, 0.0] 
+        #fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,
+        #                  parinfo=parinfo,status=status) 
+        gtab['status'][i] = status 
+        pars,cov = curve_fit()
+        if status > 0: 
+            gtab['x'][i] = ix 
+            gtab['y'][i] = iy 
+            gtab['pars'][i] = pars 
+            gtab['perror'][i] = perror 
+            gtab['chisq'][i] = chisq 
+            gtab['dof'][i] = dof
+            gtab['fwhm'][i] = 0.5*(pars[2]+pars[3]) * 2# FWHM=average of half-widths (times 2) 
+            gtab['elip'][i] = (1-np.min(pars[2:4])/np.max(pars[2:4]))# 1-a/b 
+            htx = np.max(np.sum(fit-pars[0],axis=0)) 
+            hty = np.max(np.sum(fit-pars[0],axis=1)) 
+            rnd = (hty-htx)/np.mean([htx,hty])# see definition above 
+            gtab['round'][i] = rnd 
+            # This is a slightly different "sharp" since the normal 
+            #  Stetson one is height of delta function / height 
+            #  of symmetric Gaussian 
+            gtab['sharp'][i] = peaktab1['max'] / pars[1] 
+                 
+            # The 2D Gaussian parameters are: 
+            #   A(0)   Constant baseline level 
+            #   A(1)   Peak value 
+            #   A(2)   Peak half-width (x) -- gaussian sigma or half-width at half-max 
+            #   A(3)   Peak half-width (y) -- gaussian sigma or half-width at half-max 
+            #   A(4)   Peak centroid (x) 
+            #   A(5)   Peak centroid (y) 
+            #   A(6)   Rotation angle (radians) if TILT keyword set 
+
+    return gtab
+
 def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
            skymode=None,skysig=None,backgim=None,nsigdetect=8,
            verbose=True):
@@ -118,6 +413,8 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
  
     Translated to Python by D. Nidever, May 2022
     """ 
+
+    nsig = nsigdetect
     
     # Load the input 
     files = '' 
@@ -181,318 +478,123 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
                 head = head0 
             else:
                 head = fits.Header()
-
+        
+        # No image
+        if img is None:
+            print('No image')
+            continue
+                
         # We have an image 
-        if (img is not None):
-            # Need float 
-            img = img.astype(float)             
-            # Image size
-            ny,nx = img.shape
-            # Saturation limit 
-            satlim = np.max(img)  # starting point 
-            nsaturate = 0
-            if head is not None:
-                saturate = head.get('SATURATE')
-                if saturate is not None:
-                    satlim = saturate 
-            if nsaturate == 0: 
-                satlim = dln.limit(satlim,40000.,65000.)  # this is a realistic limit for now
+        img = img.astype(float)   # need float
+        # Image size
+        ny,nx = img.shape
+        # Saturation limit 
+        satlim = np.max(img)  # starting point 
+        nsaturate = 0
+        if head is not None:
+            saturate = head.get('SATURATE')
+            if saturate is not None:
+                satlim = saturate 
+        if nsaturate == 0: 
+            satlim = dln.limit(satlim,40000.,65000.)  # this is a realistic limit for now
+        if verbose:
+            print('satlim = %.1f' % satlim)
+             
+        # Set NAN/Inf pixels to above the saturation limit 
+        bdnan = (~np.isfinite(img))
+        if np.sum(bdnan) > 0: 
+            img[bdnan] = satlim+5000. 
+             
+        # Not enough "good" pixels 
+        # sometimes "bad" pixels are exactly 0.0 
+        gdpix = ((img < satlim*0.90) & (img != 0.0))
+        if np.sum(gdpix) < 2:
             if verbose:
-                print('satlim = %.1f' % satlim)
+                print(files[f]+' NOT ENOUGH GOOD PIXELS')
+            fwhm = 99.99 
+            ellipticity = 99.99
+            continue
+
+        # Compute background image and initial sky mode/sigma
+        backgim,skymode,skysig1 = background(img,satlim=satlim)
+
+        maxim = np.max(img) 
+ 
+        # Creating background subtracted image 
+        img2 = img - backgim 
+            
+        # Mask out bad pixels, set to background 
+        bpmask = (img2 >= (0.9*satlim)).astype(float)  # making bad pixel mask 
+        bpmask_orig = bpmask 
+        satpix = (img2 >= 0.9*satlim) 
+        if np.sum(satpix) > 0: 
+            img2[satpix] = backgim[satpix]
              
-            # Set NAN/Inf pixels to above the saturation limit 
-            bdnan = (~np.isfinite(img))
-            if np.sum(bdnan) > 0: 
-                img[bdnan] = satlim+5000. 
+        # Computing sky level and sigma AGAIN with 
+        #  background subtracted image
+        skymode2,skysig = sky.getsky(img2,highbad=satlim*0.95,silent=True)
+        if verbose:
+            print('skymode = %.2f skysig = %.2f' % (skymode,skysig))
              
-            # Not enough "good" pixels 
-            # sometimes "bad" pixels are exactly 0.0 
-            gdpix = ((img < satlim*0.90) & (img != 0.0))
-            if np.sum(gdpix) < 2:
+        # Gaussian smooth the image to allow detection of fainter sources
+        gx = np.arange(5).reshape(-1,1) + np.zeros(5).reshape(1,-1)
+        gy = np.zeros(5).reshape(-1,1) + np.arange(5).reshape(1,-1)
+        gkernel = np.exp(-0.5*( (gx-2.0)**2.0 + (gy-2.0)**2.0 )/1.0**2.0 ) 
+        gkernel = gkernel/np.sum(gkernel) 
+        smimg = convolve(img2,gkernel,boundary='extend')
+             
+        # Get the gain (electrons/ADU)
+        gain = head.get('GAIN')
+        if gain is None:
+            # use scatter in background and Poisson statistic 
+            # to calculate gain empirically 
+            # Nadu = Ne/gain 
+            # Poisson scatter in electrons = sqrt(Ne) = sqrt(Nadu*gain) 
+            # scatter (ADU) = scatter(e)/gain = sqrt(Nadu*gain)/gain = sqrt(Nadu/gain) 
+            # gain = Nadu / scatter(ADU)^2 
+                 
+            # of course we should remove the RDNOISE in quadrature from the empirical scatter 
+            rdnoise = head.get('RDNOISE')  # normally in electrons
+            if rdnoise is not None:
+                rdnoise_adu = 0.0 
+            if rdnoise is not None and ngain > 0 : 
+                rdnoise_adu = rdnoise/gain 
+            skyscatter = np.sqrt( skysig**2 - rdnoise_adu**2) 
+            gain = np.median(backgim)/skyscatter**2 
+        if gain < 0: 
+            gain = 1.0
+        if verbose:
+            print('gain = %.2f' % gain)
+             
+        # Make the SIGMA map 
+        sigmap = np.maximum(np.sqrt(np.maximum(img/gain,1)), skysig)
+        sigmap = sigmap*(1.0-bpmask) + bpmask*65000. 
+
+        # Detection
+        niter = 0
+        detectflag = False
+        while (detectflag==False):
+            peaktab = detection(smimg,bpmask,sigmap,backgim,nsig=nsig,satlim=satlim)
+
+            # Getting the good ones: 
+            #  -If they were bad then FWHM=0 
+            #  -Making sure they are "round" stars 
+            #  -Ellipticity is low 
+            gd, = np.where((peaktab['fwhm'] > 0.0) & (np.abs(peaktab['round']) < 1.0) & (peaktab['flux'] > 0))
+            # If no stars fit this criteria then make it more conservative
+            if len(gd)==0:
+                gd, = np.where((peaktab['fwhm'] > 0.0) & (np.abs(peaktab['round']) < 1.0))
+        
+            # Retry with lower detection limit 
+            if len(gd) < 50 and niter < 5 and nsig > 2: 
+                nsig *= 0.7  # smaller drop
                 if verbose:
-                    print(files[f]+' NOT ENOUGH GOOD PIXELS')
-                fwhm = 99.99 
-                ellipticity = 99.99
-                continue
-             
-            # Computing sky level and sigma
-            skymode,skysig1 = sky.getsky(img,highbad=satlim*0.95,silent=True)
-            if skysig1 < 0.0: 
-                skysig1 = dln.mad(img[gdpix])
-            if skysig1 < 0.0: 
-                skysig1 = dln.mad(img) 
-            maxim = np.max(img) 
+                    print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
+                niter += 1
 
-            import pdb; pdb.set_trace()
-
-             
-            #-- Compute background image -- 
-             
-            # First pass, no clipping (except for saturated pixels) 
-            backgim_large = img.copy()
-            # Set saturated pixels to NaN so they won't be used in the smoothing 
-            bdpix = (backgim_large > satlim*0.95) 
-            if np.sum(bdpix) > 0: 
-                backgim_large[bdpix] = np.nan 
-            sm = np.minimum(np.minimum(400,(nx//2)),(ny//2))
-            #backgim_large = dln.smooth(backgim_large,[sm,sm],/edge_truncate,/nan,missing=skymode) 
-            backgim_large = dln.smooth(backgim_large,sm,fillvalue=skymode) 
-            backgim_large[~np.isfinite(backgim_large)] = skymode
-
-            # Second pass, use clipping, and first estimate of background 
-            backgim1 = img.copy()
-            # Setting hi/low pixels to NaN, they won't be used for the smoothing 
-            #bd = where(abs(im-skymode) gt 2.0*skysig1,nbd) 
-            bd1 = (np.abs(backgim1-backgim_large) > 3.0*skysig1)
-            if np.sum(bd1) > 0: 
-                backgim1[bd1] = np.nan
-            sm = np.minimum(np.minimum(400, nx/2.0),ny/2.0)
-            #backgim1 = dln.smooth(backgim1,[sm,sm],/edge_truncate,/nan,missing=skymode) 
-            backgim1 = dln.smooth(backgim1,[sm,sm],missing=skymode) 
-             
-            # Third pass, use better estimate of background 
-            backgim2 = img.copy()
-            # Setting hi/low pixels to NaN, they won't be used for the smoothing 
-            #bd = where(abs(im-skymode) gt 2.0*skysig1,nbd) 
-            bd2 = (np.abs(backgim2-backgim1) > 3.0*skysig1) 
-            if len(bd2) > 0: 
-                backgim2[bd2] = np.inf
-            sm = np.minimum(np.minimum(400,nx/2.0),ny/2.0)
-            #backgim2 = dln.smooth(backgim2,[sm,sm],/edge_truncate,/nan,missing=skymode) 
-            backgim2 = dln.smooth(backgim2,[sm,sm],missing=skymode) 
-             
-            backgim = backgim2.copy()
-             
-            # Setting left-over NaNs to the skymode 
-            b = n(~np.isfinite(backgim)) 
-            if np.sum(b)>0 : 
-                backgim[b] = skymode 
-             
-            # Creating background subtracted image 
-            img2 = img - backgim 
-             
-            # Mask out bad pixels, set to background 
-            bpmask = (img2 >= (0.9*satlim)).astype(float)  # making bad pixel mask 
-            bpmask_orig = bpmask 
-            satpix = (img2 >= 0.9*satlim) 
-            if np.sum(satpix) > 0 : 
-                img2[satpix] = backgim[satpix]
-             
-            # Computing sky level and sigma AGAIN with 
-            #  background subtracted image
-            skymode2,skysig = getsky(img2,highbad=satlim*0.95,verbose=False)
-            if verbose:
-                print('skymode = %.2f skysig = %.2f' % (skymode,skysig))
-             
-            # Gaussian smooth the image to allow detection of fainter sources
-            gx = np.arange(5).reshape(-1,1) + np.zeros(5).reshape(1,-1)
-            gy = np.zeros(5).reshape(-1,1) + np.arange(5).reshape(1,-1)
-            gkernel = np.exp(-0.5*( (gx-2.0)**2.0 + (gy-2.0)**2.0 )/1.0**2.0 ) 
-            gkernel = gkernel/np.sum(gkernel) 
-            smim = CONVOL(img2,gkernel) #,/center,/edge_truncate) 
-             
-            # Getting maxima points 
-            diffx1 = smim-shift(smim,1,0) 
-            diffx2 = smim-shift(smim,-1,0) 
-            diffy1 = smim-shift(smim,0,1) 
-            diffy2 = smim-shift(smim,0,-1) 
-             
-            # Get the gain (electrons/ADU)
-            gain = head.get('GAIN')
-            if gain is None:
-                # use scatter in background and Poisson statistic 
-                # to calculate gain empirically 
-                # Nadu = Ne/gain 
-                # Poisson scatter in electrons = sqrt(Ne) = sqrt(Nadu*gain) 
-                # scatter (ADU) = scatter(e)/gain = sqrt(Nadu*gain)/gain = sqrt(Nadu/gain) 
-                # gain = Nadu / scatter(ADU)^2 
-                 
-                # of course we should remove the RDNOISE in quadrature from the empirical scatter 
-                rdnoise = head.get('RDNOISE')  # normally in electrons
-                if rdnoise is not None:
-                    rdnoise_adu = 0.0 
-                if nrdnoise > 0 and ngain > 0 : 
-                    rdnoise_adu = rdnoise/gain 
-                skyscatter = np.sqrt( skysig**2 - rdnoise_adu**2) 
-                gain = np.median(backgim)/skyscatter**2 
-            if gain < 0: 
-                gain = 1.0
-            if verbose:
-                print('gain = %.2f' % gain)
-             
-            # Make the SIGMA map 
-            #sigmap = sqrt(backgim>1) > skysig 
-            sigmap = np.maximum(np.sqrt(np.maximum(img/gain,1)), skysig)
-            sigmap = sigmap*(1.0-bpmask) + bpmask*65000. 
-             
-             
-            # Getting the "stars" 
-            # Must be a maximum, 8*sig above the background, but 1/2 the maximum (saturation) 
-            niter = 0 
-            detendflag = False
-            while (detendflag==False):
-                if niter > 0 :# restore bpmask since we modify it below to specify these pixels as "done" 
-                    bpmask = bpmask_orig.copy()
-                diffth = 0.0#skysig  ; sigmap 
-                ind, = np.where((diffx1 > diffth) & (diffx2 > diffth) & (diffy1 > diffth) & (diffy2 > diffth) &
-                                (im2 > (nsig*sigmap)) & (im < 0.5*satlim))
-                # No "stars" found, try lower threshold 
-                if nind < 2 and niter < 5: 
-                    nsig *= 0.7  # smaller drop 
-                    if verbose:
-                        print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
-                    detendflag = False
-                else:
-                    detendflag = True
-                niter += 1 
-
-            # No "stars" found, giving up 
-            if nind < 2:
-                if verbose:
-                    print(files[f]+' NO STARS FOUND. GIVING UP!')
-                fwhm = 99.99 
-                ellipticity = 99.99 
-                continue
-            if verbose:
-                print(str(nind)+' initial peaks found')
-            ind2 = array_indices(img,ind) 
-            xind = reform(ind2[0,:]) 
-            yind = reform(ind2[1,:]) 
-             
-            offL = 50  # 1/2 width of large subimage 
-            offs = 10  # 1/2 width of small subimage 
-            minfrac = 0.5  # minimum fraction that neighbors need to be of the central pixel 
-             
-            # Creating peak structure
-            dt = [('backg',float),('flux',float),('fwhm',float),('xcen',float),('ycen',float),
-                  ('round',float),('max',float),('elip',float),('nbelow',float)]
-            peaktab = np.zeros(nind,dtype=np.dtype(dt))
-            peaktab = Table(peaktab)
-             
-            # Loop through the peaks 
-            for i in range(nind): 
-                # Checking neighboring pixels 
-                # Must >50% of central pixel 
-                cen = img2[yind[i],xind[i]] 
-                xlo = np.maximum(xind[i]-1,0)
-                xhi = np.minimum(xind[i]+1,nx)
-                ylo = np.maximum(yind[i]-1,0)
-                yhi = np.minimum(yind[i]+1,ny)
-                nbrim = img2[ylo:yhi,xlo:xhi] 
-                lofrac = np.min(nbrim/cen) 
-                nbelow = np.sum((nbrim/np.max(nbrim) <= minfrac).astype(float))
-                #nbelowarr[i] = nbelow 
-                peaktab['nbelow'][i] = nbelow 
-                #cenvalarr[i] = cen 
-                 
-                # Checking the bad pixel mask 
-                bpmask2 = get_subim(bpmask,xind[i],yind[i],offs) 
-                nbadpix = np.sum(bpmask2) 
-                 
-                # Smaller image 
-                subims = get_subim(img2,xind[i],yind[i],5) 
-                maxsubims = np.max(subims) 
-                 
-                maxnbrim = np.max(nbrim)   # maximum within +/-1 pixels 
-                 
-                # Good so far 
-                #  -No saturated pixels 
-                #  -Not a cosmic ray 
-                #  -Must be the maximum within +/-5 pix 
-                #  -Not close to the edge 
-                background = backgim[yind[i],xind[i]] 
-                 
-                # Getting Large image 
-                subimL = get_subim(img2,xind[i],yind[i],offL,background) 
-                 
-                # Local background in image 
-                #backgarr[i] = median(subimL) 
-                peaktab['backg'][i] = np.median(subimL) 
-                 
-                # Getting small image 
-                subimS = get_subim(subimL,offL,offL,offS) 
-                 
-                # Getting flux center 
-                xcen,ycen = get_fluxcenter(subimS)
-                 
-                xcen2 = int(np.round(xcen-offS))  # wrt center 
-                ycen2 = int(np.round(ycen-offS))  # wrt center 
-                 
-                # Getting flux-centered small image 
-                subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS) 
-                maxsubim = np.max(subim) 
-                 
-                # What is the flux and magnitude 
-                #fluxarr[i] = total(subimS-median(subimL)) 
-                peaktab['flux'][i] = np.sum(subimS-np.median(subimL)) 
-                #magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
-                 
-                # Getting the contours 
-                CONTOUR(subim,levels=[maxsubim*0.5],path_xy=pathxy) #,/path_data_coords 
-                 
-                # Getting the path 
-                xpath = reform(pathxy[0,:]) 
-                ypath = reform(pathxy[1,:]) 
-                xmnpath = np.mean(xpath) 
-                ymnpath = np.mean(ypath) 
-                 
-                #peakstr[i].xcen = xcen+xlo  ; THIS WAS WRONG!! 
-                #peakstr[i].ycen = ycen+ylo 
-                peaktab['xcen'][i] = xcen + (xind[i]-offS) 
-                peaktab['ycen'][i] = ycen + (yind[i]-offS) 
-                 
-                # Calculating the FWHM 
-                dist = np.sqrt((xpath-xmnpath)**2.0 + (ypath-ymnpath)**2.0) 
-                fwhm1 = 2.0 * np.mean(dist) 
-                 
-                # Measuring "ellipticity" 
-                # DLN 5/9/16, added 2x factor to make it close 
-                #  to "real" ellipticity (1-a/b) 
-                elip = 2*np.std(dist-fwhm1)/fwhm1 
-                peaktab['elip'][i] = elip 
-                 
-                # Putting it in the structure 
-                peaktab['fwhm'][i] = fwhm1 
-                peaktab['max'][i] = maxsubim 
-                 
-                # Computing the "round" factor 
-                # round = difference of the heights of the two 1D Gaussians 
-                #         ------------------------------------------------- 
-                #                 average of the two 1D Gaussians 
-                # 
-                # Where the 1D Gaussians are of the marginal sums, i.e. sum 
-                # along either the x or y dimensions 
-                # round~0 is good 
-                # round<0 object elongated in x-direction 
-                # round>0 object elongated in y-direction 
-                htx = np.max(np.sum(subim,axis=0)) 
-                hty = np.max(np.sum(subim,axis=1)) 
-                rnd = (hty-htx)/np.mean([htx,hty]) 
-                 
-                peaktab['round'][i] = rnd
-                 
-                # Making these pixels "bad pixels" so they won't be used again 
-                xlo = np.maximum(xind[i]+xcen2-offS,0)
-                xhi = np.minimum(xind[i]+xcen2+offS,nx)
-                ylo = np.maximum(yind[i]+ycen2-offS,0)
-                yhi = np.minimum(yind[i]+ycen2+offS,ny)
-                bpmask[ylo:yhi,xlo:xhi] = 1.0 
-         
-        # Getting the good ones: 
-        #  -If they were bad then FWHM=0 
-        #  -Making sure they are "round" stars 
-        #  -Ellipticity is low 
-        if len(gd) == 0: 
-            gd, = np.where((peaktab['fwhm'] > 0.0) & (np.abs(peaktab['round']) < 1.0))
-         
-        # Retry with lower detection limit 
-        #if ngd lt 10 and niter lt 5 and nsig gt 2 then begin 
-        if len(gd) < 50 and niter < 5 and nsig > 2: 
-            nsig *= 0.7  # smaller drop
-            if verbose:
-                print('No good sources detected.  Lowering detection limts to '+str(nsig)+' sigma')
-            niter += 1
-            goto,detection 
+            # Stop loop
+            if len(gd)>50 or niter>=5: detectflag=True
+                
          
         if len(gd) == 0:
             if verbose:
@@ -501,77 +603,11 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             ellipticity = 99.99 
             continue 
         if verbose:
-            print(str(ngd)+' final good peaks')
+            print(str(len(gd))+' final good peaks')
          
         # Fit Gaussians to the good sources 
         #------------------------------------
-        ny,nx = img.shape
-        x = np.arange(nx) 
-        y = np.arange(ny)
-        gdt = [('x',float),('y',float),('pars',(float,7)),('chisq',float),('dof',int),('status',int),
-               ('fwhm',float),('elip',float),('round',float),('sharp',float)]
-        gtab = np.zeros(ngd,dtype=np.dtype(gdt))
-        gtab = Table(gtab)
-        gtab['x'] = peaktab['xcen'][gd]
-        gtab['y'] = peaktab['ycen'][gd]
-        for i in range(ngd): 
-            peaktab1 = peaktab[gd[i]] 
-            ix = gtab['x'][i]
-            iy = gtab['y'][i]
-            xlo = np.maximum(int(np.round(ix)-10),0)
-            xhi = np.minimum(int(np.round(ix)+10),nx)
-            ylo = np.maximum(int(np.round(iy)-10),0)
-            yhi = np.minimum(int(np.round(iy)+10),ny)
-            subim = img2[ylo:yhi,xlo:xhi]  # use background subtracted image 
-            xarr = x[xlo:xhi] 
-            yarr = y[ylo:yhi] 
-             
-            parinfo = replicate({limited:[0,0],limits:[0,0],fixed:0},7) 
-            parinfo[1].limited=[1,1] 
-            parinfo[1].limits=[0,np.max(subim)*2]# only positive peaks 
-            parinfo[4].limited=[1,1]# constrain X and Y 
-            #parinfo[4].limits=[-1,1]+ix 
-            parinfo[4].limits = [np.min(xarr),np.max(xarr)] 
-            parinfo[5].limited=[1,1] 
-            #parinfo[5].limits=[-1,1]+iy 
-            parinfo[5].limits = [np.min(yarr),np.max(yarr)] 
-            estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peak1['backg']), 0.5),
-                         np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']/2.35, 0.5), ix, iy, 0.0] 
-            #fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,
-            #                  parinfo=parinfo,status=status) 
-            gtab['status'][i] = status 
-            pars,cov = curve_fit()
-            if status > 0: 
-                gtab['x'][i] = ix 
-                gtab['y'][i] = iy 
-                gtab['pars'][i] = pars 
-                gtab['perror'][i] = perror 
-                gtab['chisq'][i] = chisq 
-                gtab['dof'][i] = dof
-                gtab['fwhm'][i] = 0.5*(pars[2]+pars[3]) * 2# FWHM=average of half-widths (times 2) 
-                gtab['elip'][i] = (1-np.min(pars[2:4])/np.max(pars[2:4]))# 1-a/b 
-                htx = np.max(np.sum(fit-pars[0],axis=0)) 
-                hty = np.max(np.sum(fit-pars[0],axis=1)) 
-                rnd = (hty-htx)/np.mean([htx,hty])# see definition above 
-                gtab['round'][i] = rnd 
-                # This is a slightly different "sharp" since the normal 
-                #  Stetson one is height of delta function / height 
-                #  of symmetric Gaussian 
-                gtab['sharp'][i] = peaktab1['max'] / pars[1] 
-                 
-                # The 2D Gaussian parameters are: 
-                #   A(0)   Constant baseline level 
-                #   A(1)   Peak value 
-                #   A(2)   Peak half-width (x) -- gaussian sigma or half-width at half-max 
-                #   A(3)   Peak half-width (y) -- gaussian sigma or half-width at half-max 
-                #   A(4)   Peak centroid (x) 
-                #   A(5)   Peak centroid (y) 
-                #   A(6)   Rotation angle (radians) if TILT keyword set 
-                 
-                #display,subim,position=[0,0,0.5,1.0] 
-                #display,fit,position=[0.5,0,1.0,1.0],/noerase 
-                #wait,0.5 
-             
+        gtab = gausspeakfit(img,peaktab[gd]):
          
         # Some Gaussian fits converged 
         gdgtab, = np.where(gstr['status'] > 0) 
