@@ -8,6 +8,7 @@ from astropy.convolution import convolve
 from astropy.table import Table
 from dlnpyutils import utils as dln
 #import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 from skimage import measure
 from . import utils,io,sky
  
@@ -91,7 +92,7 @@ def background(img,satlim=60000):
     # Setting hi/low pixels to NaN, they won't be used for the smoothing 
     bd1 = (np.abs(backgim1-backgim_large) > 3.0*skysig)
     if np.sum(bd1) > 0: 
-        backgim1[bd1] = np.nan
+        backgim1[bd1] = skymode
     sm = np.minimum(np.minimum(400, nx//2),ny//2)
     if sm % 2 == 0: sm += 1            
     #backgim1 = dln.smooth(backgim1,[sm,sm],/edge_truncate,/nan,missing=skymode) 
@@ -102,7 +103,7 @@ def background(img,satlim=60000):
     # Setting hi/low pixels to NaN, they won't be used for the smoothing 
     bd2 = (np.abs(backgim2-backgim1) > 3.0*skysig) 
     if len(bd2) > 0: 
-        backgim2[bd2] = np.inf
+        backgim2[bd2] = skymode
     sm = np.minimum(np.minimum(400,nx//2),ny//2)
     if sm % 2 == 0: sm += 1            
     #backgim2 = dln.smooth(backgim2,[sm,sm],/edge_truncate,/nan,missing=skymode) 
@@ -164,7 +165,8 @@ def detection(img,bpmask,sigmap,backgim=0,nsig=8,satlim=60000,verbose=False):
           ('round',float),('max',float),('elip',float),('nbelow',float)]
     peaktab = np.zeros(nind,dtype=np.dtype(dt))
     peaktab = Table(peaktab)
-             
+    peaktab['flux'] = -1
+    
     # Loop through the peaks 
     for i in range(nind): 
         # Checking neighboring pixels 
@@ -177,9 +179,7 @@ def detection(img,bpmask,sigmap,backgim=0,nsig=8,satlim=60000,verbose=False):
         nbrim = img[ylo:yhi,xlo:xhi] 
         lofrac = np.min(nbrim/cen) 
         nbelow = np.sum((nbrim/np.max(nbrim) <= minfrac).astype(float))
-        #nbelowarr[i] = nbelow 
         peaktab['nbelow'][i] = nbelow 
-        #cenvalarr[i] = cen 
                 
         # Checking the bad pixel mask 
         bpmask2 = get_subim(bpmask,xind[i],yind[i],offS) 
@@ -195,106 +195,150 @@ def detection(img,bpmask,sigmap,backgim=0,nsig=8,satlim=60000,verbose=False):
         #  -No saturated pixels 
         #  -Not a cosmic ray 
         #  -Must be the maximum within +/-5 pix 
-        #  -Not close to the edge 
-        background = backgim[yind[i],xind[i]] 
-                 
-        # Getting Large image 
-        subimL = get_subim(img,xind[i],yind[i],offL,background) 
-                 
-        # Local background in image 
-        #backgarr[i] = median(subimL) 
-        peaktab['backg'][i] = np.median(subimL) 
-                 
-        # Getting small image 
-        subimS = get_subim(subimL,offL,offL,offS) 
-                 
-        # Getting flux center 
-        xcen,ycen = get_fluxcenter(subimS)
-                 
-        xcen2 = int(np.round(xcen-offS))  # wrt center 
-        ycen2 = int(np.round(ycen-offS))  # wrt center 
-                 
-        # Getting flux-centered small image 
-        subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS) 
-        maxsubim = np.max(subim) 
-                 
-        # What is the flux and magnitude 
-        #fluxarr[i] = total(subimS-median(subimL)) 
-        peaktab['flux'][i] = np.sum(subimS-np.median(subimL)) 
-        #magarr[i] = 25.0-2.5*alog10(fluxarr[i] > 1) 
-                 
-        # Getting the contours
-        #  if multiple contours, get the one closest to our measured centroid
-        contours = measure.find_contours(subim, maxsubim*0.5)
-        pdiff = np.zeros(len(contours),float)
-        for c in range(len(contours)):
-            cont = contours[c]
-            ymnpath = np.mean(cont[:,0])
-            xmnpath = np.mean(cont[:,1])
-            pdiff[c] = np.sqrt((xmnpath-xcen)**2+(ymnpath-ycen)**2)
-        pbestind = np.argmin(pdiff)
-        cont = contours[pbestind]
-        xpath = cont[:,1]
-        ypath = cont[:,0]
-        xmnpath = np.mean(xpath) 
-        ymnpath = np.mean(ypath)
-                
-        peaktab['xcen'][i] = xcen + (xind[i]-offS) 
-        peaktab['ycen'][i] = ycen + (yind[i]-offS) 
-                 
-        # Calculating the FWHM 
-        dist = np.sqrt((xpath-xmnpath)**2.0 + (ypath-ymnpath)**2.0) 
-        fwhm1 = 2.0 * np.mean(dist) 
-                 
-        # Measuring "ellipticity" 
-        # DLN 5/9/16, added 2x factor to make it close 
-        #  to "real" ellipticity (1-a/b) 
-        elip = 2*np.std(dist-fwhm1)/fwhm1 
-        peaktab['elip'][i] = elip 
-                 
-        # Putting it in the structure 
-        peaktab['fwhm'][i] = fwhm1 
-        peaktab['max'][i] = maxsubim 
-                 
-        # Computing the "round" factor 
-        # round = difference of the heights of the two 1D Gaussians 
-        #         ------------------------------------------------- 
-        #                 average of the two 1D Gaussians 
-        # 
-        # Where the 1D Gaussians are of the marginal sums, i.e. sum 
-        # along either the x or y dimensions 
-        # round~0 is good 
-        # round<0 object elongated in x-direction 
-        # round>0 object elongated in y-direction 
-        htx = np.max(np.sum(subim,axis=0)) 
-        hty = np.max(np.sum(subim,axis=1)) 
-        rnd = (hty-htx)/np.mean([htx,hty]) 
-                 
-        peaktab['round'][i] = rnd
-                 
-        # Making these pixels "bad pixels" so they won't be used again 
-        xlo = np.maximum(xind[i]+xcen2-offS,0)
-        xhi = np.minimum(xind[i]+xcen2+offS,nx)
-        ylo = np.maximum(yind[i]+ycen2-offS,0)
-        yhi = np.minimum(yind[i]+ycen2+offS,ny)
-        bpmask[ylo:yhi,xlo:xhi] = 1.0 
+        #  -Not close to the edge
+        if (nbadpix == 0) and (nbelow < 7) and (maxnbrim >= maxsubims) and \
+           (xind[i] > offS) and (xind[i] < (nx-offS-1)) and (yind[i] > offS) and \
+           (yind[i] < (ny-offS-1)):
 
+            background = backgim[yind[i],xind[i]] 
+                 
+            # Getting Large image 
+            subimL = get_subim(img,xind[i],yind[i],offL,background) 
+                 
+            # Local background in image 
+            peaktab['backg'][i] = np.median(subimL) 
+            
+            # Getting small image 
+            subimS = get_subim(subimL,offL,offL,offS) 
+                 
+            # Getting flux center 
+            xcen,ycen = get_fluxcenter(subimS)
+                 
+            xcen2 = int(np.round(xcen-offS))  # wrt center 
+            ycen2 = int(np.round(ycen-offS))  # wrt center 
+                 
+            # Getting flux-centered small image 
+            subim = get_subim(subimL,offL+xcen2,offL+ycen2,offS) 
+            maxsubim = np.max(subim) 
+                 
+            # What is the flux and magnitude 
+            peaktab['flux'][i] = np.sum(subimS-np.median(subimL)) 
+                 
+            # Getting the contours
+            #  if multiple contours, get the one closest to our measured centroid
+            contours = measure.find_contours(subim, maxsubim*0.5)
+            pdiff = np.zeros(len(contours),float)
+            for c in range(len(contours)):
+                cont = contours[c]
+                ymnpath = np.mean(cont[:,0])
+                xmnpath = np.mean(cont[:,1])
+                pdiff[c] = np.sqrt((xmnpath-xcen)**2+(ymnpath-ycen)**2)
+            pbestind = np.argmin(pdiff)
+            cont = contours[pbestind]
+            xpath = cont[:,1]
+            ypath = cont[:,0]
+            xmnpath = np.mean(xpath) 
+            ymnpath = np.mean(ypath)
+                
+            peaktab['xcen'][i] = xcen + (xind[i]-offS) 
+            peaktab['ycen'][i] = ycen + (yind[i]-offS) 
+                 
+            # Calculating the FWHM 
+            dist = np.sqrt((xpath-xmnpath)**2.0 + (ypath-ymnpath)**2.0) 
+            fwhm1 = 2.0 * np.mean(dist) 
+                 
+            # Measuring "ellipticity" 
+            # DLN 5/9/16, added 2x factor to make it close 
+            #  to "real" ellipticity (1-a/b) 
+            elip = 2*np.std(dist-fwhm1)/fwhm1 
+            peaktab['elip'][i] = elip 
+                 
+            # Putting it in the structure 
+            peaktab['fwhm'][i] = fwhm1 
+            peaktab['max'][i] = maxsubim 
+                 
+            # Computing the "round" factor 
+            # round = difference of the heights of the two 1D Gaussians 
+            #         ------------------------------------------------- 
+            #                 average of the two 1D Gaussians 
+            # 
+            # Where the 1D Gaussians are of the marginal sums, i.e. sum 
+            # along either the x or y dimensions 
+            # round~0 is good 
+            # round<0 object elongated in x-direction 
+            # round>0 object elongated in y-direction 
+            htx = np.max(np.sum(subim,axis=0)) 
+            hty = np.max(np.sum(subim,axis=1)) 
+            rnd = (hty-htx)/np.mean([htx,hty]) 
+                 
+            peaktab['round'][i] = rnd
+            
+            # Making these pixels "bad pixels" so they won't be used again 
+            xlo = np.maximum(xind[i]+xcen2-offS,0)
+            xhi = np.minimum(xind[i]+xcen2+offS,nx)
+            ylo = np.maximum(yind[i]+ycen2-offS,0)
+            yhi = np.minimum(yind[i]+ycen2+offS,ny)
+            bpmask[ylo:yhi,xlo:xhi] = 1.0 
+
+    # Keep only the "good" ones
+    gdtab, = np.where(peaktab['flux'] > 0)
+    if len(gdtab)>0:
+        peaktab = peaktab[gdtab]
+    else:
+        peaktab = []
+        
     return peaktab
 
 
-def gausspeakfit(img,peaktab):
-    """ Fit Gaussians to sources in image."""
+def gauss2d(xdata,*par):
+    return peak_gauss(xdata[0],xdata[1],par)
+
+#   The returned parameter array elements have the following meanings:
+#      A[0]   Constant baseline level
+#      A[1]   Peak value
+#      A[2]   Peak half-width (x) -- gaussian sigma
+#      A[3]   Peak half-width (y) -- gaussian sigma
+#      A[4]   Peak centroid (x)
+#      A[5]   Peak centroid (y)
+#      A[6]   Rotation angle (radians) if TILT keyword set
+
+def peak_gauss(x, y, p):
+    # Gaussian Function    
+    smax = 26
+    u = peak_u(x, y, p)
+    mask = u < (smax**2)  # Prevents floating underflow
+    return p[0] + p[1] * mask * np.exp(-0.5 * u * mask)
+
+def peak_u(x, y, p):
+    # Compute the "u" value = (x/a)^2 + (y/b)^2 with optional rotation    
+    widx = np.maximum(np.abs(p[2]), 1e-20)
+    widy = np.maximum(np.abs(p[3]), 1e-20)
+    xp = x-p[4]
+    yp = y-p[5]
+    if len(p)>=7:
+        theta = p[6]
+    else:
+        theta = 0
+    if theta != 0:
+        c = np.cos(theta)
+        s = np.sin(theta)
+        return ( (xp * (c/widx) - yp * (s/widx))**2 + (xp * (s/widy) + yp * (c/widy))**2 )
+    else:
+        return (xp/widx)**2 + (yp/widy)**2
+
+def gausspeakfit(img,sigmap,peaktab):
+    """ Fit 2D Gaussians to sources in image."""
 
     ny,nx = img.shape
     x = np.arange(nx) 
     y = np.arange(ny)
-    gdt = [('x',float),('y',float),('pars',(float,7)),('chisq',float),('dof',int),('status',int),
+    gdt = [('x',float),('y',float),('pars',(float,7)),('perror',(float,7)),('chisq',float),('dof',int),('status',int),
            ('fwhm',float),('elip',float),('round',float),('sharp',float)]
-    gtab = np.zeros(ngd,dtype=np.dtype(gdt))
+    gtab = np.zeros(len(peaktab),dtype=np.dtype(gdt))
     gtab = Table(gtab)
     gtab['x'] = peaktab['xcen']
     gtab['y'] = peaktab['ycen']
-    for i in range(ngd): 
+    for i in range(len(peaktab)): 
         peaktab1 = peaktab[i] 
         ix = gtab['x'][i]
         iy = gtab['y'][i]
@@ -302,43 +346,70 @@ def gausspeakfit(img,peaktab):
         xhi = np.minimum(int(np.round(ix)+10),nx)
         ylo = np.maximum(int(np.round(iy)-10),0)
         yhi = np.minimum(int(np.round(iy)+10),ny)
-        subim = img2[ylo:yhi,xlo:xhi]  # use background subtracted image 
+        subim = img[ylo:yhi,xlo:xhi]  # use background subtracted image
+        subsig = sigmap[ylo:yhi,xlo:xhi]
         xarr = x[xlo:xhi] 
-        yarr = y[ylo:yhi] 
+        yarr = y[ylo:yhi]
+        xv, yv = np.meshgrid(xarr, yarr)
              
-        parinfo = replicate({limited:[0,0],limits:[0,0],fixed:0},7) 
-        parinfo[1].limited=[1,1] 
-        parinfo[1].limits=[0,np.max(subim)*2]# only positive peaks 
-        parinfo[4].limited=[1,1]# constrain X and Y 
-        #parinfo[4].limits=[-1,1]+ix 
-        parinfo[4].limits = [np.min(xarr),np.max(xarr)] 
-        parinfo[5].limited=[1,1] 
-        #parinfo[5].limits=[-1,1]+iy 
-        parinfo[5].limits = [np.min(yarr),np.max(yarr)] 
-        estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peak1['backg']), 0.5),
-                     np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']/2.35, 0.5), ix, iy, 0.0] 
+        #parinfo = replicate({limited:[0,0],limits:[0,0],fixed:0},7) 
+        #parinfo[1].limited=[1,1] 
+        #parinfo[1].limits=[0,np.max(subim)*2]# only positive peaks 
+        #parinfo[4].limited=[1,1]# constrain X and Y 
+        #parinfo[4].limits = [np.min(xarr),np.max(xarr)] 
+        #parinfo[5].limited=[1,1] 
+        #parinfo[5].limits = [np.min(yarr),np.max(yarr)] 
+        #estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peak1['backg']), 0.5),
+        #             np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm/']/2.35, 0.5), ix, iy, 0.0] 
         #fit = MPFIT2DPEAK(subim,pars,xarr,yarr,estimates=estimates,chisq=chisq,dof=dof,perror=perror,/gaussian,
         #                  parinfo=parinfo,status=status) 
-        gtab['status'][i] = status 
-        pars,cov = curve_fit()
-        if status > 0: 
+        #gtab['status'][i] = status
+        # constant, peak, sigma X, sigma Y, mean X, mean Y, orientation angle
+        lbounds = np.zeros(7,float)
+        ubounds = np.zeros(7,float)
+        lbounds[0] = -np.inf
+        ubounds[0] = np.inf
+        lbounds[1] = 0.0           # only positive peaks
+        ubounds[1] = np.max(subim)*2
+        ubounds[2] = np.max(xarr)-np.min(xarr)
+        ubounds[3] = np.max(yarr)-np.min(yarr)
+        lbounds[4] = np.min(xarr)  # constrain X
+        ubounds[4] = np.max(xarr)
+        lbounds[5] = np.min(yarr)  # constrain Y
+        ubounds[5] = np.max(yarr)
+        lbounds[6] = 0
+        ubounds[6] = 2*np.pi
+        bounds = [lbounds,ubounds]
+        estimates = [peaktab1['backg'], np.maximum((peaktab1['max']-peaktab1['backg']), 0.5),
+                     np.maximum(peaktab1['fwhm']/2.35, 0.5), np.maximum(peaktab1['fwhm']/2.35, 0.5), ix, iy, 0.0] 
+        xdata = [xv.ravel(),yv.ravel()]
+        try:
+            pars,cov = curve_fit(gauss2d,xdata,subim.ravel(),sigma=subsig.ravel(),p0=estimates,
+                                 bounds=bounds,absolute_sigma=True)
+            perror = np.sqrt(np.diag(cov))
+            bestfit = gauss2d(xdata,*pars)
+            bestfit2d = bestfit.reshape(subim.shape)
+            chisq = np.sum((subim.ravel()-bestfit)**2/subsig.ravel()**2)
+            dof = subim.size-len(pars)
+
+            gtab['status'][i] = 1
             gtab['x'][i] = ix 
             gtab['y'][i] = iy 
             gtab['pars'][i] = pars 
             gtab['perror'][i] = perror 
             gtab['chisq'][i] = chisq 
             gtab['dof'][i] = dof
-            gtab['fwhm'][i] = 0.5*(pars[2]+pars[3]) * 2# FWHM=average of half-widths (times 2) 
-            gtab['elip'][i] = (1-np.min(pars[2:4])/np.max(pars[2:4]))# 1-a/b 
-            htx = np.max(np.sum(fit-pars[0],axis=0)) 
-            hty = np.max(np.sum(fit-pars[0],axis=1)) 
-            rnd = (hty-htx)/np.mean([htx,hty])# see definition above 
+            gtab['fwhm'][i] = 0.5*(pars[2]+pars[3]) * 2                # FWHM=average of half-widths (times 2) 
+            gtab['elip'][i] = (1-np.min(pars[2:4])/np.max(pars[2:4]))  # 1-a/b
+            htx = np.max(np.sum(bestfit2d-pars[0],axis=1)) 
+            hty = np.max(np.sum(bestfit2d-pars[0],axis=0)) 
+            rnd = (hty-htx)/np.mean([htx,hty])                         # see definition above 
             gtab['round'][i] = rnd 
             # This is a slightly different "sharp" since the normal 
             #  Stetson one is height of delta function / height 
             #  of symmetric Gaussian 
             gtab['sharp'][i] = peaktab1['max'] / pars[1] 
-                 
+            
             # The 2D Gaussian parameters are: 
             #   A(0)   Constant baseline level 
             #   A(1)   Peak value 
@@ -347,6 +418,9 @@ def gausspeakfit(img,peaktab):
             #   A(4)   Peak centroid (x) 
             #   A(5)   Peak centroid (y) 
             #   A(6)   Rotation angle (radians) if TILT keyword set 
+            
+        except:
+            gtab['status'][i] = 0
 
     return gtab
 
@@ -604,16 +678,16 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             continue 
         if verbose:
             print(str(len(gd))+' final good peaks')
-         
+            
         # Fit Gaussians to the good sources 
         #------------------------------------
-        gtab = gausspeakfit(img,peaktab[gd]):
-         
+        gtab = gausspeakfit(img,sigmap,peaktab[gd])
+    
         # Some Gaussian fits converged 
-        gdgtab, = np.where(gstr['status'] > 0) 
+        gdgtab, = np.where(gtab['status'] > 0) 
         if len(gdgtab) > 0: 
-            gtab0 = gtab 
-            gtab = gtab[gdgtab]# only keep the good ones 
+            gtab0 = gtab.copy()
+            gtab = gtab[gdgtab]   # only keep the good ones 
         else:    # none converged
             if verbose:
                 print('No Gaussian fits converged')
@@ -641,51 +715,38 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
         sigchisq = dln.mad(gtab['chisq']) 
         #  Positive amplitude,  Low Chisq, and Half-widths within "normal" values 
         okay, = np.where((gtab['pars'][:,1] > 0.0) & (gtab['chisq'] < medchisq+3*sigchisq) &
-                           (np.abs(gtab['pars'][:,2]-medpar2) < 3*sigpar2) &
-                           (np.abs(gtab['pars'][:,3]-medpar3) < 3*sigpar3))
+                         (np.abs(gtab['pars'][:,2]-medpar2) < 3*sigpar2) &
+                         (np.abs(gtab['pars'][:,3]-medpar3) < 3*sigpar3))
         # No stars passed, increase threshold, 4 sigma 
-        if len(okay) == 0 : 
+        if len(okay) == 0: 
             okay, = np.where((gtab['pars'][:,1] > 0.0) & (gtab['chisq'] < medchisq+4*sigchisq) &
                              (np.abs(gtab['pars'][:,2]-medpar2) < 4*sigpar2) &
                              (np.abs(gtab['pars'][:,3]-medpar3) < 4*sigpar3))
         # No stars passed, increase threshold, 5 sigma 
-        if len(okay) == 0 : 
+        if len(okay) == 0: 
             okay, = np.where((gtab['pars'][:,1] > 0.0) & (gtab['chisq'] < medchisq+5*sigchisq) &
                              (np.abs(gtab['pars'][:,2]-medpar2) < 5*sigpar2) &
                              (np.abs(gtab['pars'][:,3]-medpar3) < 5*sigpar3))
          
-        if nokay > 0: 
-            gd_orig = gd 
+        if len(okay) > 0: 
+            gd_orig = gd.copy() 
             gd = gd[okay] 
-            ngd = nokay 
+            ngd = len(okay)
             gtab2 = gtab[okay] 
         else:
             ngd = 0 
-        if verbpse:
+        if verbose:
             print(str(ngd)+' sources passed the Gaussian fitting cuts')
              
         # There are some good stars 
-        if len(gd) >= 2: 
-                 
-            # Maybe randomly sample ~50 peaks and fit them 
-            # with a Gaussian 
-                 
-            # Use the 2D fit values instead! 
-            #fwhmarr2 = fwhmarr[gd] 
-                 
-            # ; Use sigma-clipped mean to get good indices 
-            # meanclip,fwhmarr2,mean,sigma,subs=subs,clipsig=3 
-            # 
-            # ; Use the median 
-            # fwhm = median(fwhmarr2(subs)) 
-                 
+        if len(gd) >= 2:                  
             # Use MEDIAN 
             medfwhm = np.median(gtab2['fwhm']) 
             medellip = np.median(gtab2['elip']) 
                  
-            # Use RESISTANT_MEAN 
-            RESISTANT_MEAN(gtab2['fwhm'],3.0,resfwhm,fwhm_sigma)
-            RESISTANT_MEAN(gtab2['elip'],3.0,resellip,ellip_sigma)
+            # Use RESISTANT_MEAN
+            resfwhm = dln.sigclipmean(gtab2['fwhm'])
+            resellip = dln.sigclipmean(gtab2['elip'])
                  
             # Weighted mean (by flux) 
             #wt = fluxarr[gd]>0.0001 
@@ -694,9 +755,9 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             wtellip = np.sum(wt*gtab2['elip'])/np.sum(wt) 
                  
             # Weighted mean with outlier rejection 
-            sig = 1.0/np.sqrt(wt) 
-            ROBUST_MEAN(gtab2['fwhm'],robfwhm,robfwhmsigma,sig=sig)
-            ROBUST_MEAN(gtab2['elip'],robellip,robellipsigma,sig=sig)
+            sig = 1.0/np.sqrt(wt)
+            robfwhm,robfwhmsigma = dln.wtmean(gtab2['fwhm'],sig,error=True)
+            robellip,robellipsigma = dln.wtmean(gtab2['elip'],sig,error=True)
                  
             # The four methods don't agree 
             # Use flux-weighted mean with outlier rejection. 
@@ -743,7 +804,7 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
     if len(ellipticity) == 1: 
         ellipticity = ellipticity[0] 
     # Output GTAB 
-    if len(gtab2) > 0 : 
+    if len(gtab2) > 0: 
         gtab = gtab2 
  
     return fwhm, ellipticity, gtab, peaktab
