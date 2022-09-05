@@ -783,18 +783,19 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
             maxlen = np.max(np.array([len(f) for f in files]))
             if maxlen > 15:
                 form = '%'+str(maxlen)+'s%10.3f%10.3f\n'
-            f.write(form % (files(f),fwhm,ellipticity))
+            print(form % (files[f],fwhm,ellipticity))
              
-            # Input into IMFWHMARR 
-            allfwhm[f] = fwhm 
-            allellip[f] = ellipticity 
+        # Input into IMFWHMARR 
+        allfwhm[f] = fwhm 
+        allellip[f] = ellipticity 
              
-            if len(outfile) > 0 : 
-                printf,unit,format=form,files[f],fwhm,ellipticity 
+        if outfile is not None:
+            form = '%15s%10.3f%10.3f\n'            
+            fout.write(form % (files[f],fwhm,ellipticity))
      
     # Closing output file
     if outfile is not None:
-        f.close()
+        fout.close()
      
     # Copy ALLFWHM to FWHM 
     fwhm = allfwhm 
