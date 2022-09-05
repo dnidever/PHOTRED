@@ -444,23 +444,24 @@ def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
 
     Returns
     -------
+    If "outfile" is set then the FWHM values are written to this file. 
     fwhm : float
        The median fwhm of stars in the image.  If multiple 
          images are processed then this will be an array. 
-    If "outfile" is set then the FWHM values are written to this file. 
-    ellipticity  The ellipticity (1-a/b). 
+    ellipticity: float
+       The ellipticity (1-a/b). 
     gtab : table
        The table of Gaussian fits to the sources used 
          to measure FWHM and ELLIPTICITY.  This only works 
          if there's only ONE input file. 
     peaktab : table
-       The structure of detected peaks and quick shape 
-               measurements. 
+       The table of detected peaks and quick shape 
+         measurements. 
 
     Example
     -------
 
-    fwhm,gtab = imfwhm('test.fits')
+    fwhm,elip,gtab,ptab = imfwhm('test.fits')
     test.fits     4.973 
  
     PROCEDURES USED: 
