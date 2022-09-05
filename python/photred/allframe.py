@@ -16,7 +16,7 @@ from astropy.io import fits,ascii
 from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning
 from dlnpyutils import utils as dln
-from . import utils,io,iraf,combine as comb
+from . import utils,io,iraf,combine as comb,mkopt
 
 # Filtering warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -879,7 +879,7 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     combbase = os.path.splitext(os.path.basename(combfile))[0]
     if fake==False:
         # Make .opt files, set saturation just below the mask data level
-        io.mkopt(combfile,va=1,hilimit=maskdatalevel-1000)
+        mkopt.mkopt(combfile,va=1,hilimit=maskdatalevel-1000)
         #MKOPT,combfile,satlevel=maskdatalevel-1000 
         # THIS IS NOW DONE IN ALLFRAME_COMBINE/ALLFRAME_COMBINE_ORIG.PRO ABOVE 
         # Using CMN.LST of reference frame if it exists 
