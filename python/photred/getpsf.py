@@ -3,9 +3,11 @@
 import os
 import time
 import numpy as np
-from dlnpyutils import utils as dln
 import subprocess 
 import tempfile
+import shutil
+from astropy.table import Table
+from dlnpyutils import utils as dln
 from . import io
 
 def mksexconfig(filename,configfile=None,catfile=None,flagfile=None,
@@ -46,7 +48,7 @@ def mksexconfig(filename,configfile=None,catfile=None,flagfile=None,
     Translated to python by D. Nidever  Sep 2022
     """
 
-    base = os.path.basename(filename,'.fits') 
+    base,_ = os.path.splitext(os.path.basename(filename))
      
     # Make sure file exists 
     if os.path.exists(filename) == 0: 
@@ -62,7 +64,7 @@ def mksexconfig(filename,configfile=None,catfile=None,flagfile=None,
     fwhm = opt['FW']
 
     # Get pixel scale 
-    scale = getpixscale(filename)
+    scale = io.getpixscale(filename)
     if scale is None or scale>90:
         scale = 0.5 
 
@@ -80,46 +82,46 @@ def mksexconfig(filename,configfile=None,catfile=None,flagfile=None,
     sexlines = dln.readlines(configfile)
     sexlines2 = np.char.array(sexlines).copy()
     # CATALOG_NAME 
-    g, = np.where(sexlines2.find('**CATALOG_NAME') > -1) 
-    sexlines2[g[0]] = 'CATALOG_NAME    '+catfile+'# name of the output catalog' 
+    g, = np.where(sexlines2.find('CATALOG_NAME') > -1) 
+    sexlines2[g[0]] = 'CATALOG_NAME    '+catfile+'  # name of the output catalog' 
     # SATUR_LEVEL 
-    g, = np.where(sexlines2.find('**SATUR_LEVEL') > -1)
-    sexlines2[g[0]] = 'SATUR_LEVEL     '+satlevel+'# level (in ADUs) at which arises saturation' 
+    g, = np.where(sexlines2.find('SATUR_LEVEL') > -1)
+    sexlines2[g[0]] = 'SATUR_LEVEL     '+str(satlevel)+'  # level (in ADUs) at which arises saturation' 
     # GAIN 
-    g, = np.where(sexlines2.find('**GAIN') > -1)
-    sexlines2[g[0]] = 'GAIN            '+gain+'# detector gain in e-/ADU.' 
+    g, = np.where(sexlines2.find('GAIN') > -1)
+    sexlines2[g[0]] = 'GAIN            '+str(gain)+'  # detector gain in e-/ADU.' 
     # PIXEL_SCALE 
-    g, = np.where(sexlines2.find('**PIXEL_SCALE') > -1)
-    sexlines2[g[0]] = 'PIXEL_SCALE     '+str(scale,2)+'# size of pixel in arcsec (0=use FITS WCS info).' 
+    g, = np.where(sexlines2.find('PIXEL_SCALE') > -1)
+    sexlines2[g[0]] = 'PIXEL_SCALE     '+str(scale)+'  # size of pixel in arcsec (0=use FITS WCS info).' 
     # SEEING_FWHM 
-    g, = np.where(sexlines2.find('**SEEING_FWHM') > -1)
+    g, = np.where(sexlines2.find('SEEING_FWHM') > -1)
     fwhmas = float(fwhm)*float(scale) 
-    sexlines2[g[0]] = 'SEEING_FWHM     '+str(fwhmas,2)+'# stellar FWHM in arcsec' 
+    sexlines2[g[0]] = 'SEEING_FWHM     '+str(fwhmas)+'  # stellar FWHM in arcsec' 
     # DETECT_MINAREA 
-    g, = np.where(sexlines2.find('**DETECT_MINAREA') > -1)
-    sexlines2[g[0]] = 'DETECT_MINAREA     4# minimum number of pixels above threshold' 
+    g, = np.where(sexlines2.find('DETECT_MINAREA') > -1)
+    sexlines2[g[0]] = 'DETECT_MINAREA     4  # minimum number of pixels above threshold' 
     # Catalog type 
-    if len(cattype) != 0: 
-        g, = np.where(sexlines2.find('**CATALOG_TYPE') > -1)
-        if ng > 0: 
+    if cattype is not None:
+        g, = np.where(sexlines2.find('CATALOG_TYPE') > -1)
+        if len(g) > 0: 
             sexlines2[g[0]] = 'CATALOG_TYPE    '+cattype 
         else: 
-            sexlines2 += ['CATALOG_TYPE    '+cattype]
+            sexlines2 = np.append(sexlines2,'CATALOG_TYPE    '+cattype)
     # Parameters file 
-    if paramfile is None:
-        g, = np.where(sexlines2.find('**PARAMETERS_NAME') > -1)
-        if ng > 0: 
+    if paramfile is not None:
+        g, = np.where(sexlines2.find('PARAMETERS_NAME') > -1)
+        if len(g) > 0: 
             sexlines2[g[0]] = 'PARAMETERS_NAME  '+paramfile 
         else: 
-            sexlines2 += ['PARAMETERS_NAME  '+paramfile]
+            sexlines2 = np.append(sexlines2,'PARAMETERS_NAME  '+paramfile)
     # FLAG/MASK file 
-    if flagfile is None:
-        sexlines2 += ['FLAG_IMAGE  '+flagfile]
-        sexlines2 += ['FLAG_TYPE   OR']
+    if flagfile is not None:
+        sexlines2 = np.append(sexlines2,'FLAG_IMAGE  '+flagfile)
+        sexlines2 = np.append(sexlines2,'FLAG_TYPE   OR')
     # WEIGHT file 
-    if wtfile is None:
-        sexlines2 += ['WEIGHT_IMAGE  '+wtfile]
-        sexlines2 += ['WEIGHT_TYPE   MAP_WEIGHT']
+    if wtfile is not None:
+        sexlines2 = np.append(sexlines2,'WEIGHT_IMAGE  '+wtfile)
+        sexlines2 = np.append(sexlines2,'WEIGHT_TYPE   MAP_WEIGHT')
     # Write the file 
     dln.writelines(configfile,sexlines2)
 
@@ -162,7 +164,7 @@ def sex2daophot(catfile,fitsfile,daofile):
     if file_isfits(catfile) == 0: 
         #  fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR'] 
         fields = ['NUMBER','X_IMAGE','Y_IMAGE','MAG_APER','MAGERR_APER','FLAGS','CLASS_STAR'] 
-        sex = Table.read(catfile,fieldnames=fields,/noprint) 
+        sex = Table.read(catfile,fieldnames=fields) 
     else: 
         sex = Table.read(catfile,1) 
         if n_tags(sex) == 1 : 
@@ -202,7 +204,7 @@ def sex2daophot(catfile,fitsfile,daofile):
     dao['MAG'] = sex.mag_aper 
     dao['ERR'] = sex.magerr_aper 
     if 'background' in sex.columns:
-        dao['SKY'] = =sex['background']
+        dao['SKY'] = sex['background']
     else: 
         dao['SKY'] = 0.0 
     dao['ITER'] = 1 
@@ -265,28 +267,29 @@ def getpsf(base,fake=False,logger=None):
     #SPAWN,['sex',base+'.fits','-c',base+'.sex'],out,errout,/noshell 
     out = subprocess.run(['sex',base+'.fits','-c',base+'.sex'],shell=False)
     hd = io.readfile(base+'.cat',exten=1,header=True) 
-    nsources = sxpar(hd,'NAXIS',1) 
+    nsources = hd.get('NAXIS2')
     if nsources < 1: 
-        error = 'Only '+str(nsources,2)+' sources. Need at least 1 to create a PSF' 
-        printlog,logfile,error 
+        logger.info('Only '+str(nsources)+' sources. Need at least 1 to create a PSF')
         return 
+
+    import pdb; pdb.set_trace()
      
     # Apply cuts to get good stars 
-    sex = Table.read(base+'.cat') 
-    if n_tags(sex) == 1: 
-        sex = Table.read(catfile,2) 
+    sex = Table.read(base+'.cat',1)
+    if len(sex.colnames) == 1:
+        sex = Table.read(base+'.cat',2) 
     nsex = len(sex) 
-    si = np.argsort(sex.fwhm_image) 
-    fwhm80 = sex[si[floor(nsex*0.80)]]['fwhm_image']
-    bad = ((sex['imaflags_iso'] > 0) | (sex['class_star'] < 0.5) | (sex['ellipticity'] > 0.8) | 
-           (sex['fwhm_image'] > fwhm80) | ( ((sex['flags'] and 8) == 8) | ((sex['flags'] and 16) == 16) | 
-                                            (1.087/sex['magerr_aper'] <= 10)))
+    si = np.argsort(sex['FWHM_IMAGE']) 
+    fwhm80 = np.percecntile(sex['FWHM_IMAGE'],80)
+    bad = ((sex['IMAFLAGS_ISO'] > 0) | (sex['CLASS_STAR'] < 0.5) | (sex['ELLIPTICITY'] > 0.8) | 
+           (sex['FWHM_IMAGE'] > fwhm80) | ( ((sex['FLAGS'] and 8) == 8) | ((sex['FLAGS'] and 16) == 16) | 
+                                            (1.087/sex['MAGERR_APER'] <= 10)))
     nbad = np.sum(bad)
     ngood = np.sum(~bad)
     # Not enough stars, remove class_star cut and raise S/N cut 
     if ngood < 50: 
-        bad = ((sex['imaflags_iso'] > 0) | (sex['ellipticity'] > 0.8) | (sex['fwhm_image'] > fwhm80) |
-               ((sex['flags'] and 8) == 8) | ((sex.flags and 16) == 16) | (1.087/sex['magerr_aper'] <= 7))
+        bad = ((sex['IMAFLAGS_ISO'] > 0) | (sex['ELLIPTICITY'] > 0.8) | (sex['FWHM_IMAGE'] > fwhm80) |
+               ((sex['FLAGS'] and 8) == 8) | ((sex['FLAGS'] and 16) == 16) | (1.087/sex['MAGERR_APER'] <= 7))
     nbad = np.sum(bad)
     ngood = np.sum(~bad)
     # No sources left 
@@ -325,24 +328,24 @@ def getpsf(base,fake=False,logger=None):
         dln.writelines(base+'.opt',newoptlines)
      
     # Sometimes the filenames get too long for DAOPHOT 
-    # use temporary files and symlinks 
-    tbase = (os.path.basename(MKTEMP('cmb',/nodot)))[0]# create base, leave so other processes won't take it 
+    # use temporary files and symlinks
+    tid,tbasefile = tempfile.mkstemp(prefix='cmb')
+    #tbase = (os.path.basename(MKTEMP('cmb',/nodot)))[0]# create base, leave so other processes won't take it 
     tfits = tbase+'.fits'
-    os.remove(tfits,/allow)
+    if os.path.exists(tfits): os.remove(tfits)
     file_link,base+'.fits',tfits 
     topt = tbase+'.opt'
-    os.remove(topt,/allow)
-    file_link,base+'.opt',topt 
+    if os.path.exists(topt): os.remove(topt)
+    os.symlink(base+'.opt',topt)
     taopt = tbase+'.als.opt'
-    os.remove(taopt,/allow)
-    file_link,base+'.als.opt',taopt 
+    if os.path.exists(taopt): os.remove(taopt)
+    os.symlink(base+'.als.opt',taopt)
     tcoo = tbase+'.coo'
-    os.remove(tcoo,/allow)
-    file_link,base+'.coo',tcoo 
-     
+    if os.path.exists(tcoo): os.remove(tcoo)
+    os.symlink(base+'.coo',tcoo)
      
     # Get the PSF of the combined image 
-    out = subprocess.run('getpsfnofind.sh',tbase],shell=False)
+    out = subprocess.run(['getpsfnofind.sh',tbase],shell=False)
     #SPAWN,['./getpsfnofind.sh',tbase],/noshell 
      
     # If getpsf failed or has NaN, change to VA=0 
@@ -358,7 +361,7 @@ def getpsf(base,fake=False,logger=None):
         dln.writelines(base+'.opt',newoptlines)
         printlog,logfile,'getpsfnofind.sh failed or NaN.  Changing to VA=0.  Trying again.' 
         #SPAWN,['./getpsfnofind.sh',tbase],/noshell 
-        out = subprocess.run('getpsfnofind.sh',tbase],shell=False)
+        out = subprocess.run(['getpsfnofind.sh',tbase],shell=False)
      
     # Delete the temporary symlinks 
     for f in [tbase,tfits,top,taopt,tcoo]:
@@ -371,7 +374,10 @@ def getpsf(base,fake=False,logger=None):
     if info.exists == 1 and info.size > 0 and strpos(psfline1,'NaN') == -1: 
         outfiles = file_search(tbase+'*',count=noutfiles) 
         renamefiles = repstr(outfiles,tbase,base) 
-        FILE_MOVE,outfiles,renamefiles,/allow,/over 
+        for i in range(len(outfiles)):
+            if os.path.exists(renamefiles[i]): os.remove(renamefiles[i])
+            shutil.move(outfiles[i],renamefiles[i])
+        #FILE_MOVE,outfiles,renamefiles,/allow,/over 
      
     # No PSF file found 
     info = file_info(base+'.psf') 
