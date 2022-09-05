@@ -426,7 +426,7 @@ def gausspeakfit(img,sigmap,peaktab):
 
 def imfwhm(inpfiles=None,outfile=None,exten=None,im=None,head=None,
            skymode=None,skysig=None,backgim=None,nsigdetect=8,
-           verbose=True):
+           verbose=False):
     """ 
     The program estimates the FWHM of stars in images. 
 
