@@ -8,7 +8,7 @@ import tempfile
 import shutil
 from astropy.table import Table
 from dlnpyutils import utils as dln
-from . import io
+from . import io,utils
 
 def mksexconfig(filename,configfile=None,catfile=None,flagfile=None,
                 paramfile=None,wtfile=None,cattype=None):
@@ -157,17 +157,17 @@ def sex2daophot(catfile,fitsfile,daofile):
         raise ValueError(catfile+' NOT FOUND')
     if os.path.exists(fitsfile) == False:
         raise ValueError(fitsfile+' NOT FOUND')
-     
+
     #------------------------------------- 
     # Load sextractor output file 
     # default.param specifies the output columns 
-    if file_isfits(catfile) == 0: 
+    if utils.file_isfits(catfile) == False: 
         #  fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR'] 
         fields = ['NUMBER','X_IMAGE','Y_IMAGE','MAG_APER','MAGERR_APER','FLAGS','CLASS_STAR'] 
-        sex = Table.read(catfile,fieldnames=fields) 
+        sex = Table.read(catfile,format='ascii',names=fields) 
     else: 
         sex = Table.read(catfile,1) 
-        if n_tags(sex) == 1 : 
+        if len(sex.colnames)==0:
             sex = Table.read(catfile,2) 
     nsex = len(sex) 
 
@@ -177,8 +177,8 @@ def sex2daophot(catfile,fitsfile,daofile):
     naxis1 = head['NAXIS1'] 
     naxis2 = head['NAXIS2']
     saturate = head['SATURATE']
-    rdnoise = io.getrdnoise(fitsfile) 
-    gain = io.getgain(fitsfile) 
+    rdnoise,rdnoisekey = io.getrdnoise(fitsfile) 
+    gain,gainkey = io.getgain(fitsfile) 
     lowbad = 1.0 
     thresh = 20.0 
      
@@ -198,13 +198,13 @@ def sex2daophot(catfile,fitsfile,daofile):
     dt = [('ID',int),('X',float),('Y',float),('MAG',float),('ERR',float),
           ('SKY',float),('ITER',float),('CHI',float),('SHARP',float)]
     dao = np.zeros(nsex,dtype=np.dtype(dt))
-    dao['ID'] = sex.number 
-    dao['X'] = sex.x_image 
-    dao['Y'] = sex.y_image 
-    dao['MAG'] = sex.mag_aper 
-    dao['ERR'] = sex.magerr_aper 
-    if 'background' in sex.columns:
-        dao['SKY'] = sex['background']
+    dao['ID'] = sex['NUMBER']
+    dao['X'] = sex['X_IMAGE']
+    dao['Y'] = sex['Y_IMAGE']
+    dao['MAG'] = sex['MAG_APER'] 
+    dao['ERR'] = sex['MAGERR_APER'] 
+    if 'BACKGROUND' in sex.columns:
+        dao['SKY'] = sex['BACKGROUND']
     else: 
         dao['SKY'] = 0.0 
     dao['ITER'] = 1 
@@ -271,8 +271,6 @@ def getpsf(base,fake=False,logger=None):
     if nsources < 1: 
         logger.info('Only '+str(nsources)+' sources. Need at least 1 to create a PSF')
         return 
-
-    import pdb; pdb.set_trace()
      
     # Apply cuts to get good stars 
     sex = Table.read(base+'.cat',1)
@@ -280,26 +278,26 @@ def getpsf(base,fake=False,logger=None):
         sex = Table.read(base+'.cat',2) 
     nsex = len(sex) 
     si = np.argsort(sex['FWHM_IMAGE']) 
-    fwhm80 = np.percecntile(sex['FWHM_IMAGE'],80)
+    fwhm80 = np.percentile(sex['FWHM_IMAGE'],80)
     bad = ((sex['IMAFLAGS_ISO'] > 0) | (sex['CLASS_STAR'] < 0.5) | (sex['ELLIPTICITY'] > 0.8) | 
-           (sex['FWHM_IMAGE'] > fwhm80) | ( ((sex['FLAGS'] and 8) == 8) | ((sex['FLAGS'] and 16) == 16) | 
+           (sex['FWHM_IMAGE'] > fwhm80) | ( ((sex['FLAGS'] & 8) > 0) | ((sex['FLAGS'] & 16) > 0) | 
                                             (1.087/sex['MAGERR_APER'] <= 10)))
     nbad = np.sum(bad)
     ngood = np.sum(~bad)
     # Not enough stars, remove class_star cut and raise S/N cut 
     if ngood < 50: 
         bad = ((sex['IMAFLAGS_ISO'] > 0) | (sex['ELLIPTICITY'] > 0.8) | (sex['FWHM_IMAGE'] > fwhm80) |
-               ((sex['FLAGS'] and 8) == 8) | ((sex['FLAGS'] and 16) == 16) | (1.087/sex['MAGERR_APER'] <= 7))
+               ((sex['FLAGS'] & 8) > 0) | ((sex['FLAGS'] & 16) > 0) | (1.087/sex['MAGERR_APER'] <= 7))
     nbad = np.sum(bad)
     ngood = np.sum(~bad)
     # No sources left 
     if ngood == 0: 
         logger.info('No sources left after stellar cuts')
         return 
-    sex = sex[good] 
+    sex = sex[~bad] 
     nsources = ngood
-    sex.write(base+'.cat',overwrite=True)
-     
+    sex.write(base+'.cat',format='fits',overwrite=True)
+
     # Convert to DAOPHOT coo format 
     sex2daophot(base+'.cat',base+'.fits',base+'.coo')
     #SEX2DAOPHOT,base+'.cat',base+'.fits',base+'.coo' 
@@ -313,7 +311,6 @@ def getpsf(base,fake=False,logger=None):
     opt = io.readopt(base+'.opt')
     optlines = dln.readlines(base+'.opt')
     optlines = np.char.array(optlines)
-    vaind, = np.where(optarr.find('VA') > -1)
     vaval = opt['VA']
     minsources = [1,1,3,6] 
     if nsources < minsources[int(vaval)+1]: 
@@ -326,6 +323,8 @@ def getpsf(base,fake=False,logger=None):
         newoptlines = optlines.copy()
         newoptlines[vaind] = ('VA = %8.2f' % newvaval)
         dln.writelines(base+'.opt',newoptlines)
+
+    import pdb; pdb.set_trace()
      
     # Sometimes the filenames get too long for DAOPHOT 
     # use temporary files and symlinks
