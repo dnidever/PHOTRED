@@ -1734,6 +1734,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         maskdatalevel = np.max(combim) + 10000    # set "bad" data level above the highest "good" value 
         combim2 = combim*(1-badmask) + maskdatalevel*badmask   # set bad pixels to maskdatalevel
         combhead['SATURATE'] = maskdatalevel
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True) # fits_write can create an empty PDU 
         
         # Create the weight map for Sextractor using the BPM output by IMCOMBINE 
@@ -1817,6 +1818,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         maskdatalevel = np.max(combim) + 10000  # set "bad" data level above the highest "good" value 
         combim2 = combim*(1.0-badmask) + maskdatalevel*badmask  # set bad pixels to 100,000 
         combhead['SATURATE'] = maskdatalevel 
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True)
  
     # Add TILETYPE to the combined image
@@ -2449,6 +2451,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
          
         maskdatalevel = np.max(combim) + 10000# set "bad" data level above the highest "good" value 
         combim2 = combim*(1-badmask) + maskdatalevel*badmask# set bad pixels to maskdatalevel
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True) # fits_write can create an empty PDU 
          
         # Create the weight map for Sextractor using the BPM output by IMCOMBINE 
@@ -2530,6 +2533,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
         badmask = float(weightmap < 0.5) 
         maskdatalevel = max(combim) + 10000# set "bad" data level above the highest "good" value 
         combim2 = combim*(1.0-badmask) + maskdatalevel*badmask# set bad pixels to 100,000
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True)
      
     # Add TILETYPE to the combined image

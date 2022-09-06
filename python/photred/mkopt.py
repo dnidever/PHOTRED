@@ -272,7 +272,8 @@ def mkopt(inpfiles,hilimit=6.4e4,va=2,fitradius_fwhm=None,
             if anotarr[j] == 'HI = ':
                 form = '%5s,%8d'
             f.write(form % (anotarr[j],outarr[j]))
-             
+        f.write('\n')  # we need an extra blank line at end             
+
     # Writing the ALLSTAR parameter file 
     #----------------------------------- 
              
@@ -296,6 +297,7 @@ def mkopt(inpfiles,hilimit=6.4e4,va=2,fitradius_fwhm=None,
         for j in range(nanot2):
             form = '%-5s%8.2f\n'
             f.write(form % (anotarr2[j],outarr2[j]))
+        f.write('\n')  # we need an extra blank line at end
              
     # Verbose output 
     if verbose:
