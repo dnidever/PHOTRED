@@ -173,6 +173,13 @@ endif
 mhead0 = HEADFITS(fluxfile,exten=0,errmsg=errmsg0)
 if keyword_set(header) then ehead0 = HEADFITS(fluxfile,exten=fext,errmsg=errmsg1) else $
   ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
+
+if ehead0[0] eq -1 then begin
+  print,'There was an error reading the temporary file '+tfluxfile
+  meta = -1
+  return,-1
+endif
+
 ;; Required keywords
 ;XTENSION= 'IMAGE   '           /extension type                                  
 ;   SIMPE = T
