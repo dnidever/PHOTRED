@@ -174,8 +174,9 @@ mhead0 = HEADFITS(fluxfile,exten=0,errmsg=errmsg0)
 if keyword_set(header) then ehead0 = HEADFITS(fluxfile,exten=fext,errmsg=errmsg1) else $
   ehead0 = HEADFITS(tfluxfile,exten=0,errmsg=errmsg1)
 
-if ehead0[0] eq -1 then begin
-  print,'There was an error reading the temporary file '+tfluxfile
+if strtrim(ehead0[0],2) eq '-1' then begin
+  error = 'There was an error reading the temporary file '+tfluxfile
+  print,error
   meta = -1
   file_delete,file+'.lock',/allow
   return,-1

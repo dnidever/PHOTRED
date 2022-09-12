@@ -82,13 +82,12 @@ endif
 
 ; Loading FILE2
 im2 = PHOTRED_READFILE(file2,head2,error=error2)
-EXTAST,head2,astr2
-
 if n_elements(error2) gt 0 then begin
   print,'ERROR reading in ',file2
   print,error2
   return
 endif
+EXTAST,head2,astr2
 
 ; Putting WCS into FILE2
 if n_elements(wcs) eq 0 then begin

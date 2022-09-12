@@ -271,8 +271,9 @@ function photred_readfile,filename,meta,exten=exten,count=count,header=header,no
          rfilename = dir+'/.'+base
          rinfo = file_info(rfilename)
          if rinfo.exists eq 1 then begin
-           result = FITS_READ_RESOURCE(filename,meta,header=header,nowrite=nowrite)
-           count = 1
+           count = 0
+           result = FITS_READ_RESOURCE(filename,meta,header=header,nowrite=nowrite,error=error)
+           if n_elements(error) eq 0 then count=1
            return,result
          endif
          ;; Regular FITS file
