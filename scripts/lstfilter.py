@@ -57,7 +57,7 @@ if __name__ == "__main__":
     sharpdict = {}
     for l in scoolines:
         cid,dum1,dum2,dum3,sharp,rnd,dum4 = l.split()
-        sharpdict[cid] = np.float(sharp)
+        sharpdict[cid] = float(sharp)
     # Load the opt file
     if os.path.exists(base+'.opt') is False:
         raise Exception(base+'.opt NOT FOUND')
@@ -67,8 +67,8 @@ if __name__ == "__main__":
     if optlines[-1]=='': del optlines[-1] # remove blank last line 
     ps = 10
     for o in optlines:
-        if o.find('PS')>-1: ps=np.float(o.split('=')[1])
-        if o.find('HI')>-1: sat=np.float(o.split('=')[1])
+        if o.find('PS')>-1: ps=float(o.split('=')[1])
+        if o.find('HI')>-1: sat=float(o.split('=')[1])
     sat -= 3000                  # reduce the number a bit to be safe
     sat = np.min([sat,59500])    # bad pixels set to 60000
     rad = np.ceil(ps)
@@ -84,12 +84,12 @@ if __name__ == "__main__":
         slines1 = slines[i]
         arr = slines1.split()
         id, x, y, mag = arr[0:4]
-        x = np.float(x)
-        y = np.float(y)
-        xlo = np.int(np.max([np.round(x)-rad,0]))
-        xhi = np.int(np.min([np.round(x)+rad,nx]))
-        ylo = np.int(np.max([np.round(y)-rad,0]))
-        yhi = np.int(np.min([np.round(y)+rad,ny]))
+        x = float(x)
+        y = float(y)
+        xlo = int(np.max([np.round(x)-rad,0]))
+        xhi = int(np.min([np.round(x)+rad,nx]))
+        ylo = int(np.max([np.round(y)-rad,0]))
+        yhi = int(np.min([np.round(y)+rad,ny]))
         subim = im[ylo:yhi,xlo:xhi]
         nbad = np.sum(subim>=sat)
         # Get sharp value

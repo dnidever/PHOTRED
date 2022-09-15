@@ -1657,7 +1657,7 @@ def writeals(outfile,phot,head):
     if type(head) is not list:
         raise ValueError('head must be a list')
     if np.array(head).size != 2:
-        raise valueError('head must be a 2-element list')
+        raise ValueError('head must be a 2-element list')
 
     # Opening the output file
     if os.path.exists(outfile): os.remove(outfile)

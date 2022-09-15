@@ -228,7 +228,7 @@ def calcweights(mag,err,fwhm,rdnoise,medsky):
         med_ratio = np.median(ratio) 
         #wmeanerr,ratio,ratio_error,xmean,xsigma 
         scales[i] = med_ratio 
-     
+
     return actweight,scales
 
 
@@ -271,7 +271,7 @@ def getweights_raw(tab):
 
     # Getting the reference sources 
     totstars = np.sum(mag < 50,axis=0) 
-    si = np.flip(np.argsort(totstars))# get the stars with the most detections 
+    si = np.flip(np.argsort(totstars)) # get the stars with the most detections 
     gdrefstars = si[0:np.minimum(nstars,50)] 
     nrefstars = len(gdrefstars) 
     # Getting the "good" frames 
@@ -314,7 +314,7 @@ def getweights_raw(tab):
             gdrefstars, = np.where(mag[gdframe[0],:] < 50)
             nrefstars = len(gdrefstars)
             si = np.flip(np.argsort(totstars[gdrefstars]))      # order by how many other frames they are detected in 
-            gdrefstars = gdrefstars[si[0:np.minimum(50,nrefstars-1)]]   # only want 50 
+            gdrefstars = gdrefstars[si[0:np.maximum(50,nrefstars)]]   # only want 50 
             nrefstars = len(gdrefstars) 
      
     # Calculate the weights
@@ -342,10 +342,17 @@ def getweights_raw(tab):
             nigdrefstars1 = len(igdrefstars1)
         if nigdrefstars1 < 2: 
             continue
-         
-        totgdstars1 = np.sum(mag[gdframe,:][:,igdrefstars1] < 50,axis=0) 
-        si1 = np.flip(np.argsort(totgdstars1))# get the best ones 
-        igdrefstars = igdrefstars1[si1[0:(49<(nigdrefstars1-1))]] 
+
+        mag1 = mag[gdframe,:][:,igdrefstars1]         
+        totgdstars1 = np.sum(mag1 < 50,axis=0) 
+        maggdstars1 = np.mean(mag1,axis=0)
+        fluxgdstars1 = 10.0**( (maggdstars1-25.0)/(-2.5) )  # total counts  
+        # Make ID that includes number of detections and total flux, want to
+        #  sort by both,
+        sortid = totgdstars1*1e10 + fluxgdstars1
+        si1 = np.flip(np.argsort(sortid))  # get the best ones 
+        #si1 = np.flip(np.argsort(totgdstars1))  # get the best ones 
+        igdrefstars = igdrefstars1[si1[0:np.minimum(50,nigdrefstars1)]]
         nirefstars = len(igdrefstars)
          
         itotframe = np.sum(mag[gdframe,:][:,igdrefstars] < 50,axis=1) 
@@ -390,7 +397,7 @@ def getweights_raw(tab):
                     break
          
                 count += 1
-     
+
         else:
             igdframe = gdframe[igdframe1] 
      
@@ -412,8 +419,7 @@ def getweights_raw(tab):
         weights[iframe] = new_weights 
         scales[iframe] = new_scale 
      
-        #print,iframe,new_weights,new_scale 
-     
+        #print(iframe,new_weights,new_scale)
  
     # Fix images with bad weights likely due to no overlap 
     #  use the FLUX values to get a weight 
@@ -649,7 +655,6 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
             info['flux10'][i] = 10.0**( (mag10-25.0)/(-2.5) )  # total counts 
             info['fluxrate10'][i] = info['flux10'][i] / info['exptime'][i]  # flux rate = counts / sec 
      
-     
     # Using TILES 
     #-------------- 
     # We are using TILES and have multiple chips/amps 
@@ -744,9 +749,8 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
         # Perform the weights and scales calculations 
         outstr = getweights_raw(tab)
         info['weight'] = outstr['weight'] 
-        info['scale'] = outstr['scale']
-     
-     
+        info['scale'] = outstr['scale'] 
+    
     # Print out the information 
     if silent==False:
         logger.info('        FILE         FILTER EXPTIME FWHM RDNOISE MEDSKY WEIGHT SCALE')
@@ -1325,13 +1329,10 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             weights[bdscale] = 0.0 
         weightfile = mchbase+'.weights'
         dln.writelines(weightfile,weights)
-        #WRITECOL,weightfile,weights,fmt='(F10.6)' 
         scalefile = mchbase+'.scale'
         dln.writelines(scalefile,invscales)
-        #WRITECOL,scalefile,invscales,fmt='(F10.6)'# want to scale it UP 
         zerofile = mchbase+'.zero'
         dln.writelines(zerofile,-sky)
-        #WRITECOL,zerofile,-sky,fmt='(F12.4)'# want to remove the background, set to 1st frame 
          
     # FAKE, use existing ones 
     else: 
@@ -1340,18 +1341,15 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         zerofile = mchbase+'.zero'
         weights = np.array(dln.readlines(weightfile)).astype(float)
         invscales = np.array(dln.readlines(scalefile)).astype(float)        
-        #READCOL,weightfile,weights,format='F',/silent 
-        #READCOL,scalefile,invscales,format='F',/silent 
         scales = 1.0/invscales
         sky = np.array(dln.readlines(zerofile)).astype(float)        
-        #READCOL,zerofile,sky,format='F',/silent 
         sky = -sky 
     # Stuff the information into the FILEINFO structure 
     for i in range(nfiles):
         fileinfo[i]['comb_weights'] = weights[i]
         fileinfo[i]['comb_scale'] = invscales[i]
         fileinfo[i]['comb_zero'] = -sky[i] 
-     
+
      
     ############################################ 
     # STEP 2: Resample the images 
@@ -1367,8 +1365,8 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         #xb = (lindgen(tile.nx)+tile.xrange[0])#replicate(1,tile.ny) 
         #yb = replicate(1,tile.nx)#(lindgen(tile.ny)+tile.yrange[0]) 
         #HEAD_XYAD,tile.head,xb,yb,rab,decb,/deg
-        xb = (np.arange(tile['nx'])+tile['xrange'][0]).reshape(-1,1) + np.zeros(tile['ny'],float).reshape(1,-1)
-        yb = np.zeros(tile['nx'],float).reshape(-1,1) + (np.arange(tile['ny'])+tile['yrange'][0]).reshape(1,-1)
+        xb = np.zeros(tile['ny'],float).reshape(-1,1) + (np.arange(tile['nx'])+tile['xrange'][0]).reshape(1,-1)
+        yb = (np.arange(tile['ny'])+tile['yrange'][0]).reshape(-1,1) + np.zeros(tile['nx'],float).reshape(1,-1)
         wcs = WCS(tile['head'])
         bcoo = wcs.pixel_to_world(xb,yb)
         rab = bcoo.ra.deg
@@ -1401,27 +1399,28 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             youtrel = yout-tile['yrange'][0]  # relative to yrange[0] 
             youtrel = youtrel.astype(int)
             nyout = int(yout[1]-yout[0])
-            rr = rab[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
-            dd = decb[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] 
+            rr = rab[youtrel[0]:youtrel[1],xoutrel[0]:xoutrel[1]] 
+            dd = decb[youtrel[0]:youtrel[1],xoutrel[0]:xoutrel[1]] 
             #ALLFRAME_ADXYINTERP,head1,rr,dd,xx,yy,nstep=10
             xx,yy = adxyinterp(head1,rr,dd,nstep=10)
 
             # The x/y position to bilinear need to be in the original system, ~1sec 
             rim = np.zeros(xx.shape,float)+fileinfo[i]['background']
             rmask = np.zeros(xx.shape,bool)
-            good = ((xx>=0) & (xx<=im1.shape[0]-1) & (yy>=0) & (yy<=im1.shape[1]-1))
+            good = ((xx>=0) & (xx<=im1.shape[1]-1) & (yy>=0) & (yy<=im1.shape[0]-1))
             if np.sum(good)>0:
-                rim[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),im1,kx=1,ky=1).ev(xx[good],yy[good])
-                rmask[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),mask,kx=1,ky=1).ev(xx[good],yy[good])
+                rim[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),im1,kx=1,ky=1).ev(yy[good],xx[good])
+                rmask[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),mask,kx=1,ky=1).ev(yy[good],xx[good])
+                #rim[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),im1,kx=1,ky=1).ev(xx[good],yy[good])
+                #rmask[good] = RectBivariateSpline(np.arange(im1.shape[0]),np.arange(im1.shape[1]),mask,kx=1,ky=1).ev(xx[good],yy[good])
             #rim = BILINEAR(im1,xx,yy,missing=fileinfo[i].background) 
             #rmask = BILINEAR(mask,xx,yy,missing=0) 
-             
+
             # Contruct final image
-            fim = np.zeros((tile['nx'],tile['ny']),float)+fileinfo[i]['saturate']
-            fim[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rim 
-            #fmask = bytarr(tile.nx,tile.ny)
-            fmask = np.zeros((tile['nx'],tile['ny']),bool)
-            fmask[xoutrel[0]:xoutrel[1],youtrel[0]:youtrel[1]] = rmask 
+            fim = np.zeros((tile['ny'],tile['nx']),float)+fileinfo[i]['saturate']
+            fim[youtrel[0]:youtrel[1],xoutrel[0]:xoutrel[1]] = rim 
+            fmask = np.zeros((tile['ny'],tile['nx']),bool)
+            fmask[youtrel[0]:youtrel[1],xoutrel[0]:xoutrel[1]] = rmask 
              
             # Contruct the final header 
             fhead = head1.copy()
@@ -1450,7 +1449,6 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
             #MWRFITS,fmask,fileinfo[i].resampmask,mhead,/create 
             # this takes about ~37-50 sec for a 2kx4k image. 
             #  now it takes ~5 sec for a 2kx4k image 
- 
      
     # --- Pixel based --- 
     elif tile['type']=='PIXEL':
@@ -1734,6 +1732,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         maskdatalevel = np.max(combim) + 10000    # set "bad" data level above the highest "good" value 
         combim2 = combim*(1-badmask) + maskdatalevel*badmask   # set bad pixels to maskdatalevel
         combhead['SATURATE'] = maskdatalevel
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True) # fits_write can create an empty PDU 
         
         # Create the weight map for Sextractor using the BPM output by IMCOMBINE 
@@ -1817,6 +1816,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         maskdatalevel = np.max(combim) + 10000  # set "bad" data level above the highest "good" value 
         combim2 = combim*(1.0-badmask) + maskdatalevel*badmask  # set bad pixels to 100,000 
         combhead['SATURATE'] = maskdatalevel 
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True)
  
     # Add TILETYPE to the combined image
@@ -2449,6 +2449,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
          
         maskdatalevel = np.max(combim) + 10000# set "bad" data level above the highest "good" value 
         combim2 = combim*(1-badmask) + maskdatalevel*badmask# set bad pixels to maskdatalevel
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True) # fits_write can create an empty PDU 
          
         # Create the weight map for Sextractor using the BPM output by IMCOMBINE 
@@ -2530,6 +2531,7 @@ def combine_orig(filename,scriptsdir=None,logfile=None,
         badmask = float(weightmap < 0.5) 
         maskdatalevel = max(combim) + 10000# set "bad" data level above the highest "good" value 
         combim2 = combim*(1.0-badmask) + maskdatalevel*badmask# set bad pixels to 100,000
+        combim2 = combim2.astype(np.float32)  # daophot must have float32
         fits.PrimaryHDU(combim2,combhead).writeto(combfile,overwrite=True)
      
     # Add TILETYPE to the combined image

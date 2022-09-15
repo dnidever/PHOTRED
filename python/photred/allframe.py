@@ -12,11 +12,12 @@ import logging
 import re
 from glob import glob
 import warnings
+import traceback
 from astropy.io import fits,ascii
 from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning
 from dlnpyutils import utils as dln
-from . import utils,io,iraf,combine as comb,mkopt
+from . import utils,io,iraf,combine as comb,mkopt,getpsf
 
 # Filtering warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
@@ -36,22 +37,30 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
  
     Parameters
     ----------
-    file        Filename of the stacked images 
-    xoff        The offset in X between the original and shifted images 
-                  xorig = xshift + xoff 
-    yoff        The offset in Y between the original and shifted images 
-                  yorig = yshift + yoff 
-    maskfile    The name of a mask/weight file to use for the combined image. 
-    maxiter     Maximum number of times to iterate. 
-                  By default, maxiter=1
-    scriptsdir  Directory that contains the scripts. 
-    detectprog  The program to use for source detection.  The options 
-                  are 'SEXTRACTOR' (the default) or 'DAOPHOT'. 
-    logfile     A logfile to print output to. 
- 
+    filename : str
+       Filename of the stacked images 
+    xoff : float, optional
+       The offset in X between the original and shifted images 
+         xorig = xshift + xoff 
+    yoff : float, optional
+       The offset in Y between the original and shifted images 
+         yorig = yshift + yoff 
+    maxiter : int, optional
+       Maximum number of times to iterate. By default, maxiter=1
+    scriptsdir : str, optional
+       Directory that contains the scripts. 
+    detectprog : str, optional
+       The program to use for source detection.  The options 
+         are 'SEXTRACTOR' (the default) or 'DAOPHOT'. 
+    logfile : str, optional
+       A logfile to print output to. 
+    maskfile : str, optional
+       The name of a mask/weight file to use for the combined image. 
+
     Returns
     -------
-    als       Final ALLSTAR structure 
+    als : table,
+       Final ALLSTAR table.
  
     Example
     -------
@@ -66,7 +75,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         logger = dln.basiclogger()
      
     # Make sure file exists 
-    if os.path.exists(filename):
+    if os.path.exists(filename)==False:
         raise ValueError(filename+' NOT FOUND')
      
     # What program are we using for source detection? 
@@ -109,7 +118,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             shutil.copyfile(scriptsdir+'/'+scripts[i],scripts[i])
 
     # Check that the SEXTRACTOR program exists
-    out = subprocess.check_output(['which','sextractor'],shell=False)
+    out = subprocess.check_output(['which','sex'],shell=False)
     if type(out) is bytes: out = out.decode()
     out = out.strip()
     if os.path.exists(out)==False:
@@ -120,7 +129,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
     out = out.strip()
     if os.path.exists(out)==False:
         raise ValueError('No allstar program found')    
-   # Check that the DAOPHOT program exists
+    # Check that the DAOPHOT program exists
     out = subprocess.check_output(['which','daophot'],shell=False)
     if type(out) is bytes: out = out.decode()
     out = out.strip()
@@ -128,7 +137,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         raise ValueError('No daophot program found') 
      
     base,ext = os.path.splitext(os.path.basename(filename))
-     
+
     # Read the .opt file
     opt = io.readopt(base+'.opt')
     satlevel = opt['HI']
@@ -136,7 +145,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
     fwhm = opt['FW']
      
     # Get pixel scale
-    scale = utils.pixscale(filename)
+    scale = io.getpixscale(filename)
     if scale is  None: # default 
         scale = 0.5 
      
@@ -156,40 +165,41 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         if os.path.exists(sexconfigfile): os.remove(sexconfigfile)
         shutil.copyfile('default.sex',sexconfigfile)
         sexlines = dln.readlines(sexconfigfile)
-        sexlines2 = sexlines.copy()
-        for line,i in enumerate(sexlines):
+        sexlines2 = np.char.array(sexlines).copy()
+        for i,line in enumerate(sexlines):
             # CATALOG_NAME
-            if line.find('**CATALOG_NAME')>-1:
-                sexlines2[i] = 'CATALOG_NAME    '+catfile+'# name of the output catalog' 
+            if line.find('CATALOG_NAME')>-1:
+                sexlines2[i] = 'CATALOG_NAME    '+catfile+'  # name of the output catalog' 
             # SATUR_LEVEL
-            elif line.find('**SATUR_LEVEL')>-1:
-                sexlines2[i] = 'SATUR_LEVEL     '+satlevel+'# level (in ADUs) at which arises saturation' 
+            elif line.find('SATUR_LEVEL')>-1:
+                sexlines2[i] = 'SATUR_LEVEL     '+str(satlevel)+'  # level (in ADUs) at which arises saturation' 
             # GAIN
-            elif line.find('**GAIN')>-1:
-                sexlines2[i] = 'GAIN            '+gain+'# detector gain in e-/ADU.' 
+            elif line.find('GAIN')>-1:
+                sexlines2[i] = 'GAIN            '+str(gain)+'  # detector gain in e-/ADU.' 
             # PIXEL_SCALE
-            elif line.find('**PIXEL_SCALE')>-1:
-                sexlines2[i] = 'PIXEL_SCALE     '+str(scale)+'# size of pixel in arcsec (0=use FITS WCS info).' 
+            elif line.find('PIXEL_SCALE')>-1:
+                sexlines2[i] = 'PIXEL_SCALE     '+str(scale)+' # size of pixel in arcsec (0=use FITS WCS info).' 
             # SEEING_FWHM
-            elif line.find('**SEEING_FWHM'):
+            elif line.find('SEEING_FWHM')>-1:
                 fwhmas = float(fwhm)*float(scale) 
-                sexlines2[i] = 'SEEING_FWHM     '+str(fwhmas)+'# stellar FWHM in arcsec' 
+                sexlines2[i] = 'SEEING_FWHM     '+str(fwhmas)+'  # stellar FWHM in arcsec' 
         # MASK/WEIGHT file 
         if maskfile is not None:
-            sexlines2 += ['WEIGHT_IMAGE  '+maskfile,'WEIGHT_TYPE   MAP_WEIGHT']
+            sexlines2 = np.append(sexlines2,'WEIGHT_IMAGE  '+maskfile)
+            sexlines2 = np.append(sexlines2,'WEIGHT_TYPE   MAP_WEIGHT')
         # Write the file
         dln.writelines(sexconfigfile,sexlines2)
-     
-     
-    logger.info('Using '+strupcase(detectprog)+' for Source Detection')
+          
+    logger.info('Using '+detectprog.upper()+' for Source Detection')
      
     # Loop to find all the objects the first time, bright star problems 
     flag = 0 
     nals = 0 
+    als = []
     count = 1 
     allsex = None
     while (flag==0):
-        logger.info('--Iteration '+str(count,2)+'--')
+        logger.info('--Iteration '+str(count)+'--')
         nlastals = nals 
                   
         ####################### 
@@ -207,27 +217,25 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             # Run sextractor on star subtracted file 
             logger.info('Running SExtractor')
             if os.path.exists(catfile): os.remove(catfile) # delete sextractor catalog file 
-            out = subprocess.check_output(['sex',subfile,'-c',sexconfigfile],shell=False)
-            exists = os.path.exists(catfile)
-            size = os.size(catfile)
-            if exists==False or size==0:  # no output file 
+            out = subprocess.check_output(['sex',subfile,'-c',sexconfigfile],shell=False,stderr=subprocess.STDOUT)
+            if os.path.exists(catfile)==False or os.path.getsize(catfile)==0:  # no output file 
                 raise ValueError('Error when running SExtractor')
              
             #------------------------------------- 
             # Load sextractor output file 
             # default.param specifies the output columns 
             if utils.file_isfits(catfile)==False:
-                fiels = dln.readlines('default.param')
-                gd , = np.where(strmid(fields,0,1) != '#' and str(fields) != '')
-                fields = fields[gd] 
-                fields = repstr(fields,'(1)','') 
+                #fields = dln.readlines('default.param')
+                #fields = np.char.array(fields)
+                #gd, = np.where((fields.startswith('#')==False) & (fields.strip() != ''))
+                #fields = fields[gd] 
+                #fields = fields.replace('(1)','')
                 #fields = ['ID','X','Y','MAG','ERR','FLAGS','STAR']
                 sex = Table.read(catfile,format='ascii')
-                #sex = IMPORTASCII(catfile,fieldnames=fields)
             else:
-                sex = Table.read(catfile)
-                if n_tags(sex) == 1: 
-                    sex = Table.read(catfile,2)
+                sex = Table.read(catfile,format='fits')
+                if len(sex.colnames)==0:
+                    sex = Table.read(catfile,2,format='fits')
             nsex = len(sex)
             sex['ndetiter'] = 0    # add the detection iteration 
             sex['ndetiter'] = count 
@@ -240,7 +248,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             with open(base+'.als','r') as f:
                 line1 = f.readline().replace("\n","")
                 line2 = f.readline().replace("\n","")                        
-            head = [line1,line2,'']
+            head = [line1,line2]
              
             # Concatenate with the ALS file to make a combined 
             # list of sources 
@@ -254,7 +262,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 nsex = len(sex) 
                 # Making ALS structure for new SEX sources 
                 dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
-                      ('sky',float),('iter',int),('chi',float),('sharp',float)]
+                      ('sky',float),('niter',int),('chi',float),('sharp',float)]
                 sex2 = np.zeros(nsex,dtype=np.dtype(dt))
                 sex2['id'] = sex['number'] + maxid   # offset the IDs, sex IDs start at 1 
                 sex2['x'] = sex['x_image']
@@ -262,7 +270,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 sex2['mag'] = sex['mag_aper']
                 sex2['err'] = sex['magerr_aper']
                 sex2['sky'] = np.median(als['sky']) 
-                sex2['iter'] = 1 
+                sex2['niter'] = 1 
                 sex2['chi'] = 1.0 
                 sex2['sharp'] = 0.0 
                  
@@ -274,25 +282,25 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 allsex = np.hstack((allsex,sex))
                  
                 # Concatenate 
-                all = np.hstack((als,sex2))
-                nall = len(all) 
+                allals = np.hstack((als,sex2))
+                nall = len(allals) 
                  
                 # Write to file 
-                io.writeals(coofile,all,alshead)
+                io.writeals(coofile,allals,alshead)
                  
             # First time, no ALS file yet 
             else:  
                 # Making ALS structure for new SEX sources 
                 dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
-                      ('sky',float),('iter',int),('chi',float),('sharp',float)]
+                      ('sky',float),('niter',int),('chi',float),('sharp',float)]
                 sex2 = np.zeros(nsex,dtype=np.dtype(dt))
-                sex2['id'] = sex['number']
-                sex2['x'] = sex['x_image']
-                sex2['y'] = sex['y_image']
-                sex2['mag'] = sex['mag_aper'] 
-                sex2['err'] = sex['magerr_aper']
+                sex2['id'] = sex['NUMBER']
+                sex2['x'] = sex['X_IMAGE']
+                sex2['y'] = sex['Y_IMAGE']
+                sex2['mag'] = sex['MAG_APER'] 
+                sex2['err'] = sex['MAGERR_APER']
                 sex2['sky'] = 0.0 
-                sex2['iter'] = 1 
+                sex2['niter'] = 1 
                 sex2['chi'] = 1.0 
                 sex2['sharp'] = 0.0 
                  
@@ -326,7 +334,8 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 shutil.copyfile(subbase+'.opt','daophot.opt')
              
             # Make temporary photo.opt file
-            tid,tphotofile = tempfile.mkstemp(prefix="photo") 
+            tid,tphotofile = tempfile.mkstemp(prefix="photo",dir='.')
+            tphotofile = os.path.basename(tphotofile)
             photlines = []
             photlines += ['A1 = %7.4f' % (fwhm*3)]
             photlines += ['IS = 45.0000']
@@ -356,18 +365,19 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             lines += ['${image}.temp.ap']
             lines += ['EXIT']
             lines += ['END_DAOPHOT']
-            tid2,tempfile = tempfile.mkstemp(prefix="dao") 
-            dln.writelines(tempfile,lines)
-            os.chmod(tempfile,0o755)
+            tid2,tmpfile = tempfile.mkstemp(prefix="dao",dir='.')
+            tmpfile = os.path.basename(tmpfile)
+            dln.writelines(tmpfile,lines)
+            os.chmod(tmpfile,0o755)
              
             # Run the program
-            out = subprocess.check_output(tempfile+' '+subbase)
-            if os.path.exists(tempfile): os.remove(tempfile) # delete the temporary script 
+            out = subprocess.check_output(tmpfile+' '+subbase,shell=False,stderr=subprocess.STDOUT)
+            if os.path.exists(tmpfile): os.remove(tmpfile) # delete the temporary script 
              
             #------------------------------------- 
             # Load DAOPHOT FIND and PHOT output files
-            io.loadcoo(subbase+'.temp.coo',coo,coohead)
-            io.loadaper(subbase+'.temp.ap',aper,aperhead)
+            io.readcoo(subbase+'.temp.coo',coo,coohead)
+            io.readaper(subbase+'.temp.ap',aper,aperhead)
             for f in [subbase+'.temp.coo',subbase+'.temp.ap']:
                 if os.path.exists(f): os.remove(f)
             ncoo = len(coo) 
@@ -393,7 +403,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 ndao = len(coo) 
                 # Making ALS structure for new DAOPHOT sources
                 dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
-                      ('sky',float),('iter',int),('chi',float),('sharp',float)]
+                      ('sky',float),('niter',int),('chi',float),('sharp',float)]
                 dao = np.zeros(ndao,dtype=np.dtype(dt))
                 dao['id'] = coo['id'] + maxid  # offset the IDs, sex IDs start at 1 
                 dao['x'] = coo['x'] 
@@ -401,16 +411,16 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 dao['mag'] = aper['mag'][0] 
                 dao['err'] = aper['err'][0] 
                 dao['sky'] = aper['sky']
-                dao['iter'] = 1 
+                dao['niter'] = 1 
                 dao['chi'] = 1.0 
                 dao['sharp'] = 0.0 
                  
                 # Concatenate 
-                all = np.hstack((als,dao))
-                nall = len(all) 
+                allals = np.hstack((als,dao))
+                nall = len(allals) 
                  
                 # Write to file 
-                io.writeals(coofile,all,alshead)
+                io.writeals(coofile,allals,alshead)
 
                  
             # First time, no ALS file yet 
@@ -421,7 +431,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 ndao = len(coo) 
                 # Making ALS structure for new DAOPHOT sources 
                 dt = [('id',int),('x',float),('y',float),('mag',float),('err',float),
-                      ('sky',float),('iter',int),('chi',float),('sharp',float)]
+                      ('sky',float),('niter',int),('chi',float),('sharp',float)]
                 dao = np.zeros(ndao,dtype=np.dtype(dt))
                 dao['id'] = coo['id'] 
                 dao['x'] = coo['x'] 
@@ -429,7 +439,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
                 dao['mag'] = aper['mag'][0] 
                 dao['err'] = aper['err'][0] 
                 dao['sky'] = aper['sky'] 
-                dao['iter'] = 1 
+                dao['niter'] = 1 
                 dao['chi'] = 1.0 
                 dao['sharp'] = 0.0 
                  
@@ -444,9 +454,9 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         if os.path.exists(subbase+'.als'): os.remove(subbase+'.als')  # delete als output file 
         # Sometimes the filenames get too long for daophot/allstar, 
         # use temporary files and symlinks
-        tid3,tbase = tempfile.mkstemp(prefix="base")  # create base, leave so other processes won't take it
+        tid3,tbase = tempfile.mkstemp(prefix="base",dir='.')  # create base, leave so other processes won't take it
         tbase = os.path.basename(tbase)
-        tid4,tsub = tempfile.mkstemp(prefix="sub")    # create sub base, leave so other processes won't take it
+        tid4,tsub = tempfile.mkstemp(prefix="sub",dir='.')    # create sub base, leave so other processes won't take it
         tsub = os.path.basename(tsub)
         tbasefits = tbase+'.fits'
         if os.path.exists(tbasefits): os.remove(tbasefits)
@@ -454,7 +464,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         tbasepsf = tbase+'.psf'
         if os.path.exists(tbasepsf): os.remove(tbasepsf)
         os.symlink(base+'.psf',tbasepsf) 
-        tid5,tcoofile = tempfile,mkstemp(prefix="coo")
+        tid5,tcoofile = tempfile.mkstemp(prefix="coo",suffix='.coo',dir='.')
         tcoofile = os.path.basename(tcoofile)
         if os.path.exists(tcoofile): os.remove(tcoofile)
         os.symlink(coofile,tcoofile)
@@ -462,13 +472,6 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         if os.path.exists(tsubals): os.remove(tsubals)
         tsubfits = tsub+'.fits'
         if os.path.exists(tsubfits): os.remove(tsubfits)
-        #tbase = (os.path.basename(MKTEMP('base',/nodot)))[0]# create base, leave so other processes won't take it 
-        #tsub = (os.path.basename(MKTEMP('sub',/nodot)))[0]# create sub base, leave so other processes won't take it 
-        #tbasefits = tbase+'.fits'       & os.remove(tbasefits,/allow & file_link,base+'.fits',tbasefits 
-        #tbasepsf = tbase+'.psf'         & os.remove(tbasepsf,/allow  & file_link,base+'.psf',tbasepsf 
-        #tcoofile = (os.path.basename(MKTEMP('coo',/nodot))+'.coo')[0] & os.remove(tcoofile,/allow  & file_link,coofile,tcoofile 
-        #tsubals = tsub+'.als'           & os.remove(tsubals,/allow 
-        #tsubfits = tsub+'.fits'         & os.remove(tsubals,/allow 
         # Make Input file 
         cmd = []
         alsoptlines = dln.readlines(base+'.als.opt') # make sure we use the right als options 
@@ -478,9 +481,12 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
         cmd += [tcoofile]  # coordinate file (symlink) 
         cmd += [tsubals]   # new als file (temporary file) 
         cmd += [tsubfits]  # subtracted fits file (temporary file) 
-        cmdfile = MKTEMP('temp') 
+        cmdid,cmdfile = tempfile.mkstemp(prefix='temp',dir='.')
+        cmdfile = os.path.basename(cmdfile)
         dln.writelines(cmdfile,cmd)
-        out = subprocess.check_output('allstar < '+cmdfile)
+        out = subprocess.check_output('allstar < '+cmdfile,shell=True,stderr=subprocess.STDOUT)
+        out = out.decode().split('\n')
+        for o in out: print(o)
         # Copy and clean up
         if os.path.exists(subbase+'.als'): os.remove(subbase+'.als')
         shutil.move(tsubals,subbase+'.als')
@@ -490,7 +496,7 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
             if os.path.exists(f): os.remove(f)
          
         # Load ALS file
-        als,alshead = io.loadals(subbase+'.als')
+        als,alshead = io.readals(subbase+'.als')
         nals = len(als) 
         logger.info('ALLSTAR found '+str(nals)+' sources')
          
@@ -509,21 +515,213 @@ def allfprep(filename,xoff=0.0,yoff=0.0,maxiter=1,scriptsdir=None,
          
      
     # Write out the SExtractor catalog 
-    allsex.write(sexfile,overwrite=True)
+    Table(allsex).write(sexfile,format='fits',overwrite=True)
      
     # The X/Y pixel coordinates should already be in the reference image 
     # coordinate system 
      
     # Need to offset the final X/Y pixel coordinates for XOFF/YOFF 
     logger.info('Applying offsets: Xoff=%.2f Yoff=%.2f' % (xoff,yoff))
-    als,alshead = io.loadals(subbase+'.als')
+    als,alshead = io.readals(subbase+'.als')
     als['x'] += xoff 
     als['y'] += yoff
-    utils.writeals(base+'_allf.als',als,alshead)
+    io.writeals(base+'_allf.als',als,alshead)
     logger.info('Final ALS file = '+base+'_allf.als')
     if os.path.exists(sexfile):
         logger.info('Final SExtractor file = '+sexfile)
+
+    return als
+
+
+def makemag(tfrfile,outfile,nowrite=False):
+    """
+    This combines the ALLFRAME alf photometry output files 
+
+    Parameters
+    ----------
+    tfrfile : str
+       Filename of the TFR file.
+    outfile : str, optional
+       The output filename to write the final combined photometry to.
+    nowrite : boolean, optional
+       Do not write final table to a file.  Default is False.
+
+    Returns
+    -------
+    phot : table
+      The final table of the combined alf photometry.
+
+    Example
+    -------
+    phot = makemag(tfrfile)
+
+    """
+
+    if os.path.exists(tfrfile)==False:
+        raise ValueError(tfrfile+' NOT FOUND')
      
+    # GETTING the number of files and filenames 
+    #------------------------------------------ 
+    nfiles = 0
+    lines = []
+    line = ''
+    with open(tfrfile,'r') as f:
+        line = f.readline()
+        while line.strip().startswith('===')==False:
+            lines += [line]
+            nfiles += 1
+            line = f.readline()
+     
+    # No files 
+    if nfiles < 1: 
+        print('No files in '+tfrfile)
+        return None
+     
+    # Getting filenames 
+    lines = np.char.array(lines).strip()
+    files = [l.split()[0] for l in lines]
+     
+    # Loading the entire TFR file 
+    #---------------------------- 
+    nlines = dln.numlines(tfrfile)
+    with open(tfrfile,'r') as f:
+        for i in range(nfiles+1):
+            f.readline()
+        nrow = nlines-nfiles-1
+        ncol = 3+nfiles
+
+        # Only 9-18 per line, the rest wraps on multiple lines 
+        # but ID/X/Y stay the same 
+        ids = np.zeros(nrow,int) 
+        x = np.zeros(nrow,float) 
+        y = np.zeros(nrow,float) 
+        num = np.zeros((nrow,nfiles),int)-1 
+        flag = 0 
+        count = 0
+        istar = 0 
+        line = f.readline()
+        while line!='':
+            arr = line.split()
+            id1 = int(arr[0]) 
+            x1 = float(arr[1]) 
+            y1 = float(arr[2]) 
+            num1 = np.array(arr[3:]).astype(int)
+            nnum1 = len(num1) 
+         
+            # First line 
+            if count == 0: 
+                ids[istar] = id1 
+                x[istar] = x1 
+                y[istar] = y1 
+                num[istar,0:nnum1] = num1 
+                numcount = nnum1 
+            # Second or later lines 
+            else: 
+                # Same star, wrapped line 
+                if id1 == ids[istar]: 
+                    num[istar,numcount:numcount+nnum1] = num1 
+                    numcount += nnum1 
+                # New star 
+                else: 
+                    istar += 1
+                    ids[istar] = id1 
+                    x[istar] = x1 
+                    y[istar] = y1 
+                    num[istar,0:nnum1] = num1 
+                    numcount = nnum1 
+
+            line = f.readline()         
+            count += 1
+
+    # Trim excess lines 
+    nstars = istar+1 
+    ids = ids[0:nstars] 
+    x = x[0:nstars] 
+    y = y[0:nstars] 
+    num = num[0:nstars,:] 
+     
+     
+    magarr = np.zeros((nstars,nfiles),float)+99.9999 
+    magerrarr = np.zeros((nstars,nfiles),float)+9.9999 
+    skyarr = np.zeros((nstars,nfiles),float)
+    iterarr = np.zeros((nstars,nfiles),float)
+    chiarr = np.zeros((nstars,nfiles),float)+np.nan  # NANs are ignored by MEDIAN 
+    sharparr = np.zeros((nstars,nfiles),float)+np.nan 
+    countarr = np.zeros(nstars,int)  # how many good mags for this stars 
+              
+    # Loop through the ALF files 
+    #--------------------------- 
+    for i in range(nfiles):          
+        if os.path.exists(files[i]) == False:
+            print(files[i]+' NOT FOUND')
+            return 
+
+        # Load the ALF file 
+        alf,alfhead = io.readals(files[i])
+        nalf = len(alf)
+         
+        ind = num[:,i] 
+        gd, = np.where(ind > 0) 
+        bd, = np.where(ind == 0) 
+         
+        alfind = ind[gd]-1   # python indices 
+         
+        if len(gd) > 0: 
+            magarr[gd,i] = alf['mag'][alfind]
+            magerrarr[gd,i] = alf['err'][alfind]
+            skyarr[gd,i] = alf['sky'][alfind] 
+            iterarr[gd,i] = alf['niter'][alfind]
+            chiarr[gd,i] = alf['chi'][alfind]
+            sharparr[gd,i] = alf['sharp'][alfind]
+            countarr[gd] += 1
+     
+    # Calculating the Median CHI and SHARP 
+    if nfiles > 1: 
+        chi = np.nanmedian(chiarr,axis=1) 
+        sharp = np.nanmedian(sharparr,axis=1)
+        # The fortran makemag code used the mean 
+        chimean = np.nansum(chiarr,axis=1)/countarr 
+        sharpmean = np.nansum(sharparr,axis=1)/countarr 
+    # only 1 file 
+    else: 
+        chi = chiarr 
+        sharp = sharparr 
+        chimean = chiarr 
+        sharpmean = sharparr 
+     
+    # Creating mag/magerr output array 
+    magoutarr = np.zeros((nstars,nfiles*2),float)
+    magoutarr[:,np.arange(nfiles)*2] = magarr 
+    magoutarr[:,np.arange(nfiles)*2+1] = magerrarr 
+     
+    # Create PHOT structure 
+    dt = [('id',int),('x',float),('y',float)]
+    for i in range(nfiles): 
+        dt += [('mag'+str(i+1),float),('mag'+str(i+1)+'err',float)]
+    dt += [('chiarr',(float,nfiles)),('sharparr',(float,nfiles)),('chi',float),('sharp',float)]
+    phot = np.zeros(nstars,dtype=np.dtype(dt))
+    phot['id'] = ids
+    phot['x'] = x 
+    phot['y'] = y 
+    for i in range(nfiles): 
+        phot['mag'+str(i+1)] = magarr[:,i]
+        phot['mag'+str(i+1)+'err'] = magerrarr[:,i]
+    phot['chiarr'] = chiarr
+    phot['sharparr'] = sharparr
+    phot['chi'] = chimean 
+    phot['sharp'] = sharpmean 
+          
+    # Print the output 
+    if not nowrite:
+        print('Writing output to '+outfile)
+        with open(outfile,'w') as f:
+            for i in range(nstars): 
+                form = '%1s%8d%9.3f%9.3f'+(nfiles*2+2)*'%9.4f'+'\n'
+                data = ('',ids[i],x[i],y[i],*magoutarr[i,:],chimean[i],sharpmean[i])
+                f.write(form % data)
+
+    return phot
+
 
 
 def cleanup(mchbase,files,fpack,mchdir,workdir,tempdir):
@@ -722,7 +920,7 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
             shutil.copyfile(scriptsdir+'/'+scripts[i],scripts[i])
      
     # Check that the ALLFRAME program exists
-    out = subprocess.check_output(['which','allframe'],shell=False)
+    out = subprocess.check_output(['which','allframe'],shell=False,stderr=subprocess.STDOUT)
     if type(out) is bytes: out = out.decode()
     out = out.strip()
     if os.path.exists(out)==False:
@@ -781,7 +979,7 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
         if os.path.exists(base+'.fits')==False and os.path.exists(base+'.fits.fz'):
             fpack[i] = True
             logger.info('Temporarily uncompressing '+base+'.fits.fz')
-            out = subprocess.run(['funpack',base+'.fits.fz'],shell=False)     
+            out = subprocess.run(['funpack',base+'.fits.fz'],shell=False,stderr=subprocess.STDOUT)
         # Checking OPT file
         for e in ['opt','als.opt','ap','als','log','psf']:
             if os.path.exists(base+'.'+e)==False:
@@ -869,7 +1067,6 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
         combfile = mchbase+'_comb.fits' 
         combweightfile = mchbase+'_comb.mask.fits'
  
- 
     ############################################ 
     # STEP 2: Get PSF for Combined Image 
     logger.info('----------------------------------------')
@@ -887,8 +1084,10 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
         #  print,'Using reference image COMMON SOURCE file' 
         #  shutil.copyfile(mchbase+'.cmn.lst',mchbase+'_comb.cmn.lst',/over,/allow 
         #endif
-        getpsf(combbase)
-        if len(error)>0:
+        try:
+            pfile = getpsf.getpsf(combbase)
+        except:
+            traceback.print_exc()
             cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
             return            
  
@@ -896,7 +1095,7 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     else: 
         logger.info('Using existing '+combbase+'.psf file and running ALLSTAR.')
         os.chmod('allstar.sh',0o755)
-        out = subprocess.run('./allstar.sh '+combbase,shell=True)
+        out = subprocess.run('./allstar.sh '+combbase,shell=True,stderr=subprocess.STDOUT)
         logger.info(' ')
  
  
@@ -911,14 +1110,15 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     # Make sure we have an allstar.opt file
     if os.path.exists('allstar.opt')==False:
         shutil.copyfile(base[0]+'.als.opt','allstar.opt')
- 
-    allfprep(combfile,als,xoff,yoff,logfile=logfile,error=error,
-             detectprog=detectprog,scriptsdir=scriptsdir,maxiter=finditer,
-             maskfile=combweightfile)
-    if len(error) > 0:
+    try:
+        als = allfprep(combfile,xoff,yoff,logfile=logfile,
+                       detectprog=detectprog,scriptsdir=scriptsdir,maxiter=finditer,
+                       maskfile=combweightfile)
+    except:
+        traceback.print_exc()
         cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
         return        
- 
+
  
     ############################################ 
     # STEP 4: Running ALLFRAME 
@@ -951,11 +1151,11 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
         shutil.copyfile(mchbase+'.tfr',mchbase+'.tfr.orig')
     if os.path.exists(mchbase+'.bck'): os.remove(mchbase+'.bck')
     for e in ['.bck','.nmg','.tfr','j.fits','k.fits','.alf']:
-        if os.path.exists(base+e): os.remove(base+e)
+        if os.path.exists(mchbase+e): os.remove(mchbase+e)
      
     # Sometimes the filenames get too long for allframe, 
     # use temporary files and symlinks
-    tid,tbase = tempfile.mkstemp(prefix="allf") # create base, leave so other processes won't take it         
+    tid,tbase = tempfile.mkstemp(prefix="allf",dir='.') # create base, leave so other processes won't take it         
     tmch = tbase+'.mch'
     if os.path.exists(tmch): os.remove(tmch)
     os.symlink(combmch,tmch)
@@ -964,188 +1164,193 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     os.symlink(mchbase+'_comb_allf.als',tals)
      
     # Geometric coefficients 
-    if len(geocoef) > 0: 
+    if geocoef is not None:
         logger.info('Modifying ALLFRAME Geometric Coefficients to '+str(geocoef))
         if os.path.exists('allframe.opt'):
             optlines = dln.readlines('allframe.opt')
-            g = dln.grep(optlines,'GE = ')
-            if ng > 0: 
+            opt = io.readopt('allframe.opt')
+            g = dln.grep(optlines,'GE = ',index=True)
+            if len(g) > 0: 
                 optlines[g[0]] = 'GE = '+str(geocoef)
             else:
                 optlines.append('GE = '+str(geocoef))
-            dln.writeline('allframe.opt',optlines)
+            dln.writelines('allframe.opt',optlines)
          
-        # Make input file
-        cmd = ''
-        if len(geocoef) > 0: # geometric coefficients
-            cmd += 'ge='+str(geocoef)+'\n'
-        cmd += '    \n'
-        cmd += tmch+'\n'
-        cmd += tals+'n'
-        cmd += '    \n' 
-        cmdfile = MKTEMP('temp')
-        dln.writelines(cmdfile,cmd)
+    # Make input file
+    cmd = []
+    if geocoef is not None: # geometric coefficients
+        cmd += ['ge='+str(geocoef)+'\n']
+    cmd += ['    \n']
+    cmd += [tmch+'\n']
+    cmd += [tals+'\n']
+    cmd += ['    \n']
+    cmdid,cmdfile = tempfile.mkstemp(prefix='temp',dir='.')
+    dln.writelines(cmdfile,cmd)
          
-        out = subprocess.run('allframe < '+cmdfile,shell=True)
+    out = subprocess.run('allframe < '+cmdfile,shell=True,stderr=subprocess.STDOUT)
          
-        # Rename tfr and nmg files
-        if os.path.exists(combbase+'.tfr'): os.remove(combbase+'.tfr')
-        shutil.move(tbase+'.tfr',combbase+'.tfr')
-        if os.path.exists(combbase+'.nmg'): os.remove(combbase+'.nmg')
-        shutil.move(tbase+'.nmg',combbase+'.nmg')
-        if os.path.exists(cmdfile): os.remove(cmdfile)
-        for f in files:
-            base1,ext = os.path.splitext(os.path.basename(f))
-            if os.path.exists(base1+'j.fits'): os.remove(base1+'.fits') # delete subtracted images 
-            if os.path.exists(tbase): os.remove(tbase) # delete temporary files and links 
-            if os.path.exists(tmch): os.remove(tmch)
-            if os.path.exists(tals): os.remove(tals)
-         
-        ############################################ 
-        # STEP 5: Combine photometry with MAKEMAG 
-        # This combines the photometry in the N alf files 
-        # and averages chi and sharp 
-        logger.info('--------------------------') 
-        logger.info('STEP 5: Running MAKEMAG')
-        logger.info('--------------------------')
-        logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))                                            
-                                      
-        #FILE_COPY,scriptsdir+'makemag','.',/overwrite 
-        if os.path.exists(mchbase+'.makemag'): os.remove(mchbase+'.makemag')
-         
-        # Make input file 
-        #magfile = mchbase+'.makemag' 
-        #undefine,cmd 
-        #push,cmd,mchbase+'.tfr'           ; final tfr file 
-        #push,cmd,strtrim(nfiles,2)+',0'   ; nfiles, offset 
-        #push,cmd,magfile                  ; final output file 
-        #push,cmd,'2'                      ; do not renumber 
-        #cmdfile = maketemp('temp','.inp') 
-        #cmdfile = MKTEMP('temp') 
-        #WRITELINE,cmdfile,cmd 
-        #SPAWN,'./makemag < '+cmdfile 
-        #FILE_DELETE,cmdfile,/allow        ; delete temporary input file 
-         
-        magfile = mchbase+'.makemag' 
-        # With the new combined files we are using _comb.mch 
-        #   and _comb.tfr, 10/23/16 
-        # combmch = FILEBASE.mch        ORIG 
-        # combmch = FILEBASE_comb.mch   NEW 
-        # The tfr file will have the same name but with .tfr 
-        makemag(combbase+'.tfr',magfile,error=magerror)
-        if len(magerror)>0:
-            cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
-            return
-         
-        # Prepend the ALF header to the makemag file
-        with open(os.path.splitext(os.path.basename(files[0]))[0]+'.alf','rb') as f:
-            line1 = f.readline()
-            line2 = f.readline()
-            line3 = f.readline()            
-        head = [line1,line2,line3]
-        # Prepend header
-        with open(magfile, 'r+') as f:
-            content = f.read()
-            f.seek(0)
-            f.write(head + content)
-         
-         
-        ####################################################### 
-        # STEP 6: Adding SExtractor information 
-        logger.info('----------------------------------------') 
-        logger.info('STEP 6: Adding SExtractor information')
-        logger.info('----------------------------------------')
-        logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))                                            
-                                      
-        # combfile_allf.sex can be matched to the makemag file using IDs 
-        # Load the SExtractor file 
-        sexfile = combbase+'_allf.sex' 
-        if os.path.exists(sexfile): 
-             
-            #------------------------------------- 
-            # Load sextractor output file 
-            # default.param specifies the output columns 
-            if file_isfits(sexfile)==False:
-                fields = dln.readlines('default.param')
-                #gd , = np.where(strmid(fields,0,1) != '#' and strtrim(fields,2) ne '',ngd) 
-                #fields = fields[gd]
-                sex = Table.read(sexfile)
-                #sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint) 
-            else:
-                sex = Table.read(sexfile,1)
-                #sex = MRDFITS(sexfile,1,/silent) 
-                if n_tags(sex) == 1: 
-                    sex = Table.read(sexfile,2) 
-            nsex = len(sex)
-             
-            # Load the MAKEMAG file 
-            mag,alfhead = io.loadraw(mchbase+'.makemag')
-            nmag = len(mag) 
-             
-            # Match them with IDs
-            ind1,ind2 = dln.match(mag['id'],sex['number'])
-            count = len(ind1)
-             
-            # Add SExtractor information to mag file 
-            sextags = sex.colnames
-            # New columns 
-            newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_WORLD',
-                       'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM_WORLD'] 
-            newname = ['FLAG','PROB','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA',
-                       'ASEMI','BSEMI','THETA','ELLIPTICITY','FWHM'] 
-            for k in range(len(newcols)):
-                if newcols[k] in sex.colnames:
-                #colind, = np.where(sextags == newcols[k],ncolind) 
-                #if len(colind) > 0:
-                    mag[newname[k]][ind1] = sex[newcols[k]][ind2]
-                    #add_tag,mag,newname[k],fix('',type=size(sex[0].(colind),/type)),mag 
-                    #mag[ind1].(n_tags(mag)-1) = sex[ind2].(colind) 
-                    # Convert to arcsec 
-                    if newcols[k]=='A_WORLD' or newcols[k]=='B_WORLD' or newcols[k]=='FWHM_WORLD' : 
-                        mag[newname[k]][ind1] *= 3600 
-             
-             
-            if nind < nmag: 
-                logger.info('DID NOT MATCH ALL THE STARS!')
-             
-             
-            # Write the final output file 
-            #---------------------------- 
-            finalfile = mchbase+'.mag' 
-            # FITS has a limit 999 columns/fields for binary tables, use ASCII 
-            # if over that limit 
-            if catformat == 'FITS' and n_tags(mag) > 999 : 
-                logger.info('Cannot use FITS output because number of columns>999.  Using ASCII instead')
-            if (catformat == 'FITS') and (len(mag.colnames)<1000):
-                if os.path.exists(finalfile+'.fits'): os.remove(finalfile+'.fits')
-                mag.writeto(finalfile+'.fits',overwrite=True)
-                if os.path.exists(finalfile): os.remove(finalfile)
-                shutil.move(finalfile+'.fits',finalfiel)
-            else:  # ASCII
-                mag.writeto(finalfile,overwrite=True)                
-                #PRINTSTR,mag,finalfile,/silent 
-             
-        # DAOPHOT 
-        else: 
-            # No SExtractor information, just copy .makemag to .mag 
-            finalfile = mchbase+'.mag' 
-            if catformat == 'FITS' and n_tags(mag) > 999 : 
-                logger.info('Cannot use FITS output because number of columns>999.  Using ASCII instead')
-            if (catformat == 'FITS') and (n_tags(mag) < 1000):
-                mag,alfhead = io.loadraw(mchbase+'.makemag')
-                if os.path.exists(finalfile+'.fits'): os.remove(finalfile+'.fits')
-                mag.writeto(finalfile+'.fits',overwrite=True)
-                if os.path.exists(finalfile): os.remove(finalfile)
-                shutil.move(finalfile+'.fits',finalfiel)               
-            else:  # ASCII
-                if os.path.exists(finalfile): os.remove(finalfile)
-                shutil.copyfile(mchbase+'.makemag',finalfile)
-         
-        logger.info('FINAL ALLFRAME file = '+finalfile)
-        logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))
+    # Rename tfr and nmg files
+    if os.path.exists(combbase+'.tfr'): os.remove(combbase+'.tfr')
+    shutil.move(tbase+'.tfr',combbase+'.tfr')
+    if os.path.exists(combbase+'.nmg'): os.remove(combbase+'.nmg')
+    shutil.move(tbase+'.nmg',combbase+'.nmg')
+    if os.path.exists(cmdfile): os.remove(cmdfile)
+    for f in files:
+        base1,ext = os.path.splitext(os.path.basename(f))
+        if os.path.exists(base1+'j.fits'): os.remove(base1+'.fits') # delete subtracted images 
+        if os.path.exists(tbase): os.remove(tbase) # delete temporary files and links 
+        if os.path.exists(tmch): os.remove(tmch)
+        if os.path.exists(tals): os.remove(tals)
 
-        # Clean up
-        cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)
+    import pdb; pdb.set_trace()
+         
+    ############################################ 
+    # STEP 5: Combine photometry with MAKEMAG 
+    # This combines the photometry in the N alf files 
+    # and averages chi and sharp 
+    logger.info('--------------------------') 
+    logger.info('STEP 5: Running MAKEMAG')
+    logger.info('--------------------------')
+    logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))                                            
+                                      
+    #FILE_COPY,scriptsdir+'makemag','.',/overwrite 
+    if os.path.exists(mchbase+'.makemag'): os.remove(mchbase+'.makemag')
+         
+    # Make input file 
+    #magfile = mchbase+'.makemag' 
+    #undefine,cmd 
+    #push,cmd,mchbase+'.tfr'           ; final tfr file 
+    #push,cmd,strtrim(nfiles,2)+',0'   ; nfiles, offset 
+    #push,cmd,magfile                  ; final output file 
+    #push,cmd,'2'                      ; do not renumber 
+    #cmdfile = maketemp('temp','.inp') 
+    #cmdfile = MKTEMP('temp') 
+    #WRITELINE,cmdfile,cmd 
+    #SPAWN,'./makemag < '+cmdfile 
+    #FILE_DELETE,cmdfile,/allow        ; delete temporary input file 
+         
+    magfile = mchbase+'.makemag' 
+    # With the new combined files we are using _comb.mch 
+    #   and _comb.tfr, 10/23/16 
+    # combmch = FILEBASE.mch        ORIG 
+    # combmch = FILEBASE_comb.mch   NEW 
+    # The tfr file will have the same name but with .tfr 
+    try:
+        makemag(combbase+'.tfr',magfile)
+    except:
+        traceback.print_exc()
+        cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)  # cleanup
+        return
+         
+    # Prepend the ALF header to the makemag file
+    with open(os.path.splitext(os.path.basename(files[0]))[0]+'.alf','rb') as f:
+        line1 = f.readline()
+        line2 = f.readline()
+        line3 = f.readline()            
+    head = [line1,line2,line3]
+    # Prepend header
+    with open(magfile, 'r+') as f:
+        content = f.read()
+        f.seek(0)
+        f.write(head + content)
+         
+    import pdb; pdb.set_trace()
+         
+    ####################################################### 
+    # STEP 6: Adding SExtractor information 
+    logger.info('----------------------------------------') 
+    logger.info('STEP 6: Adding SExtractor information')
+    logger.info('----------------------------------------')
+    logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))                                            
+                                      
+    # combfile_allf.sex can be matched to the makemag file using IDs 
+    # Load the SExtractor file 
+    sexfile = combbase+'_allf.sex' 
+    if os.path.exists(sexfile): 
+             
+        #------------------------------------- 
+        # Load sextractor output file 
+        # default.param specifies the output columns 
+        if file_isfits(sexfile)==False:
+            fields = dln.readlines('default.param')
+            #gd , = np.where(strmid(fields,0,1) != '#' and strtrim(fields,2) ne '',ngd) 
+            #fields = fields[gd]
+            sex = Table.read(sexfile)
+            #sex = IMPORTASCII(sexfile,fieldnames=fields,/noprint) 
+        else:
+            sex = Table.read(sexfile,1)
+            #sex = MRDFITS(sexfile,1,/silent) 
+            if n_tags(sex) == 1: 
+                sex = Table.read(sexfile,2) 
+        nsex = len(sex)
+             
+        # Load the MAKEMAG file 
+        mag,alfhead = io.readraw(mchbase+'.makemag')
+        nmag = len(mag) 
+             
+        # Match them with IDs
+        ind1,ind2 = dln.match(mag['id'],sex['number'])
+        count = len(ind1)
+             
+        # Add SExtractor information to mag file 
+        sextags = sex.colnames
+        # New columns 
+        newcols = ['FLAGS','CLASS_STAR','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA_WORLD',
+                   'A_WORLD','B_WORLD','THETA_WORLD','ELLIPTICITY','FWHM_WORLD'] 
+        newname = ['FLAG','PROB','MAG_AUTO','MAGERR_AUTO','BACKGROUND','THRESHOLD','ISOAREA',
+                   'ASEMI','BSEMI','THETA','ELLIPTICITY','FWHM'] 
+        for k in range(len(newcols)):
+            if newcols[k] in sex.colnames:
+            #colind, = np.where(sextags == newcols[k],ncolind) 
+            #if len(colind) > 0:
+                mag[newname[k]][ind1] = sex[newcols[k]][ind2]
+                #add_tag,mag,newname[k],fix('',type=size(sex[0].(colind),/type)),mag 
+                #mag[ind1].(n_tags(mag)-1) = sex[ind2].(colind) 
+                # Convert to arcsec 
+                if newcols[k]=='A_WORLD' or newcols[k]=='B_WORLD' or newcols[k]=='FWHM_WORLD' : 
+                    mag[newname[k]][ind1] *= 3600 
+             
+        if nind < nmag: 
+            logger.info('DID NOT MATCH ALL THE STARS!')
+             
+             
+        # Write the final output file 
+        #---------------------------- 
+        finalfile = mchbase+'.mag' 
+        # FITS has a limit 999 columns/fields for binary tables, use ASCII 
+        # if over that limit 
+        if catformat == 'FITS' and n_tags(mag) > 999 : 
+            logger.info('Cannot use FITS output because number of columns>999.  Using ASCII instead')
+        if (catformat == 'FITS') and (len(mag.colnames)<1000):
+            if os.path.exists(finalfile+'.fits'): os.remove(finalfile+'.fits')
+            mag.writeto(finalfile+'.fits',overwrite=True)
+            if os.path.exists(finalfile): os.remove(finalfile)
+            shutil.move(finalfile+'.fits',finalfiel)
+        else:  # ASCII
+            mag.writeto(finalfile,overwrite=True)                
+            #PRINTSTR,mag,finalfile,/silent 
+             
+    # DAOPHOT 
+    else: 
+        # No SExtractor information, just copy .makemag to .mag 
+        finalfile = mchbase+'.mag' 
+        if catformat == 'FITS' and n_tags(mag) > 999 : 
+            logger.info('Cannot use FITS output because number of columns>999.  Using ASCII instead')
+        if (catformat == 'FITS') and (n_tags(mag) < 1000):
+            mag,alfhead = io.readraw(mchbase+'.makemag')
+            if os.path.exists(finalfile+'.fits'): os.remove(finalfile+'.fits')
+            mag.writeto(finalfile+'.fits',overwrite=True)
+            if os.path.exists(finalfile): os.remove(finalfile)
+            shutil.move(finalfile+'.fits',finalfiel)               
+        else:  # ASCII
+            if os.path.exists(finalfile): os.remove(finalfile)
+            shutil.copyfile(mchbase+'.makemag',finalfile)
+         
+    logger.info('FINAL ALLFRAME file = '+finalfile)
+    logger.info(datetime.now().strftime("%a %b %d %H:%M:%S %Y"))
+
+    # Clean up
+    cleanup(mchbase,files,fpack,mchdir,workdir,tempdir)
          
 
     
