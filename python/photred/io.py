@@ -112,7 +112,7 @@ def fileinfo(files):
         info['mjd'][i] = utils.date2jd(info['dateobs'][i],mjd=True) 
         wcs = WCS(head)
         pcoo = wcs.pixel_to_world([info['nx'][i],info['nx'][i]+1],[info['ny'][i],info['ny'][i]+1])
-        pixscale = 3600*pcoo[0].separation(pcoo[1]).deg
+        pixscale = 3600*pcoo[0].separation(pcoo[1]).deg/np.sqrt(2)
         info['pixscale'][i] = pixscale 
         coo = wcs.pixel_to_world(info['nx'][i]//2,info['ny'][i]//2)
         cenra1 = coo.ra.deg
