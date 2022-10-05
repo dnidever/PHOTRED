@@ -396,13 +396,63 @@ FOR n=0,nnights-1 do begin
   printlog,logfile,'RUNNING DAOGROW'
   printlog,logfile,systime(0)
   SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout
-
-  ; DAOGROW Converged
-  ;----------------------
-  ; Read in the log file
   READLINE,'daogrow.log',lines
   ind = first_el(where(stregex(lines,'converged',/boolean,/fold_case) eq 1,nind),/last)
-  if nind gt 0 then begin
+  nan = where(stregex(lines,'nan',/boolean,/fold_case) eq 1,nnan)
+  
+  ;; Sometimes DAOGROW finds NaN solutions
+  ;; in that case, try different values for the fixed parameters
+  if nind eq 0 or nnan gt 0 then begin
+    undefine,lines
+    push,lines,'#!/bin/csh'
+    push,lines,'set input=${1}'
+    push,lines,'daogrow << DONE'
+    push,lines,'photo.opt'
+    push,lines,' '
+    push,lines,'${input}.inf'
+    push,lines,'${input}.ext'
+    push,lines,'3'
+    push,lines,'0.7,0.0'
+    push,lines,'0.2'
+    push,lines,'DONE'
+    writeline,'daogrow.sh',lines
+    printlog,logfile,'RUNNING DAOGROW AGAIN'
+    printlog,logfile,systime(0)
+    file_move,'daogrow.log','daogrow.log1',/over,/allow
+    SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout
+    READLINE,'daogrow.log',lines
+    ind = first_el(where(stregex(lines,'converged',/boolean,/fold_case) eq 1,nind),/last)
+    nan = where(stregex(lines,'nan',/boolean,/fold_case) eq 1,nnan)    
+  endif
+    
+  ;; Still problems
+  ;; try one more free parameter this time
+  if nind eq 0 or nnan gt 0 then begin
+    undefine,lines
+    push,lines,'#!/bin/csh'
+    push,lines,'set input=${1}'
+    push,lines,'daogrow << DONE'
+    push,lines,'photo.opt'
+    push,lines,' '
+    push,lines,'${input}.inf'
+    push,lines,'${input}.ext'
+    push,lines,'4'
+    push,lines,'0.0'
+    push,lines,'0.2'
+    push,lines,'DONE'
+    writeline,'daogrow.sh',lines
+    printlog,logfile,'RUNNING DAOGROW ONCE AGAIN'
+    printlog,logfile,systime(0)
+    file_move,'daogrow.log','daogrow.log2',/over,/allow
+    SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout    
+    READLINE,'daogrow.log',lines
+    ind = first_el(where(stregex(lines,'converged',/boolean,/fold_case) eq 1,nind),/last)
+    nan = where(stregex(lines,'nan',/boolean,/fold_case) eq 1,nnan)
+  endif
+  
+  ; DAOGROW Converged
+  ;----------------------
+  if nind gt 0 and nnan eq 0 then begin
 
     printlog,logfile,lines[ind[0]:*]
     printlog,logfile,'DAOGROW CONVERGED'
