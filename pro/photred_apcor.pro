@@ -416,7 +416,7 @@ FOR n=0,nnights-1 do begin
     push,lines,'0.2'
     push,lines,'DONE'
     writeline,'daogrow.sh',lines
-    printlog,logfile,'RUNNING DAOGROW AGAIN'
+    printlog,logfile,'DAOGROW failed.  RUNNING DAOGROW AGAIN'
     printlog,logfile,systime(0)
     file_move,'daogrow.log','daogrow.log1',/over,/allow
     SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout
@@ -441,7 +441,7 @@ FOR n=0,nnights-1 do begin
     push,lines,'0.2'
     push,lines,'DONE'
     writeline,'daogrow.sh',lines
-    printlog,logfile,'RUNNING DAOGROW ONCE AGAIN'
+    printlog,logfile,'DAOGROW failed again. RUNNING DAOGROW ONE MORE TIME'
     printlog,logfile,systime(0)
     file_move,'daogrow.log','daogrow.log2',/over,/allow
     SPAWN,'./daogrow.sh daogrow > daogrow.log',out,errout    
