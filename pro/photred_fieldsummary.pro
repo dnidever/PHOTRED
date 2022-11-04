@@ -857,7 +857,16 @@ For i=0,nexpnum-1 do begin
   if ngd gt 0 then expstr[i].airmass = median([chipstr1[gd].airmass],/even)
   expstr[i].wcstype = chipstr1[0].wcstype
   gd = where(finite(chipstr1.ra) eq 1,ngd)
-  if ngd gt 0 then expstr[i].ra = median([chipstr1[gd].ra],/even)
+  if ngd gt 0 then begin
+    ra = chipstr1[gd].ra
+    if range(ra) gt 100 then begin
+      bd = where(ra gt 180,nbd)
+      if nbd gt 0 then ra[bd] -= 360
+    endif
+    mnra = mean(minmax(ra))
+    if mnra lt 0 then mnra+=360
+    expstr[i].ra = mnra
+  endif
   gd = where(finite(chipstr1.dec) eq 1,ngd)
   if ngd gt 0 then expstr[i].dec = median([chipstr1[gd].dec],/even)
   gd = where(finite(chipstr1.wcsrms) eq 1,ngd)
@@ -980,7 +989,7 @@ MWRFITS,expstr,outfile,/silent
 MWRFITS,chipstr,outfile,/silent
 
 ; Copy file to main directory
-FILE_COPY,outfile,setupdir,/over,/verbose
+FILE_COPY,outfile,setupdir,/over,/verbose,/allow
 
 ;stop
 
