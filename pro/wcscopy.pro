@@ -83,13 +83,13 @@ endif
 ; Loading FILE2
 im2 = PHOTRED_READFILE(file2,head2,error=error2)
 if n_elements(error2) gt 0 then begin
-  error2 = 'ERROR reading in ',file2
+  error2 = 'ERROR reading in '+file2
   print,error2
   return
 endif
 EXTAST,head2,astr2
 if n_elements(astr2) eq 0 then begin
-  error2 = 'NO WCS found in file2'
+  error2 = 'NO WCS found in '+file2
   print,error2
   return
 endif
