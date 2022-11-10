@@ -50,8 +50,18 @@ endif
 ;; Create the DAOPHOT file
 ;;   taken from smashred_imprep_single.pro
 if not keyword_set(header) then begin
-  FITS_READ,fluxfile,fim,fhead
-  FITS_READ,maskfile,mim,mhead
+  FITS_READ,fluxfile,fim,fhead,/no_abort,message=ferror
+  if ferror ne '' then begin
+    error = ferror
+    print,error
+    return
+  endif
+  FITS_READ,maskfile,mim,mhead,/no_abort,message=merror
+  if merror ne '' then begin
+    error = merror
+    print,error
+    return
+  endif
 endif else fhead=HEADFITS(fluxfile)
 ccdnum = sxpar(fhead,'CCDNUM')
 

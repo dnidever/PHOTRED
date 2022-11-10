@@ -103,7 +103,7 @@ if info.exists eq 1 and info.size gt 1 then begin
   ;; Only return the header
   if keyword_set(header) then return,meta
   ;; Load the data in the fits file
-  FITS_READ,file,im
+  FITS_READ,file,im,/no_abort
   return,im
 endif
 
