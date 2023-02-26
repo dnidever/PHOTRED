@@ -202,10 +202,10 @@ outmaskfiles = base+'.mask.shft.fits'
 ;; photred_gatherfileinfo.pro can do most of this
 printlog,logf,'Gathering file information'
 ntrans = n_elements(trans[0,*])
-filestr = replicate({fitsfile:'',catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),head:ptr_new(),$
-                      vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,saturate:0.0,$
-                      background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,$
-                      resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles)
+filestr = replicate({fitsfile:'',exists:0,catfile:'',nx:0L,ny:0L,trans:dblarr(ntrans),magoff:fltarr(2),$
+                     head:ptr_new(),vertices_ra:dblarr(4),vertices_dec:dblarr(4),pixscale:0.0,$
+                     saturate:0.0,background:0.0,comb_zero:0.0,comb_scale:0.0,comb_weights:0.0,$
+                     resampfile:'',resampmask:'',resamptrans:dblarr(ntrans),resamptransrms:0.0},nfiles)
 filestr.fitsfile = fitsfiles
 filestr.catfile = files
 filestr.trans = transpose(trans)
@@ -213,7 +213,9 @@ filestr.magoff = magoff
 filestr.resampfile = outfiles
 filestr.resampmask = outmaskfiles
 for i=0,nfiles-1 do begin
-  im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1)
+  im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1,error=rderror)
+  if n_elements(rderror) ne 0 then continue
+  filestr[i].exists = 1
   filestr[i].head = ptr_new(head1)
   filestr[i].nx = sxpar(head1,'NAXIS1')
   filestr[i].ny = sxpar(head1,'NAXIS2')
@@ -229,7 +231,12 @@ for i=0,nfiles-1 do begin
   background = median(im1[gdpix])
   filestr[i].background = background
 endfor
-
+;gdfiles = where(filestr.exists eq 1,ngd,comp=bdfiles,ncomp=nbd)
+;if nbd gt 0 then begin
+;  printlog,logf,'Removing '+strtrim(nbd,2)+' bad files'
+;  filestr = filestr[gdfiles]
+;  nfiles = n_elements(filestr)
+;endif
 
 ;#################################################
 ; Create default reference frame if TILE not input
@@ -240,19 +247,20 @@ if tile.type eq 'WCS' and n_tags(tile) eq 1 then begin
   ; at halfway between the ra/dec min/max of all of
   ; the images.  The mean pixel scale is used.
   ;  near RA=0 line
-  if range(filestr.vertices_ra) gt 180 then begin
-    vertices_ra = filestr.vertices_ra
+  gd = where(filestr.exists eq 1,ngd)
+  if range(filestr[gd].vertices_ra) gt 180 then begin
+    vertices_ra = filestr[gd].vertices_ra
     over = where(vertices_ra gt 180,nover,comp=under,ncomp=nunder)
     if nover gt 0 then vertices_ra[over]-=360
     rar = minmax(vertices_ra)
     cenra = mean(rar)
   endif else begin
-    rar = minmax(filestr.vertices_ra)
+    rar = minmax(filestr[gd].vertices_ra)
     cenra = mean(rar)
   endelse
-  decr = minmax(filestr.vertices_dec)
+  decr = minmax(filestr[gd].vertices_dec)
   cendec = mean(decr)
-  pixscale = mean(filestr.pixscale)
+  pixscale = mean(filestr[gd].pixscale)
   ; Set up the tangent plane projection
   step = pixscale/3600.0d0
   delta_dec = range(decr)
@@ -350,12 +358,13 @@ if not keyword_set(fake) then begin
     invscales[bdscale] = 1.0
     weights[bdscale] = 0.0
   endif
+  gd = where(filestr.exists eq 1)
   weightfile = mchbase+'.weights'
-  WRITECOL,weightfile,weights,fmt='(F10.6)'
+  WRITECOL,weightfile,weights[gd],fmt='(F10.6)'
   scalefile = mchbase+'.scale'
-  WRITECOL,scalefile,invscales,fmt='(F10.6)'  ; want to scale it UP
+  WRITECOL,scalefile,invscales[gd],fmt='(F10.6)'  ; want to scale it UP
   zerofile = mchbase+'.zero'
-  WRITECOL,zerofile,-sky,fmt='(F12.4)'  ; want to remove the background, set to 1st frame
+  WRITECOL,zerofile,-sky[gd],fmt='(F12.4)'  ; want to remove the background, set to 1st frame
 
 ; FAKE, use existing ones
 endif else begin
@@ -394,6 +403,7 @@ CASE tile.type of
 
   ; Loop through the files
   For i=0,nfiles-1 do begin
+    if filestr[i].exists eq 0 then continue
     im1 = PHOTRED_READFILE(filestr[i].fitsfile,head1)
 
     ; Make the mask
@@ -470,6 +480,7 @@ end
   yy1 = replicate(1,nx)#lindgen(ny)
   for i=0,nfiles-1 do begin
     ; Image
+    if filestr[i].exists eq 0 then continue
     tim = PHOTRED_READFILE(tempfits[i],thead)
     background = median(tim)
     out = trans_coo(xx1[*],yy1[*],reform(trans[i,*]))
@@ -512,7 +523,7 @@ ENDCASE
 if not keyword_set(fake) then begin
   print,'Deriving new transformation equations for the resampled coordinate system'
   for i=0,nfiles-1 do begin
-
+    if filestr[i].exists eq 0 then continue
     ; Convert X/Y of this system into the combined reference frame
     ;  The pixel values are 1-indexed like DAOPHOT uses.
     ngridbin = 50
@@ -592,7 +603,9 @@ printlog,logf,'-------------------'
 
 ; The imcombine input file
 resampfile = mchbase+'.resamp'
-WRITELINE,resampfile,filestr.resampfile
+gd = where(filestr.exists eq 1)
+WRITELINE,resampfile,filestr[gd].resampfile
+
 
 ; SCALE the images for combining
 ;-------------------------------
@@ -683,7 +696,8 @@ if not keyword_set(nocmbimscale) then begin
   rdnoisearr = fltarr(nfiles)
   for i=0,nfiles-1 do rdnoisearr[i] = PHOTRED_GETRDNOISE(base[i]+'.fits')
   ;  the "scales" array here is actually 1/scales used by IMCOMBINE.
-  rdnoise = sqrt(total((weights*rdnoisearr/scales)^2))
+  gd = where(filestr.exists eq 1)
+  rdnoise = sqrt(total((weights[gd]*rdnoisearr[gd]/scales[gd])^2))
   rdnoise = rdnoise > 0.01   ; must be >=0.01 or it will be 0.00 in the opt file and daophot will crash
   dummy = PHOTRED_GETRDNOISE(combfile,keyword=rdnoisekey) ; get keyword
   sxaddpar,combhead,rdnoisekey,rdnoise
@@ -698,7 +712,7 @@ if not keyword_set(nocmbimscale) then begin
   ; So the final sky level should be
   ; final sky = total((weights*scale*sqrt(sky/gain))^2)*gain
   gain = PHOTRED_GETGAIN(combfile,keyword=gainkey)
-  comb_sky = total((weights*sqrt((sky>0)/gain)/scales)^2)*gain
+  comb_sky = total((weights[gd]*sqrt((sky[gd]>0)/gain)/scales[gd])^2)*gain
   ; the "scales" array here is actually 1/scale
   combim += float(comb_sky)  ; keep it float
 
@@ -755,7 +769,8 @@ Endif else begin
   ; The final RDNOISE is essentially: comb_rdnoise = sqrt(total((weights*rdnoise)^2))
   rdnoisearr = fltarr(nfiles)
   for i=0,nfiles-1 do rdnoisearr[i] = PHOTRED_GETRDNOISE(base[i]+'.fits')
-  rdnoise = sqrt(total((weights*rdnoisearr)^2))
+  gd = where(filestr.exists eq 1)
+  rdnoise = sqrt(total((weights[gd]*rdnoisearr[gd])^2))
   rdnoise = rdnoise > 0.01   ; must be >=0.01 or it will be 0.00 in the opt file and daophot will crash
   dummy = PHOTRED_GETRDNOISE(combfile,keyword=rdnoisekey) ; get keyword
   sxaddpar,combhead,rdnoisekey,rdnoise
@@ -764,7 +779,7 @@ Endif else begin
   ; So the final sky level should be
   ; final sky = total((weights*scale*sqrt(sky/gain))^2)*gain
   gain = PHOTRED_GETGAIN(combfile,keyword=gainkey)
-  comb_sky = total((weights*sqrt(sky/gain))^2)*gain
+  comb_sky = total((weights[gd]*sqrt(sky[gd]/gain))^2)*gain
   ; the "scales" array here is actually 1/scale
   combim += comb_sky
 
@@ -828,6 +843,7 @@ if keyword_set(usecmn) then begin
   ; Loop through the files and convert to coordinates to the comined file
   undefine,allcmn
   for i=0,nfiles-1 do begin
+    if filestr[i].exists eq 0 then continue
     cmnfile1 = file_basename(filestr[i].fitsfile,'.fits')+'.cmn.lst'
     if file_test(cmnfile1) eq 1 then begin
       cmn1 = IMPORTASCII(cmnfile1,fieldnames=['id','x','y','mag','err','sky','skysig','sharp','round','round2'],$

@@ -71,7 +71,7 @@ if ngdframe eq 0 then begin
   if nrefstars eq 0 then begin
     gdrefstars = where(reform(mag[gdframe,*]) lt 50,nrefstars)
     si = reverse(sort(totstars[gdrefstars]))           ; order by how many other frames they are detected in
-    gdrefstars = gdrefstars[si[0:(49>(nrefstars-1))]]  ; only want 50
+    gdrefstars = gdrefstars[si[0:(49<(nrefstars-1))]]  ; only want 50
     nrefstars = n_elements(gdrefstars)
   endif
 endif
