@@ -64,14 +64,25 @@ nfiles = n_elements(files)
 ; Get the information that we need
 
 ; Load the opt files
-info = replicate({name:'',filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,mnsky:0.0,medsky:0.0,$
-                  mag10:99.99,flux10:0.0,fluxrate10:0.0,weight:0.0,scale:0.0},nfiles)
+info = replicate({name:'',exists:0,filter:'',exptime:0.0,fwhm:0.0,rdnoise:0.0,$
+                  mnsky:0.0,medsky:0.0,mag10:99.99,flux10:0.0,fluxrate10:0.0,$
+                  weight:0.0,scale:0.0},nfiles)
 info.name = files
 for i=0,nfiles-1 do begin
   dir = file_dirname(mchfile)
   base = file_basename(files[i],'.als')
   optfile = dir+'/'+base+'.opt'
   logfile1 = dir+'/'+base+'.log'
+  
+  ;; Check that the FITS file exists
+  info[i].exists = 1
+  fitsfile = base+'.fits'
+  if file_test(fitsfile) eq 0 then fitsfile+='.fz'
+  if file_test(fitsfile) eq 1 then begin
+    info1 = file_info(fitsfile)
+    if info1.size le 1 then info[i].exists = 0
+  endif else info[i].exists = 0
+  if info[i].exists eq 0 then print,fitsfile+' NOT FOUND'
 
   READCOL,optfile,name,dum,value,format='A,A,F',/silent
   name = strtrim(strupcase(name),2)
@@ -121,12 +132,19 @@ for i=0,nfiles-1 do begin
   endif
 
   arr = strsplit(out[0],' ',/extract)
-  info[i].mnsky = float(arr[5])
-  info[i].medsky = float(arr[6])
+  if n_elements(arr) ge 7 then begin
+    info[i].mnsky = float(arr[5])
+    info[i].medsky = float(arr[6])
+  endif
+  ;; Get sky from ALS file
+  if n_elements(arr) lt 7 or info[i].medsky le 0.0 then begin
+    alsfile = base+'.als'
+    LOADALS,alsfile,als
+    info[i].mnsky = mean(als.sky)
+    info[i].medsky = median(als.sky)
+  endif
 
   ;; Get exptime and filter
-  fitsfile = base+'.fits'
-  if file_test(fitsfile) eq 0 then fitsfile+='.fz'
   info[i].exptime = PHOTRED_GETEXPTIME(fitsfile)
   info[i].filter = PHOTRED_GETFILTER(fitsfile)
 endfor  ;; file loop
