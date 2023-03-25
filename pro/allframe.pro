@@ -550,7 +550,9 @@ if n_elements(magerror) gt 0 then goto,BOMB
 
 ; Prepend the ALF header to the makemag file
 line1='' & line2='' & line3=''
-openr,unit,/get_lun,file_basename(files[0],'.als')+'.alf'
+test = file_test(file_basename(files,'.als')+'.alf')
+gd = where(test eq 1)
+openr,unit,/get_lun,file_basename(files[gd[0]],'.als')+'.alf'
 readf,unit,line1
 readf,unit,line2
 readf,unit,line3
