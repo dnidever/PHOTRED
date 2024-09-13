@@ -192,7 +192,6 @@ precursor = 'CALIB'
 lists = PHOTRED_GETINPUT(thisprog,precursor,redo=redo,ext='phot')
 ninputlines = lists.ninputlines
 
-
 ; No files to process
 ;---------------------
 if ninputlines eq 0 then begin
@@ -365,7 +364,6 @@ for i=0,nsfields-1 do begin
     basename = strmid(firstname,0,len-endlen-1)
   endif
   outname = ishortfield+'/'+basename+'.cmb'
-
   ;; Make sure that it exists, and add to OUTLIST
   outtest = FILE_TEST(outname)
   if outtest eq 1 then outlines = FILE_LINES(outname) else outlines=0
