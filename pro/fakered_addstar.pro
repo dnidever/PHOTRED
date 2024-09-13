@@ -112,6 +112,7 @@ htcondor_cmd    = getparam(htcondor_cmd    , 'htcondor_cmd'    , setup, ''      
 starsshuffle    = getparam(starsshuffle    , 'starsshuffle'    , setup, '0'           , logfile, /bool)
 maxmocks        = getparam(maxmocks        , 'maxmocks'        , setup, '0'           , logfile)
 refinemch       = getparam(refinemch       , 'refinemch'       , setup, '0'           , logfile)
+alftiletype     = getparam(alftiletype     , 'alftiletype'     , setup, 'ORIG'        , logfile)
 
 ; SOME EXTRA VALIDATIONS
 
@@ -278,11 +279,19 @@ if sepchipdir  eq 1 then reldir += ".." + PATH_SEP()
 printlog,logfile,"Processing " + strcompress(nmchinputlines) + " files from INPUT list"
 for i=0,nmchinputlines-1 do begin
   base_dir = file_dirname(mchinputlines[i])
+  mchfile = mchinputlines[i]
+
+  ;; WCS tile type, need to use _comb.mch file
+  if alftype eq 'WCS' then begin
+    mchfile = mchinputlines[i]
+    mchfile = repstr(mchfile,'.mch','_comb.mch')
+  endif
+
   ; Make commands for addstar python program
   ; Syntax: python python_script.py  <1:mch_file> <2:chips_file> <3:maxmocks> <4:starscols> <5:starsshufle> 
   ;                                  <6:magext>   <7:maxccdsize> <8:dimfield> <9:radcent> <10:distance> <11:refinemch>
   cmd1  = pythonbin                 + " "   + base_script            + " '"    $
-        + mchinputlines[i]          + "' '" + base_chipsfile         + "' '"   $
+        + mchfile                   + "' '" + base_chipsfile         + "' '"   $
         + strcompress(maxmocks)     + "' '" + strcompress(starscols) + "' '"   $
         + strcompress(starsshuffle) + "' '" + strcompress(magext)    + "' '"   $
         + strcompress(maxccdsize)   + "' '" + strcompress(radcent)   + "' '"   $
