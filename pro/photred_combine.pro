@@ -158,6 +158,10 @@ if (n_tags(imagers) eq 0) then begin
   return
 endif
 
+filterfile = scriptsdir+'/filters'
+if file_test(filterfile) eq 0 then begin
+  print,'no >>filters<< file in ',scriptsdir
+endif
 
 
 ; What IMAGER are we using??
@@ -332,7 +336,11 @@ FOR i=0,nsfields-1 do begin
   if keyword_set(sepchipdir) gt 0 then cmd1 += ',/sepchipdir'
 
   PUSH,cmd,cmd1
-  PUSH,cmddir,ishortfield
+  PUSH,cmddir,curdir+'/'+ishortfield
+
+  ;; make sure there's a "filters" file in each field directory
+  if file_test(curdir+'/'+ishortfield+'/filters') eq 0 then $
+    file_copy,filterfile,curdir+'/'+ishortfield,/over,/allow
 
 ENDFOR
 ncmd = n_elements(cmd)
