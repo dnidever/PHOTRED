@@ -162,7 +162,7 @@ if ncmd gt 0 then begin
   cmd = "cd,'"+cmddir+"' & "+cmd  ; go to the directory
   ; Submit the jobs to the daemon
   PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='astrom',hyperthread=hyperthread,/idle,$
-             waittime=1,scriptsdir=scriptsdir
+             waittime=1,/cdtodir,scriptsdir=scriptsdir
 endif
 
 ; Check for success/failures
