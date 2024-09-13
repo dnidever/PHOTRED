@@ -958,7 +958,7 @@ def allframe(infile,tile=None,setupdir=None,setup=None,scriptsdir=None,
     # Check that the mch, als, and opt files exist
     for f in [mchfile,mchbase+'.raw']:
         if os.path.exists(f)==False:
-            raise ValuError(f+' NOT FOUND')
+            raise ValueError(f+' NOT FOUND')
 
      
     ############################################ 

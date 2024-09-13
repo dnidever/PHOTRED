@@ -578,6 +578,7 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
             for f in [base+'.find.temp',tempscript]:
                 if os.path.exists(f): os.remove(f)
          
+        import pdb; pdb.set_trace()
         arr = out[0].split()
         info['mnsky'][i] = float(arr[5]) 
         info['medsky'][i] = float(arr[6]) 
@@ -1261,7 +1262,7 @@ def combine(filename,tile=None,setup=None,scriptsdir=None,logger=None,irafdir=No
         tilehead['CRVAL2'] = cendec 
         tilehead['CTYPE2'] = 'DEC--TAN' 
         tilewcs = WCS(tilehead)
-        tileast['equinox'] = 2000 
+        tilehead['equinox'] = 2000 
          
         logger.info('RA range = ['+str(rar[0])+','+str(rar[1])+'] deg')
         logger.info('DEC range = ['+str(decr[0])+','+str(decr[1])+'] deg')

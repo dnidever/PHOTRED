@@ -6,8 +6,9 @@
 ; in the photometry files.
 ;
 ; INPUTS:
-;  /redo Redo files that were already done.
-;  /stp  Stop at the end of the program.
+;  =nmulti  Number of parallel jobs to run
+;  /redo    Redo files that were already done.
+;  /stp     Stop at the end of the program.
 ;
 ; OUTPUTS:
 ;  The final calibrated photometry with accurate astrometry
@@ -15,7 +16,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_astrom,redo=redo,stp=stp
+pro photred_astrom,nmulti=nmulti,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -76,6 +77,23 @@ if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
 ndetmin = READPAR(setup,'NDETMIN')
 if (ndetmin eq '-1' or ndetmin eq '0' or ndetmin eq '') then undefine,ndetmin else ndetmin=long(ndetmin)
 
+; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread')
+if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if strtrim(hyperthread,2) eq '0' then hyperthread=0
+if n_elements(hyperthread) eq 0 then hyperthread=0
+
+; Getting NMULTI
+if n_elements(nmulti) eq 0 then begin
+  nmulti = READPAR(setup,'NMULTI')
+  nmulti = long(nmulti)
+
+  ; Use NMULTI_WCS if set
+  nmultiwcs = READPAR(setup,'NMULTI_WCS')
+  if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
+endif
+nmulti = nmulti > 1  ; must be >=1
+
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
 instrument = READPAR(setup,'INSTRUMENT')
@@ -123,175 +141,42 @@ printlog,logfile,'-----------------------'
 printlog,logfile,systime(0)
 
 undefine,outlist,successlist,failurelist
+undefine,cmd,cmddir
 
 ; Loop through the input PHOT files
 FOR i=0,ninputlines-1 do begin
-
   longfile = inputlines[i]
   file = FILE_BASENAME(longfile)
   filedir = FILE_DIRNAME(longfile)
 
-  printlog,logfile,''
-  printlog,logfile,'=========================================='
-  printlog,logfile,'Getting coordinates for '+file
-  printlog,logfile,'=========================================='
+  cmd1 = "PHOTRED_ASTROM_SINGLE,'"+longfile+"',catformat='"+catformat+"'"
+  if keyword_set(redo) then cmd1 += ',/redo'
+  if n_elements(ndetmin) gt 0 then cmd1 += ',ndetmin='+strtrim(ndetmin,2)
 
+  PUSH,cmd,cmd1
+  PUSH,cmddir,filedir
+ENDFOR
+ncmd = n_elements(cmd)
 
-  CD,filedir
+if ncmd gt 0 then begin
+  cmd = "cd,'"+cmddir+"' & "+cmd  ; go to the directory
+  ; Submit the jobs to the daemon
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='astrom',hyperthread=hyperthread,/idle,$
+             waittime=1,scriptsdir=scriptsdir
+endif
 
+; Check for success/failures
+for i=0,ninputlines-1 do begin
+  longfile = inputlines[i]
+  file = file_basename(longfile)
+  filedir = file_dirname(longfile)
   ending = first_el(strsplit(longfile,'.',/extract),/last)
-
-  ; Wrong input file
-  if (ending ne 'mch' and ending ne 'mag') then begin
-    printlog,logfile,file+' ERROR - Input files must end in ".mag" or ".mch"'
-    PUSH,failurelist,longfile
-    goto,BOMB
-  endif
-
-  ; ALLFRAME output
-  ;------------------
-  If (ending eq 'mag') then begin
-    base = FILE_BASENAME(file,'.mag')
-    mchfile = base+'.mch'
-    magfile = base+'.mag'
-    ; Switched to the stacked/comb file for the WCS, 10/23/16
-    ;  in the original combination procedure these two files ahd
-    ;  the identical WCS, in the new combination procedure they
-    ;  are very different but the "reference frame" is the 
-    ;  combined frame.
-    ;fitsfile = base+'.fits'
-    fitsfile = base+'_comb.fits'
-    photfile = magfile
-  Endif ; 'mag' file
-
-  ; DAOPHOT output
-  ;------------------
-  If (ending eq 'mch') then begin
-    base = FILE_BASENAME(file,'.mch')
-    mchfile = file
-    rawfile = base+'.raw'
-    fitsfile = base+'.fits'
-    if file_test(fitsfile) eq 0 then fitsfile=base+'.fits.fz'
-    photfile = rawfile
-  Endif
-
-  ; Check that the MAG/RAW, MCH and FITS files exist
-  ;-------------------------------------------------
-  mchtest = FILE_TEST(mchfile)
-  if mchtest eq 1 then nmchlines = FILE_LINES(mchfile) else nmchlines=0
-  phottest = FILE_TEST(photfile)
-  if phottest eq 1 then nphotlines = FILE_LINES(photfile) else nphotlines=0
-  fitstest = FILE_TEST(fitsfile)
-  if (nmchlines eq 0) or (nphotlines eq 0) or (fitstest eq 0) then begin
-    PUSH,failurelist,longfile
-    if mchtest eq 0 then printlog,logfile,mchfile+' NOT FOUND'
-    if mchtest eq 1 and nmchlines eq 0 then printlog,logfile,mchfile+' HAS 0 LINES'
-    if phottest eq 0 then printlog,logfile,photfile+' NOT FOUND'
-    if phottest eq 1 and nphotlines eq 0 then printlog,logfile,photfile+' HAS 0 LINES'
-    if fitstest eq 0 then printlog,logfile,fitsfile+' NOT FOUND'
-    goto,BOMB
-  endif
-
-
-  ; Load the MCH file
-  ;------------------
-  LOADMCH,mchfile,alsfiles
-  nalsfiles = n_elements(alsfiles)    
-  numobs = nalsfiles
-
-  ; Load the photometry file
-  ;-------------------------  
-  phot0 = PHOTRED_READFILE(photfile)
-  nphot = n_elements(phot0)
-  schema = phot0[0]
-  struct_assign,{dum:''},schema
-  schema = CREATE_STRUCT(schema,'RA',0.0d0,'DEC',0.0d0)
-  phot = REPLICATE(schema,nphot)
-  struct_assign,phot0,phot
-  undefine,phot0
-  printlog,logfile,'Nstars = '+strtrim(nphot,2)
-
-
-  ; Load the FITS header
-  if strmid(fitsfile,6,7,/reverse_offset) eq 'fits.fz' then begin
-    head = PHOTRED_READFILE(fitsfile,exten=1,/header)
-    ; Fix the NAXIS1/2 values in the header
-    sxaddpar,head,'NAXIS1',sxpar(head,'ZNAXIS1')
-    sxaddpar,head,'NAXIS2',sxpar(head,'ZNAXIS2')
+  if ending eq 'mag' then begin
+    base = file_basename(file,'.mag')
   endif else begin
-    head = PHOTRED_READFILE(fitsfile,/header)
-  endelse
-
-  ; Checking that the header has a WCS
-  EXTAST,head,astr
-  nastr = n_elements(astr)
-  if (nastr eq 0) then begin
-    PUSH,failurelist,longfile
-    printlog,logfile,fitsfile,' DOES NOT HAVE A WCS'
-    goto,BOMB
-  endif
-
-  ; Check that the structure has X/Y
-  tags = TAG_NAMES(phot)
-  xgd = where(tags eq 'X',nxgd)
-  ygd = where(tags eq 'Y',nygd)
-  if (nxgd eq 0) or (nygd eq 0) then begin
-    PUSH,failurelist,longfile
-    printlog,logfile,file,' DOES NOT HAVE X/Y COORDINATES'
-    goto,BOMB
-  endif
-
-
-  ; Converting to IDL X/Y convention, starting at (0,0)
-  ; DAOPHOT has X/Y start at (1,1)
-  x = phot.x - 1.0
-  y = phot.y - 1.0
-
-
-  ; Get RA/DEC coordinates for X/Y
-  HEAD_XYAD,head,x,y,ra,dec,/degree
-
-  ;; Add the RA/DEC tags
-  ;ragd = where(tags eq 'RA',nragd)
-  ;if (nragd) eq 0 then ADD_TAG,phot,'RA',0.0d0,phot
-  ;decgd = where(tags eq 'DEC',ndecgd)
-  ;if (ndecgd) eq 0 then ADD_TAG,phot,'DEC',0.0d0,phot
-
-  ; Put RA/DEC into the structure
-  phot.ra = ra
-  phot.dec = dec
-
-
-  ; Apply minimum number of detections, NDETMIN
-  if n_elements(ndetmin) gt 0 then begin
-    printlog,logfile,'Applying NDETMIN = '+strtrim(ndetmin,2)
-    ; ID X Y MAG1 MAG1ERR MAG2 MAG2ERR MAG3 MAG3ERR MAG4 MAG4ERR
-    magind = where(stregex(tags,'^MAG',/boolean) eq 1 and stregex(tags,'ERR$',/boolean) eq 0,nmagind)
-    printlog,logfile,strtrim(nmagind,2)+' magnitude columns'
-    ndet = lonarr(n_elements(phot))
-    for i=0,nmagind-1 do ndet += (phot.(magind[i]) lt 50)
-    gddet = where(ndet ge ndetmin,ngddet)
-    if ngddet gt 0 then begin
-      printlog,logfile,'Keeping '+strtrim(ngddet,2)+' of '+strtrim(n_elements(phot),2)+' sources'
-    endif else begin
-      printlog,logfile,'NO SOURCES PASS.  Keeping the first source.'      
-      gddet = 0
-      ngddet = 1
-    endelse
-    phot = phot[gddet]
-  endif
-  
-  
-  ; Output the structure to the AST file
-  astfile = base+'.ast'
-  printlog,logfile,'File with RA/DEC coordinates is: ',astfile
-
-  if catformat eq 'FITS' then begin
-    MWRFITS,phot,astfile,/create,/silent
-  endif else begin   ; ASCII
-    PRINTSTR,phot,astfile,/silent
-  endelse
-    
+    base = file_basename(file,'.mch')
+  endelse 
+  astfile = filedir+'/'+base+'.ast'
   ; Check that the file AST file is there
   asttest = FILE_TEST(astfile)
   if (asttest eq 1) then begin
@@ -301,21 +186,7 @@ FOR i=0,ninputlines-1 do begin
     PUSH,failurelist,longfile
     printlog,logfile,astfile,' NOT FOUND'
   endelse
-
-
-  BOMB:
-
-  CD,curdir
-
-  ;##########################################
-  ;#  UPDATING LIST FILES
-  ;##########################################
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                    failurelist=failurelist,setupdir=curdir,/silent
-
-  ;stop
-
-ENDFOR
+endfor
 
 
 ;#####################
@@ -328,8 +199,5 @@ PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
 printlog,logfile,'PHOTRED_ASTROM Finished  ',systime(0)
 
 if keyword_set(stp) then stop
-
-
-
 
 end
