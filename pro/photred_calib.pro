@@ -15,7 +15,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_calib,redo=redo,stp=stp
+pro photred_calib,nmulti=nmulti,redo=redo,stp=stp
 
 COMMON photred,setup
 
@@ -83,6 +83,22 @@ tilesep = '+'
 ; Are we redoing?
 doredo = READPAR(setup,'REDO')
 if keyword_set(redo) or (doredo ne '-1' and doredo ne '0') then redo=1
+
+; Hyperthread?
+hyperthread = READPAR(setup,'hyperthread')
+if hyperthread ne '0' and hyperthread ne '' and hyperthread ne '-1' then hyperthread=1
+if strtrim(hyperthread,2) eq '0' then hyperthread=0
+if n_elements(hyperthread) eq 0 then hyperthread=0
+
+; Getting NMULTI
+if n_elements(nmulti) eq 0 then begin
+  nmulti = READPAR(setup,'NMULTI')
+  nmulti = long(nmulti)
+  ; Use NMULTI_WCS if set
+  nmultiwcs = READPAR(setup,'NMULTI_WCS')
+  if nmultiwcs ne '0' and nmultiwcs ne '' and nmultiwcs ne '-1' then nmulti=long(nmultiwcs)
+endif
+nmulti = nmulti > 1  ; must be >=1   
 
 ; Telescope, Instrument
 telescope = READPAR(setup,'TELESCOPE')
@@ -406,6 +422,7 @@ printlog,logfile,''
 printlog,logfile,systime(0)
 
 undefine,outlist,successlist,failurelist
+undefine,cmd,cmddir
 
 ; Looping through the input files
 FOR i=0,ninputlines-1 do begin
@@ -416,240 +433,54 @@ FOR i=0,ninputlines-1 do begin
   base = FILE_BASENAME(file,'.ast')
   mchfile = base+'.mch'
 
-  printlog,logfile,'CALIBRATING ',file
-  printlog,logfile,systime(0)
-
-  CD,filedir
-
-  ; Check that the AST and MCH files exist
-  ;---------------------------------------
-  asttest = FILE_TEST(longfile)
-  if asttest eq 1 then nastlines = FILE_LINES(longfile) else nastlines=0
-  mchtest = FILE_TEST(mchfile)
-  if mchtest eq 1 then nmchlines = FILE_LINES(mchfile) else nmchlines=0
-  if (nmchlines eq 0) or (nastlines eq 0) then begin
-    PUSH,failurelist,longfile
-    if asttest eq 0 then printlog,logfile,file+' NOT FOUND'
-    if asttest eq 1 and nastlines eq 0 then printlog,logfile,file+' HAS 0 LINES'
-    if mchtest eq 0 then printlog,logfile,mchfile,' NOT FOUND'
-    if mchtest eq 1 and nmchlines eq 0 then printlog,logfile,mchfile,' HAS 0 LINES'
-    goto,BOMB
+  cmd1 = "PHOTRED_CALIB_SINGLE,'"+longfile+"','"+scriptsdir+"/imagers','"+transfile+"'"
+  cmd1 += ",'"+apcorfile+"',catformat='"+catformat+"',telescope='"+telescope+"'"
+  cmd1 += ",instrument='"+instrument+"',observatory='"+observatory+"'"
+  if keyword_set(ddo51radialoffset) then begin
+    cmd1 += ',/ddo51radialoffset'
+    cmd1 += ',fieldra='+strtrim(fieldcenters[i].ra,2)
+    cmd1 += ',fielddec='+strtrim(fieldcenters[i].dec,2)
   endif
+  if keyword_set(mchusetiles) then cmd1 += ',/mchusetiles'
+  if keyword_set(dokeepstr) then cmd1 += ',/keepinstr'
+  if keyword_set(doavgmag) then cmd1 += ',/avgmag'
+  if keyword_set(doavgonly) then cmd1 += ',/avgonlymag'
 
-  ; Check that the individual FITS files exist
-  ; and appear in the apcor.lst
-  ; the 'a.del' endings were already removed
-  LOADMCH,mchfile,alsfiles
-  nalsfiles = n_elements(alsfiles)
-  for j=0,nalsfiles-1 do begin
-    ialsfile = alsfiles[j]
-    ibase = FILE_BASENAME(ialsfile,'.als')
-    ifitsfile = ibase+'.fits'
-    if file_test(ifitsfile) eq 0 then ifitsfile=ibase+'.fits.fz'
-    ifitstest = FILE_TEST(ifitsfile)
-    igd = where(apcor.name eq ibase,nigd)
-    ;; TILES, strip off the tile portion at the end
-    if nigd eq 0 and keyword_set(mchusetiles) and stregex(ibase,'\'+tilesep+'T',/boolean) eq 1 then begin
-      itilebase = (strsplit(ibase,tilesep,/extract))[0]
-      igd = where(apcor.name eq itilebase,nigd)
-    endif
-    if (ifitstest eq 0) or (nigd eq 0) then begin
-      PUSH,failurelist,longfile
-      if ifitstest eq 0 then printlog,logfile,ifitsfile,' NOT FOUND'
-      if nigd eq 0 then printlog,logfile,ialsfile,' NOT in apcor.lst'
-      goto,BOMB
-    endif
-  endfor
+  PUSH,cmd,cmd1
+  PUSH,cmddir,filedir
+
+ENDFOR
+ncmd = n_elements(cmd)
+
+if ncmd gt 0 then begin
+  cmd = "cd,'"+cmddir+"' & "+cmd ; go to the directory
+  ; Submit the jobs to the daemon
+  PBS_DAEMON,cmd,cmddir,nmulti=nmulti,prefix='calib',hyperthread=hyperthread,/idle,$
+             waittime=1,scriptsdir=scriptsdir
+endif
 
 
-  ; DDO51 Radial Offset Correction
-  ;-------------------------------
-  undefine,photfile
-  If keyword_set(ddo51radoffset) and (telescope eq 'BLANCO') and (instrument eq 'MOSAIC') then begin
-
-    ; Check that we have DDO51
-    alsbases = FILE_BASENAME(alsfiles,'.als')
-    alsfitsfiles = alsbases+'.fits'
-    bdfits = where(file_test(alsfitsfiles) eq 0,nbdfits)
-    if nbdfits gt 0 then alsfitsfiles[bdfits]=alsbases[bdfits]+'.fits.fz'
-    filters = PHOTRED_GETFILTER(alsfitsfiles)
-
-    ; We have a DDO51 filter
-    gd_ddo51 = where(filters eq 'D',ngd_ddo51)
-    if (ngd_ddo51 gt 0) then begin
-
-      ; Load the AST file
-      ast = IMPORTASCII(longfile,/header,/noprint)
-      tags = tag_names(ast)
-
-      ; Make sure we have RA/DEC in the AST structure
-      if TAG_EXIST(ast,'RA') eq 0 then begin
-        printlog,logfile,file+' DOES NOT HAVE RA.  CANNOT DO DDO51 Radial Offset Correction'
-        PUSH,failurelist,longfile
-        goto,BOMB
-      endif
-      if TAG_EXIST(ast,'DEC') eq 0 then begin
-        printlog,logfile,file+' DOES NOT HAVE DEC.  CANNOT DO DDO51 Radial Offset Correction'
-        PUSH,failurelist,longfile
-        goto,BOMB
-      endif
-
-      ; Get field center
-      ishortname = first_el(strsplit(base,'-',/extract))
-      gdshort = where(fieldcenters.field eq ishortname,ngdshort)
-      if (ngdshort eq 0) then begin
-        printlog,logfile,'NO FIELD CENTER FOR '+ishortname
-        PUSH,failurelist,longfile
-        goto,BOMB
-      endif
-      ifieldcenters = fieldcenters[gdshort[0]]
-
-      printlog,logfile,'Applying DDO51 Radial Offset Correction'
-
-      ; Convert from RA/DEC to X/Y
-      ROTSPHCEN,ast.ra,ast.dec,ifieldcenters.ra,ifieldcenters.dec,xi,eta,/gnomic
-      ; The MOSAIC camera is oriented so that N is to the right.
-      ; So xi -> YB, and eta -> XB.
-      yb = xi*3600./0.26   ; convert from deg to pixels
-      xb = eta*3600./0.26
-      rad = sqrt(xb^2.0 + yb^2.0)
-      xb = xb + 4096
-      yb = yb + 4096
-
-      ; Calculate the offset
-      ; expr = 'P[0]*exp(-0.5*(X-P[1])^2.0/P[2]^2.0)+P[3]+P[4]*X'
-      ; 0.0632479 593.665 600.155 0.0186573 -9.44991e-06
-      ddo51_radoffset = 0.0632479*exp(-0.5*(rad-593.665)^2.0/(600.155^2.0)) + 0.0186573 - 9.44991e-06*rad
-      ddo51_radoffset = -ddo51_radoffset     ; we want to remove the offset by addition
-
-      ; Add to the structure
-      ADD_TAG,ast,'RPIX',0.0,ast
-      ADD_TAG,ast,'XB',0.0,ast
-      ADD_TAG,ast,'YB',0.0,ast
-      ADD_TAG,ast,'DDO51_RADOFFSET',0.0,ast
-      ast.rpix = rad
-      ast.xb = xb
-      ast.yb = yb
-      ast.ddo51_radoffset = ddo51_radoffset
-
-
-      ; Now correct the magnitudes
-      for j=0,ngd_ddo51-1 do begin
-        ; The columns are: ID, X, Y, MAG1, MAG1ERR, MAG2, MAG2ERR, ...
-        thismag = gd_ddo51[j]
-        thiscol = 3+2*thismag
-        ;thiscol = where(tags eq 'MAG'+strtrim(thismag+1,2),nthiscol)
-
-        ; Applying the correction
-        ast.(thiscol) = ast.(thiscol) + ddo51_radoffset
-
-        ; bad values are still bad
-        bdval = where(ast.(thiscol) gt 90,nbdval)
-        if nbdval gt 0 then ast[bdval].(thiscol)=99.9999
-
-      end ; DDO51 filter loop
-
-      ; Write the new file  
-      photfile = base+'.temp'
-      PRINTSTR,ast,photfile,/silent
-
-    endif else begin
-      printlog,logfile,'NO DDO51 Filter.  CANNOT APPLY DDO51 Radial Offset'
-      undefine,photfile
-    endelse
-
-  Endif  ; DDO51 radial offset
-
-
-  ; Make the input file with PHOTRED_PHOTCALIB_PREP
-  ;------------------------------------------------
-  inpfile = base+'.input'
-  printlog,logfile,'Making input file: ',inpfile
-  PHOTRED_PHOTCALIB_PREP,mchfile,apcor,inpfile,error=error,imager=thisimager,$
-                         observatory=observatory,photfile=photfile
-
-  ; Make sure the input file exists
-  inptest = FILE_TEST(inpfile)
-  if (inptest eq 0) or (n_elements(error) ne 0) then begin
-    PUSH,failurelist,longfile
-    if (inptest eq 0) then printlog,logfile,inpfile,' NOT FOUND' else $
-        printlog,logfile,inpfile,' ERROR'
-    goto,BOMB
-  endif
-
-
-  ;*****************************************************
-  ; DOES THE TRANS FILE HAVE THE MAGNITUDES WE NEED???
-  ;*****************************************************
-  ; I think PHOTCALIB deals with this
-
-  ; Check info there's CHIP information in the trans eqns.
-  ;  CHIP=-1 means there's no info
-  chipinfo = 0
-  if tag_exist(trans,'CHIP') then begin
-    gchip = where(trans.chip ge 1,ngchip)
-    if ngchip gt 0 then chipinfo=1
-  endif
-
-  ; CHIP-SPECIFIC transformation equations
-  if chipinfo eq 1 then begin
-    inptransfile = ''
-    ext = first_el(strsplit(base,thisimager.separator,/extract),/last)
-    chip = long(ext)
-    ;ind = where(trans.chip eq chip,nind)
-    ind = where(trans.chip eq chip or trans.chip eq -1,nind)      ; keep trans without chip info as well
-
-    ; Nothing for this chip
-    if nind eq 0 then begin
-      PUSH,failurelist,longfile
-      printlog,logfile,'NO transformation information for CHIP=',strtrim(chip,2)
-      goto,BOMB
-    endif
-    inptrans = trans[ind]
-
-  ; Global transformation equations
-  endif else begin
-    undefine,inptrans
-    inptransfile = transfile
-  endelse
-
-  ; Run PHOTCALIB
-  ;---------------
-  printlog,logfile,'Calibrating photometry for ',file
-  PHOTCALIB,inpfile,inptransfile,inptrans=inptrans,average=doavgmag,keepinstrumental=dokeepinstr,$
-            onlyaverage=doavgonlymag,catformat=catformat,logfile=logfile,/header
-
+;; Check the output files
+for i=0,ninputlines-1 do begin
+  longfile = inputlines[i]
+  file = FILE_BASENAME(longfile)
+  filedir = FILE_DIRNAME(longfile)
+  base = FILE_BASENAME(file,'.ast')
 
   ; Check that the PHOT file exists
   ;-----------------------------------
-  photfile = base+'.phot'
+  photfile = filedir+'/'+base+'.phot'
   phottest = FILE_TEST(photfile)
   if phottest eq 1 then nlines = FILE_LINES(photfile) else nlines=0
   if (phottest eq 1) and (nlines gt 0) then begin
-    PUSH,outlist,filedir+'/'+photfile     ; add to outputarr
+    PUSH,outlist,photfile        ; add to outputarr
     PUSH,successlist,longfile
   endif else begin
     PUSH,failurelist,longfile
     if phottest eq 0 then printlog,logfile,photfile,' NOT FOUND'
     if phottest eq 1 and nlines eq 0 then printlog,logfile,photfile,' HAS 0 LINES'
   endelse
-
-
-  BOMB:
-
-  CD,curdir
-
-
-  ;##########################################
-  ;#  UPDATING LIST FILES
-  ;##########################################
-  PHOTRED_UPDATELISTS,lists,outlist=outlist,successlist=successlist,$
-                      failurelist=failurelist,setupdir=curdir,/silent
-
-  ;stop
-
-ENDFOR
-
+endfor
 
 
 ;#####################

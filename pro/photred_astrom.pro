@@ -180,7 +180,7 @@ for i=0,ninputlines-1 do begin
   ; Check that the file AST file is there
   asttest = FILE_TEST(astfile)
   if (asttest eq 1) then begin
-    PUSH,outlist,filedir+'/'+astfile
+    PUSH,outlist,astfile
     PUSH,successlist,longfile
   endif else begin
     PUSH,failurelist,longfile
