@@ -561,7 +561,10 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
 
         ; Getting JOBID
         jobid = reform(out)
-        if keyword_set(hyperthread) then jobid = reform(out[1])
+        if keyword_set(hyperthread) then begin
+          jobid = reform(out[1])
+          if strlowcase(strmid(jobid,0,6)) eq 'jobid=' then jobid=strmid(jobid,6)
+        endif
 
         ; Printing info
         print,'Submitted ',scriptname[0],'  JobID=',jobid[0]
@@ -571,7 +574,6 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
         jobs[nosubmit[i]].jobid = jobid[0]
         jobs[nosubmit[i]].name = name[0]
         jobs[nosubmit[i]].scriptname = scriptname[0]
-
         newsubmitted++  ; increment
         
         BOMB_SUBMIT:
