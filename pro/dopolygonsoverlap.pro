@@ -211,6 +211,13 @@ end
 
 ;==================
 
+function rangeoverlap, a, b
+  ; does the range (start1, end1) overlap with (start2, end2)
+  return,max(a) ge min(b) and min(a) le max(b)
+end
+
+;==================
+
 function dopolygonsoverlap, xpolygon1, ypolygon1, xpolygon2, ypolygon2
 ; Returns True if two polygons are overlapping.
 ;
@@ -220,6 +227,11 @@ function dopolygonsoverlap, xpolygon1, ypolygon1, xpolygon2, ypolygon2
     
 n2 = n_elements(xPolygon2)
 isin = 0
+
+; If ranges don't overlap, then polygons don't overlap                                                                   
+if rangeoverlap(xPolygon1,xPolygon2) eq 0 or rangeoverlap(yPolygon1,yPolygon2) eq 0 then begin
+  return,0
+endif
 
 ; Loop through all vertices of second polygon
 for i=0,n2-1 do begin
