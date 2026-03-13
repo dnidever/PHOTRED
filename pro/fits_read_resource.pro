@@ -278,6 +278,7 @@ if n_elements(error) gt 0 then return,-1
 
 ;; Use the local header
 ;;   to write to the file and return
+scaled = 0
 if tag_exist(rstr,'HEADER') then begin
   if strmid(rstr.header,0,1) eq '/' then hfile=rstr.header else hfile = dir+'/'+rstr.header
   if file_test(hfile) eq 0 then begin
@@ -295,6 +296,7 @@ if tag_exist(rstr,'HEADER') then begin
       if nbscale eq 0 then bscale=1.0
       print,'Applying bscale=',strtrim(bscale,2),' and bzero=',strtrim(bzero,2)
       im = bscale*im + bzero
+      scaled = 1
     endif
   endelse
 endif
@@ -312,8 +314,12 @@ endif
 ;endif
 
 ;; Write new image
-if not keyword_set(nowrite) and not keyword_set(header) then $
+if not keyword_set(nowrite) and not keyword_set(header) then begin
+  ;; if we are writing the file and bscale != 0 then we need to scale
+  ;; it down again
+  if scaled eq 1 then im = (im-bzero)/bscale
   MWRFITS,im,file,meta,/create
+endif
 
 ;; Delete the lock file
 FILE_DELETE,file+'.lock',/allow
