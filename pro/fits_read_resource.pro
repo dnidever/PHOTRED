@@ -287,6 +287,15 @@ if tag_exist(rstr,'HEADER') then begin
     READLINE,hfile,meta
     ;meta0 = meta
     ;READLINE,rstr.header,meta
+
+    ;; Apply BSCALE and BZERO
+    bscale = sxpar(meta,'bscale',count=nbscale)
+    bzero = sxpar(meta,'bzero',count=nbzero)
+    if nbscale gt 0 or nbzero gt 0 then begin
+      if nbscale eq 0 then bscale=1.0
+      print,'Applying bscale=',strtrim(bscale,2),' and bzero=',strtrim(bzero,2)
+      im = bscale*im + bzero
+    endif
   endelse
 endif
 
