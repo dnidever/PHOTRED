@@ -147,6 +147,16 @@ for i=0,nfiles-1 do begin
   ;; Get exptime and filter
   info[i].exptime = PHOTRED_GETEXPTIME(fitsfile)
   info[i].filter = PHOTRED_GETFILTER(fitsfile)
+
+  ;; If there's a bscale, then load the image and calculate the median
+  head1 = headfits(fitsfile)
+  bscale = sxpar(head1,'bscale',count=nbscale)
+  if nbscale gt 0 then begin
+    FITS_READ,fitsfile,im1,head1
+    med = median(im1)
+    info[i].medsky = med
+  endif
+
 endfor  ;; file loop
 
 ;; Only ONE file, return 1s

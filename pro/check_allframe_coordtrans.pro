@@ -2,7 +2,7 @@
 ;
 ; CHECK_ALLFRAME_COORDTRANS
 ;
-; Check the coordinates transformations used by ALLFRAME.
+; Check the coordinate transformations used by ALLFRAME.
 ; This uses the combined .mch file, the .nmg file, the FITS headers
 ; and the .alf files.
 ;
@@ -62,6 +62,7 @@ for i=0,n-1 do begin
   endif else begin
     if not keyword_set(silent) then print,alffile,' NOT FOUND'
   endelse
+;;if nmatch gt 50 and out[i].decstd gt 0.1 then stop,'problem'
 endfor
 
 return,out

@@ -359,7 +359,7 @@ if not keyword_set(fake) then begin
     invscales[bdscale] = 1.0
     weights[bdscale] = 0.0
   endif
-  gd = where(filestr.exists eq 1)
+  gd = where(filestr.exists eq 1 and weights gt 0)
   weightfile = mchbase+'.weights'
   WRITECOL,weightfile,weights[gd],fmt='(F10.6)'
   scalefile = mchbase+'.scale'
@@ -452,6 +452,12 @@ CASE tile.type of
     sxaddpar,fhead,'BPM',filestr[i].resampmask
     printlog,logf,filestr[i].resampfile,' ['+strtrim(xout[0],2)+':'+strtrim(xout[1],2)+','+$
                   strtrim(yout[0],2)+':'+strtrim(yout[1],2)+']'
+    ;; fix bscale in header, if it exists, mwrfits does not handle this properly
+    bscale = sxpar(fhead,'bscale',count=nbscale)
+    if nbscale gt 0 then begin
+      sxaddpar,fhead,'oldbscl',bscale,' old bscale value'
+      sxdelpar,fhead,'bscale'
+    endif
     MWRFITS,fim,filestr[i].resampfile,fhead,/create
     mhead = fhead
     sxaddpar,mhead,'BITPIX',8
@@ -500,6 +506,12 @@ end
     sxaddpar,thead2,'NAXIS2',nyf
     sxaddpar,thead2,'CRPIX1',sxpar(thead2,'CRPIX1')+pix_expand[0]
     sxaddpar,thead2,'CRPIX2',sxpar(thead2,'CRPIX2')+pix_expand[1]
+    ;; fix bscale in header, if it exists, mwrfits does not handle this properly
+    bscale = sxpar(fhead,'bscale',count=nbscale)
+    if nbscale gt 0 then begin
+      sxaddpar,fhead,'oldbscl',bscale,' old bscale value'
+      sxdelpar,fhead,'bscale'
+    endif
     MWRFITS,tim2,outfiles[i],thead2,/create
     ; Mask
     mfile = file_basename(tempfits[i],'.fits')+'.mask.fits'
@@ -594,7 +606,7 @@ endif else begin
   combmch = mchbase+'_comb.mch'
   ; don't need to load the information
 endelse
-  
+
 
 ;###########################################
 ; STEP 5: COMBINE IMAGES
@@ -604,7 +616,7 @@ printlog,logf,'-------------------'
 
 ; The imcombine input file
 resampfile = mchbase+'.resamp'
-gd = where(filestr.exists eq 1)
+gd = where(filestr.exists eq 1 and filestr.comb_weights gt 0,ngd)
 WRITELINE,resampfile,filestr[gd].resampfile
 
 
@@ -745,9 +757,22 @@ Endif else begin
 
   combfile = mchbase+'_comb.fits'
   FILE_DELETE,combfile,/allow
+  ;; original
+  ;;IRAF_IMCOMBINE,'@'+resampfile,combfile,combine='average',reject='avsigclip',$
+  ;;               weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',$
+  ;;               irafdir=irafdir,error=imcombineerror2
+
+  ;; use zero file and masking
   IRAF_IMCOMBINE,'@'+resampfile,combfile,combine='average',reject='avsigclip',$
                  weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',$
-                 irafdir=irafdir,error=imcombineerror2
+                 irafdir=irafdir,error=imcombineerror2,zero='@'+zerofile
+                 ;;masktype='badvalue',maskvalue=0,bpmasks=mchbase+'_comb.bpm'
+
+
+  ;;IRAF_IMCOMBINE,'@'+resampfile,combfile,combine='average',reject='avsigclip',$
+  ;;               weight='@'+weightfile,rdnoise='!rdnoise',gain='!gain',$
+  ;;               irafdir=irafdir,error=imcombineerror2,scale='@'+scalefile,zero='@'+zerofile,$
+  ;;               masktype='badvalue',maskvalue=0,bpmasks=mchbase+'_comb.bpm'
 
   if n_elements(imcombineerror2) ne 0 then begin
     printlog,logf,'ERROR in IRAF_IMCOMBINE'
@@ -832,6 +857,7 @@ Endelse ; no scaling of images for combining
 combhead = PHOTRED_READFILE(combfile,/header)
 sxaddpar,combhead,'AFTILTYP',tile.type
 MODFITS,combfile,0,combhead
+
 
 ; Delete the resampled images
 FILE_DELETE,filestr.resampfile,/allow,/quiet
