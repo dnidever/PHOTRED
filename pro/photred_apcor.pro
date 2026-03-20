@@ -187,7 +187,6 @@ FOR n=0,nnights-1 do begin
 
     CD,filedir
 
-
     ; Check that the FITS file exists
     ;--------------------------------
     fitstest = FILE_TEST(file)

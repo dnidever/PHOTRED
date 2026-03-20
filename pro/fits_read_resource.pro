@@ -298,9 +298,17 @@ if tag_exist(rstr,'HEADER') then begin
       im = bscale*im + bzero
       scaled = 1
     endif
+    ;; remove BSCALE/BZERO from header because DAOPHOT cannot handle it
+    if nbscale gt 0 then sxdelpar,meta,'bscale'
+    if nbzero gt 0 then sxdelpar,meta,'bzero'
   endelse
 endif
 
+;; DAOPHOT cannot handle DOUBLE arrays (BITPIX=-64)
+if sxpar(meta,'bitpix') eq -64 or size(im,/type) eq 5 then begin
+  sxaddpar,meta,'bitpix',-32
+  im = float(im)
+endif
 
 ;;; Put in FPACK parameters
 ;if keyword_set(fpack) then begin
@@ -315,9 +323,6 @@ endif
 
 ;; Write new image
 if not keyword_set(nowrite) and not keyword_set(header) then begin
-  ;; if we are writing the file and bscale != 0 then we need to scale
-  ;; it down again
-  if scaled eq 1 then im = (im-bzero)/bscale
   MWRFITS,im,file,meta,/create
 endif
 

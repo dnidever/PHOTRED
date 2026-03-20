@@ -16,7 +16,7 @@
 ; By D.Nidever  Mar 2008
 ;-
 
-pro photred_combine,redo=redo,stp=stp,force=force,posonly=cmbposonly
+pro photred_combine,nmulti=nmulti,redo=redo,stp=stp,force=force,posonly=cmbposonly
 
 COMMON photred,setup
 

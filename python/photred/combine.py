@@ -531,6 +531,8 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
         optfile = fdir+'/'+base+'.opt' 
         logfile1 = fdir+'/'+base+'.log' 
 
+        print(i+1,base)
+
         opt = io.readopt(optfile)
         info['rdnoise'][i] = opt['RE']
         info['fwhm'][i] = opt['FW']
@@ -578,11 +580,14 @@ def getweights(mchfile,imager=None,setup=None,logger=None,silent=False):
             for f in [base+'.find.temp',tempscript]:
                 if os.path.exists(f): os.remove(f)
          
-        import pdb; pdb.set_trace()
-        arr = out[0].split()
-        info['mnsky'][i] = float(arr[5]) 
-        info['medsky'][i] = float(arr[6]) 
-         
+        try:
+            arr = out[0].split()
+            info['mnsky'][i] = float(arr[5]) 
+            info['medsky'][i] = float(arr[6]) 
+        except:
+            print('problem')
+            import pdb; pdb.set_trace()
+
         # Get exptime and filter 
         fitsfile = base+'.fits' 
         if os.path.exists(fitsfile)==False: 
