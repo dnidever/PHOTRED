@@ -29,6 +29,7 @@
 ;  =waittime    Time to wait between checking the running jobs.  Default
 ;                 is 5 sec.
 ;  =verbose     Currently this only controls if the command is printed.
+;  =stagger     Wait X sec. between job submissions.
 ;
 ; OUTPUTS:
 ;  Jobs are run.
@@ -43,7 +44,7 @@ pro pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,  $
                hyperthread=hyperthread,waittime=waittime,cdtodir=cdtodir,   $
                htcondor=htcondor, htc_idlvm=htcondor_idlvm,                 $
                pythonbin=pythonbin, scriptsdir=scriptsdir,verbose=verbose,  $
-               lockfiles=lockfiles,donefiles=donefiles
+               lockfiles=lockfiles,donefiles=donefiles,stagger=stagger
 
 t0 = systime(1)
   
@@ -51,7 +52,7 @@ t0 = systime(1)
 ninput = n_elements(input)
 if ninput eq 0 then begin
   print,'Syntax - pbs_daemon,input,dirs,jobs=jobs,idle=idle,prefix=prefix,nmulti=nmulti,'
-  print,'                    hyperthread=hyperthread'
+  print,'                    hyperthread=hyperthread,stagger=stagger'
   return
 endif
 
@@ -64,6 +65,7 @@ endif
 if not keyword_set(htcondor) then htcondor='0' $
 else if htcondor eq "" then htcondor='0'
 if n_elements(verbose) eq 0 then verbose=1
+if n_elemetns(stagger) eq 0 then stagger=0
 
 ; Current directory
 CD,current=curdir
@@ -539,6 +541,12 @@ IF (nmulti gt 1) and ((pleione eq 1) or (hyades eq 1) or (hyperthread eq 1) or (
 
         ; Check that the script exists
         test = FILE_TEST(scriptname)
+
+        ; Stagger set, waiting
+        if stagger ne 0 then begin
+          print,'Waiting stagger=',strtrim(stagger,2)
+          wait,stagger
+        endif
 
         ; Submitting the job
         if not keyword_set(hyperthread) then begin
