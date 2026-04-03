@@ -65,7 +65,7 @@ endif
 if not keyword_set(htcondor) then htcondor='0' $
 else if htcondor eq "" then htcondor='0'
 if n_elements(verbose) eq 0 then verbose=1
-if n_elemetns(stagger) eq 0 then stagger=0
+if n_elements(stagger) eq 0 then stagger=0
 
 ; Current directory
 CD,current=curdir
